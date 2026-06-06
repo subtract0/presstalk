@@ -1,5 +1,6 @@
 #!/usr/bin/env swift
 import AppKit
+import Carbon.HIToolbox
 import Foundation
 
 final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
@@ -24,6 +25,17 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
     private var tracePipelineCompletedAt: Date?
     private var traceFinalTranscript: String?
     private var tracePasteCommandPosted = false
+    private var pasteSelfTestResults: [[String: Any]] = []
+    private var pasteSelfTestSucceeded = false
+    private let pasteSelfTestCases: [(label: String, sourceStateID: CGEventSourceStateID, tap: CGEventTapLocation)] = [
+        ("hid_session", .hidSystemState, .cgSessionEventTap),
+        ("hid_hid", .hidSystemState, .cghidEventTap),
+        ("hid_annotated", .hidSystemState, .cgAnnotatedSessionEventTap),
+        ("combined_session", .combinedSessionState, .cgSessionEventTap),
+        ("combined_hid", .combinedSessionState, .cghidEventTap),
+        ("private_session", .privateState, .cgSessionEventTap),
+        ("private_hid", .privateState, .cghidEventTap),
+    ]
 
     override init() {
         let env = ProcessInfo.processInfo.environment
@@ -58,7 +70,7 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         }
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            self?.startAutomation()
+            self?.runPasteSelfTestCase(at: 0)
         }
     }
 
@@ -120,6 +132,43 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
         window.makeKeyAndOrderFront(nil)
         window.makeFirstResponder(textView)
+    }
+
+    private func runPasteSelfTestCase(at index: Int) {
+        guard !completed else { return }
+        guard index < pasteSelfTestCases.count else {
+            textView.string = ""
+            focusCaptureWindow()
+            statusLabel.stringValue = pasteSelfTestSucceeded
+                ? "Paste self-test succeeded. Starting synthetic dictation."
+                : "Paste self-test did not capture text. Starting synthetic dictation anyway."
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
+                self?.startAutomation()
+            }
+            return
+        }
+
+        let item = pasteSelfTestCases[index]
+        let token = "PT_PASTE_SELF_TEST_\(item.label)_\(UUID().uuidString)"
+        textView.string = ""
+        focusCaptureWindow()
+
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(token, forType: .string)
+
+        let postError = Self.postPasteShortcut(sourceStateID: item.sourceStateID, tap: item.tap)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { [weak self] in
+            guard let self else { return }
+            let captured = self.textView.string.contains(token)
+            self.pasteSelfTestSucceeded = self.pasteSelfTestSucceeded || captured
+            self.pasteSelfTestResults.append([
+                "case": item.label,
+                "captured": captured,
+                "error": postError ?? NSNull(),
+                "capturedTextLength": self.textView.string.count,
+            ])
+            self.runPasteSelfTestCase(at: index + 1)
+        }
     }
 
     private func startAutomation() {
@@ -222,6 +271,10 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         let finalRuntimeStatus = Self.runtimeStatusDictionary(from: statusURL)
         refreshTracePipelineState()
         let trimmedCapturedText = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetCaptureSuccess = trimmedCapturedText.count >= minCapturedTextLength
+        let targetCaptureFailureHint: Any = targetCaptureSuccess
+            ? NSNull()
+            : (pasteSelfTestSucceeded ? "target_capture_failed_after_paste_self_test_success" : "local_cmd_v_event_synthesis_unavailable")
 
         let payload: [String: Any] = [
             "smokeVersion": 1,
@@ -234,11 +287,16 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             "automationError": automationError ?? NSNull(),
             "spokenPhrase": phrase,
             "capturedText": trimmedCapturedText,
-            "targetCaptureSuccess": trimmedCapturedText.count >= minCapturedTextLength,
+            "targetCaptureSuccess": targetCaptureSuccess,
+            "targetCaptureFailureHint": targetCaptureFailureHint,
             "minCapturedTextLength": minCapturedTextLength,
+            "pasteSelfTest": [
+                "success": pasteSelfTestSucceeded,
+                "results": pasteSelfTestResults,
+            ],
             "traceFinalTranscript": traceFinalTranscript ?? NSNull(),
             "tracePasteCommandPosted": tracePasteCommandPosted,
-            "tracePasteCompleted": trimmedCapturedText.count >= minCapturedTextLength,
+            "tracePasteCompleted": targetCaptureSuccess,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": "f5",
             "expectedTriggerLabel": "F5 Darwin notification bridge",
@@ -279,6 +337,21 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         if process.terminationStatus != 0 {
             throw SmokeError.processFailed(command: ([launchPath] + arguments).joined(separator: " "), status: process.terminationStatus)
         }
+    }
+
+    private static func postPasteShortcut(sourceStateID: CGEventSourceStateID, tap: CGEventTapLocation) -> String? {
+        guard let source = CGEventSource(stateID: sourceStateID),
+              let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
+        else {
+            return "event_create_failed"
+        }
+
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
+        keyDown.post(tap: tap)
+        keyUp.post(tap: tap)
+        return nil
     }
 
     private static func traceLines(from url: URL) -> [String] {

@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc35`
-- Commit: `af8b562f5414122cdaafa5f3a05d6a4ef008fe5b`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc35`
-- Asset: `PressTalk-0.1.5-rc35-macos-arm64.zip`
-- SHA-256: `808ae31787962ea335deae80b45500340e018b30c81ece9337b3234b852629f8`
+- Tag: `v0.1.5-rc36`
+- Commit: `29d5798d1fc8900ff470f30eb8e91e775f8fbc57`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc36`
+- Asset: `PressTalk-0.1.5-rc36-macos-arm64.zip`
+- SHA-256: `b0c809b669bafd6ea8d428f65a5d1f2bc87b2c6ed0e4ed6b42bfcae14e17d236`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -221,6 +221,17 @@ Verified on `studio1` on 2026-06-06:
   attempt quarantine/provenance cleanup. Rebuild/install/register still reports
   `TISRegisterInputSource=0` and `recognizedSourceCount=0`, so these metadata
   changes are not sufficient to solve TIS discovery on `studio1`.
+- After publishing `v0.1.5-rc36`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `permissionPaneOpeningAllowed=false`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`.
 - A skipped macOS signing/trust password prompt can explain earlier unstable
   local identity behavior: builds may still receive a code signature, but a
   self-signed development identity is not a production Gatekeeper approval. Do

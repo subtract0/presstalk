@@ -55,6 +55,12 @@ The app bundle includes presstalk-manual-fn-smoke.swift, a focused-window helper
 that records physical Fn dictation smoke results as JSON without opening macOS
 permission panes.
 
+Settings now distinguish read-only permission preflight results from effective
+runtime capability. If the real input listener is armed, Input Monitoring shows
+as listener-ready instead of sending users back through already-granted macOS
+privacy toggles; Accessibility is treated as a paste probe until paste actually
+fails.
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

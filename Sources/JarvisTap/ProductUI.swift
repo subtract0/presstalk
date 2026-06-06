@@ -21,19 +21,29 @@ struct PressTalkRuntimeStatus {
     let inputMonitoringGranted: Bool
     let microphoneGranted: Bool
     let accessibilityGranted: Bool
+    let inputPipelineReady: Bool
+    let inputListenerStatus: String
+    let pasteAutomatically: Bool
     let systemDictationHotkeyDisabled: Bool
     let adHocSigned: Bool
     let speechModelStatus: String
     let f5BridgeStatus: String
 
+    var inputMonitoringEffective: Bool {
+        inputMonitoringGranted || inputPipelineReady
+    }
+
     static let placeholder = PressTalkRuntimeStatus(
         inputMonitoringGranted: false,
         microphoneGranted: false,
         accessibilityGranted: false,
+        inputPipelineReady: false,
+        inputListenerStatus: "Checking...",
+        pasteAutomatically: true,
         systemDictationHotkeyDisabled: true,
         adHocSigned: false,
-        speechModelStatus: "Checking…",
-        f5BridgeStatus: "Checking…"
+        speechModelStatus: "Checking...",
+        f5BridgeStatus: "Checking..."
     )
 }
 
@@ -1172,42 +1182,69 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func applyRuntimeStatus() {
-        configureStatusLabel(inputMonitoringValueLabel, granted: runtimeStatus.inputMonitoringGranted)
+        configureInputMonitoringLabel(inputMonitoringValueLabel)
         configureStatusLabel(microphoneValueLabel, granted: runtimeStatus.microphoneGranted)
-        configureStatusLabel(accessibilityValueLabel, granted: runtimeStatus.accessibilityGranted)
+        configureAccessibilityLabel(accessibilityValueLabel)
         configureInterferenceLabel(systemDictationValueLabel, disabled: runtimeStatus.systemDictationHotkeyDisabled)
         configureDetailLabel(speechModelValueLabel, text: runtimeStatus.speechModelStatus)
         configureDetailLabel(f5BridgeValueLabel, text: runtimeStatus.f5BridgeStatus)
         setupHintLabel.stringValue = permissionHintText()
     }
 
+    private func configureInputMonitoringLabel(_ label: NSTextField) {
+        if runtimeStatus.inputMonitoringGranted {
+            label.stringValue = "Granted"
+            label.textColor = .systemGreen
+        } else if runtimeStatus.inputPipelineReady {
+            label.stringValue = "Listener ready"
+            label.textColor = .systemGreen
+        } else {
+            label.stringValue = "Preflight unavailable"
+            label.textColor = .systemOrange
+        }
+    }
+
+    private func configureAccessibilityLabel(_ label: NSTextField) {
+        if runtimeStatus.accessibilityGranted {
+            label.stringValue = "Granted"
+            label.textColor = .systemGreen
+        } else if runtimeStatus.pasteAutomatically {
+            label.stringValue = "Paste probe pending"
+            label.textColor = .systemOrange
+        } else {
+            label.stringValue = "Copy-only mode"
+            label.textColor = .secondaryLabelColor
+        }
+    }
+
     private func configureStatusLabel(_ label: NSTextField, granted: Bool) {
-        label.stringValue = granted ? "Granted" : "Preflight unavailable"
+        label.stringValue = granted ? "Granted" : "Missing"
         label.textColor = granted ? .systemGreen : .systemOrange
     }
 
     private func permissionHintText() -> String {
-        var missing: [String] = []
-        if !runtimeStatus.inputMonitoringGranted {
-            missing.append("Input Monitoring")
+        var blockers: [String] = []
+        if !runtimeStatus.inputMonitoringEffective {
+            blockers.append("Input listener")
         }
         if !runtimeStatus.microphoneGranted {
-            missing.append("Microphone")
+            blockers.append("Microphone")
         }
+
+        if !blockers.isEmpty {
+            let blockerText = blockers.joined(separator: ", ")
+            return "\(blockerText) not ready. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+        }
+
+        if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
+            return "Input listener is ready. Accessibility preflight is unavailable, so paste will be verified on the next dictation."
+        }
+
         if !runtimeStatus.accessibilityGranted {
-            missing.append("Accessibility")
+            return "Input listener is ready. Copy-only mode does not need Accessibility until auto-paste is enabled."
         }
 
-        guard !missing.isEmpty else {
-            return "Permissions are granted to the current PressTalk build. Run Setup Check if the key listener is not armed."
-        }
-
-        let missingText = missing.joined(separator: ", ")
-        let preflightNoun = missing.count == 1 ? "preflight is" : "preflights are"
-        if runtimeStatus.adHocSigned {
-            return "\(missingText) \(preflightNoun) unavailable to this ad-hoc copy. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
-        }
-        return "\(missingText) \(preflightNoun) unavailable to this PressTalk process. If macOS already shows PressTalk enabled, this is a listener/probe issue; export diagnostics instead of re-granting repeatedly."
+        return "PressTalk is ready for the current build."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {

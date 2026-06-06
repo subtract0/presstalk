@@ -429,7 +429,7 @@ enum JarvisTapError: Error, CustomStringConvertible {
         case .tokenizerUnavailable(let message):
             return "Whisper tokenizer unavailable: \(message)"
         case .accessibilityPermissionMissing:
-            return "Accessibility permission is missing"
+            return "Paste permission preflight is unavailable"
         case .eventSynthesisUnavailable:
             return "Failed to synthesize keyboard events"
         }
@@ -1860,6 +1860,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             inputMonitoringGranted: CGPreflightListenEventAccess(),
             microphoneGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
             accessibilityGranted: AXIsProcessTrusted(),
+            inputPipelineReady: inputPipelineReady,
+            inputListenerStatus: eventTapInstallSummary,
+            pasteAutomatically: settingsStore.pasteAutomatically,
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             speechModelStatus: whisperStatus,
@@ -1894,6 +1897,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             ],
             "permissions": [
                 "inputMonitoringGranted": status.inputMonitoringGranted,
+                "inputMonitoringEffective": status.inputMonitoringEffective,
                 "microphoneGranted": status.microphoneGranted,
                 "accessibilityGranted": status.accessibilityGranted,
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
@@ -1974,6 +1978,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             Permissions
             - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
+            - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
             - Microphone: \(runtimeStatus.microphoneGranted ? "granted" : "missing")
             - Accessibility preflight: \(runtimeStatus.accessibilityGranted ? "granted" : "unavailable")
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
@@ -4489,7 +4494,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if let jarvisError = error as? JarvisTapError {
                     switch jarvisError {
                     case .accessibilityPermissionMissing:
-                        return "Accessibility permission is missing."
+                        return "I could not paste the transcript."
                     case .eventSynthesisUnavailable:
                         return "I could not paste the transcript."
                     default:
@@ -4827,7 +4832,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         if let jarvisError = error as? JarvisTapError {
             switch jarvisError {
             case .accessibilityPermissionMissing:
-                return "Accessibility permission is missing."
+                return "I could not paste the transcript."
             case .eventSynthesisUnavailable:
                 return "I could not paste the transcript."
             default:
@@ -4873,13 +4878,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func printAccessibilityHelp() {
         fputs(
             """
-            [PressTalk] Accessibility permission is missing.
+            [PressTalk] Paste event synthesis is unavailable.
 
-            1. Open System Settings -> Privacy & Security -> Accessibility
-            2. Enable the app that launches PressTalk:
-               - Terminal or iTerm for foreground testing
-               - the built jarvistap executable for LaunchAgent use
-            3. Start PressTalk again.
+            If macOS already shows PressTalk enabled in Accessibility, do not
+            keep toggling the permission. Collect diagnostics and check the
+            paste probe/runtime status first.
 
             """,
             stderr
@@ -4905,11 +4908,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func printInputMonitoringHelp() {
         fputs(
             """
-            [PressTalk] Input Monitoring permission is missing.
+            [PressTalk] The input listener is not armed.
 
-            1. Open System Settings -> Privacy & Security -> Input Monitoring
-            2. Enable PressTalk.app
-            3. Start PressTalk again.
+            If macOS already shows PressTalk enabled in Input Monitoring, do not
+            keep toggling the permission. Collect diagnostics and check
+            runtime.inputListener first.
 
             """,
             stderr
@@ -4922,8 +4925,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             [PressTalk] Failed to install the global event tap.
 
             Check:
-            1. Input Monitoring is granted
-            2. No other utility is aggressively intercepting the microphone/F5 key
+            1. runtime.inputListener in the diagnostics status
+            2. Whether another utility is intercepting the configured trigger key
 
             """,
             stderr

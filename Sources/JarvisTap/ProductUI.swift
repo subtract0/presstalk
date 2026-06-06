@@ -22,6 +22,7 @@ struct PressTalkRuntimeStatus {
     let microphoneGranted: Bool
     let accessibilityGranted: Bool
     let systemDictationHotkeyDisabled: Bool
+    let adHocSigned: Bool
     let speechModelStatus: String
     let f5BridgeStatus: String
 
@@ -30,6 +31,7 @@ struct PressTalkRuntimeStatus {
         microphoneGranted: false,
         accessibilityGranted: false,
         systemDictationHotkeyDisabled: true,
+        adHocSigned: false,
         speechModelStatus: "Checking…",
         f5BridgeStatus: "Checking…"
     )
@@ -840,6 +842,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let pricingSummaryLabel = NSTextField(wrappingLabelWithString: "")
     private let plansButton = NSButton(title: "View Plans", target: nil, action: nil)
     private let upgradeButton = NSButton(title: "Upgrade to Pro", target: nil, action: nil)
+    private let setupHintLabel = NSTextField(wrappingLabelWithString: "")
     private let inputMonitoringValueLabel = NSTextField(labelWithString: "")
     private let microphoneValueLabel = NSTextField(labelWithString: "")
     private let accessibilityValueLabel = NSTextField(labelWithString: "")
@@ -926,7 +929,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let setupLabel = NSTextField(labelWithString: "Setup & Diagnostics")
         setupLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
-        let setupHintLabel = NSTextField(wrappingLabelWithString: "Allow the needed permissions below, then run Setup Check. If something breaks on another Mac, export diagnostics before guessing.")
         setupHintLabel.font = NSFont.systemFont(ofSize: 12)
         setupHintLabel.textColor = .secondaryLabelColor
 
@@ -1170,11 +1172,35 @@ final class PressTalkSettingsWindowController: NSWindowController {
         configureInterferenceLabel(systemDictationValueLabel, disabled: runtimeStatus.systemDictationHotkeyDisabled)
         configureDetailLabel(speechModelValueLabel, text: runtimeStatus.speechModelStatus)
         configureDetailLabel(f5BridgeValueLabel, text: runtimeStatus.f5BridgeStatus)
+        setupHintLabel.stringValue = permissionHintText()
     }
 
     private func configureStatusLabel(_ label: NSTextField, granted: Bool) {
-        label.stringValue = granted ? "Granted" : "Missing"
+        label.stringValue = granted ? "Granted" : "Not granted"
         label.textColor = granted ? .systemGreen : .systemOrange
+    }
+
+    private func permissionHintText() -> String {
+        var missing: [String] = []
+        if !runtimeStatus.inputMonitoringGranted {
+            missing.append("Input Monitoring")
+        }
+        if !runtimeStatus.microphoneGranted {
+            missing.append("Microphone")
+        }
+        if !runtimeStatus.accessibilityGranted {
+            missing.append("Accessibility")
+        }
+
+        guard !missing.isEmpty else {
+            return "Permissions are granted to the current PressTalk build. Run Setup Check if the key listener is not armed."
+        }
+
+        let missingText = missing.joined(separator: ", ")
+        if runtimeStatus.adHocSigned {
+            return "\(missingText) is not granted to this rebuilt ad-hoc copy. If macOS already shows PressTalk enabled, toggle it off and on for the current build, then run Setup Check."
+        }
+        return "\(missingText) is not granted to the current PressTalk build. Approve it in macOS Privacy & Security, then run Setup Check."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {

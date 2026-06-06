@@ -1065,6 +1065,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
     private lazy var traceLogger = TraceLogger(path: config.traceLogPath)
+    private lazy var appCodeSignatureSummary = codeSignatureSummary()
     private lazy var memoryStore = ConversationMemoryStore(path: config.memoryStorePath, traceLogger: traceLogger)
     private lazy var responder = RemoteResponder(config: config, traceLogger: traceLogger)
     private lazy var codexAgent = CodexAgent(config: config, traceLogger: traceLogger, memoryStore: memoryStore)
@@ -1178,6 +1179,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
             return 0
         }
+        traceLogger.log("Bundle path=\(Bundle.main.bundleURL.path)")
+        traceLogger.log("Executable path=\(Bundle.main.executableURL?.path ?? "unknown")")
         traceLogger.log("Agent mode=\(config.agentMode)")
         traceLogger.log(
             "Release tail max seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds))"
@@ -1238,6 +1241,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Microphone permission OK")
         print("Microphone permission OK.")
         fflush(stdout)
+
+        print("Checking Accessibility permission...")
+        fflush(stdout)
+        guard ensureAccessibilityPermission() else {
+            traceLogger.log("Startup blocked: Accessibility permission missing")
+            printAccessibilityHelp()
+            refreshRuntimeStatusUI()
+            present(.setupRequired("Allow Accessibility, then run Setup Check."))
+            if showSetupWindowOnFailure || forcePresentSetupWindow {
+                DispatchQueue.main.async { [weak self] in
+                    self?.settingsWindowController?.present()
+                }
+            }
+            return
+        }
+        traceLogger.log("Accessibility permission OK")
 
         if !inputPipelineReady {
             installDarwinTriggerNotifications()
@@ -1779,6 +1798,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             microphoneGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
             accessibilityGranted: AXIsProcessTrusted(),
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
+            adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             speechModelStatus: whisperStatus,
             f5BridgeStatus: bridgeStatus
         )
@@ -1844,6 +1864,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Microphone: \(runtimeStatus.microphoneGranted ? "granted" : "missing")
             - Accessibility: \(runtimeStatus.accessibilityGranted ? "granted" : "missing")
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
+
+            Code signature
+            \(appCodeSignatureSummary)
 
             Runtime
             - Speech model: \(runtimeStatus.speechModelStatus)
@@ -2378,6 +2401,42 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         let lines = contents.split(whereSeparator: \.isNewline)
         return lines.suffix(limit).joined(separator: "\n")
+    }
+
+    private func codeSignatureSummary() -> String {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = ["-dv", "--verbose=4", Bundle.main.bundleURL.path]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+            let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+            let interestingPrefixes = [
+                "Identifier=",
+                "Format=",
+                "CodeDirectory ",
+                "CandidateCDHash ",
+                "CDHash=",
+                "Signature=",
+                "Authority=",
+                "TeamIdentifier=",
+            ]
+            let lines = output
+                .split(whereSeparator: \.isNewline)
+                .map(String.init)
+                .filter { line in
+                    interestingPrefixes.contains { line.hasPrefix($0) }
+                }
+            let statusLine = "codesign status=\(process.terminationStatus)"
+            return ([statusLine] + lines).joined(separator: "\n")
+        } catch {
+            return "codesign unavailable: \(error.localizedDescription)"
+        }
     }
 
     private func ensureAccessibilityPermission() -> Bool {

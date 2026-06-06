@@ -33,6 +33,16 @@ off and on again for the newly built `PressTalk.app`, then rerun:
 PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
+If macOS keeps showing a stale enabled row, reset only PressTalk's TCC entries
+and approve the current build again:
+
+```bash
+tccutil reset ListenEvent com.am.jarvistap
+tccutil reset Microphone com.am.jarvistap
+tccutil reset Accessibility com.am.jarvistap
+PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+```
+
 For repeated local development builds, prefer a stable signing identity:
 
 ```bash

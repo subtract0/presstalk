@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc10`
-- Commit: `f0df8249c129cc5cdbd0a9a11d8a6ef79ed01d2f`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc10`
-- Asset: `PressTalk-0.1.5-rc10-macos-arm64.zip`
-- SHA-256: `fd315be754cb7e74a17f04b4f5d9cec3158fcf9a3ad5ba3fd0fb4ebbbad45995`
+- Tag: `v0.1.5-rc11`
+- Commit: `154d93dd40f027b39b6a5820243ea6e358bd4417`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc11`
+- Asset: `PressTalk-0.1.5-rc11-macos-arm64.zip`
+- SHA-256: `18f3e81acb92b0e62968bb6c35412940bc2bfd63c7f480d4c37e28eebdaaaa8c`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,11 +17,12 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc10` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc11` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc10` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc11` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
-  bundled local-signing helper, and bundled smoke-status collector.
+  bundled local-signing helper, bundled smoke-status collector, and bundled
+  manual Fn smoke helper.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -69,10 +70,11 @@ Known current blocker:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `v0.1.5-rc10` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc11` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, and the no-automatic-prompt/no-auto-settings
-  window fixes. It is the artifact to use for the next cross-machine smoke
-  attempts.
+  window fixes. It also includes `presstalk-manual-fn-smoke.swift`, which opens
+  a focused text window and records physical Fn dictation smoke results as JSON.
+  It is the artifact to use for the next cross-machine smoke attempts.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
   configured on `studio1`, and `mbp1` currently resolves but SSH times out.
 

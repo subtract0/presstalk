@@ -39,6 +39,7 @@ struct JarvisTapConfig {
     let releaseTailPaddingSeconds: TimeInterval
     let triggerKey: JarvisTapSettingsStore.TriggerKeyOption
     let enableNativeMicrophoneKey: Bool
+    let autoShowSetupWindow: Bool
 
     static func load() -> JarvisTapConfig {
         let env = ProcessInfo.processInfo.environment
@@ -127,6 +128,9 @@ struct JarvisTapConfig {
         let enableNativeMicrophoneKey =
             env["PRESSTALK_ENABLE_NATIVE_MICROPHONE_KEY"] == "1" ||
             env["JARVISTAP_ENABLE_NATIVE_MICROPHONE_KEY"] == "1"
+        let autoShowSetupWindow =
+            env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "1" ||
+            env["JARVISTAP_AUTO_SHOW_SETUP_WINDOW"] == "1"
 
         return JarvisTapConfig(
             agentMode: agentMode,
@@ -149,7 +153,8 @@ struct JarvisTapConfig {
             requestTimeoutSeconds: requestTimeoutSeconds,
             releaseTailPaddingSeconds: releaseTailPaddingSeconds,
             triggerKey: triggerKey,
-            enableNativeMicrophoneKey: enableNativeMicrophoneKey
+            enableNativeMicrophoneKey: enableNativeMicrophoneKey,
+            autoShowSetupWindow: autoShowSetupWindow
         )
     }
 }
@@ -1203,7 +1208,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         applyWhisperDecodingPreferences()
         refreshRuntimeStatusUI()
 
-        let shouldPresentSetupGuide = !settingsStore.hasSeenSetupGuide
+        let shouldPresentSetupGuide = config.autoShowSetupWindow && !settingsStore.hasSeenSetupGuide
         if shouldPresentSetupGuide {
             settingsStore.hasSeenSetupGuide = true
         }
@@ -1218,11 +1223,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func completeStartupIfPossible(
         showSetupWindowOnFailure: Bool,
         forcePresentSetupWindow: Bool = false,
-        presentFailureStatus: Bool = true,
-        requestPermissionPrompts: Bool = false
+        presentFailureStatus: Bool = true
     ) {
         refreshRuntimeStatusUI()
-        let permissions = checkSetupPermissions(requestPrompts: requestPermissionPrompts)
+        let permissions = checkSetupPermissions()
 
         if presentFailureStatus {
             print("Checking Input Monitoring permission...")
@@ -1343,8 +1347,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             self.completeStartupIfPossible(
                 showSetupWindowOnFailure: false,
                 forcePresentSetupWindow: false,
-                presentFailureStatus: false,
-                requestPermissionPrompts: false
+                presentFailureStatus: false
             )
         }
         setupRetryTimer = timer
@@ -1929,7 +1932,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func requestAccessibilitySetup() {
-        _ = ensureAccessibilityPermission()
         openAccessibilityPrivacyPane()
         refreshRuntimeStatusUI()
     }
@@ -1966,9 +1968,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Launch label (internal): com.am.jarvistap
 
             Permissions
-            - Input Monitoring: \(runtimeStatus.inputMonitoringGranted ? "granted" : "missing")
+            - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
             - Microphone: \(runtimeStatus.microphoneGranted ? "granted" : "missing")
-            - Accessibility: \(runtimeStatus.accessibilityGranted ? "granted" : "missing")
+            - Accessibility preflight: \(runtimeStatus.accessibilityGranted ? "granted" : "unavailable")
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature
@@ -2574,68 +2576,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func ensureAccessibilityPermission() -> Bool {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        return AXIsProcessTrustedWithOptions(options)
-    }
-
-    private func checkSetupPermissions(requestPrompts: Bool) -> PermissionCheckResult {
-        let inputMonitoringGranted = requestPrompts ? ensureListenEventPermission() : CGPreflightListenEventAccess()
-        let microphoneGranted = requestPrompts
-            ? ensureMicrophonePermissionSync()
-            : AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
-        let accessibilityGranted = requestPrompts ? ensureAccessibilityPermission() : AXIsProcessTrusted()
+    private func checkSetupPermissions() -> PermissionCheckResult {
+        let inputMonitoringGranted = CGPreflightListenEventAccess()
+        let microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let accessibilityGranted = AXIsProcessTrusted()
 
         return PermissionCheckResult(
             inputMonitoringGranted: inputMonitoringGranted,
             microphoneGranted: microphoneGranted,
             accessibilityGranted: accessibilityGranted
         )
-    }
-
-    private func ensureListenEventPermission() -> Bool {
-        if CGPreflightListenEventAccess() {
-            return true
-        }
-        _ = CGRequestListenEventAccess()
-        return false
-    }
-
-    private func ensureMicrophonePermission() async -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            return true
-        case .notDetermined:
-            return await withCheckedContinuation { continuation in
-                AVCaptureDevice.requestAccess(for: .audio) { granted in
-                    continuation.resume(returning: granted)
-                }
-            }
-        case .denied, .restricted:
-            return false
-        @unknown default:
-            return false
-        }
-    }
-
-    private func ensureMicrophonePermissionSync() -> Bool {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
-        case .authorized:
-            return true
-        case .notDetermined:
-            let semaphore = DispatchSemaphore(value: 0)
-            var granted = false
-            AVCaptureDevice.requestAccess(for: .audio) { accessGranted in
-                granted = accessGranted
-                semaphore.signal()
-            }
-            semaphore.wait()
-            return granted
-        case .denied, .restricted:
-            return false
-        @unknown default:
-            return false
-        }
     }
 
     private func loadWhisperKitSync() throws {

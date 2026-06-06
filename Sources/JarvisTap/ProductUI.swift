@@ -1182,7 +1182,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func configureStatusLabel(_ label: NSTextField, granted: Bool) {
-        label.stringValue = granted ? "Granted" : "Not available"
+        label.stringValue = granted ? "Granted" : "Preflight unavailable"
         label.textColor = granted ? .systemGreen : .systemOrange
     }
 
@@ -1203,11 +1203,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         let missingText = missing.joined(separator: ", ")
-        let verb = missing.count == 1 ? "is" : "are"
+        let preflightNoun = missing.count == 1 ? "preflight is" : "preflights are"
         if runtimeStatus.adHocSigned {
-            return "\(missingText) \(verb) not available to this rebuilt ad-hoc copy. If macOS already shows PressTalk enabled, toggle it off and on for the current build, then run Setup Check."
+            return "\(missingText) \(preflightNoun) unavailable to this ad-hoc copy. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
         }
-        return "\(missingText) \(verb) not available to this running PressTalk process. If macOS already shows PressTalk enabled, click Restart PressTalk; otherwise approve it in Privacy & Security, then run Setup Check."
+        return "\(missingText) \(preflightNoun) unavailable to this PressTalk process. If macOS already shows PressTalk enabled, this is a listener/probe issue; export diagnostics instead of re-granting repeatedly."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {

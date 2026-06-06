@@ -17,6 +17,7 @@ PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sb
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-0}"
+PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-0}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -123,6 +124,7 @@ OPEN_ENV_ARGS="$(
   open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "30"
   open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "0.35"
   open_env_arg PRESSTALK_TRIGGER_KEY "$PRESSTALK_TRIGGER_KEY"
+  open_env_arg PRESSTALK_AUTO_SHOW_SETUP_WINDOW "$PRESSTALK_AUTO_SHOW_SETUP_WINDOW"
   open_env_arg JARVISTAP_TRACE_LOG "$TRACE_LOG"
   open_env_arg JARVISTAP_WHISPERKIT_MODEL "openai_whisper-large-v3-v20240930_turbo_632MB"
   open_env_arg JARVISTAP_WHISPER_LANGUAGE "de"
@@ -163,6 +165,8 @@ $OPEN_ENV_ARGS
     <string>0.35</string>
     <key>PRESSTALK_TRIGGER_KEY</key>
     <string>$PRESSTALK_TRIGGER_KEY</string>
+    <key>PRESSTALK_AUTO_SHOW_SETUP_WINDOW</key>
+    <string>$PRESSTALK_AUTO_SHOW_SETUP_WINDOW</string>
     <key>JARVISTAP_TRACE_LOG</key>
     <string>$TRACE_LOG</string>
     <key>JARVISTAP_WHISPERKIT_MODEL</key>
@@ -211,11 +215,11 @@ Installed:
 - LaunchAgent: $PLIST
 - Stable local signing: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
 - Open permission panes: $PRESSTALK_OPEN_PERMISSION_PANES
+- Auto-show setup window: $PRESSTALK_AUTO_SHOW_SETUP_WINDOW
 
 Next:
-1. Allow PressTalk microphone access
-2. Allow PressTalk input monitoring / accessibility
-3. Hold Fn/Globe to speak, then release to paste
+1. Use the PressTalk menu bar icon for Settings or diagnostics
+2. Hold Fn/Globe to speak, then release to paste
 
 To use another trigger, set PRESSTALK_TRIGGER_KEY before bootstrapping.
 Supported values: fn, option, left_option, right_option, f5, trackpad_hold.

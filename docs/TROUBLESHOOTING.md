@@ -2,58 +2,57 @@
 
 ## Permission Toggle Is On, But PressTalk Still Cannot Use It
 
-This usually means the running process and the app entry in macOS Privacy
-settings do not match closely enough for TCC.
+This means the macOS Privacy UI state and PressTalk's runtime capability probe
+are disagreeing. Treat it as a PressTalk listener/probe bug first, not as a user
+approval mistake.
 
 Common causes:
 
 - A stale manually opened PressTalk process is still holding the singleton lock.
 - PressTalk was rebuilt after the permission was granted.
-- macOS has granted the app, but the already-running process has not refreshed
-  the TCC state yet.
+- macOS has granted the app, but the runtime preflight or event-tap probe still
+  cannot observe that grant.
 - The local development build is ad-hoc signed, so macOS may treat a new build as
   a different privacy client even if the app name looks unchanged.
 
-If macOS already shows PressTalk enabled, use `Restart PressTalk` in PressTalk
-Settings first. Current builds do not reopen the setup window after the first
-setup guide; the restart button is the intended way to refresh a running
-process after permission changes.
-
-First reset the running process:
+If macOS already shows PressTalk enabled, do not repeatedly reopen Privacy
+panes, toggle approvals, or reset TCC as the default response. First collect the
+read-only status:
 
 ```bash
-PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+bash scripts/presstalk_collect_smoke_status.sh
 ```
 
-Then open:
+Current builds keep the setup retry loop quiet. They do not auto-open System
+Settings panes, do not auto-show the PressTalk Settings window unless
+`PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is set, and do not call macOS
+permission-request APIs during startup/setup.
+
+If you are deliberately refreshing a development process after changing code,
+restart the LaunchAgent without opening panes:
 
 ```bash
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
-If a toggle is already on but PressTalk still reports it unavailable after
-restart, turn the toggle off and on again for the newly built `PressTalk.app`,
-then rerun:
+Only when intentionally preparing a fresh machine should bootstrap open the
+privacy panes:
 
 ```bash
-PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
-Current builds check all three permissions during setup instead of stopping at
-Input Monitoring first. They also keep a quiet setup retry loop running while
-blocked on permissions, but some TCC changes still require a fresh process
-before macOS reports them through the preflight APIs.
-
-If macOS keeps showing a stale enabled row, reset only PressTalk's TCC entries
-and approve the current build again:
+Use TCC reset only as an explicit last-resort debugging step, because it discards
+the already-approved state:
 
 ```bash
 tccutil reset ListenEvent com.am.jarvistap
 tccutil reset Microphone com.am.jarvistap
 tccutil reset Accessibility com.am.jarvistap
-PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
 Current bootstrap helpers try to stabilize local signing automatically. They

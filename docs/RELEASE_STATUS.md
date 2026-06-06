@@ -38,10 +38,9 @@ Verified on `studio1` on 2026-06-06:
   `presstalk-collect-smoke-status.sh` helper collects that file together with
   app signature, launchd state, machine info, and trace tail for cross-machine
   proof.
-- Current local builds also stop reopening the settings window after the first
-  setup guide, add a `Restart PressTalk` settings action for refreshing macOS
-  permission state, and run all permission requests/checks during setup instead
-  of stopping at the first missing permission.
+- Current local builds do not auto-show the settings window by default. They add
+  a `Restart PressTalk` settings action for refreshing the running process and
+  run read-only preflights plus real listener capability probes during setup.
 - Current bootstrap runs launch PressTalk through LaunchServices via
   `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and they
   no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
@@ -57,12 +56,11 @@ Verified on `studio1` on 2026-06-06:
 
 Known current blocker:
 
-- `studio1` has repeated ad-hoc development rebuilds. The trace proved one build
-  could reach `Input Monitoring permission OK` and `Microphone permission OK`,
-  but the next rebuild changed the ad-hoc CDHash and the runtime again reported
-  `Startup blocked: Input Monitoring permission missing`. `studio1` now has a
-  stable local development signing identity, so refresh the permission toggle
-  once for the stable-signed build before attempting the Fn dictation smoke.
+- On `studio1`, macOS Settings can show PressTalk as enabled while the current
+  PressTalk runtime still reports Input Monitoring and Accessibility preflight
+  unavailable, and the HID/session event-tap listener probes fail. Treat this as
+  a listener/probe blocker; do not keep reopening panes or re-granting
+  permissions as the default response.
 - `v0.1.5-rc7` includes the latest settings restart/status-collector fixes and
   is the artifact to use for the next cross-machine smoke attempts.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
@@ -70,7 +68,7 @@ Known current blocker:
 
 Do not claim full release coverage until these are recorded:
 
-- `studio1`: Fn dictation smoke after Input Monitoring approval.
+- `studio1`: Fn dictation smoke after the listener/probe blocker is resolved.
 - `s1`: install plus Fn dictation smoke.
 - `s2`: install plus Fn dictation smoke.
 - `mbp1`: M1 Max install plus Fn or Option dictation smoke.

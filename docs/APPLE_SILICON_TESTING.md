@@ -73,6 +73,10 @@ Approve the prompts for:
 - PressTalk accessibility
 - Karabiner-Elements input monitoring / driver extension if macOS asks
 
+If macOS already shows PressTalk enabled but PressTalk reports a preflight as
+unavailable, stop re-approving and collect diagnostics. That state is a
+listener/probe blocker, not proof that the user skipped a permission.
+
 Karabiner is only needed when testing the optional `F5` fallback path. The default
 trigger is native `Fn / Globe`.
 

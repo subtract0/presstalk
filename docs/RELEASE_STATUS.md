@@ -1,6 +1,14 @@
 # Release Status
 
-Current status: public source staged, full cross-machine release not yet proven.
+Current status: public prerelease smoke artifact published, full cross-machine
+release not yet proven.
+
+Public prerelease:
+
+- Tag: `v0.1.5-rc1`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc1`
+- Asset: `PressTalk-0.1.5-rc1-macos-arm64.zip`
+- SHA-256: `af3bba91d30d35be5f19df2bbca9dfbe32b1c0a3e5a98d9af057f0b74b756682`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -11,7 +19,13 @@ Verified on `studio1` on 2026-06-06:
 
 Known current blocker:
 
-- `studio1` has not granted Input Monitoring to PressTalk yet, so the local runtime stops at the macOS permission gate before a real Fn dictation smoke test.
+- `studio1` shows `PressTalk.app` enabled in Input Monitoring, but the freshly
+  started app still reports `Startup blocked: Input Monitoring permission
+  missing`. The stale duplicate process path was fixed in the installer, so the
+  remaining likely issue is TCC identity/signature mismatch from repeated ad-hoc
+  development rebuilds. Refresh the permission toggle after the current build, or
+  build with a stable `PRESSTALK_CODESIGN_IDENTITY`, before attempting the Fn
+  dictation smoke.
 
 Do not claim full release coverage until these are recorded:
 

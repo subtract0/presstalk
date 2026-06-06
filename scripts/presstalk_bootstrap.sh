@@ -18,6 +18,39 @@ PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
 
+terminate_existing_presstalk() {
+  local pids=""
+  pids="$(ps -axo pid=,command= | awk '
+    index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap") {
+      print $1
+    }
+  ')"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  for _ in {1..20}; do
+    local remaining=""
+    for pid in $pids; do
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        remaining="$remaining $pid"
+      fi
+    done
+    if [[ -z "$remaining" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  for pid in $pids; do
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
 # Homebrew-installed GitHub app archives can still arrive quarantined on a fresh Mac.
 # Clear that before launchd tries to exec the app, otherwise launchd may report OS_REASON_EXEC.
 /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
@@ -82,6 +115,7 @@ chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
+terminate_existing_presstalk
 launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap" >/dev/null 2>&1 || true
 

@@ -33,6 +33,39 @@ fi
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
 
+terminate_existing_presstalk() {
+  local pids=""
+  pids="$(ps -axo pid=,command= | awk '
+    index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap") {
+      print $1
+    }
+  ')"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  for _ in {1..20}; do
+    local remaining=""
+    for pid in $pids; do
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        remaining="$remaining $pid"
+      fi
+    done
+    if [[ -z "$remaining" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  for pid in $pids; do
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
 JARVISTAP_AGENT_MODE="${JARVISTAP_AGENT_MODE:-dictation}"
 JARVISTAP_WHISPERKIT_MODEL="${JARVISTAP_WHISPERKIT_MODEL:-openai_whisper-large-v3-v20240930_turbo_632MB}"
 JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-de}"
@@ -125,6 +158,7 @@ chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
+terminate_existing_presstalk
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap"
 

@@ -54,6 +54,9 @@ Cross-device Apple Silicon checklist:
 
 - [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md)
 
+If macOS shows a permission toggle as enabled but PressTalk still reports it
+missing, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
 ## Build
 ```bash
 bash scripts/build_jarvistap.sh

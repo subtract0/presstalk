@@ -1252,9 +1252,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         guard permissions.microphoneGranted else {
             if presentFailureStatus {
-                traceLogger.log("Startup blocked: microphone permission missing")
+                traceLogger.log("Startup blocked: microphone unavailable to current build")
                 printMicrophoneHelp()
-                present(.setupRequired("Allow microphone access, then run Setup Check."))
+                present(.setupRequired("Microphone is not available to this PressTalk build."))
             }
             refreshRuntimeStatusUI()
             scheduleSetupRetry()

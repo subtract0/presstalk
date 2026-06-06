@@ -74,8 +74,12 @@ JARVISTAP_SAY_VOICE="${JARVISTAP_SAY_VOICE:-Samantha}"
 JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
 JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS:-0.35}"
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-fn}}"
+PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-${JARVISTAP_AUTO_SHOW_SETUP_WINDOW:-0}}"
 JARVISTAP_TRACE_LOG="${JARVISTAP_TRACE_LOG:-$TRACE_LOG}"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+
+/usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
+/usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true
 
 xml_escape() {
   local value="$1"
@@ -108,6 +112,8 @@ ENV_BLOCK="  <key>EnvironmentVariables</key>
     <string>${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS}</string>
     <key>PRESSTALK_TRIGGER_KEY</key>
     <string>${PRESSTALK_TRIGGER_KEY}</string>
+    <key>PRESSTALK_AUTO_SHOW_SETUP_WINDOW</key>
+    <string>${PRESSTALK_AUTO_SHOW_SETUP_WINDOW}</string>
     <key>JARVISTAP_TRACE_LOG</key>
     <string>${JARVISTAP_TRACE_LOG}</string>
     <key>JARVISTAP_WHISPERKIT_MODEL</key>
@@ -149,6 +155,7 @@ OPEN_ENV_ARGS="$(
   open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "$JARVISTAP_REQUEST_TIMEOUT_SECONDS"
   open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "$JARVISTAP_RELEASE_TAIL_PADDING_SECONDS"
   open_env_arg PRESSTALK_TRIGGER_KEY "$PRESSTALK_TRIGGER_KEY"
+  open_env_arg PRESSTALK_AUTO_SHOW_SETUP_WINDOW "$PRESSTALK_AUTO_SHOW_SETUP_WINDOW"
   open_env_arg JARVISTAP_TRACE_LOG "$JARVISTAP_TRACE_LOG"
   open_env_arg JARVISTAP_WHISPERKIT_MODEL "$JARVISTAP_WHISPERKIT_MODEL"
   open_env_arg JARVISTAP_WHISPER_LANGUAGE "$JARVISTAP_WHISPER_LANGUAGE"
@@ -210,12 +217,20 @@ plutil -lint "$PLIST" >/dev/null
 
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 terminate_existing_presstalk
-launchctl bootstrap "gui/$(id -u)" "$PLIST"
-launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap"
+LAUNCHD_DOMAIN="gui/$(id -u)"
+LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/com.am.jarvistap"
+launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
+if ! launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"; then
+  echo "LaunchAgent bootstrap failed; enabling com.am.jarvistap and retrying." >&2
+  launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
+  launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
+fi
+launchctl kickstart -k "$LAUNCHD_SERVICE"
 
 echo "Installed and started: com.am.jarvistap"
 echo "Mode: $JARVISTAP_AGENT_MODE"
 echo "Trigger: $PRESSTALK_TRIGGER_KEY"
+echo "Auto-show setup window: $PRESSTALK_AUTO_SHOW_SETUP_WINDOW"
 echo "Trace: $JARVISTAP_TRACE_LOG"
 echo "Tail live logs with:"
 echo "  tail -f $JARVISTAP_TRACE_LOG"

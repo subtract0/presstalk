@@ -61,6 +61,12 @@ as listener-ready instead of sending users back through already-granted macOS
 privacy toggles; Accessibility is treated as a paste probe until paste actually
 fails.
 
+Bootstrap now clears both quarantine and provenance metadata from the installed
+app bundle and explicitly re-enables the com.am.jarvistap launchd label before
+bootstrapping. This fixes the mbp1 failure mode where launchd had the label
+disabled and returned "5: Input/output error" even though the same app could
+launch through LaunchServices.
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

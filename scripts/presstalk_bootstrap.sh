@@ -55,9 +55,11 @@ terminate_existing_presstalk() {
   done
 }
 
-# Homebrew-installed GitHub app archives can still arrive quarantined on a fresh Mac.
-# Clear that before launchd tries to exec the app, otherwise launchd may report OS_REASON_EXEC.
+# Homebrew-installed GitHub app archives can still arrive with Gatekeeper
+# metadata on a fresh Mac. Clear that before launchd/LaunchServices tries to
+# open the app, otherwise the first start can fail before PressTalk writes logs.
 /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
+/usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true
 
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 terminate_existing_presstalk
@@ -197,8 +199,15 @@ PLIST
 chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
-launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
-launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap" >/dev/null 2>&1 || true
+LAUNCHD_DOMAIN="gui/$(id -u)"
+LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/com.am.jarvistap"
+launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
+if ! launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"; then
+  echo "LaunchAgent bootstrap failed; enabling com.am.jarvistap and retrying." >&2
+  launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
+  launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
+fi
+launchctl kickstart -k "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
 
 # Do not also `open -a` the app here. The LaunchAgent already starts it, and
 # opening the app bundle separately can create a second live dictation agent.

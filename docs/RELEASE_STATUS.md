@@ -164,6 +164,42 @@ Verified on `studio1` on 2026-06-06:
   `sha256:462256f9b9d775b548aec2334ac7f087b874ff62767e48aa775cd7bce8d86e40`,
   and the remote tag points at
   `37dbb045e44142daa46c5045805f1dc1a3686918`.
+- Post-rc33 local debugging reproduced the settings-loop root cause on
+  `studio1`: running `scripts/build_jarvistap.sh` without an explicit bundle id
+  rebuilt the installed app as `com.am.presstalk`. The no-pane launch then
+  reported `microphoneAuthorizationStatus=not_determined`,
+  `microphoneGranted=false`, `inputMonitoringEffective=false`,
+  `inputListener=not_installed`, and `setupRetryActive=true`, even though the
+  same machine's working privacy grants are under `com.am.jarvistap`. This was
+  an identity mismatch, not evidence that the user had skipped permissions.
+- Post-rc33 local fix: `scripts/build_jarvistap.sh` now preserves the currently
+  installed `PressTalk.app` bundle identifier by default and creates or reuses
+  the stable local development code-signing identity unless
+  `PRESSTALK_BUILD_STABLE_SIGNING=0` is explicitly set, while
+  `scripts/package_presstalk_release.sh` explicitly forces the public
+  `com.am.presstalk` identity and disables local signing for release artifacts.
+  This keeps local rebuilds from silently switching a working development
+  install into a different macOS privacy client or a new ad-hoc CDHash.
+- Runtime status and Settings now expose `status.codeSignatureIdentifier`,
+  `status.codeSignatureCDHash`, and `status.codeSignatureAuthority`; the
+  no-pane Settings hint names the exact bundle id/CDHash being checked and says
+  that the run will not open System Settings.
+- The release bundle now includes `presstalk-unicode-event-insert-probe.swift`.
+  On `studio1`, this probe posted Unicode CGEvents into a focused local
+  `NSTextView` while `AXIsProcessTrusted=false`, but observed no inserted text:
+  `success=false`, `reason=timeout_waiting_for_payload`, `postResult=posted`,
+  `observedText=""`. This rules out the old Unicode CGEvent path as a reliable
+  no-Accessibility insertion fallback on this machine.
+- After the local identity regression was reproduced, `studio1` was restored
+  with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `status.speechModel=Ready`, and `status.triggerPath=Fn / Globe ready`.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.

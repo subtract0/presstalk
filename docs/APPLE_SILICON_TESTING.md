@@ -74,7 +74,10 @@ Approve the prompts for:
 - PressTalk microphone access
 - PressTalk input monitoring
 - PressTalk accessibility
-- Karabiner-Elements input monitoring / driver extension if macOS asks
+
+Karabiner is not required for the default `Fn / Globe` path. Do not install or
+approve Karabiner during the core smoke unless you are explicitly testing the
+optional legacy `F5` fallback.
 
 If macOS already shows PressTalk enabled but PressTalk reports a preflight as
 unavailable, stop re-approving and collect diagnostics. That state is a

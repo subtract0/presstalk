@@ -10,7 +10,9 @@ ARCH="${ARCH:-$(uname -m)}"
 ZIP_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.zip"
 SHA_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 
-bash "$ROOT/scripts/build_jarvistap.sh" >/dev/null
+PRESSTALK_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-com.am.presstalk}" \
+PRESSTALK_BUILD_STABLE_SIGNING=0 \
+  bash "$ROOT/scripts/build_jarvistap.sh" >/dev/null
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Missing app bundle: $APP_BUNDLE" >&2

@@ -18,6 +18,7 @@ struct PressTalkCommerceConfig {
 }
 
 struct PressTalkRuntimeStatus {
+    let bundleIdentifier: String
     let inputMonitoringGranted: Bool
     let microphoneGranted: Bool
     let microphoneAuthorizationStatus: String
@@ -30,12 +31,26 @@ struct PressTalkRuntimeStatus {
     let permissionPaneOpeningAllowed: Bool
     let speechModelStatus: String
     let f5BridgeStatus: String
+    let codeSignatureIdentifier: String
+    let codeSignatureCDHash: String
+    let codeSignatureAuthority: String
 
     var inputMonitoringEffective: Bool {
         inputMonitoringGranted || inputPipelineReady
     }
 
+    var codeSignatureSummary: String {
+        if codeSignatureCDHash != "unknown" {
+            return "CDHash \(codeSignatureCDHash)"
+        }
+        if codeSignatureAuthority != "unknown" {
+            return codeSignatureAuthority
+        }
+        return "signature unknown"
+    }
+
     static let placeholder = PressTalkRuntimeStatus(
+        bundleIdentifier: "unknown",
         inputMonitoringGranted: false,
         microphoneGranted: false,
         microphoneAuthorizationStatus: "unknown",
@@ -47,7 +62,10 @@ struct PressTalkRuntimeStatus {
         adHocSigned: false,
         permissionPaneOpeningAllowed: false,
         speechModelStatus: "Checking...",
-        f5BridgeStatus: "Checking..."
+        f5BridgeStatus: "Checking...",
+        codeSignatureIdentifier: "unknown",
+        codeSignatureCDHash: "unknown",
+        codeSignatureAuthority: "unknown"
     )
 }
 
@@ -1252,32 +1270,37 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func permissionHintText() -> String {
+        let identity = "\(runtimeStatus.bundleIdentifier), \(runtimeStatus.codeSignatureSummary)"
+        let noPaneSuffix = runtimeStatus.permissionPaneOpeningAllowed
+            ? ""
+            : " This no-pane run will not open System Settings."
+
         if !runtimeStatus.microphoneGranted {
             if runtimeStatus.microphoneAuthorizationStatus == "denied" {
-                return "Microphone preflight denies this app identity. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+                return "Microphone preflight denies \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
             if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
-                return "Microphone preflight has no approval record for this app identity. Export diagnostics before changing settings."
+                return "Microphone preflight has no approval record for \(identity). Export diagnostics before changing settings.\(noPaneSuffix)"
             }
             if runtimeStatus.adHocSigned {
-                return "Microphone preflight is unavailable to this ad-hoc build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+                return "Microphone preflight is unavailable to this ad-hoc build (\(identity)). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
-            return "Microphone preflight is unavailable to this PressTalk build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+            return "Microphone preflight is unavailable to \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.inputMonitoringEffective {
-            return "Input listener is not ready. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+            return "Input listener is not ready for \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            return "Input listener is ready. Auto-paste is not trusted by this build, so dictation will be copied instead."
+            return "Input listener and microphone are ready for \(identity). Auto-paste is not trusted by this build, so dictation will be copied instead.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted {
-            return "Input listener is ready. Copy-only mode does not need Accessibility until auto-paste is enabled."
+            return "Input listener and microphone are ready for \(identity). Copy-only mode does not need Accessibility until auto-paste is enabled.\(noPaneSuffix)"
         }
 
-        return "PressTalk is ready for the current build."
+        return "PressTalk is ready for \(identity)."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {

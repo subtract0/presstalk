@@ -66,6 +66,14 @@ missing, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 bash scripts/build_jarvistap.sh
 ```
 
+Local builds preserve the currently installed `PressTalk.app` bundle identifier
+by default. That prevents a working development install from silently switching
+between `com.am.jarvistap` and `com.am.presstalk`, which macOS treats as
+different privacy clients. Source-tree builds also create or reuse the local
+development code-signing identity by default; set
+`PRESSTALK_BUILD_STABLE_SIGNING=0` only when you deliberately want an ad-hoc
+debug build.
+
 That produces:
 - `bin/jarvistap`
 - `~/Applications/PressTalk.app`
@@ -110,6 +118,9 @@ Package a Homebrew release zip:
 ```bash
 bash scripts/package_presstalk_release.sh 0.1.5
 ```
+
+Release packaging explicitly builds the public `com.am.presstalk` identity even
+when your local development install is preserving `com.am.jarvistap`.
 
 Publish a public prerelease artifact for machine smoke testing:
 ```bash

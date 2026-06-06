@@ -11,7 +11,17 @@ APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
 APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
 APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
-APP_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-com.am.presstalk}}"
+LOCAL_CODESIGN_HELPER="$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh"
+
+current_bundle_identifier() {
+  if [[ -f "$APP_INFO_PLIST" ]]; then
+    /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_INFO_PLIST" 2>/dev/null || true
+  fi
+}
+
+DEFAULT_BUNDLE_IDENTIFIER="$(current_bundle_identifier)"
+DEFAULT_BUNDLE_IDENTIFIER="${DEFAULT_BUNDLE_IDENTIFIER:-com.am.presstalk}"
+APP_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-$DEFAULT_BUNDLE_IDENTIFIER}}"
 
 if [[ ! "$APP_BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]; then
   echo "Invalid PRESSTALK_BUNDLE_IDENTIFIER: $APP_BUNDLE_IDENTIFIER" >&2
@@ -54,6 +64,8 @@ cp "$PKG_DIR/scripts/presstalk_input_method_status.swift" "$APP_RESOURCES_DIR/pr
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
 cp "$PKG_DIR/scripts/presstalk_input_method_client_probe.swift" "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
+cp "$PKG_DIR/scripts/presstalk_unicode_event_insert_probe.swift" "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
 cp "$PKG_DIR/scripts/presstalk_install_input_method.sh" "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 bash "$PKG_DIR/scripts/build_presstalk_input_method.sh" \
@@ -94,7 +106,32 @@ cat >"$APP_INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
-SIGN_IDENTITY="${PRESSTALK_CODESIGN_IDENTITY:-${CODESIGN_IDENTITY:--}}"
+resolve_signing_identity() {
+  if [[ -n "${PRESSTALK_CODESIGN_IDENTITY:-}" ]]; then
+    printf '%s' "$PRESSTALK_CODESIGN_IDENTITY"
+    return
+  fi
+  if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    printf '%s' "$CODESIGN_IDENTITY"
+    return
+  fi
+  if [[ "${PRESSTALK_BUILD_STABLE_SIGNING:-1}" == "1" && -x "$LOCAL_CODESIGN_HELPER" ]]; then
+    local output identity_hash
+    if output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+      identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
+      if [[ -n "$identity_hash" ]]; then
+        printf '%s' "$identity_hash"
+        return
+      fi
+    else
+      printf '%s\n' "$output" >&2
+      printf '%s\n' "Stable local signing skipped: could not prepare local code-signing identity." >&2
+    fi
+  fi
+  printf '%s' "-"
+}
+
+SIGN_IDENTITY="$(resolve_signing_identity)"
 SIGN_KEYCHAIN="${PRESSTALK_CODESIGN_KEYCHAIN:-}"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
   echo "Code signing: ad-hoc"

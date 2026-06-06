@@ -80,6 +80,12 @@ flags. The client probe temporarily enables/selects the source, focuses a local
 text view, posts a payload, records whether text lands, and restores the
 original input source.
 
+The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
+local text view and posts per-character Unicode CGEvents without opening System
+Settings. On studio1 this probe posted events but observed no inserted text
+while Accessibility was untrusted, which rules out the old Unicode event path as
+a reliable no-Accessibility insertion fallback on that machine.
+
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
 phrase through system audio, and records whether PressTalk transcribes, posts
@@ -122,10 +128,13 @@ bootstrapping. This fixes the mbp1 failure mode where launchd had the label
 disabled and returned "5: Input/output error" even though the same app could
 launch through LaunchServices.
 
-The app bundle identifier is now com.am.presstalk while the launchd label
-remains com.am.jarvistap for compatibility. This matches older PressTalk TCC
-rows on mbp1 and avoids the microphone block caused by the previous
-com.am.jarvistap code requirement drift.
+Release packaging builds the public app bundle identifier com.am.presstalk while
+the launchd label remains com.am.jarvistap for compatibility. Local source-tree
+builds now preserve the currently installed app bundle identifier and create or
+reuse the local development signing identity by default, so a working
+development install under com.am.jarvistap is not silently rebuilt as
+com.am.presstalk or as a new ad-hoc CDHash and sent back through a different
+macOS privacy client.
 
 Bootstrap can now preserve a legacy working privacy identity by setting
 PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap before running

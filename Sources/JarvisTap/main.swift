@@ -1886,8 +1886,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         let bridgeStatus = currentTriggerBridgeStatus()
+        let bundleIdentifier = Bundle.main.bundleIdentifier ?? "unknown"
+        let codeSignatureIdentifier = codeSignatureValue(prefix: "Identifier=")
+        let codeSignatureCDHash = codeSignatureValue(prefix: "CDHash=")
+        let codeSignatureAuthority = codeSignatureValue(prefix: "Authority=")
 
         return PressTalkRuntimeStatus(
+            bundleIdentifier: bundleIdentifier,
             inputMonitoringGranted: CGPreflightListenEventAccess(),
             microphoneGranted: microphoneAuthorizationStatus == .authorized,
             microphoneAuthorizationStatus: microphoneAuthorizationStatusDescription(microphoneAuthorizationStatus),
@@ -1899,7 +1904,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
             speechModelStatus: whisperStatus,
-            f5BridgeStatus: bridgeStatus
+            f5BridgeStatus: bridgeStatus,
+            codeSignatureIdentifier: codeSignatureIdentifier,
+            codeSignatureCDHash: codeSignatureCDHash,
+            codeSignatureAuthority: codeSignatureAuthority
         )
     }
 
@@ -1944,6 +1952,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "speechModel": status.speechModelStatus,
                 "triggerPath": status.f5BridgeStatus,
                 "adHocSigned": status.adHocSigned,
+                "codeSignatureIdentifier": status.codeSignatureIdentifier,
+                "codeSignatureCDHash": status.codeSignatureCDHash,
+                "codeSignatureAuthority": status.codeSignatureAuthority,
             ],
             "codeSignatureSummary": appCodeSignatureSummary,
         ]
@@ -2023,6 +2034,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Version: \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")
             Bundle path: \(Bundle.main.bundleURL.path)
             Executable path: \(Bundle.main.executableURL?.path ?? "unknown")
+            Bundle identifier: \(runtimeStatus.bundleIdentifier)
             Process ID: \(ProcessInfo.processInfo.processIdentifier)
             Launch label (internal): com.am.jarvistap
 
@@ -2035,6 +2047,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature
+            Identifier: \(runtimeStatus.codeSignatureIdentifier)
+            CDHash: \(runtimeStatus.codeSignatureCDHash)
+            Authority: \(runtimeStatus.codeSignatureAuthority)
             \(appCodeSignatureSummary)
 
             Runtime
@@ -2636,6 +2651,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         } catch {
             return "codesign unavailable: \(error.localizedDescription)"
         }
+    }
+
+    private func codeSignatureValue(prefix: String) -> String {
+        appCodeSignatureSummary
+            .split(whereSeparator: \.isNewline)
+            .compactMap { line -> String? in
+                guard line.hasPrefix(prefix) else { return nil }
+                let value = line.dropFirst(prefix.count)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return value.isEmpty ? nil : value
+            }
+            .first ?? "unknown"
     }
 
     private func checkSetupPermissions() -> PermissionCheckResult {

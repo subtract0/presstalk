@@ -128,8 +128,12 @@ PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
-For repeated local development builds from the source tree, prefer a stable
-signing identity:
+For repeated local development builds from the source tree, current builds
+preserve both parts of the privacy identity by default: the build helper keeps
+the currently installed bundle identifier and creates or reuses the local
+development code-signing identity. A working `com.am.jarvistap` development
+install should not silently rebuild as `com.am.presstalk` or as a new ad-hoc
+CDHash.
 
 ```bash
 bash scripts/create_presstalk_local_codesign_identity.sh
@@ -137,9 +141,25 @@ PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" bash scripts/bu
 PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
-If no signing identity exists, the build script uses ad-hoc signing. That is fine
-for local smoke tests, but privacy approvals may need to be refreshed after a
-rebuild.
+If you need to force the local compatibility identity, make it explicit:
+
+```bash
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
+PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" \
+  bash scripts/build_jarvistap.sh
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+```
+
+If stable signing is disabled or the helper cannot prepare an identity, the
+build script uses ad-hoc signing. That is fine for local smoke tests, but
+privacy approvals may need to be refreshed after a rebuild.
+
+To deliberately force an ad-hoc debug build:
+
+```bash
+PRESSTALK_BUILD_STABLE_SIGNING=0 bash scripts/build_jarvistap.sh
+```
 
 The local identity script creates a self-signed code-signing identity in
 `~/Library/Keychains/presstalk-local-dev.keychain-db` and adds that keychain to

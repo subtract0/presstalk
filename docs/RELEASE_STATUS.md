@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc14`
-- Commit: `8e5b159772823545a6f038feaf06ef1679670046`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc14`
-- Asset: `PressTalk-0.1.5-rc14-macos-arm64.zip`
-- SHA-256: `28558a1f05cc12500e2fad9a24f747e42e967ae93c84c53ddb936b3f4efd9c25`
+- Tag: `v0.1.5-rc15`
+- Commit: `909ec2097710aedc04ceb23d76fca9d96a5ba55d`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc15`
+- Asset: `PressTalk-0.1.5-rc15-macos-arm64.zip`
+- SHA-256: `22dc6eddca81a72d2c92c6488887681ecb738766b17d63245a9bee1011db5fac`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc14` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc15` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc14` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc15` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -81,23 +81,26 @@ Known current blocker:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `mbp1`: `v0.1.5-rc13` was downloaded from GitHub with SHA-256
-  `4a1ccbc3c1b58a71a48125b6d9a2ead9ee3a7f4edae6ae77cae88ee1888e692a` and
+- `mbp1`: `v0.1.5-rc15` was downloaded from GitHub with SHA-256
+  `22dc6eddca81a72d2c92c6488887681ecb738766b17d63245a9bee1011db5fac` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
   The old `launchctl` blocker was reproduced as a disabled
-  `com.am.jarvistap` label, then fixed by enabling the label; after rc13
+  `com.am.jarvistap` label, then fixed by enabling the label; after rc15
   bootstrap, `launchctl` reports `state = running`, `program = /usr/bin/open`,
   and a live `/Users/alexandermonas/Applications/PressTalk.app/Contents/MacOS/jarvistap`
-  process. No quarantine/provenance xattrs remain on the installed app.
+  process with CDHash `a08419316ac86beeeaf0c9d64f22dd8c0f106f27`. No
+  quarantine/provenance xattrs remain on the installed app.
 - `mbp1` current blocker: runtime status reports `microphoneGranted=false`,
   `inputMonitoringEffective=false`, `inputListener=not_installed`, and
   `setupRetryActive=true`. Read-only TCC inspection shows old microphone rows
   for `com.am.jarvistap` and `com.am.presstalk`, so the likely cause is ad-hoc
   CDHash/code-requirement drift rather than a launchd failure. The local signing
   helper still times out while adding trust on mbp1 and leaves the installed app
-  ad-hoc signed.
-- `v0.1.5-rc14` includes the listen-only event-tap fallback, WhisperKit cache
+  ad-hoc signed. The latest rc15 trace now says
+  `Startup blocked: microphone unavailable to current build`, not a permission
+  re-grant instruction.
+- `v0.1.5-rc15` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, and the no-automatic-prompt/no-auto-settings
   window fixes. It also includes the settings status fix for already-granted
   permission toggles, the mbp1 launchd disabled-label/provenance fix, microphone

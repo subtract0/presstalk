@@ -46,6 +46,8 @@ cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/pres
 chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
+cp "$PKG_DIR/scripts/presstalk_automated_f5_smoke.swift" "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
 
 cat >"$APP_INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

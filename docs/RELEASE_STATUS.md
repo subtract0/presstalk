@@ -97,6 +97,22 @@ Verified on `studio1` on 2026-06-06:
   helper reads the configured runtime trigger key, labels Fn/Option/F5 or
   trackpad smoke correctly, and records readiness before and after the manual
   paste attempt.
+- Current post-rc21 work adds `presstalk-automated-f5-smoke.swift`, an explicit
+  synthetic pipeline helper. It posts the F5 Darwin trigger bridge, speaks a
+  local phrase through system audio, and records PressTalk trace evidence for
+  transcription and paste completion. Its JSON result sets
+  `physicalTriggerProof=false`, includes `traceFinalTranscript` and
+  `tracePasteCompleted`, and separately reports `targetCaptureSuccess`, so it
+  helps isolate STT/paste failures but does not replace physical Fn or Option
+  smoke.
+- `studio1` local synthetic F5/Darwin/TTS smoke on 2026-06-06 succeeded at the
+  trace pipeline level after a temporary no-pane F5 bootstrap. Result JSON:
+  `success=true`, `reason=trace_pipeline_completed`,
+  `physicalTriggerProof=false`, `tracePasteCompleted=true`,
+  `traceFinalTranscript="Press Talg Automated Smoke Test."`,
+  `targetCaptureSuccess=false`, with runtime readiness true at start and finish.
+  The app was restored to `PRESSTALK_TRIGGER_KEY=fn` afterward and status
+  consistency was clean.
 - `studio1`: a no-pane rc21-equivalent local install from commit
   `f92daebee990f7d45d66cb577cce05e250894d4b` was bootstrapped with
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,

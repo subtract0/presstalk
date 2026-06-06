@@ -158,6 +158,26 @@ Expected:
 - the helper result JSON has the expected `expectedTriggerKey` and readiness
   fields for the tested machine
 
+For a synthetic pipeline check that does not prove the physical trigger, first
+bootstrap with the F5 trigger and no panes:
+
+```bash
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=f5 \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-automated-f5-smoke.swift"
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
+
+This helper posts the PressTalk F5 bridge notifications, speaks a local phrase,
+and records PressTalk trace evidence for transcription and paste completion.
+Its JSON result sets `physicalTriggerProof=false`, includes
+`traceFinalTranscript` / `tracePasteCompleted`, and separately reports
+`targetCaptureSuccess` for whether the helper text window captured enough pasted
+text. Use it to debug STT/paste separately from the real Fn/Option trigger.
+
 If you need to force the F5 bridge manually on that Mac, use:
 
 ```bash

@@ -159,20 +159,23 @@ Known current proof gaps:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `studio2`: `v0.1.5-rc21` was downloaded from GitHub with SHA-256
-  `8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421` and
+- `studio2`: `v0.1.5-rc24` was downloaded from GitHub with SHA-256
+  `30d4a21c8a4ab37bca1fda140a7dd0d9db0c351bb795c576d5b842f6c02cf775` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts and
   `permissionPaneOpeningAllowed=false`, but runtime is blocked before dictation
-  because `microphoneGranted=false`, `inputMonitoringEffective=false`,
+  because `microphoneGranted=false`,
+  `microphoneStatus=preflight_unavailable`,
+  `inputMonitoringEffective=false`,
+  `inputMonitoringStatus=preflight_unavailable`,
   `inputListener=not_installed`, `inputPipelineReady=false`, and
   `setupRetryActive=true`. Prior read-only TCC inspection returned no
   `com.am.presstalk` or `com.am.jarvistap` rows on `studio2`, so this remains a
   first-grant/setup gap rather than the already-granted-but-reported-missing
   bug. `Status Consistency` reports matching live process ID, bundle identifier
   `com.am.presstalk`, and CDHash
-  `259bd0196f96e994692db71ca600afcf23e9f990`.
+  `119e9241b17903f631b0f8bce84a8f7f05bdf5b3`.
 - `mbp1`: `v0.1.5-rc24` was downloaded from GitHub with SHA-256
   `30d4a21c8a4ab37bca1fda140a7dd0d9db0c351bb795c576d5b842f6c02cf775` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,

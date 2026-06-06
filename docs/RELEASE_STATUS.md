@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc19`
-- Commit: `d5152e28576abe29445bd00dcd2c04518961c8b1`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc19`
-- Asset: `PressTalk-0.1.5-rc19-macos-arm64.zip`
-- SHA-256: `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98`
+- Tag: `v0.1.5-rc21`
+- Commit: tag target for `v0.1.5-rc21`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc21`
+- Asset: `PressTalk-0.1.5-rc21-macos-arm64.zip`
+- SHA-256: `8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc19` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc21` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc19` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc21` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -46,6 +46,10 @@ Verified on `studio1` on 2026-06-06:
   `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and they
   no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
   is set.
+- `v0.1.5-rc21` passes `PRESSTALK_OPEN_PERMISSION_PANES` into the running app.
+  With the default value `0`, the Settings window disables its Microphone, Input
+  Monitoring, and Accessibility buttons and suppresses privacy-pane open calls,
+  so no-pane smoke runs cannot accidentally reopen System Settings.
 - Current startup/setup checks no longer call macOS permission-request APIs
   automatically. They only preflight and attempt the real listener capability,
   so repeated restarts do not keep prompting for already-approved permissions.

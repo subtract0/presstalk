@@ -65,6 +65,11 @@ fails. Microphone now reports as unavailable to the current build instead of
 implying the user failed to grant it, which is important for ad-hoc TCC identity
 drift.
 
+The running app now receives PRESSTALK_OPEN_PERMISSION_PANES from bootstrap and
+launchd. When that value is 0, the Settings window disables the Microphone,
+Input Monitoring, and Accessibility buttons and suppresses any attempted privacy
+pane opens, so no-pane smoke tests cannot accidentally reopen System Settings.
+
 Bootstrap now clears both quarantine and provenance metadata from the installed
 app bundle and explicitly re-enables the com.am.jarvistap launchd label before
 bootstrapping. This fixes the mbp1 failure mode where launchd had the label

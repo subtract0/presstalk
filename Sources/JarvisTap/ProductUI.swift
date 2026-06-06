@@ -26,6 +26,7 @@ struct PressTalkRuntimeStatus {
     let pasteAutomatically: Bool
     let systemDictationHotkeyDisabled: Bool
     let adHocSigned: Bool
+    let permissionPaneOpeningAllowed: Bool
     let speechModelStatus: String
     let f5BridgeStatus: String
 
@@ -42,6 +43,7 @@ struct PressTalkRuntimeStatus {
         pasteAutomatically: true,
         systemDictationHotkeyDisabled: true,
         adHocSigned: false,
+        permissionPaneOpeningAllowed: false,
         speechModelStatus: "Checking...",
         f5BridgeStatus: "Checking..."
     )
@@ -1188,7 +1190,17 @@ final class PressTalkSettingsWindowController: NSWindowController {
         configureInterferenceLabel(systemDictationValueLabel, disabled: runtimeStatus.systemDictationHotkeyDisabled)
         configureDetailLabel(speechModelValueLabel, text: runtimeStatus.speechModelStatus)
         configureDetailLabel(f5BridgeValueLabel, text: runtimeStatus.f5BridgeStatus)
+        configurePermissionPaneButtons()
         setupHintLabel.stringValue = permissionHintText()
+    }
+
+    private func configurePermissionPaneButtons() {
+        let enabled = runtimeStatus.permissionPaneOpeningAllowed
+        let tooltip = enabled ? nil : "System Settings opening is disabled for this run. Export diagnostics instead of re-granting repeatedly."
+        for button in [microphoneSettingsButton, inputMonitoringSettingsButton, accessibilitySettingsButton] {
+            button.isEnabled = enabled
+            button.toolTip = tooltip
+        }
     }
 
     private func configureInputMonitoringLabel(_ label: NSTextField) {

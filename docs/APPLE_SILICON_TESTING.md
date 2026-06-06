@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc19/PressTalk-0.1.5-rc19-macos-arm64.zip
-echo "ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98  $tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc21-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc21/PressTalk-0.1.5-rc21-macos-arm64.zip
+echo "8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421  $tmpdir/PressTalk-0.1.5-rc21-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc21-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98
+8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -65,6 +65,8 @@ The cask should:
 - write the LaunchAgent
 - leave macOS permission panes closed unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
   is set for bootstrap
+- pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
+  macOS privacy panes during no-pane smoke runs
 
 ## Approvals
 

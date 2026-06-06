@@ -42,6 +42,7 @@ struct JarvisTapConfig {
     let triggerKey: JarvisTapSettingsStore.TriggerKeyOption
     let enableNativeMicrophoneKey: Bool
     let autoShowSetupWindow: Bool
+    let allowPermissionPaneOpen: Bool
 
     static func load() -> JarvisTapConfig {
         let env = ProcessInfo.processInfo.environment
@@ -142,6 +143,9 @@ struct JarvisTapConfig {
         let autoShowSetupWindow =
             env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "1" ||
             env["JARVISTAP_AUTO_SHOW_SETUP_WINDOW"] == "1"
+        let allowPermissionPaneOpen =
+            env["PRESSTALK_OPEN_PERMISSION_PANES"] == "1" ||
+            env["JARVISTAP_OPEN_PERMISSION_PANES"] == "1"
 
         return JarvisTapConfig(
             agentMode: agentMode,
@@ -166,7 +170,8 @@ struct JarvisTapConfig {
             releaseTailPaddingSeconds: releaseTailPaddingSeconds,
             triggerKey: triggerKey,
             enableNativeMicrophoneKey: enableNativeMicrophoneKey,
-            autoShowSetupWindow: autoShowSetupWindow
+            autoShowSetupWindow: autoShowSetupWindow,
+            allowPermissionPaneOpen: allowPermissionPaneOpen
         )
     }
 }
@@ -1877,6 +1882,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             pasteAutomatically: settingsStore.pasteAutomatically,
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
+            permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
             speechModelStatus: whisperStatus,
             f5BridgeStatus: bridgeStatus
         )
@@ -1913,6 +1919,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "microphoneGranted": status.microphoneGranted,
                 "accessibilityGranted": status.accessibilityGranted,
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
+                "permissionPaneOpeningAllowed": status.permissionPaneOpeningAllowed,
             ],
             "status": [
                 "speechModel": status.speechModelStatus,
@@ -1935,18 +1942,30 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func openMicrophonePrivacyPane() {
+        guard config.allowPermissionPaneOpen else {
+            traceLogger.log("Suppressed Microphone privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+            return
+        }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
             NSWorkspace.shared.open(url)
         }
     }
 
     private func openInputMonitoringPrivacyPane() {
+        guard config.allowPermissionPaneOpen else {
+            traceLogger.log("Suppressed Input Monitoring privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+            return
+        }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
             NSWorkspace.shared.open(url)
         }
     }
 
     private func openAccessibilityPrivacyPane() {
+        guard config.allowPermissionPaneOpen else {
+            traceLogger.log("Suppressed Accessibility privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+            return
+        }
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
             NSWorkspace.shared.open(url)
         }

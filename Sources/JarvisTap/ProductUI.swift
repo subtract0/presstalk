@@ -1263,10 +1263,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
         } else if runtimeStatus.pasteAutomatically {
-            label.stringValue = "AX false; copy fallback"
-            label.textColor = .systemOrange
+            label.stringValue = "Input method fallback"
+            label.textColor = .systemGreen
         } else {
-            label.stringValue = "AX false; copy-only mode"
+            label.stringValue = "Optional; copy only"
             label.textColor = .secondaryLabelColor
         }
     }
@@ -1314,7 +1314,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, even if macOS Settings shows a toggle. Dictation will be copied instead; run diagnostics or the identity probe instead of re-granting.\(noPaneSuffix)"
+            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, even if macOS Settings shows a toggle. Dictation will use the input method fallback, then copy only if that is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted {

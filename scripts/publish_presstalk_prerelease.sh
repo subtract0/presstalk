@@ -109,10 +109,15 @@ fails. Runtime status also records inputMonitoringStatus, microphoneStatus, and
 accessibilityStatus so raw macOS preflight misses are visibly separate from
 effective readiness.
 
+When Accessibility is not trusted but dictation can use the InputMethodKit
+fallback, Settings now labels the Accessibility row as input method fallback and
+runtime status records accessibilityStatus=ax_false_input_method_fallback
+instead of naming it as a missing permission or copy-only path.
+
 The Settings window is now resizable and scrollable, and the Accessibility row
-names the exact runtime state when auto-paste is blocked:
-AXIsProcessTrusted=false for this signed app. In that state PressTalk copies the
-transcript instead of sending users back through an already-enabled macOS Privacy
+names the exact runtime state when AXIsProcessTrusted=false for this signed app.
+With auto-paste enabled, PressTalk tries the input method fallback before copy
+fallback instead of sending users back through an already-enabled macOS Privacy
 toggle.
 
 Runtime status also records microphoneAuthorizationStatus, so a blocked machine

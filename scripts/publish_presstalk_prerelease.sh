@@ -110,6 +110,12 @@ fails. Runtime status also records inputMonitoringStatus, microphoneStatus, and
 accessibilityStatus so raw macOS preflight misses are visibly separate from
 effective readiness.
 
+The Settings window is now resizable and scrollable, and the Accessibility row
+names the exact runtime state when auto-paste is blocked:
+AXIsProcessTrusted=false for this signed app. In that state PressTalk copies the
+transcript instead of sending users back through an already-enabled macOS Privacy
+toggle.
+
 Runtime status also records microphoneAuthorizationStatus, so a blocked machine
 can distinguish authorized, denied, restricted, not_determined, and unknown
 microphone preflight states without opening System Settings.

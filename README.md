@@ -45,7 +45,7 @@ brew install --cask presstalk
 The Homebrew cask runs the bundled bootstrap helper so a fresh Mac lands closer to:
 
 - install
-- approve the macOS prompts
+- approve only any fresh macOS prompts that have not already been granted
 - hold `Fn / Globe` to dictate
 
 Legacy F5 compatibility still ships as an optional helper, but it is no longer the default path:
@@ -58,8 +58,9 @@ Cross-device Apple Silicon checklist:
 
 - [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md)
 
-If macOS shows a permission toggle as enabled but PressTalk still reports it
-missing, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+If macOS shows a permission toggle as enabled but PressTalk still reports a
+runtime preflight mismatch, do not keep re-approving it; see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ## Build
 ```bash

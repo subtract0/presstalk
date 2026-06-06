@@ -904,13 +904,14 @@ final class PressTalkSettingsWindowController: NSWindowController {
         self.commerceConfig = commerceConfig
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 560),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "PressTalk Settings"
         window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 520, height: 420)
         super.init(window: window)
         buildUI()
         reloadFromStore()
@@ -1123,12 +1124,32 @@ final class PressTalkSettingsWindowController: NSWindowController {
         stack.alignment = .leading
         stack.spacing = 12
 
-        contentView.addSubview(stack)
+        let scrollView = NSScrollView()
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+
+        let documentView = NSView()
+        documentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.documentView = documentView
+
+        contentView.addSubview(scrollView)
+        documentView.addSubview(stack)
 
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+
+            documentView.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: documentView.leadingAnchor, constant: 20),
+            stack.trailingAnchor.constraint(equalTo: documentView.trailingAnchor, constant: -20),
+            stack.topAnchor.constraint(equalTo: documentView.topAnchor, constant: 18),
+            stack.bottomAnchor.constraint(equalTo: documentView.bottomAnchor, constant: -18),
         ])
 
         showHUDCheckbox.target = self
@@ -1242,10 +1263,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
         } else if runtimeStatus.pasteAutomatically {
-            label.stringValue = "Copy fallback"
+            label.stringValue = "AX false; copy fallback"
             label.textColor = .systemOrange
         } else {
-            label.stringValue = "Copy-only mode"
+            label.stringValue = "AX false; copy-only mode"
             label.textColor = .secondaryLabelColor
         }
     }
@@ -1293,11 +1314,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            return "Input listener and microphone are ready for \(identity). Auto-paste is not trusted by this build, so dictation will be copied instead.\(noPaneSuffix)"
+            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, even if macOS Settings shows a toggle. Dictation will be copied instead; run diagnostics or the identity probe instead of re-granting.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted {
-            return "Input listener and microphone are ready for \(identity). Copy-only mode does not need Accessibility until auto-paste is enabled.\(noPaneSuffix)"
+            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, but copy-only mode does not need Accessibility until auto-paste is enabled.\(noPaneSuffix)"
         }
 
         return "PressTalk is ready for \(identity)."

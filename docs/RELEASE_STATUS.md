@@ -353,8 +353,8 @@ Verified on `studio1` on 2026-06-06:
   element, then falls back to pasteboard plus Cmd-V. If Accessibility is not
   trusted, PressTalk copies the transcript to the clipboard and records
   `dictation_copy_fallback` instead of posting a Cmd-V command that cannot land.
-  Runtime status reports `accessibilityStatus=copy_fallback_accessibility_untrusted`
-  in that state.
+	  Runtime status reports an explicit copy-fallback Accessibility state in that
+	  condition.
 - `studio1` local post-rc22 synthetic F5/Darwin/TTS smoke with the revised
   helper and paste path reported `success=true`,
   `reason=trace_pipeline_command_posted`,
@@ -444,8 +444,8 @@ Known current proof gaps:
   after rc31 reports `microphoneGranted=true`,
   `microphoneAuthorizationStatus=authorized`,
   `microphoneStatus=preflight_granted`, `inputMonitoringEffective=true`,
-  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
-  `accessibilityStatus=copy_fallback_accessibility_untrusted`,
+	  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+	  `accessibilityGranted=false` with copy fallback active,
   `permissionPaneOpeningAllowed=false`, `inputListener=hid:listen_only`,
   `inputPipelineReady=true`, `setupRetryActive=false`,
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.

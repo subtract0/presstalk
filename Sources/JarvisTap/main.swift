@@ -1944,7 +1944,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "microphoneAuthorizationStatus": status.microphoneAuthorizationStatus,
                 "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_\(status.microphoneAuthorizationStatus)",
                 "accessibilityGranted": status.accessibilityGranted,
-                "accessibilityStatus": status.accessibilityGranted ? "preflight_granted" : (status.pasteAutomatically ? "copy_fallback_accessibility_untrusted" : "copy_only"),
+                "accessibilityStatus": status.accessibilityGranted ? "ax_trusted" : (status.pasteAutomatically ? "ax_false_copy_fallback" : "ax_false_copy_only"),
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
                 "permissionPaneOpeningAllowed": status.permissionPaneOpeningAllowed,
             ],
@@ -2043,7 +2043,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
             - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
             - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : runtimeStatus.microphoneAuthorizationStatus)
-            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "preflight granted" : (runtimeStatus.pasteAutomatically ? "copy fallback; preflight unavailable" : "copy-only mode"))
+            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "AXIsProcessTrusted=true" : (runtimeStatus.pasteAutomatically ? "AXIsProcessTrusted=false; copy fallback active" : "AXIsProcessTrusted=false; copy-only mode"))
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature

@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc34-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc34/PressTalk-0.1.5-rc34-macos-arm64.zip
-echo "74eb415184773e31a9e2fb36902ffdf48ea56c8f15e509dc54d551257868a859  $tmpdir/PressTalk-0.1.5-rc34-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc34-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc38-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc38/PressTalk-0.1.5-rc38-macos-arm64.zip
+echo "db9b7426d4f4d618d68ac787f87c7ba65da8768fa4648f3c7757fdf46a2b8401  $tmpdir/PressTalk-0.1.5-rc38-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc38-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-74eb415184773e31a9e2fb36902ffdf48ea56c8f15e509dc54d551257868a859
+db9b7426d4f4d618d68ac787f87c7ba65da8768fa4648f3c7757fdf46a2b8401
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -67,9 +67,10 @@ The cask should:
 - pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
   macOS privacy panes during no-pane smoke runs
 
-## Approvals
+## Runtime Checks
 
-Approve the prompts for:
+Approve only fresh macOS prompts that are not already granted for the current
+PressTalk identity:
 
 - PressTalk microphone access
 - PressTalk input monitoring
@@ -82,6 +83,11 @@ optional legacy `F5` fallback.
 If macOS already shows PressTalk enabled but PressTalk reports a preflight as
 unavailable, stop re-approving and collect diagnostics. That state is a
 listener/probe blocker, not proof that the user skipped a permission.
+
+If Accessibility reports `AXIsProcessTrusted=false` while the toggle appears
+enabled in macOS Settings, treat it as a current signed-app identity mismatch.
+Run the identity probe and keep permission panes closed unless the user
+explicitly asks to open them.
 
 If a machine was already working under the older JarvisTap privacy identity and
 regresses after a new install, preserve that identity instead of reopening

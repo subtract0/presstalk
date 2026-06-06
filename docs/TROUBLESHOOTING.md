@@ -43,6 +43,23 @@ change CDHash between releases, leaving old TCC rows that no longer match the
 current binary. Current PressTalk app bundles identify as `com.am.presstalk`;
 `com.am.jarvistap` is retained as the legacy launchd/helper label.
 
+Some development machines have their existing working microphone/input grants
+under the older `com.am.jarvistap` app identity. If a no-pane restart with
+`com.am.presstalk` regresses a machine that was previously working, preserve the
+legacy privacy identity instead of reopening settings:
+
+```bash
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
+PRESSTALK_OPEN_PERMISSION_PANES=0 \
+PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+PRESSTALK_TRIGGER_KEY=fn \
+  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
+
+Use `com.am.presstalk` for new installs or machines where that identity already
+works, such as the current mbp1 rc17 smoke path. Use `com.am.jarvistap` only as
+a compatibility fallback for machines with older grants.
+
 On a machine where launchd reports `Bootstrap failed: 5: Input/output error`,
 first check whether the label was disabled:
 

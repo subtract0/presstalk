@@ -12,6 +12,8 @@ Production naming:
 - product name: `PressTalk`
 - internal launchd/helper identifiers such as `com.am.jarvistap` and
   `JARVISTAP_*` stay stable for now
+- for machines with older working TCC grants, the bootstrap helper can preserve
+  the legacy app identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`
 
 Current packaged behavior:
 - hold `Fn / Globe` by default to bring up the light and start recording
@@ -67,6 +69,15 @@ bash scripts/build_jarvistap.sh
 That produces:
 - `bin/jarvistap`
 - `~/Applications/PressTalk.app`
+
+To build or bootstrap against a legacy local privacy identity:
+
+```bash
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap bash scripts/build_jarvistap.sh
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
+  PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
 
 ## Install As LaunchAgent
 ```bash

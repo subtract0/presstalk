@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_CONTENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_BUNDLE="$(cd "$APP_CONTENTS_DIR/.." && pwd)"
 APP_BINARY="$APP_CONTENTS_DIR/MacOS/jarvistap"
+APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
 LOCAL_CODESIGN_HELPER="$APP_CONTENTS_DIR/Resources/create-presstalk-local-codesign-identity.sh"
 KARABINER_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-karabiner-fallback.sh"
 DISABLE_DICTATION_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-disable-system-dictation.sh"
@@ -18,6 +19,7 @@ PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-0}"
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-0}"
+PRESSTALK_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-}}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -64,13 +66,54 @@ terminate_existing_presstalk() {
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 terminate_existing_presstalk
 
+current_bundle_identifier() {
+  /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_INFO_PLIST" 2>/dev/null || true
+}
+
+if [[ -z "$PRESSTALK_BUNDLE_IDENTIFIER" ]]; then
+  PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER="$(current_bundle_identifier)"
+else
+  PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER="$PRESSTALK_BUNDLE_IDENTIFIER"
+fi
+PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER="${PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER:-com.am.presstalk}"
+
+if [[ ! "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]; then
+  echo "Invalid PRESSTALK_BUNDLE_IDENTIFIER: $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" >&2
+  exit 2
+fi
+
+BUNDLE_IDENTIFIER_CHANGED=0
+if [[ "$(current_bundle_identifier)" != "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" ]]; then
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" "$APP_INFO_PLIST"
+  BUNDLE_IDENTIFIER_CHANGED=1
+fi
+
+sign_app() {
+  local identity="$1"
+  codesign --force --sign "$identity" --timestamp=none --identifier "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" "$APP_BINARY" &&
+    codesign --force --sign "$identity" --timestamp=none "$APP_BUNDLE"
+}
+
+adhoc_resign_if_needed() {
+  if [[ "$BUNDLE_IDENTIFIER_CHANGED" == "1" ]]; then
+    if sign_app "-"; then
+      echo "Ad-hoc signing applied for bundle identifier $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER."
+    else
+      echo "Ad-hoc signing failed for bundle identifier $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER." >&2
+      return 1
+    fi
+  fi
+}
+
 resign_with_local_identity_if_possible() {
   if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" != "1" ]]; then
     echo "Stable local signing skipped: PRESSTALK_BOOTSTRAP_STABLE_SIGNING=$PRESSTALK_BOOTSTRAP_STABLE_SIGNING"
+    adhoc_resign_if_needed
     return 0
   fi
   if [[ ! -x "$LOCAL_CODESIGN_HELPER" ]]; then
     echo "Stable local signing skipped: helper missing from app bundle."
+    adhoc_resign_if_needed
     return 0
   fi
 
@@ -78,21 +121,23 @@ resign_with_local_identity_if_possible() {
   if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
     echo "$output"
     echo "Stable local signing skipped: could not prepare local code-signing identity."
+    adhoc_resign_if_needed
     return 0
   fi
   identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
   if [[ -z "$identity_hash" ]]; then
     echo "$output"
     echo "Stable local signing skipped: helper did not report an identity hash."
+    adhoc_resign_if_needed
     return 0
   fi
 
   echo "Stable local signing identity: $identity_hash"
-  if codesign --force --sign "$identity_hash" --timestamp=none --identifier "com.am.presstalk" "$APP_BINARY" &&
-    codesign --force --sign "$identity_hash" --timestamp=none "$APP_BUNDLE"; then
+  if sign_app "$identity_hash"; then
     echo "Stable local signing applied to PressTalk.app."
   else
     echo "Stable local signing skipped: codesign failed."
+    adhoc_resign_if_needed
   fi
 }
 
@@ -222,6 +267,7 @@ PressTalk bootstrap completed.
 
 Installed:
 - LaunchAgent: $PLIST
+- Bundle identifier: $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER
 - Stable local signing: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
 - Open permission panes: $PRESSTALK_OPEN_PERMISSION_PANES
 - Auto-show setup window: $PRESSTALK_AUTO_SHOW_SETUP_WINDOW

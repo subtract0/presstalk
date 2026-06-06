@@ -11,6 +11,12 @@ APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
 APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
 APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+APP_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-com.am.presstalk}}"
+
+if [[ ! "$APP_BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]; then
+  echo "Invalid PRESSTALK_BUNDLE_IDENTIFIER: $APP_BUNDLE_IDENTIFIER" >&2
+  exit 2
+fi
 
 mkdir -p "$OUT_DIR"
 rm -rf "$APP_BUNDLE"
@@ -41,7 +47,7 @@ chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
 
-cat >"$APP_INFO_PLIST" <<'PLIST'
+cat >"$APP_INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -53,7 +59,7 @@ cat >"$APP_INFO_PLIST" <<'PLIST'
   <key>CFBundleExecutable</key>
   <string>jarvistap</string>
   <key>CFBundleIdentifier</key>
-  <string>com.am.presstalk</string>
+  <string>$APP_BUNDLE_IDENTIFIER</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -92,7 +98,7 @@ if [[ -n "$SIGN_KEYCHAIN" ]]; then
   codesign_args+=(--keychain "$SIGN_KEYCHAIN")
 fi
 
-codesign "${codesign_args[@]}" --identifier "com.am.presstalk" "$APP_MACOS_DIR/jarvistap"
+codesign "${codesign_args[@]}" --identifier "$APP_BUNDLE_IDENTIFIER" "$APP_MACOS_DIR/jarvistap"
 codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
 if [[ -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
@@ -101,3 +107,4 @@ fi
 
 echo "Built: $OUT_BIN"
 echo "App:   $APP_BUNDLE"
+echo "Bundle identifier: $APP_BUNDLE_IDENTIFIER"

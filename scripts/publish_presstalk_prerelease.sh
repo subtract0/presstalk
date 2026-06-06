@@ -74,6 +74,12 @@ remains com.am.jarvistap for compatibility. This matches older PressTalk TCC
 rows on mbp1 and avoids the microphone block caused by the previous
 com.am.jarvistap code requirement drift.
 
+Bootstrap can now preserve a legacy working privacy identity by setting
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap before running
+presstalk-bootstrap.sh. This is for machines whose existing microphone/input
+grants are under the older JarvisTap identity; new installs continue to default
+to com.am.presstalk.
+
 WhisperKit now defaults to a no-Neural-Engine compute preset
 (mel/audio encoder/text decoder on CPU+GPU, prefill on CPU) because mbp1 on
 macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via

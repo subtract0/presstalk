@@ -75,8 +75,6 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>PressTalkIMController</string>
   <key>InputMethodServerDelegateClass</key>
   <string>PressTalkIMController</string>
-  <key>InputMethodType</key>
-  <string>palette</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -85,6 +83,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>NSApplication</string>
   <key>TISInputSourceID</key>
   <string>com.am.presstalk.inputmethod</string>
+  <key>TISIntendedLanguage</key>
+  <string>en</string>
 </dict>
 </plist>
 PLIST

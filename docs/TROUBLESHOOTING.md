@@ -94,13 +94,16 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
-Only when intentionally preparing a fresh machine should bootstrap open the
-privacy panes:
+Only when intentionally preparing a fresh machine should the app's manual
+privacy-pane buttons be enabled:
 
 ```bash
 PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
+
+Bootstrap still will not open System Settings automatically; the flag only
+allows the manual Settings buttons inside PressTalk.
 
 Use TCC reset only as an explicit last-resort debugging step, because it discards
 the already-approved state:

@@ -50,6 +50,8 @@ cp "$PKG_DIR/scripts/presstalk_automated_f5_smoke.swift" "$APP_RESOURCES_DIR/pre
 chmod 755 "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
 cp "$PKG_DIR/scripts/presstalk_input_method_insert_probe.sh" "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
+cp "$PKG_DIR/scripts/presstalk_input_method_status.swift" "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
 cp "$PKG_DIR/scripts/presstalk_install_input_method.sh" "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 bash "$PKG_DIR/scripts/build_presstalk_input_method.sh" \

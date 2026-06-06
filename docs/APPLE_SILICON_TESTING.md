@@ -63,8 +63,7 @@ The cask should:
   `PressTalk.app` before launchd starts it
 - write `~/Library/Application Support/JarvisTap/runtime-status.json`
 - write the LaunchAgent
-- leave macOS permission panes closed unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
-  is set for bootstrap
+- leave macOS permission panes closed during bootstrap
 - pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
   macOS privacy panes during no-pane smoke runs
 
@@ -96,10 +95,11 @@ PRESSTALK_TRIGGER_KEY=fn \
 Karabiner is only needed when testing the optional `F5` fallback path. The default
 trigger is native `Fn / Globe`.
 
-If you want bootstrap to open the panes for a fresh machine, run it with:
+For a fresh machine, keep bootstrap quiet and inspect diagnostics before opening
+any macOS privacy panes manually:
 
 ```bash
-PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_TRIGGER_KEY=fn \
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -194,6 +194,26 @@ Install the prototype without opening System Settings:
 
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-install-input-method.sh"
+```
+
+Check recognition without changing the active input source:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift"
+```
+
+If the installed input method is not recognized yet, register it without
+selecting it:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --register
+```
+
+When ready to run an insertion probe, enable it explicitly, then select it:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --enable
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --select
 ```
 
 After macOS recognizes and you select `PressTalk Input Method`, focus an

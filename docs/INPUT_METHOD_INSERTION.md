@@ -57,6 +57,36 @@ Installing the bundle does not select it as the active input source. macOS may
 require logout/login or manual input-source selection before the input method
 receives a text client.
 
+## Status
+
+Check whether macOS recognizes the input method without changing anything:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift"
+```
+
+Register the installed input method bundle without selecting it:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --register
+```
+
+Enable the input source only when you are ready to make it selectable:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --enable
+```
+
+Select the input source only when you are ready to run an insertion probe:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --select
+```
+
+`--enable` changes the enabled input-source list, and `--select` changes the
+current input source. Run the read-only command first and record the current
+source so you can restore your normal keyboard/input method after the probe.
+
 ## Probe
 
 After the input method is installed, selected, and focused in an editable text

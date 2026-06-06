@@ -259,10 +259,12 @@ launchctl kickstart -k "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
 
 # Do not also `open -a` the app here. The LaunchAgent already starts it, and
 # opening the app bundle separately can create a second live dictation agent.
+#
+# Do not open macOS privacy panes from bootstrap. Repeatedly presenting those
+# panes is noisy on machines that already have valid TCC grants, and the app's
+# diagnostics are read-only enough to show whether a grant is truly missing.
 if [[ "$PRESSTALK_OPEN_PERMISSION_PANES" == "1" ]]; then
-  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" >/dev/null 2>&1 || true
-  open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" >/dev/null 2>&1 || true
-  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" >/dev/null 2>&1 || true
+  echo "Permission-pane auto-open is disabled in bootstrap; use the app menu manually if a fresh machine really needs it."
 fi
 
 cat <<EOF

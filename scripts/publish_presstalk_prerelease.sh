@@ -31,15 +31,17 @@ Default trigger: Fn / Globe.
 
 The bundled bootstrap creates or reuses a local development code-signing
 identity on the target Mac, re-signs PressTalk.app before launchd starts it,
-and leaves macOS permission panes closed unless
-PRESSTALK_OPEN_PERMISSION_PANES=1 is explicitly set. This is intended to avoid
-repeated ad-hoc TCC identity drift without repeatedly prompting for already
-approved permissions during smoke testing and updates.
+and leaves macOS permission panes closed. Bootstrap never opens System Settings;
+the permission-pane flag only controls whether the app manual Settings
+buttons are enabled. This is intended to avoid repeated ad-hoc TCC identity
+drift without repeatedly prompting for already approved permissions during smoke
+testing and updates.
 
 While blocked on macOS privacy approvals, PressTalk keeps a quiet setup retry
 timer running. Startup/setup checks use read-only preflights and real listener
 capability probes by default; the setup window is not auto-shown unless
-PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 is explicitly set.
+PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 and PRESSTALK_OPEN_PERMISSION_PANES=1 are
+both explicitly set.
 
 Even when the first-run setup guide is explicitly enabled, successful startup no
 longer force-presents the Settings window. The setup window is only auto-shown
@@ -66,11 +68,14 @@ physical trigger/STT success is visibly separate from an active-field insertion
 failure.
 
 The bundle now also carries a separate PressTalkInputMethod.app prototype plus
-presstalk-install-input-method.sh and presstalk-input-method-insert-probe.sh.
-This is an explicit, opt-in InputMethodKit insertion experiment for the current
-active-field blocker. It is not selected or installed automatically and does not
-open System Settings; it only gives testers a concrete path to verify whether a
-selected PressTalk input method can insert text without Accessibility trust.
+presstalk-install-input-method.sh, presstalk-input-method-status.swift, and
+presstalk-input-method-insert-probe.sh. This is an explicit, opt-in
+InputMethodKit insertion experiment for the current active-field blocker. It is
+not selected or installed automatically and does not open System Settings; it
+gives testers a concrete path to verify whether a selected PressTalk input
+method can insert text without Accessibility trust. The status helper is
+read-only by default; registration, enabling, and selection require explicit
+flags.
 
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local

@@ -1364,7 +1364,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func shouldPresentSetupWindow(showSetupWindowOnFailure: Bool, forcePresentSetupWindow: Bool) -> Bool {
-        config.allowPermissionPaneOpen && (showSetupWindowOnFailure || forcePresentSetupWindow)
+        config.allowPermissionPaneOpen &&
+            config.autoShowSetupWindow &&
+            (showSetupWindowOnFailure || forcePresentSetupWindow)
     }
 
     private func scheduleSetupRetry() {

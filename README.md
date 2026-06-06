@@ -95,6 +95,11 @@ Package a Homebrew release zip:
 bash scripts/package_presstalk_release.sh 0.1.5
 ```
 
+Publish a public prerelease artifact for machine smoke testing:
+```bash
+bash scripts/publish_presstalk_prerelease.sh 0.1.5-rc1
+```
+
 Publish the public binary release plus Homebrew tap:
 ```bash
 bash scripts/publish_presstalk_homebrew.sh 0.1.5

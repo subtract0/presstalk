@@ -8,7 +8,7 @@ Public prerelease:
 - Tag: `v0.1.5-rc1`
 - URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc1`
 - Asset: `PressTalk-0.1.5-rc1-macos-arm64.zip`
-- SHA-256: `af3bba91d30d35be5f19df2bbca9dfbe32b1c0a3e5a98d9af057f0b74b756682`
+- SHA-256: `7afcbf0284f7f832741eb9cf999a5da5b1f1cd3067aa21d318aba3c701d91e14`
 
 Verified on `studio1` on 2026-06-06:
 

@@ -46,6 +46,11 @@ and session event taps before falling back to writable taps. Runtime status
 records the selected input listener mode so cross-machine smoke tests can tell
 whether the lower-permission path armed successfully.
 
+PressTalk also recognizes WhisperKit's actual local cache layout under
+~/Library/Application Support/JarvisTap/Models/models/... and prefetches the
+small Whisper tokenizer files explicitly, so a populated model cache does not
+leave the app stuck at "Warming up".
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

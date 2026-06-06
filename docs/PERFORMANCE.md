@@ -26,7 +26,7 @@ macOS does not expose per-process ANE wattage from an unprivileged shell. `power
 
 - App bundle size: `5.5 MB`
 - Local speech model used by the app:
-  `~/Library/Application Support/JarvisTap/Models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3-v20240930_turbo_632MB`
+  `~/Library/Application Support/JarvisTap/Models/models/argmaxinc/whisperkit-coreml/openai_whisper-large-v3-v20240930_turbo_632MB`
 
 ### Launch / Ready Time
 

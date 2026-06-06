@@ -412,6 +412,7 @@ enum JarvisTapError: Error, CustomStringConvertible {
     case invalidRemotePayload
     case httpFailure(Int, String)
     case whisperUnavailable
+    case tokenizerUnavailable(String)
     case accessibilityPermissionMissing
     case eventSynthesisUnavailable
 
@@ -425,6 +426,8 @@ enum JarvisTapError: Error, CustomStringConvertible {
             return "HTTP \(code): \(body)"
         case .whisperUnavailable:
             return "WhisperKit was not initialized"
+        case .tokenizerUnavailable(let message):
+            return "Whisper tokenizer unavailable: \(message)"
         case .accessibilityPermissionMissing:
             return "Accessibility permission is missing"
         case .eventSynthesisUnavailable:
@@ -2615,15 +2618,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         fflush(stdout)
 
         let localModelFolder = localWhisperModelFolder(for: config.whisperModel)
-        let localTokenizerFolder = localWhisperTokenizerFolder(for: config.whisperModel)
+        var localTokenizerFolder = localWhisperTokenizerFolder(for: config.whisperModel)
         let downloadBase = whisperModelSearchRoots().first
         let shouldDownloadModel = localModelFolder == nil
+
+        if localTokenizerFolder == nil {
+            try await ensureLocalWhisperTokenizerIfPossible(for: config.whisperModel)
+            localTokenizerFolder = localWhisperTokenizerFolder(for: config.whisperModel)
+        }
 
         if let localModelFolder {
             traceLogger.log("Using local Whisper model folder=\(localModelFolder)")
         }
         if let localTokenizerFolder {
             traceLogger.log("Using local Whisper tokenizer folder=\(localTokenizerFolder.path)")
+        } else {
+            throw JarvisTapError.tokenizerUnavailable("No local tokenizer cache for \(config.whisperModel)")
         }
         if shouldDownloadModel, let downloadBase {
             traceLogger.log("Whisper model download base=\(downloadBase.path)")
@@ -2695,40 +2705,118 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func localWhisperModelFolder(for model: String) -> String? {
         for root in whisperModelSearchRoots() {
-            let folder = root
-                .appendingPathComponent("argmaxinc/whisperkit-coreml", isDirectory: true)
-                .appendingPathComponent(model, isDirectory: true)
-            if isUsableLocalWhisperModelFolder(folder, model: model) {
-                return folder.path
-            }
-            if FileManager.default.fileExists(atPath: folder.path) {
-                traceLogger.log("Ignoring incomplete local Whisper model folder=\(folder.path)")
+            for folder in localWhisperModelFolderCandidates(root: root, model: model) {
+                if isUsableLocalWhisperModelFolder(folder, model: model) {
+                    return folder.path
+                }
+                if FileManager.default.fileExists(atPath: folder.path) {
+                    traceLogger.log("Ignoring incomplete local Whisper model folder=\(folder.path)")
+                }
             }
         }
         return nil
     }
 
+    private func localWhisperModelFolderCandidates(root: URL, model: String) -> [URL] {
+        let repositoryPath = "argmaxinc/whisperkit-coreml"
+        return [
+            root
+                .appendingPathComponent(repositoryPath, isDirectory: true)
+                .appendingPathComponent(model, isDirectory: true),
+            root
+                .appendingPathComponent("models", isDirectory: true)
+                .appendingPathComponent(repositoryPath, isDirectory: true)
+                .appendingPathComponent(model, isDirectory: true),
+        ]
+    }
+
     private func localWhisperTokenizerFolder(for model: String) -> URL? {
-        let tokenizerModelName: String
-        switch model {
-        case let name where name.contains("whisper-large-v3"):
-            tokenizerModelName = "whisper-large-v3"
-        case "openai_whisper-tiny":
-            tokenizerModelName = "whisper-tiny"
-        default:
-            return nil
-        }
+        guard let tokenizerModelName = whisperTokenizerModelName(for: model) else { return nil }
 
         for root in whisperTokenizerSearchRoots() {
-            let folder = root
-                .appendingPathComponent("openai", isDirectory: true)
-                .appendingPathComponent(tokenizerModelName, isDirectory: true)
-            let tokenizerPath = folder.appendingPathComponent("tokenizer.json")
-            if FileManager.default.fileExists(atPath: tokenizerPath.path) {
-                return folder
+            for folder in localWhisperTokenizerFolderCandidates(root: root, tokenizerModelName: tokenizerModelName) {
+                let tokenizerPath = folder.appendingPathComponent("tokenizer.json")
+                let tokenizerConfigPath = folder.appendingPathComponent("tokenizer_config.json")
+                if FileManager.default.fileExists(atPath: tokenizerPath.path),
+                   FileManager.default.fileExists(atPath: tokenizerConfigPath.path)
+                {
+                    return folder
+                }
             }
         }
         return nil
+    }
+
+    private func whisperTokenizerModelName(for model: String) -> String? {
+        switch model {
+        case let name where name.contains("whisper-large-v3"):
+            return "whisper-large-v3"
+        case "openai_whisper-tiny":
+            return "whisper-tiny"
+        default:
+            return nil
+        }
+    }
+
+    private func localWhisperTokenizerFolderCandidates(root: URL, tokenizerModelName: String) -> [URL] {
+        return [
+            root
+                .appendingPathComponent("openai", isDirectory: true)
+                .appendingPathComponent(tokenizerModelName, isDirectory: true),
+            root
+                .appendingPathComponent("models", isDirectory: true)
+                .appendingPathComponent("openai", isDirectory: true)
+                .appendingPathComponent(tokenizerModelName, isDirectory: true),
+        ]
+    }
+
+    private func ensureLocalWhisperTokenizerIfPossible(for model: String) async throws {
+        guard let tokenizerModelName = whisperTokenizerModelName(for: model),
+              let root = whisperTokenizerSearchRoots().first
+        else { return }
+
+        let targetFolder = root
+            .appendingPathComponent("models", isDirectory: true)
+            .appendingPathComponent("openai", isDirectory: true)
+            .appendingPathComponent(tokenizerModelName, isDirectory: true)
+        let requiredFiles = ["tokenizer.json", "tokenizer_config.json"]
+        let fileManager = FileManager.default
+        if requiredFiles.allSatisfy({ fileManager.fileExists(atPath: targetFolder.appendingPathComponent($0).path) }) {
+            return
+        }
+
+        traceLogger.log("Prefetching Whisper tokenizer cache model=openai/\(tokenizerModelName) target=\(targetFolder.path)")
+        try fileManager.createDirectory(at: targetFolder, withIntermediateDirectories: true)
+
+        for fileName in requiredFiles {
+            let destination = targetFolder.appendingPathComponent(fileName)
+            guard !fileManager.fileExists(atPath: destination.path) else { continue }
+            let urlString = "https://huggingface.co/openai/\(tokenizerModelName)/resolve/main/\(fileName)"
+            guard let url = URL(string: urlString) else {
+                throw JarvisTapError.tokenizerUnavailable("Invalid tokenizer URL for \(fileName)")
+            }
+            try await downloadTokenizerFile(from: url, to: destination)
+        }
+        traceLogger.log("Whisper tokenizer cache ready folder=\(targetFolder.path)")
+    }
+
+    private func downloadTokenizerFile(from url: URL, to destination: URL) async throws {
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 25
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200 ... 299).contains(httpResponse.statusCode)
+        else {
+            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw JarvisTapError.tokenizerUnavailable("Download failed status=\(statusCode) url=\(url.absoluteString)")
+        }
+        let temporaryURL = destination.appendingPathExtension("tmp")
+        try data.write(to: temporaryURL, options: [.atomic])
+        if FileManager.default.fileExists(atPath: destination.path) {
+            try FileManager.default.removeItem(at: destination)
+        }
+        try FileManager.default.moveItem(at: temporaryURL, to: destination)
+        traceLogger.log("Downloaded Whisper tokenizer file=\(destination.lastPathComponent) bytes=\(data.count)")
     }
 
     private func whisperTokenizerSearchRoots() -> [URL] {

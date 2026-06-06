@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc37`
-- Commit: `b3922ee42bc382e6c026104147539f10bf91ab3c`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc37`
-- Asset: `PressTalk-0.1.5-rc37-macos-arm64.zip`
-- SHA-256: `f6fd25c8fa018f7115df8e1eba64b246adc49065c038fbc6b714e7dae4b91c96`
+- Tag: `v0.1.5-rc38`
+- Commit: `02e74505e91572fe1463943cb6bea61261a3f9a3`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc38`
+- Asset: `PressTalk-0.1.5-rc38-macos-arm64.zip`
+- SHA-256: `af84fafc1b1bf0e014afdce776ef4d69f09f1e0ab2bb54eb9dfb0d569c802562`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -246,6 +246,31 @@ Verified on `studio1` on 2026-06-06:
   product-specific automated-smoke audio-route wording with the generic rule:
   `/usr/bin/say` playback must be audible to the microphone for acoustic TTS
   smoke tests to be meaningful.
+- `v0.1.5-rc38` fixes the Settings permission-loop UX: the Settings window is
+  resizable and scrollable, the Accessibility row now reports `AX false; copy
+  fallback` / `AX false; copy-only mode`, diagnostics write
+  `accessibilityStatus=ax_false_copy_fallback` or `ax_false_copy_only`, and the
+  no-pane hint names `AXIsProcessTrusted=false` for the exact signed app instead
+  of sending users back through already-enabled macOS Privacy toggles.
+- The `v0.1.5-rc38` GitHub release asset digest is
+  `sha256:af84fafc1b1bf0e014afdce776ef4d69f09f1e0ab2bb54eb9dfb0d569c802562`,
+  and the remote tag points at
+  `02e74505e91572fe1463943cb6bea61261a3f9a3`.
+- After publishing `v0.1.5-rc38`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `codeSignatureCDHash=169354db5cd453fab31ad47d2e0e87cb15d4102b`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `microphoneStatus=preflight_granted`,
+  `inputMonitoringEffective=true`,
+  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `inputListener=hid:listen_only`, `inputPipelineReady=true`,
+  `setupRetryActive=false`, `permissionPaneOpeningAllowed=false`,
+  `accessibilityStatus=ax_false_copy_fallback`, `status.speechModel=Ready`,
+  and `status.triggerPath=Fn / Globe ready`.
 - After publishing `v0.1.5-rc37`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,

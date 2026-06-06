@@ -28,9 +28,9 @@ Settings panes, do not auto-show the PressTalk Settings window unless
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is set, and do not call macOS
 permission-request APIs during startup/setup.
 When launched with `PRESSTALK_OPEN_PERMISSION_PANES=0`, the Settings window's
-Microphone, Input Monitoring, and Accessibility buttons are disabled too. This
-keeps a no-pane diagnostic run from reopening System Settings after the user has
-already confirmed the toggles.
+Microphone, Input Monitoring, and Accessibility buttons are hidden too. This
+keeps a no-pane diagnostic run from reopening System Settings or suggesting
+another approval pass after the user has already confirmed the toggles.
 
 For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID and
 session event taps before falling back to writable taps. Check

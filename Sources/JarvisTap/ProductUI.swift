@@ -1199,6 +1199,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let tooltip = enabled ? nil : "System Settings opening is disabled for this run. Export diagnostics instead of re-granting repeatedly."
         for button in [microphoneSettingsButton, inputMonitoringSettingsButton, accessibilitySettingsButton] {
             button.isEnabled = enabled
+            button.isHidden = !enabled
             button.toolTip = tooltip
         }
     }
@@ -1234,7 +1235,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
         } else {
-            label.stringValue = "Not available"
+            label.stringValue = "Preflight unavailable"
             label.textColor = .systemOrange
         }
     }
@@ -1242,9 +1243,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private func permissionHintText() -> String {
         if !runtimeStatus.microphoneGranted {
             if runtimeStatus.adHocSigned {
-                return "Microphone is not available to this ad-hoc build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+                return "Microphone preflight is unavailable to this ad-hoc build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
             }
-            return "Microphone is not available to this PressTalk build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+            return "Microphone preflight is unavailable to this PressTalk build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
         }
 
         if !runtimeStatus.inputMonitoringEffective {

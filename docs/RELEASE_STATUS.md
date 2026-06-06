@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc22`
-- Commit: `6f30d6b30e4e9bdc2bda4a999713830a1f02e72c`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc22`
-- Asset: `PressTalk-0.1.5-rc22-macos-arm64.zip`
-- SHA-256: `e5d5f6d42b71a4b6f99b44fb34eadcc66036673488a5ad1e73a8eb66e665c6b9`
+- Tag: `v0.1.5-rc23`
+- Commit: `039b70e7e656ddafde391ea93ecb1380e71ab8b1`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc23`
+- Asset: `PressTalk-0.1.5-rc23-macos-arm64.zip`
+- SHA-256: `9dd261782f6bfbeb364a4634fa617b16624c6d08d354d6c2260116288f6e12ed`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc22` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc23` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc22` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc23` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, and bundled automated F5 smoke helper.
@@ -47,9 +47,10 @@ Verified on `studio1` on 2026-06-06:
   no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
   is set.
 - `v0.1.5-rc21` passes `PRESSTALK_OPEN_PERMISSION_PANES` into the running app.
-  With the default value `0`, the Settings window disables its Microphone, Input
-  Monitoring, and Accessibility buttons and suppresses privacy-pane open calls,
-  so no-pane smoke runs cannot accidentally reopen System Settings.
+  With the default value `0`, post-rc23 local builds hide the Settings window's
+  Microphone, Input Monitoring, and Accessibility buttons and suppress
+  privacy-pane open calls, so no-pane smoke runs cannot accidentally reopen
+  System Settings or suggest another approval pass.
 - Current startup/setup checks no longer call macOS permission-request APIs
   automatically. They only preflight and attempt the real listener capability,
   so repeated restarts do not keep prompting for already-approved permissions.
@@ -62,9 +63,11 @@ Verified on `studio1` on 2026-06-06:
   listener-ready and `runtime-status.json` records
   `permissions.inputMonitoringEffective=true` instead of sending the user back
   through already-enabled macOS privacy toggles. Accessibility is treated as a
-  paste probe unless paste actually fails. Microphone now reports as unavailable
-  to the current build rather than claiming the user failed to grant it, which
-  matters when ad-hoc code identity drift invalidates an older TCC row.
+  paste probe unless paste actually fails. Post-rc23 local builds record
+  machine-readable `permissions.inputMonitoringStatus`,
+  `permissions.microphoneStatus`, and `permissions.accessibilityStatus` strings
+  so raw macOS preflight misses are visibly separate from effective runtime
+  readiness.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.
@@ -113,11 +116,22 @@ Verified on `studio1` on 2026-06-06:
   `targetCaptureSuccess=false`, with runtime readiness true at start and finish.
   The app was restored to `PRESSTALK_TRIGGER_KEY=fn` afterward and status
   consistency was clean.
-- Current post-rc22 paste work changes insertion to pasteboard plus Cmd-V
+- `v0.1.5-rc23` paste work changes insertion to pasteboard plus Cmd-V
   instead of per-code-unit Unicode key events, delays pasteboard restore to 1.0s,
   and changes trace wording from `Dictation paste completed` to
   `Dictation paste command posted`. The revised synthetic helper now separates
   `tracePasteCommandPosted` from `tracePasteCompleted`.
+- Local post-rc23 settings/status work on `studio1` suppresses automatic setup
+  window presentation when `PRESSTALK_OPEN_PERMISSION_PANES=0`, makes Run Setup
+  Check refresh status without reopening the Settings window, hides privacy-pane
+  buttons in no-pane mode, and removes `missing` / `refresh macOS permissions`
+  wording from diagnostics. The rebuilt local app is stable-signed as
+  `com.am.jarvistap` with CDHash
+  `bc6b4920b40c8063d286dcfa301c2e268be64324`; runtime status reports
+  `permissionPaneOpeningAllowed=false`, `setupRetryActive=false`,
+  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `microphoneStatus=preflight_granted`, and
+  `accessibilityStatus=paste_probe_pending`.
 - `studio1` local post-rc22 synthetic F5/Darwin/TTS smoke with the revised
   helper and paste path reported `success=true`,
   `reason=trace_pipeline_command_posted`,
@@ -181,7 +195,7 @@ Known current proof gaps:
   `traceFinalTranscript="Press-Talg Automated Smoke Test"`,
   `targetCaptureSuccess=false`, with runtime readiness true at start and finish.
   Final restored Fn status was ready and status consistency was clean.
-- `v0.1.5-rc22` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc23` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle

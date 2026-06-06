@@ -1275,7 +1275,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
             refreshRuntimeStatusUI()
             scheduleSetupRetry()
-            if showSetupWindowOnFailure || forcePresentSetupWindow {
+            if shouldPresentSetupWindow(showSetupWindowOnFailure: showSetupWindowOnFailure, forcePresentSetupWindow: forcePresentSetupWindow) {
                 DispatchQueue.main.async { [weak self] in
                     self?.settingsWindowController?.present()
                 }
@@ -1313,7 +1313,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
                 refreshRuntimeStatusUI()
                 scheduleSetupRetry()
-                if showSetupWindowOnFailure || forcePresentSetupWindow {
+                if shouldPresentSetupWindow(showSetupWindowOnFailure: showSetupWindowOnFailure, forcePresentSetupWindow: forcePresentSetupWindow) {
                     DispatchQueue.main.async { [weak self] in
                         self?.settingsWindowController?.present()
                     }
@@ -1338,7 +1338,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         refreshRuntimeStatusUI()
 
-        if forcePresentSetupWindow {
+        if shouldPresentSetupWindow(showSetupWindowOnFailure: false, forcePresentSetupWindow: forcePresentSetupWindow) {
             DispatchQueue.main.async { [weak self] in
                 self?.settingsWindowController?.present()
             }
@@ -1354,6 +1354,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         present(.warming)
         startWhisperWarmupIfNeeded()
+    }
+
+    private func shouldPresentSetupWindow(showSetupWindowOnFailure: Bool, forcePresentSetupWindow: Bool) -> Bool {
+        config.allowPermissionPaneOpen && (showSetupWindowOnFailure || forcePresentSetupWindow)
     }
 
     private func scheduleSetupRetry() {
@@ -1433,7 +1437,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             self?.handleSettingsChanged()
         }
         settingsWindowController.onRunSetupCheck = { [weak self] in
-            self?.completeStartupIfPossible(showSetupWindowOnFailure: true, forcePresentSetupWindow: false)
+            self?.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
         }
         settingsWindowController.onExportDiagnostics = { [weak self] in
             self?.exportDiagnostics()
@@ -1805,7 +1809,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     @objc private func runSetupCheckFromMenu(_ sender: Any?) {
-        completeStartupIfPossible(showSetupWindowOnFailure: true, forcePresentSetupWindow: true)
+        completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
     }
 
     @objc private func toggleHUDFromMenu(_ sender: Any?) {
@@ -1916,8 +1920,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "permissions": [
                 "inputMonitoringGranted": status.inputMonitoringGranted,
                 "inputMonitoringEffective": status.inputMonitoringEffective,
+                "inputMonitoringStatus": status.inputMonitoringGranted ? "preflight_granted" : (status.inputMonitoringEffective ? "listener_ready_preflight_unavailable" : "preflight_unavailable"),
                 "microphoneGranted": status.microphoneGranted,
+                "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_unavailable",
                 "accessibilityGranted": status.accessibilityGranted,
+                "accessibilityStatus": status.accessibilityGranted ? "preflight_granted" : (status.pasteAutomatically ? "paste_probe_pending" : "copy_only"),
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
                 "permissionPaneOpeningAllowed": status.permissionPaneOpeningAllowed,
             ],
@@ -2010,8 +2017,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Permissions
             - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
-            - Microphone: \(runtimeStatus.microphoneGranted ? "granted" : "missing")
-            - Accessibility preflight: \(runtimeStatus.accessibilityGranted ? "granted" : "unavailable")
+            - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
+            - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : "unavailable")
+            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "preflight granted" : (runtimeStatus.pasteAutomatically ? "paste probe pending" : "copy-only mode"))
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature
@@ -2050,7 +2058,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func restartPressTalkFromSettings() {
         traceLogger.log("Restart requested from settings")
-        present(.setupRequired("Restarting PressTalk to refresh macOS permissions."))
+        present(.setupRequired("Restarting PressTalk to refresh runtime status."))
 
         let bundlePath = shellQuoted(Bundle.main.bundleURL.path)
         let launchLabel = "gui/\(getuid())/com.am.jarvistap"

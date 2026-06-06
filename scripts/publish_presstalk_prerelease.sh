@@ -78,7 +78,7 @@ WhisperKit now defaults to a no-Neural-Engine compute preset
 (mel/audio encoder/text decoder on CPU+GPU, prefill on CPU) because mbp1 on
 macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via
 the Neural Engine path. Set PRESSTALK_WHISPER_COMPUTE=default only when you
-explicitly want WhisperKit's upstream compute defaults.
+explicitly want the upstream WhisperKit compute defaults.
 
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 

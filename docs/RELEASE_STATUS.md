@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc21`
-- Commit: `f92daebee990f7d45d66cb577cce05e250894d4b`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc21`
-- Asset: `PressTalk-0.1.5-rc21-macos-arm64.zip`
-- SHA-256: `8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421`
+- Tag: `v0.1.5-rc22`
+- Commit: `6f30d6b30e4e9bdc2bda4a999713830a1f02e72c`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc22`
+- Asset: `PressTalk-0.1.5-rc22-macos-arm64.zip`
+- SHA-256: `e5d5f6d42b71a4b6f99b44fb34eadcc66036673488a5ad1e73a8eb66e665c6b9`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,12 +17,12 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc21` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc22` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc21` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc22` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
-  bundled local-signing helper, bundled smoke-status collector, and bundled
-  manual Fn smoke helper.
+  bundled local-signing helper, bundled smoke-status collector, bundled manual
+  Fn smoke helper, and bundled automated F5 smoke helper.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -97,7 +97,7 @@ Verified on `studio1` on 2026-06-06:
   helper reads the configured runtime trigger key, labels Fn/Option/F5 or
   trackpad smoke correctly, and records readiness before and after the manual
   paste attempt.
-- Current post-rc21 work adds `presstalk-automated-f5-smoke.swift`, an explicit
+- `v0.1.5-rc22` adds `presstalk-automated-f5-smoke.swift`, an explicit
   synthetic pipeline helper. It posts the F5 Darwin trigger bridge, speaks a
   local phrase through system audio, and records PressTalk trace evidence for
   transcription and paste completion. Its JSON result sets
@@ -145,21 +145,29 @@ Known current proof gaps:
   bug. `Status Consistency` reports matching live process ID, bundle identifier
   `com.am.presstalk`, and CDHash
   `259bd0196f96e994692db71ca600afcf23e9f990`.
-- `mbp1`: `v0.1.5-rc21` was downloaded from GitHub with SHA-256
-  `8f2a89e4d3809a27d00c1dcc5989eda31bf336f0389c434cf56905b6419c0421` and
+- `mbp1`: `v0.1.5-rc22` was downloaded from GitHub with SHA-256
+  `e5d5f6d42b71a4b6f99b44fb34eadcc66036673488a5ad1e73a8eb66e665c6b9` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
-  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. The installed app is ad-hoc signed
   with bundle identifier `com.am.presstalk` and CDHash
-  `259bd0196f96e994692db71ca600afcf23e9f990`.
+  `f7d384173b4a4608a07f8d73c279b4bb949bbc93`.
 - `mbp1` no longer has the rc15 microphone/listener blocker. Runtime status
-  after rc21 reports `microphoneGranted=true`,
+  after rc22 reports `microphoneGranted=true`,
   `inputMonitoringEffective=true`, `permissionPaneOpeningAllowed=false`,
   `inputListener=hid:listen_only`, `inputPipelineReady=true`,
   `setupRetryActive=false`, `status.triggerPath=Fn / Globe ready`, and
   `status.speechModel=Ready`. `Status Consistency` reports matching live
   process ID, bundle identifier, and CDHash.
-- `v0.1.5-rc21` includes the listen-only event-tap fallback, WhisperKit cache
+- `mbp1` rc22 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
+  level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
+  Result JSON:
+  `success=true`, `reason=trace_pipeline_completed`,
+  `physicalTriggerProof=false`, `tracePasteCompleted=true`,
+  `traceFinalTranscript="Press-Talg Automated Smoke Test"`,
+  `targetCaptureSuccess=false`, with runtime readiness true at start and finish.
+  Final restored Fn status was ready and status consistency was clean.
+- `v0.1.5-rc22` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle

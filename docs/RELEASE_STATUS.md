@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc31`
-- Commit: `97d5e36ef8a76edc8d3ebfa3cd1cf06dc1ee52d3`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc31`
-- Asset: `PressTalk-0.1.5-rc31-macos-arm64.zip`
-- SHA-256: `38106cb2c2917348ab13332661e0b4463f55d56d39caef89a0cca04dfae2d553`
+- Tag: `v0.1.5-rc32`
+- Commit: `b08f648b8535207a0a105593e2e9ff330b787016`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc32`
+- Asset: `PressTalk-0.1.5-rc32-macos-arm64.zip`
+- SHA-256: `ed7d0ac9274253982d1dbc790e28b93b28d0d1c150e8aa51ba89fa932be29537`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -42,14 +42,14 @@ Verified on `studio1` on 2026-06-06:
 - Current local builds do not auto-show the settings window by default. They add
   a `Restart PressTalk` settings action for refreshing the running process and
   run read-only preflights plus real listener capability probes during setup.
-- `v0.1.5-rc29` stops force-presenting the PressTalk Settings window after a
-  successful first-run startup. Even when
-  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is deliberately enabled, automatic
-  setup presentation is now reserved for real startup failures.
+- Current startup code stops force-presenting the PressTalk Settings window
+  after successful startup. Automatic setup presentation requires both
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` and
+  `PRESSTALK_OPEN_PERMISSION_PANES=1`; no-pane installs stay quiet even when
+  setup checks are running.
 - Current bootstrap runs launch PressTalk through LaunchServices via
-  `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and they
-  no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
-  is set.
+  `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and it no
+  longer opens System Settings panes automatically.
 - `v0.1.5-rc21` passes `PRESSTALK_OPEN_PERMISSION_PANES` into the running app.
   With the default value `0`, current builds hide the Settings window's
   Microphone, Input Monitoring, and Accessibility buttons and suppress
@@ -99,6 +99,35 @@ Verified on `studio1` on 2026-06-06:
   selected automatically, and it does not open System Settings. It is a concrete
   experiment for proving whether a selected PressTalk input method can insert
   text into the active client without Accessibility trust.
+- `v0.1.5-rc32` removes bootstrap's automatic System Settings open path. Even
+  if `PRESSTALK_OPEN_PERMISSION_PANES=1` is present, bootstrap prints a warning
+  instead of opening Microphone, Input Monitoring, or Accessibility panes.
+  Startup setup-window presentation now requires both
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` and
+  `PRESSTALK_OPEN_PERMISSION_PANES=1`; no-pane local restores use
+  `PRESSTALK_OPEN_PERMISSION_PANES=0` and
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`.
+- `v0.1.5-rc32` adds `presstalk-input-method-status.swift` to the release
+  bundle. The helper is read-only by default and reports current input source,
+  installed bundle state, all-installed recognition, enabled recognition, and
+  explicit `--register`, `--enable`, and `--select` statuses.
+- On `studio1`, the rc32 local restore was rebuilt as `com.am.jarvistap`,
+  re-signed by `Authority=PressTalk Local Development Code Signing`, and
+  restarted with no-pane flags. Runtime status after restart:
+  `permissionPaneOpeningAllowed=false`, `setupRetryActive=false`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`.
+- On `studio1`, the installed `PressTalkInputMethod.app` is recognized by TIS
+  as `TISTypeKeyboardInputMethodWithoutModes` in
+  `TISCategoryKeyboardInputSource`, with `recognizedAllSourceCount=1` and
+  `recognizedEnabledSourceCount=0`. It was not enabled or selected during this
+  verification; the current input source remained `com.apple.keylayout.German`.
+- The `v0.1.5-rc32` GitHub release asset digest is
+  `sha256:ed7d0ac9274253982d1dbc790e28b93b28d0d1c150e8aa51ba89fa932be29537`,
+  and the remote tag was corrected to point at
+  `b08f648b8535207a0a105593e2e9ff330b787016` after publish.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.

@@ -10,7 +10,7 @@ Use this on another Apple Silicon Mac such as:
 Verify that a fresh machine can install PressTalk with minimal thinking:
 
 1. install
-2. approve permissions
+2. approve permissions if the machine has not already granted PressTalk
 3. hold `Fn / Globe`
 4. dictate
 
@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc7-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc7/PressTalk-0.1.5-rc7-macos-arm64.zip
-echo "b6b7180e3c6553aa60f3277d6f29f40e5841f9beb8158c1ca17ca788d47e2633  $tmpdir/PressTalk-0.1.5-rc7-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc7-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc8-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc8/PressTalk-0.1.5-rc8-macos-arm64.zip
+echo "72d6fd232edfdbb672ce0f15740cd1c09f5dd15223fc43785cc956f75c9dc34c  $tmpdir/PressTalk-0.1.5-rc8-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc8-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -33,7 +33,7 @@ PRESSTALK_TRIGGER_KEY=fn /bin/bash "$HOME/Applications/PressTalk.app/Contents/Re
 Expected SHA-256:
 
 ```text
-b6b7180e3c6553aa60f3277d6f29f40e5841f9beb8158c1ca17ca788d47e2633
+72d6fd232edfdbb672ce0f15740cd1c09f5dd15223fc43785cc956f75c9dc34c
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is

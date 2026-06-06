@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc33`
-- Commit: `37dbb045e44142daa46c5045805f1dc1a3686918`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc33`
-- Asset: `PressTalk-0.1.5-rc33-macos-arm64.zip`
-- SHA-256: `462256f9b9d775b548aec2334ac7f087b874ff62767e48aa775cd7bce8d86e40`
+- Tag: `v0.1.5-rc34`
+- Commit: `212ca227bd97ab4e8d2f4e16c483951e4890ee9a`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc34`
+- Asset: `PressTalk-0.1.5-rc34-macos-arm64.zip`
+- SHA-256: `74eb415184773e31a9e2fb36902ffdf48ea56c8f15e509dc54d551257868a859`
 
 Verified on `studio1` on 2026-06-06:
 

@@ -156,8 +156,16 @@ to com.am.presstalk.
 
 The bundled smoke-status collector now reports a Status Consistency section
 that compares runtime-status.json against the live PressTalk process and the
-installed app signature. This makes stale or mismatched diagnostics visible
-when a machine is blocked before dictation.
+installed app signature. It now derives the inspected app bundle from the live
+PressTalk process before falling back to install defaults, and prints both the
+status bundle path and inspected app bundle path. This makes stale or mismatched
+diagnostics visible when a machine is blocked before dictation.
+
+The InputMethodKit diagnostics now use the single source id
+com.am.presstalk.inputmethod instead of a stale .dictation mode id. The generated
+input method still registers without opening System Settings, but on studio1 TIS
+continues to report recognizedSourceCount=0, so the input-method insertion path
+remains a discovery blocker rather than a proven paste fallback.
 
 The bundle also includes presstalk-accessibility-identity-probe.sh. It launches
 small background probe apps for com.am.jarvistap and com.am.presstalk with the

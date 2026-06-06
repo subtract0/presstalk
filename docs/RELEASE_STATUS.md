@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc38`
-- Commit: `02e74505e91572fe1463943cb6bea61261a3f9a3`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc38`
-- Asset: `PressTalk-0.1.5-rc38-macos-arm64.zip`
-- SHA-256: `af84fafc1b1bf0e014afdce776ef4d69f09f1e0ab2bb54eb9dfb0d569c802562`
+- Tag: `v0.1.5-rc39`
+- Commit: `5425a3fe02eefcdafb299c4e824f7661048c0495`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc39`
+- Asset: `PressTalk-0.1.5-rc39-macos-arm64.zip`
+- SHA-256: `2c8b31b1a7c0c0d6eb09c1df0a2b9f7fc66d6c6255d7b4d47977e6a6afda77c5`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -292,6 +292,28 @@ Verified on `studio1` on 2026-06-06:
   `recognizedAllSourceCount=0` remain after installing, registering, moving aside
   `~/Library/Caches/com.apple.tiswitcher.cache`, and restarting text-input
   agents.
+- `v0.1.5-rc39` publishes the live-process-aware smoke-status collector and the
+  single-source IMK diagnostics. The GitHub release asset digest is
+  `sha256:2c8b31b1a7c0c0d6eb09c1df0a2b9f7fc66d6c6255d7b4d47977e6a6afda77c5`,
+  and the remote tag points at
+  `5425a3fe02eefcdafb299c4e824f7661048c0495`.
+- After publishing `v0.1.5-rc39`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `bundlePath=/Users/am/Applications/PressTalk.app`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `codeSignatureCDHash=40e2ad34497d13552fd78fa7009b460be6cf70b5`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `microphoneStatus=preflight_granted`,
+  `inputMonitoringEffective=true`,
+  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `inputListener=hid:listen_only`, `inputPipelineReady=true`,
+  `setupRetryActive=false`, `permissionPaneOpeningAllowed=false`,
+  `accessibilityStatus=ax_false_copy_fallback`, `status.speechModel=Ready`,
+  and `status.triggerPath=Fn / Globe ready`. Status consistency reports matching
+  live process, status bundle path, app bundle path, bundle id, and CDHash.
 - After publishing `v0.1.5-rc37`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,

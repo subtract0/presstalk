@@ -4892,13 +4892,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func printMicrophoneHelp() {
         fputs(
             """
-            [PressTalk] Microphone permission is missing.
+            [PressTalk] Microphone is not available to this PressTalk build.
 
-            1. Open System Settings -> Privacy & Security -> Microphone
-            2. Enable the app that launches PressTalk:
-               - Terminal or iTerm for foreground testing
-               - the built jarvistap executable for LaunchAgent use
-            3. Start PressTalk again.
+            If macOS already shows PressTalk enabled in Microphone, do not keep
+            toggling the permission. Collect diagnostics and check the code
+            signature/TCC identity first.
 
             """,
             stderr

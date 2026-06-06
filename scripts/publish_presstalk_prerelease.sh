@@ -59,7 +59,9 @@ Settings now distinguish read-only permission preflight results from effective
 runtime capability. If the real input listener is armed, Input Monitoring shows
 as listener-ready instead of sending users back through already-granted macOS
 privacy toggles; Accessibility is treated as a paste probe until paste actually
-fails.
+fails. Microphone now reports as unavailable to the current build instead of
+implying the user failed to grant it, which is important for ad-hoc TCC identity
+drift.
 
 Bootstrap now clears both quarantine and provenance metadata from the installed
 app bundle and explicitly re-enables the com.am.jarvistap launchd label before

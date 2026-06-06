@@ -1183,7 +1183,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     private func applyRuntimeStatus() {
         configureInputMonitoringLabel(inputMonitoringValueLabel)
-        configureStatusLabel(microphoneValueLabel, granted: runtimeStatus.microphoneGranted)
+        configureMicrophoneLabel(microphoneValueLabel)
         configureAccessibilityLabel(accessibilityValueLabel)
         configureInterferenceLabel(systemDictationValueLabel, disabled: runtimeStatus.systemDictationHotkeyDisabled)
         configureDetailLabel(speechModelValueLabel, text: runtimeStatus.speechModelStatus)
@@ -1217,23 +1217,26 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
     }
 
-    private func configureStatusLabel(_ label: NSTextField, granted: Bool) {
-        label.stringValue = granted ? "Granted" : "Missing"
-        label.textColor = granted ? .systemGreen : .systemOrange
+    private func configureMicrophoneLabel(_ label: NSTextField) {
+        if runtimeStatus.microphoneGranted {
+            label.stringValue = "Granted"
+            label.textColor = .systemGreen
+        } else {
+            label.stringValue = "Not available"
+            label.textColor = .systemOrange
+        }
     }
 
     private func permissionHintText() -> String {
-        var blockers: [String] = []
-        if !runtimeStatus.inputMonitoringEffective {
-            blockers.append("Input listener")
-        }
         if !runtimeStatus.microphoneGranted {
-            blockers.append("Microphone")
+            if runtimeStatus.adHocSigned {
+                return "Microphone is not available to this ad-hoc build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+            }
+            return "Microphone is not available to this PressTalk build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
         }
 
-        if !blockers.isEmpty {
-            let blockerText = blockers.joined(separator: ", ")
-            return "\(blockerText) not ready. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+        if !runtimeStatus.inputMonitoringEffective {
+            return "Input listener is not ready. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {

@@ -46,9 +46,18 @@ PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 For repeated local development builds, prefer a stable signing identity:
 
 ```bash
-PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: Example" bash scripts/build_jarvistap.sh
+bash scripts/create_presstalk_local_codesign_identity.sh
+PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" bash scripts/build_jarvistap.sh
+PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
 If no signing identity exists, the build script uses ad-hoc signing. That is fine
 for local smoke tests, but privacy approvals may need to be refreshed after a
 rebuild.
+
+The local identity script creates a self-signed code-signing identity in
+`~/Library/Keychains/presstalk-local-dev.keychain-db` and adds that keychain to
+the user search list. It stores the keychain password locally under
+`~/Library/Application Support/PressTalk/` with user-only permissions. This is
+for development builds only; public release artifacts still need normal release
+signing/notarization before they are treated as production-grade.

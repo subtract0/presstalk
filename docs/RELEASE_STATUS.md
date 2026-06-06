@@ -21,15 +21,19 @@ Verified on `studio1` on 2026-06-06:
   reports the expected asset SHA-256 digest.
 - The `v0.1.5-rc2` zip was unpacked locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, and ad-hoc app signature.
+- A local development code-signing identity was created on `studio1`, and a
+  local build now signs as `Authority=PressTalk Local Development Code Signing`
+  instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
+  build with `PRESSTALK_TRIGGER_KEY=fn`.
 
 Known current blocker:
 
 - `studio1` has repeated ad-hoc development rebuilds. The trace proved one build
   could reach `Input Monitoring permission OK` and `Microphone permission OK`,
-  but the next rebuild changed the ad-hoc CDHash and the current runtime again
-  reports `Startup blocked: Input Monitoring permission missing`. Refresh the
-  permission toggle after the current build, or build with a stable
-  `PRESSTALK_CODESIGN_IDENTITY`, before attempting the Fn dictation smoke.
+  but the next rebuild changed the ad-hoc CDHash and the runtime again reported
+  `Startup blocked: Input Monitoring permission missing`. `studio1` now has a
+  stable local development signing identity, so refresh the permission toggle
+  once for the stable-signed build before attempting the Fn dictation smoke.
 - `v0.1.5-rc2` includes the settings-window fix for this case: the UI now
   distinguishes "not granted to this rebuilt ad-hoc copy" from a generic missing
   permission, and diagnostics include the app code-signature summary.

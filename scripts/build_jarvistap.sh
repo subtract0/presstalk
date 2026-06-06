@@ -71,13 +71,23 @@ cat >"$APP_INFO_PLIST" <<'PLIST'
 PLIST
 
 SIGN_IDENTITY="${PRESSTALK_CODESIGN_IDENTITY:-${CODESIGN_IDENTITY:--}}"
+SIGN_KEYCHAIN="${PRESSTALK_CODESIGN_KEYCHAIN:-}"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
   echo "Code signing: ad-hoc"
 else
   echo "Code signing identity: $SIGN_IDENTITY"
+  if [[ -n "$SIGN_KEYCHAIN" ]]; then
+    echo "Code signing keychain: $SIGN_KEYCHAIN"
+  fi
 fi
-codesign --force --sign "$SIGN_IDENTITY" --timestamp=none --identifier "com.am.jarvistap" "$APP_MACOS_DIR/jarvistap" >/dev/null 2>&1 || true
-codesign --force --sign "$SIGN_IDENTITY" --timestamp=none "$APP_BUNDLE" >/dev/null 2>&1 || true
+
+codesign_args=(--force --sign "$SIGN_IDENTITY" --timestamp=none)
+if [[ -n "$SIGN_KEYCHAIN" ]]; then
+  codesign_args+=(--keychain "$SIGN_KEYCHAIN")
+fi
+
+codesign "${codesign_args[@]}" --identifier "com.am.jarvistap" "$APP_MACOS_DIR/jarvistap"
+codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
 if [[ -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
   rm -rf "$LEGACY_APP_BUNDLE"

@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Carbon.HIToolbox
+import CoreML
 import Darwin
 import Foundation
 import IOKit.hidsystem
@@ -32,6 +33,7 @@ struct JarvisTapConfig {
     let memoryStorePath: String
     let whisperModel: String
     let whisperLanguage: String?
+    let whisperComputePreset: String
     let sayVoice: String?
     let printPartials: Bool
     let traceLogPath: String
@@ -105,6 +107,15 @@ struct JarvisTapConfig {
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
 
+        let whisperComputePreset =
+            (env["PRESSTALK_WHISPER_COMPUTE"] ??
+            env["JARVISTAP_WHISPER_COMPUTE"] ??
+            "cpu-gpu-no-ane")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .nonEmpty ??
+            "cpu-gpu-no-ane"
+
         let traceLogPath =
             env["JARVISTAP_TRACE_LOG"] ??
             "\(homeDirectory)/Library/Logs/jarvistap_trace.log"
@@ -147,6 +158,7 @@ struct JarvisTapConfig {
             memoryStorePath: memoryStorePath,
             whisperModel: whisperModel,
             whisperLanguage: (whisperLanguage?.isEmpty == false) ? whisperLanguage : nil,
+            whisperComputePreset: whisperComputePreset,
             sayVoice: env["JARVISTAP_SAY_VOICE"],
             printPartials: env["JARVISTAP_PRINT_PARTIALS"].map { $0 != "0" } ?? true,
             traceLogPath: traceLogPath,
@@ -2618,6 +2630,56 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private struct WhisperComputeSelection {
+        let label: String
+        let options: ModelComputeOptions?
+    }
+
+    private func whisperComputeSelection() -> WhisperComputeSelection {
+        let preset = config.whisperComputePreset
+            .replacingOccurrences(of: "_", with: "-")
+            .replacingOccurrences(of: "+", with: "-")
+
+        switch preset {
+        case "default", "whisperkit-default", "ane", "neural-engine":
+            return WhisperComputeSelection(
+                label: "whisperkit-default",
+                options: nil
+            )
+        case "cpu", "cpu-only":
+            return WhisperComputeSelection(
+                label: "cpu-only mel=cpuOnly audioEncoder=cpuOnly textDecoder=cpuOnly prefill=cpuOnly",
+                options: ModelComputeOptions(
+                    melCompute: .cpuOnly,
+                    audioEncoderCompute: .cpuOnly,
+                    textDecoderCompute: .cpuOnly,
+                    prefillCompute: .cpuOnly
+                )
+            )
+        case "cpu-gpu", "cpu-gpu-no-ane", "no-ane", "safe":
+            return WhisperComputeSelection(
+                label: "cpu-gpu-no-ane mel=cpuAndGPU audioEncoder=cpuAndGPU textDecoder=cpuAndGPU prefill=cpuOnly",
+                options: ModelComputeOptions(
+                    melCompute: .cpuAndGPU,
+                    audioEncoderCompute: .cpuAndGPU,
+                    textDecoderCompute: .cpuAndGPU,
+                    prefillCompute: .cpuOnly
+                )
+            )
+        default:
+            traceLogger.log("Unknown Whisper compute preset=\(config.whisperComputePreset); using cpu-gpu-no-ane")
+            return WhisperComputeSelection(
+                label: "cpu-gpu-no-ane mel=cpuAndGPU audioEncoder=cpuAndGPU textDecoder=cpuAndGPU prefill=cpuOnly",
+                options: ModelComputeOptions(
+                    melCompute: .cpuAndGPU,
+                    audioEncoderCompute: .cpuAndGPU,
+                    textDecoderCompute: .cpuAndGPU,
+                    prefillCompute: .cpuOnly
+                )
+            )
+        }
+    }
+
     private func loadWhisperKit() async throws {
         print("Loading WhisperKit model: \(config.whisperModel)")
         fflush(stdout)
@@ -2644,11 +2706,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Whisper model download base=\(downloadBase.path)")
         }
 
+        let computeSelection = whisperComputeSelection()
+        traceLogger.log("Whisper compute preset=\(computeSelection.label)")
+
         let wkConfig = WhisperKitConfig(
             model: config.whisperModel,
             downloadBase: downloadBase,
             modelFolder: localModelFolder,
             tokenizerFolder: localTokenizerFolder,
+            computeOptions: computeSelection.options,
             verbose: false,
             logLevel: .error,
             prewarm: false,

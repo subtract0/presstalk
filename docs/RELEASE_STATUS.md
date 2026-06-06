@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc39`
-- Commit: `5425a3fe02eefcdafb299c4e824f7661048c0495`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc39`
-- Asset: `PressTalk-0.1.5-rc39-macos-arm64.zip`
-- SHA-256: `2c8b31b1a7c0c0d6eb09c1df0a2b9f7fc66d6c6255d7b4d47977e6a6afda77c5`
+- Tag: `v0.1.5-rc40`
+- Commit: `8e88a2c2714e4d4713f6b953008e5872b4014620`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc40`
+- Asset: `PressTalk-0.1.5-rc40-macos-arm64.zip`
+- SHA-256: `1125ec492764f718580a3c3f68985bddadc0fce72629d664bf267a4734e83406`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -297,6 +297,38 @@ Verified on `studio1` on 2026-06-06:
   `sha256:2c8b31b1a7c0c0d6eb09c1df0a2b9f7fc66d6c6255d7b4d47977e6a6afda77c5`,
   and the remote tag points at
   `5425a3fe02eefcdafb299c4e824f7661048c0495`.
+- `v0.1.5-rc40` publishes the actual-bundle Accessibility trust probe. The
+  bundled `presstalk-actual-accessibility-probe.sh` launches the installed
+  `PressTalk.app` itself with `PRESSTALK_ACCESSIBILITY_TRUST_PROBE=1` and
+  `kAXTrustedCheckOptionPrompt=false`, records bundle path, bundle id, CDHash,
+  signing authority, and `accessibilityTrusted`, then exits before normal
+  startup. The GitHub release asset digest is
+  `sha256:1125ec492764f718580a3c3f68985bddadc0fce72629d664bf267a4734e83406`,
+  and the remote tag points at
+  `8e88a2c2714e4d4713f6b953008e5872b4014620`.
+- After publishing `v0.1.5-rc40`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `bundlePath=/Users/am/Applications/PressTalk.app`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `codeSignatureCDHash=fb494efe3b8cacf28cc2130e6693a4a498dfd0c1`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `microphoneStatus=preflight_granted`,
+  `inputMonitoringEffective=true`,
+  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `inputListener=hid:listen_only`, `inputPipelineReady=true`,
+  `setupRetryActive=false`, `permissionPaneOpeningAllowed=false`,
+  `accessibilityStatus=ax_false_copy_fallback`, `status.speechModel=Ready`,
+  and `status.triggerPath=Fn / Globe ready`. Status consistency reports matching
+  live process, status bundle path, app bundle path, bundle id, and CDHash.
+- The restored `studio1` actual-bundle probe ran without prompts and reported
+  `status=ran`, `promptRequested=false`, `accessibilityTrusted=false`,
+  `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureCDHash=fb494efe3b8cacf28cc2130e6693a4a498dfd0c1`, and
+  `codeSignatureAuthority=PressTalk Local Development Code Signing` for
+  `/Users/am/Applications/PressTalk.app`.
 - After publishing `v0.1.5-rc39`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,

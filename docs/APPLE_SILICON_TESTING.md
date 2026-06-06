@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc18/PressTalk-0.1.5-rc18-macos-arm64.zip
-echo "8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307  $tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc19/PressTalk-0.1.5-rc19-macos-arm64.zip
+echo "ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98  $tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc19-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307
+ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -187,5 +187,5 @@ Record each machine result before claiming release coverage:
 
 Attach or paste the output of `presstalk-collect-smoke-status.sh` for each
 machine. A successful smoke should show `inputPipelineReady: true`, the trigger
-key used, `WhisperKit ready` / `PressTalk armed` in the trace, and a completed
-dictation paste line.
+key used, `WhisperKit ready` / `PressTalk armed` in the trace, matching values
+in `Status Consistency`, and a completed dictation paste line.

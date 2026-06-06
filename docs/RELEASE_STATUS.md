@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc18`
-- Commit: `53f8b42edfe4e6a1cb738edebbc8567ac9dcc10a`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc18`
-- Asset: `PressTalk-0.1.5-rc18-macos-arm64.zip`
-- SHA-256: `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307`
+- Tag: `v0.1.5-rc19`
+- Commit: `d5152e28576abe29445bd00dcd2c04518961c8b1`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc19`
+- Asset: `PressTalk-0.1.5-rc19-macos-arm64.zip`
+- SHA-256: `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc18` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc19` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc18` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc19` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -86,8 +86,11 @@ Verified on `studio1` on 2026-06-06:
   path. The default app identity remains `com.am.presstalk`, but a machine with
   older working grants can preserve `com.am.jarvistap` without opening privacy
   panes.
-- `studio1`: rc18 was downloaded from GitHub with SHA-256
-  `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307`, then
+- `v0.1.5-rc19` adds a `Status Consistency` section to the bundled smoke-status
+  collector. It compares `runtime-status.json` with the live PressTalk process
+  and installed app signature, so stale or mismatched diagnostics are visible.
+- `studio1`: rc19 was downloaded from GitHub with SHA-256
+  `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98`, then
   bootstrapped with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
@@ -95,15 +98,17 @@ Verified on `studio1` on 2026-06-06:
   `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
   `inputPipelineReady=true`, `setupRetryActive=false`,
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
-  Trace evidence shows `WhisperKit ready` at `2026-06-06T17:25:35Z`.
+  `Status Consistency` reports matching live process ID, bundle identifier, and
+  CDHash. Trace evidence shows `WhisperKit ready` at
+  `2026-06-06T17:37:00Z`.
 
 Known current blocker:
 
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `studio2`: rc18 was downloaded from GitHub with SHA-256
-  `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307` and
+- `studio2`: rc19 was downloaded from GitHub with SHA-256
+  `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts, but runtime is
@@ -112,33 +117,37 @@ Known current blocker:
   `inputPipelineReady=false`, and `setupRetryActive=true`. Read-only TCC
   inspection returned no `com.am.presstalk` or `com.am.jarvistap` rows on
   `studio2`, so this is a first-grant/setup gap rather than the
-  already-granted-but-reported-missing bug.
-- `mbp1`: `v0.1.5-rc17` was downloaded from GitHub with SHA-256
-  `10de71442fe1d54465f71d9e463456b9dc259b6e8e6b10b5de0f697d22467911` and
+  already-granted-but-reported-missing bug. The rc19 `Status Consistency`
+  section reports matching live process ID, bundle identifier, and CDHash, so
+  the blocked status describes the current process.
+- `mbp1`: `v0.1.5-rc19` was downloaded from GitHub with SHA-256
+  `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. The installed app is ad-hoc signed
   with bundle identifier `com.am.presstalk` and CDHash
-  `ede4ea701e897b06b9d7817353f228c192602161`.
+  `234a45356ce762d393f9e9564015fcc97cc9847f`.
 - `mbp1` no longer has the rc15 microphone/listener blocker. Runtime status
-  after rc17 reports `microphoneGranted=true`,
+  after rc19 reports `microphoneGranted=true`,
   `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
   `inputPipelineReady=true`, `setupRetryActive=false`,
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
-  Trace evidence shows the no-ANE compute preset at `2026-06-06T17:09:50Z`
-  and `WhisperKit ready` at `2026-06-06T17:10:21Z`.
-- `v0.1.5-rc18` includes the listen-only event-tap fallback, WhisperKit cache
+  `Status Consistency` reports matching live process ID, bundle identifier, and
+  CDHash. Trace evidence shows `WhisperKit ready` at
+  `2026-06-06T17:37:47Z`.
+- `v0.1.5-rc19` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
   identifier fix, the no-ANE WhisperKit compute preset,
-  `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, and
+  `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, the smoke-status
+  consistency checker, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It is the artifact to use
   for the next cross-machine smoke attempts.
 - Local SSH aliases `s1` and `s2` are still not configured on `studio1`.
-  `studio2` is reachable as `studio2` or `studio2-tb`; `mbp1` was previously
-  reachable via `mbp1-tb` but timed out during the rc18 continuation pass.
+  `studio2` is reachable as `studio2` or `studio2-tb`; `mbp1` is reachable via
+  `mbp1-tb`.
 
 Do not claim full release coverage until these are recorded:
 

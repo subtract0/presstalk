@@ -29,6 +29,7 @@ if [[ ! -x "$APP_BINARY" ]]; then
   echo "  brew tap subtract0/presstalk && brew install --cask presstalk"
   exit 1
 fi
+APP_BUNDLE="$(cd "$(dirname "$APP_BINARY")/../.." && pwd)"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -75,6 +76,23 @@ JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-fn}}"
 JARVISTAP_TRACE_LOG="${JARVISTAP_TRACE_LOG:-$TRACE_LOG}"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+
+xml_escape() {
+  local value="$1"
+  value="${value//&/&amp;}"
+  value="${value//</&lt;}"
+  value="${value//>/&gt;}"
+  value="${value//\"/&quot;}"
+  value="${value//\'/&apos;}"
+  printf '%s' "$value"
+}
+
+open_env_arg() {
+  local key="$1"
+  local value="$2"
+  printf '    <string>--env</string>\n'
+  printf '    <string>%s=%s</string>\n' "$key" "$(xml_escape "$value")"
+}
 
 ENV_BLOCK="  <key>EnvironmentVariables</key>
   <dict>
@@ -124,6 +142,30 @@ fi
 ENV_BLOCK="$ENV_BLOCK
   </dict>"
 
+OPEN_ENV_ARGS="$(
+  open_env_arg HOME "$HOME"
+  open_env_arg PATH "$PATH_VALUE"
+  open_env_arg JARVISTAP_AGENT_MODE "$JARVISTAP_AGENT_MODE"
+  open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "$JARVISTAP_REQUEST_TIMEOUT_SECONDS"
+  open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "$JARVISTAP_RELEASE_TAIL_PADDING_SECONDS"
+  open_env_arg PRESSTALK_TRIGGER_KEY "$PRESSTALK_TRIGGER_KEY"
+  open_env_arg JARVISTAP_TRACE_LOG "$JARVISTAP_TRACE_LOG"
+  open_env_arg JARVISTAP_WHISPERKIT_MODEL "$JARVISTAP_WHISPERKIT_MODEL"
+  open_env_arg JARVISTAP_WHISPER_LANGUAGE "$JARVISTAP_WHISPER_LANGUAGE"
+  open_env_arg JARVISTAP_SAY_VOICE "$JARVISTAP_SAY_VOICE"
+  if [[ -n "${JARVISTAP_PRINT_PARTIALS:-}" ]]; then
+    open_env_arg JARVISTAP_PRINT_PARTIALS "$JARVISTAP_PRINT_PARTIALS"
+  fi
+  if [[ "$JARVISTAP_AGENT_MODE" == "codex-confirm-execute" ]]; then
+    open_env_arg JARVISTAP_CODEX_COMMAND "${JARVISTAP_CODEX_COMMAND:-codex}"
+    open_env_arg JARVISTAP_CODEX_MODEL "${JARVISTAP_CODEX_MODEL:-gpt-5.4}"
+    open_env_arg JARVISTAP_CODEX_PLAN_REASONING_EFFORT "${JARVISTAP_CODEX_PLAN_REASONING_EFFORT:-medium}"
+    open_env_arg JARVISTAP_CODEX_EXEC_REASONING_EFFORT "${JARVISTAP_CODEX_EXEC_REASONING_EFFORT:-high}"
+    open_env_arg JARVISTAP_CODEX_PLAN_TIMEOUT_SECONDS "${JARVISTAP_CODEX_PLAN_TIMEOUT_SECONDS:-120}"
+    open_env_arg JARVISTAP_CODEX_WORKDIR "${JARVISTAP_CODEX_WORKDIR:-$HOME}"
+  fi
+)"
+
 cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -133,7 +175,16 @@ cat >"$PLIST" <<PLIST
   <string>com.am.jarvistap</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$APP_BINARY</string>
+    <string>/usr/bin/open</string>
+    <string>-g</string>
+    <string>-j</string>
+    <string>-W</string>
+    <string>--stdout</string>
+    <string>$LOG_OUT</string>
+    <string>--stderr</string>
+    <string>$LOG_ERR</string>
+$OPEN_ENV_ARGS
+    <string>$(xml_escape "$APP_BUNDLE")</string>
   </array>
 $ENV_BLOCK
   <key>WorkingDirectory</key>

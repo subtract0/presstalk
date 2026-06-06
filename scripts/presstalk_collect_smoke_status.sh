@@ -34,6 +34,16 @@ section "LaunchAgent"
 launchctl print "gui/$(id -u)/$LABEL" 2>&1 |
   awk '/state =|program =|pid =|PRESSTALK_TRIGGER_KEY|job state =/ { print }' || true
 
+section "PressTalk Process"
+ps -axo pid=,ppid=,command= |
+  awk '
+    (index($0, "/PressTalk.app/Contents/MacOS/jarvistap") ||
+    index($0, "/JarvisTap.app/Contents/MacOS/jarvistap")) &&
+    !index($0, " awk ") {
+      print
+    }
+  ' || true
+
 section "Runtime Status"
 if [[ -f "$STATUS_JSON" ]]; then
   cat "$STATUS_JSON"

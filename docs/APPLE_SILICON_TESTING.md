@@ -61,7 +61,8 @@ The cask should:
   `PressTalk.app` before launchd starts it
 - write `~/Library/Application Support/JarvisTap/runtime-status.json`
 - write the LaunchAgent
-- open the macOS permission panes
+- leave macOS permission panes closed unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
+  is set for bootstrap
 
 ## Approvals
 
@@ -74,6 +75,13 @@ Approve the prompts for:
 
 Karabiner is only needed when testing the optional `F5` fallback path. The default
 trigger is native `Fn / Globe`.
+
+If you want bootstrap to open the panes for a fresh machine, run it with:
+
+```bash
+PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
 
 ## Trigger Choices
 

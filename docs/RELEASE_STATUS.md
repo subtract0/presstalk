@@ -42,6 +42,10 @@ Verified on `studio1` on 2026-06-06:
   setup guide, add a `Restart PressTalk` settings action for refreshing macOS
   permission state, and run all permission requests/checks during setup instead
   of stopping at the first missing permission.
+- Current bootstrap runs launch PressTalk through LaunchServices via
+  `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and they
+  no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
+  is set.
 - After the rc5 publish path, the local app was re-bootstrapped and re-signed as
   `Authority=PressTalk Local Development Code Signing`; the collector reports
   `microphoneGranted=true`, `inputMonitoringGranted=false`,

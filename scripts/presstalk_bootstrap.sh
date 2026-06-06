@@ -16,6 +16,7 @@ TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
+PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-0}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -98,6 +99,36 @@ if [[ -x "$KARABINER_HELPER" ]]; then
   /bin/bash "$KARABINER_HELPER" --disable >/dev/null 2>&1 || true
 fi
 
+xml_escape() {
+  local value="$1"
+  value="${value//&/&amp;}"
+  value="${value//</&lt;}"
+  value="${value//>/&gt;}"
+  value="${value//\"/&quot;}"
+  value="${value//\'/&apos;}"
+  printf '%s' "$value"
+}
+
+open_env_arg() {
+  local key="$1"
+  local value="$2"
+  printf '    <string>--env</string>\n'
+  printf '    <string>%s=%s</string>\n' "$key" "$(xml_escape "$value")"
+}
+
+OPEN_ENV_ARGS="$(
+  open_env_arg HOME "$HOME"
+  open_env_arg PATH "$PATH_VALUE"
+  open_env_arg JARVISTAP_AGENT_MODE "dictation"
+  open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "30"
+  open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "0.35"
+  open_env_arg PRESSTALK_TRIGGER_KEY "$PRESSTALK_TRIGGER_KEY"
+  open_env_arg JARVISTAP_TRACE_LOG "$TRACE_LOG"
+  open_env_arg JARVISTAP_WHISPERKIT_MODEL "openai_whisper-large-v3-v20240930_turbo_632MB"
+  open_env_arg JARVISTAP_WHISPER_LANGUAGE "de"
+  open_env_arg JARVISTAP_SAY_VOICE "Samantha"
+)"
+
 cat >"$PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -107,7 +138,16 @@ cat >"$PLIST" <<PLIST
   <string>com.am.jarvistap</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$APP_BINARY</string>
+    <string>/usr/bin/open</string>
+    <string>-g</string>
+    <string>-j</string>
+    <string>-W</string>
+    <string>--stdout</string>
+    <string>$LOG_OUT</string>
+    <string>--stderr</string>
+    <string>$LOG_ERR</string>
+$OPEN_ENV_ARGS
+    <string>$(xml_escape "$APP_BUNDLE")</string>
   </array>
   <key>EnvironmentVariables</key>
   <dict>
@@ -158,9 +198,11 @@ launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap" >/dev/null 2>&1 || true
 
 # Do not also `open -a` the app here. The LaunchAgent already starts it, and
 # opening the app bundle separately can create a second live dictation agent.
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" >/dev/null 2>&1 || true
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" >/dev/null 2>&1 || true
-open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" >/dev/null 2>&1 || true
+if [[ "$PRESSTALK_OPEN_PERMISSION_PANES" == "1" ]]; then
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone" >/dev/null 2>&1 || true
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent" >/dev/null 2>&1 || true
+  open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" >/dev/null 2>&1 || true
+fi
 
 cat <<EOF
 PressTalk bootstrap completed.
@@ -168,6 +210,7 @@ PressTalk bootstrap completed.
 Installed:
 - LaunchAgent: $PLIST
 - Stable local signing: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
+- Open permission panes: $PRESSTALK_OPEN_PERMISSION_PANES
 
 Next:
 1. Allow PressTalk microphone access

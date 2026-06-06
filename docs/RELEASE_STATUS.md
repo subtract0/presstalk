@@ -142,7 +142,7 @@ Verified on `studio1` on 2026-06-06:
   `CFBundleSupportedPlatforms`, `CFBundleSignature`,
   `NSSupportsSuddenTermination`, `TISIconIsTemplate`, a visible
   `ComponentInputModeDict`, and exported `PressTalkIMController` ObjC class.
-  The installer clears quarantine/provenance metadata from the copied
+  The installer attempts to clear quarantine/provenance metadata from the copied
   `~/Library/Input Methods/PressTalkInputMethod.app`.
 - Current `studio1` rc33 evidence: the bundled client probe from
   `~/Applications/PressTalk.app` fails cleanly with
@@ -185,11 +185,15 @@ Verified on `studio1` on 2026-06-06:
   no-pane Settings hint names the exact bundle id/CDHash being checked and says
   that the run will not open System Settings.
 - The release bundle now includes `presstalk-unicode-event-insert-probe.swift`.
-  On `studio1`, this probe posted Unicode CGEvents into a focused local
-  `NSTextView` while `AXIsProcessTrusted=false`, but observed no inserted text:
-  `success=false`, `reason=timeout_waiting_for_payload`, `postResult=posted`,
-  `observedText=""`. This rules out the old Unicode CGEvent path as a reliable
-  no-Accessibility insertion fallback on this machine.
+  On `studio1`, the original probe posted Unicode CGEvents into a focused local
+  `NSTextView` while `AXIsProcessTrusted=false`, but observed no inserted text.
+  Post-rc35 local debugging expanded the same probe to test HID, session,
+  annotated-session, and PID-targeted posting. Result JSON
+  `unicode-event-insert-probe-2026-06-06T21-54-53-225Z.json` reports
+  `success=false`, `reason=timeout_waiting_for_payload`, `observedText=""`,
+  and all four `methodResults` have `postResult=posted` with `success=false`.
+  This rules out these CGEvent routes as reliable no-Accessibility insertion
+  fallbacks on this machine.
 - After the local identity regression was reproduced, `studio1` was restored
   with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
@@ -211,6 +215,12 @@ Verified on `studio1` on 2026-06-06:
   both verify. Treat the remaining IMK failure as a macOS input-source
   discovery/trust blocker, not as missing Microphone, Input Monitoring, or
   Accessibility permissions.
+- Post-rc35 local debugging made the generated input-method bundle more
+  Apple-like by removing `LSBackgroundOnly`, using string-valued `LSUIElement`,
+  adding `CFBundleIconFile`, and making the build-script `--install` path
+  attempt quarantine/provenance cleanup. Rebuild/install/register still reports
+  `TISRegisterInputSource=0` and `recognizedSourceCount=0`, so these metadata
+  changes are not sufficient to solve TIS discovery on `studio1`.
 - A skipped macOS signing/trust password prompt can explain earlier unstable
   local identity behavior: builds may still receive a code signature, but a
   self-signed development identity is not a production Gatekeeper approval. Do

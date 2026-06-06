@@ -55,7 +55,7 @@ The installed bundle path is:
 
 Current builds sign the prototype with the same local development identity as
 `PressTalk.app` unless `PRESSTALK_BUILD_STABLE_SIGNING=0` is set. The generated
-bundle also carries the documented IMK metadata keys `LSBackgroundOnly`,
+bundle also carries the IMK metadata keys `CFBundleIconFile`, `LSUIElement`,
 `tsInputMethodIconFileKey`, and `tsInputMethodCharacterRepertoireKey`.
 
 Installing the bundle does not select it as the active input source. macOS may
@@ -114,6 +114,14 @@ app, and `PressTalkIMController` is exported under that Objective-C class name.
 TIS still reports `recognizedSourceCount=0`. Treat that as a macOS input-source
 discovery/trust blocker, not a missing Microphone, Input Monitoring, or
 Accessibility permission.
+
+The non-IMK event route is also ruled out on `studio1` while
+`AXIsProcessTrusted=false`. The bundled `presstalk-unicode-event-insert-probe`
+now tries Unicode CGEvents through HID, session, annotated-session, and
+PID-targeted posting. Local evidence from
+`~/Library/Application Support/JarvisTap/Diagnostics/unicode-event-insert-probe-2026-06-06T21-54-53-225Z.json`
+shows all four methods reported `postResult=posted` but `success=false` and
+`observedText=""`.
 
 After the input method is installed, selected, and focused in an editable text
 field, post a probe insert:

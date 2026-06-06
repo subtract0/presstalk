@@ -33,8 +33,9 @@ private func parseOptions() -> Options {
             print("""
             Usage: presstalk-unicode-event-insert-probe.swift [--payload TEXT] [--timeout SECONDS] [--json]
 
-            Opens a local text view, posts Unicode CGEvent key events, and
-            reports whether the payload lands. It does not open System Settings.
+            Opens a local text view, posts Unicode CGEvent key events through
+            several delivery paths, and reports whether the payload lands. It
+            does not open System Settings.
             """)
             exit(0)
         default:
@@ -71,9 +72,11 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
 
     private var window: NSWindow?
     private var textView: NSTextView?
-    private var timer: Timer?
     private var didFinish = false
-    private var postResult = "not_posted"
+    private var postResult = "not_started"
+    private var methodResults: [[String: Any]] = []
+    private let postMethods = ["hid", "session", "annotated", "pid"]
+    private var methodIndex = 0
 
     init(options: Options) {
         self.options = options
@@ -83,10 +86,7 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         openProbeWindow()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in
-            self?.postPayload()
-        }
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.poll()
+            self?.runNextMethod()
         }
     }
 
@@ -119,9 +119,29 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
         self.textView = textView
     }
 
-    private func postPayload() {
+    private func runNextMethod() {
+        guard !didFinish else { return }
+        guard methodIndex < postMethods.count else {
+            let succeeded = methodResults.contains { result in
+                (result["success"] as? Bool) == true
+            }
+            finish(success: succeeded, reason: succeeded ? "payload_inserted" : "timeout_waiting_for_payload")
+            return
+        }
+
+        let method = postMethods[methodIndex]
+        methodIndex += 1
+        textView?.string = ""
+
         guard let window, let textView else {
             postResult = "no_target_window"
+            methodResults.append([
+                "method": method,
+                "postResult": postResult,
+                "observedText": "",
+                "success": false,
+            ])
+            runNextMethod()
             return
         }
 
@@ -129,36 +149,62 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
         window.makeFirstResponder(textView)
         NSApp.activate(ignoringOtherApps: true)
 
-        guard let source = CGEventSource(stateID: .hidSystemState),
-              let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
-        else {
-            postResult = "event_synthesis_unavailable"
-            return
+        let posted = postPayload(method: method, targetPID: getpid())
+        DispatchQueue.main.asyncAfter(deadline: .now() + perMethodTimeoutSeconds) { [weak self] in
+            guard let self else { return }
+            let observed = textView.string
+            let success = observed.contains(self.options.payload)
+            self.methodResults.append([
+                "method": method,
+                "postResult": posted,
+                "observedText": observed,
+                "success": success,
+            ])
+            self.runNextMethod()
         }
+    }
 
+    private var perMethodTimeoutSeconds: TimeInterval {
+        max(0.25, options.timeoutSeconds / Double(max(postMethods.count, 1)))
+    }
+
+    private func postPayload(method: String, targetPID: pid_t) -> String {
         for codeUnit in options.payload.utf16 {
             var unit = codeUnit
+            guard let source = CGEventSource(stateID: .hidSystemState),
+                  let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
+                  let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+            else {
+                postResult = "event_synthesis_unavailable"
+                return postResult
+            }
+
             keyDown.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
             keyUp.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
             keyDown.flags = []
             keyUp.flags = []
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
-        }
-        postResult = "posted"
-    }
 
-    private func poll() {
-        guard !didFinish else { return }
-        let observed = textView?.string ?? ""
-        if observed.contains(options.payload) {
-            finish(success: true, reason: "payload_inserted")
-            return
+            switch method {
+            case "hid":
+                keyDown.post(tap: .cghidEventTap)
+                keyUp.post(tap: .cghidEventTap)
+            case "session":
+                keyDown.post(tap: .cgSessionEventTap)
+                keyUp.post(tap: .cgSessionEventTap)
+            case "annotated":
+                keyDown.post(tap: .cgAnnotatedSessionEventTap)
+                keyUp.post(tap: .cgAnnotatedSessionEventTap)
+            case "pid":
+                keyDown.postToPid(targetPID)
+                keyUp.postToPid(targetPID)
+            default:
+                postResult = "unknown_method"
+                return postResult
+            }
         }
-        if Date().timeIntervalSince(startedAt) >= options.timeoutSeconds {
-            finish(success: false, reason: "timeout_waiting_for_payload")
-        }
+
+        postResult = "posted"
+        return postResult
     }
 
     private func writeDiagnostics(_ payload: [String: Any]) -> String {
@@ -179,7 +225,6 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
     private func finish(success: Bool, reason: String) {
         guard !didFinish else { return }
         didFinish = true
-        timer?.invalidate()
 
         var payload: [String: Any] = [
             "success": success,
@@ -187,9 +232,12 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
             "payload": options.payload,
             "observedText": textView?.string ?? "",
             "postResult": postResult,
+            "methodResults": methodResults,
+            "targetProcessID": getpid(),
             "accessibilityTrusted": AXIsProcessTrusted(),
             "durationSeconds": Date().timeIntervalSince(startedAt),
             "timeoutSeconds": options.timeoutSeconds,
+            "perMethodTimeoutSeconds": perMethodTimeoutSeconds,
         ]
         payload["diagnosticPath"] = writeDiagnostics(payload)
 
@@ -203,7 +251,9 @@ private final class UnicodeEventProbeApp: NSObject, NSApplicationDelegate {
             print("Post result: \(postResult)")
             print("Accessibility trusted: \(AXIsProcessTrusted())")
             print("Diagnostic: \(payload["diagnosticPath"] ?? "unknown")")
-            print("Observed text: \(payload["observedText"] ?? "")")
+            for result in methodResults {
+                print("Method \(result["method"] ?? "unknown"): success=\(result["success"] ?? false) post=\(result["postResult"] ?? "unknown") observed=\(result["observedText"] ?? "")")
+            }
         }
         NSApp.terminate(nil)
     }

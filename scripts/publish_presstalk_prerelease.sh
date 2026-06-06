@@ -82,9 +82,10 @@ original input source.
 
 The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
 local text view and posts per-character Unicode CGEvents without opening System
-Settings. On studio1 this probe posted events but observed no inserted text
-while Accessibility was untrusted, which rules out the old Unicode event path as
-a reliable no-Accessibility insertion fallback on that machine.
+Settings. It tests HID, session, annotated-session, and PID-targeted event
+delivery. On studio1 these paths posted events but observed no inserted text
+while Accessibility was untrusted, which rules out these CGEvent routes as
+reliable no-Accessibility insertion fallbacks on that machine.
 
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local

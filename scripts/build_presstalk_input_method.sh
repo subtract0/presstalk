@@ -99,6 +99,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>$INPUT_METHOD_BUNDLE_ID</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleIconFile</key>
+  <string>$ICON_FILE</string>
   <key>CFBundleName</key>
   <string>PressTalkInputMethod</string>
   <key>CFBundlePackageType</key>
@@ -153,12 +155,10 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>PressTalkIMController</string>
   <key>InputMethodServerDelegateClass</key>
   <string>PressTalkIMController</string>
-  <key>LSBackgroundOnly</key>
-  <true/>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
-  <true/>
+  <string>1</string>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSSupportsSuddenTermination</key>
@@ -197,6 +197,8 @@ if [[ "$INSTALL" == "1" ]]; then
   mkdir -p "$HOME/Library/Input Methods"
   rm -rf "$INSTALLED_BUNDLE"
   ditto "$APP_BUNDLE" "$INSTALLED_BUNDLE"
+  /usr/bin/xattr -dr com.apple.quarantine "$INSTALLED_BUNDLE" >/dev/null 2>&1 || true
+  /usr/bin/xattr -dr com.apple.provenance "$INSTALLED_BUNDLE" >/dev/null 2>&1 || true
   echo "Installed input method prototype: $INSTALLED_BUNDLE"
   echo "You may need to log out/in or manually add/select this input source before it can receive a text client."
 else

@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 APP_CONTENTS_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 APP_BUNDLE="$(cd "$APP_CONTENTS_DIR/.." && pwd)"
 APP_BINARY="$APP_CONTENTS_DIR/MacOS/jarvistap"
+LOCAL_CODESIGN_HELPER="$APP_CONTENTS_DIR/Resources/create-presstalk-local-codesign-identity.sh"
 KARABINER_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-karabiner-fallback.sh"
 DISABLE_DICTATION_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-disable-system-dictation.sh"
 PLIST="$HOME/Library/LaunchAgents/com.am.jarvistap.plist"
@@ -14,6 +15,7 @@ LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
 TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -54,6 +56,43 @@ terminate_existing_presstalk() {
 # Homebrew-installed GitHub app archives can still arrive quarantined on a fresh Mac.
 # Clear that before launchd tries to exec the app, otherwise launchd may report OS_REASON_EXEC.
 /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
+
+launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
+terminate_existing_presstalk
+
+resign_with_local_identity_if_possible() {
+  if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" != "1" ]]; then
+    echo "Stable local signing skipped: PRESSTALK_BOOTSTRAP_STABLE_SIGNING=$PRESSTALK_BOOTSTRAP_STABLE_SIGNING"
+    return 0
+  fi
+  if [[ ! -x "$LOCAL_CODESIGN_HELPER" ]]; then
+    echo "Stable local signing skipped: helper missing from app bundle."
+    return 0
+  fi
+
+  local output identity_hash
+  if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+    echo "$output"
+    echo "Stable local signing skipped: could not prepare local code-signing identity."
+    return 0
+  fi
+  identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
+  if [[ -z "$identity_hash" ]]; then
+    echo "$output"
+    echo "Stable local signing skipped: helper did not report an identity hash."
+    return 0
+  fi
+
+  echo "Stable local signing identity: $identity_hash"
+  if codesign --force --sign "$identity_hash" --timestamp=none --identifier "com.am.jarvistap" "$APP_BINARY" &&
+    codesign --force --sign "$identity_hash" --timestamp=none "$APP_BUNDLE"; then
+    echo "Stable local signing applied to PressTalk.app."
+  else
+    echo "Stable local signing skipped: codesign failed."
+  fi
+}
+
+resign_with_local_identity_if_possible
 
 if [[ -x "$KARABINER_HELPER" ]]; then
   /bin/bash "$KARABINER_HELPER" --disable >/dev/null 2>&1 || true
@@ -114,8 +153,6 @@ PLIST
 chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
-launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
-terminate_existing_presstalk
 launchctl bootstrap "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap" >/dev/null 2>&1 || true
 
@@ -130,6 +167,7 @@ PressTalk bootstrap completed.
 
 Installed:
 - LaunchAgent: $PLIST
+- Stable local signing: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
 
 Next:
 1. Allow PressTalk microphone access

@@ -57,6 +57,8 @@ The cask should:
 
 - install `PressTalk.app`
 - run the bundled bootstrap helper
+- create or reuse a local development code-signing identity, then re-sign
+  `PressTalk.app` before launchd starts it
 - write the LaunchAgent
 - open the macOS permission panes
 

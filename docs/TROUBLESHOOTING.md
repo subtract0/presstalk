@@ -43,7 +43,18 @@ tccutil reset Accessibility com.am.jarvistap
 PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
-For repeated local development builds, prefer a stable signing identity:
+Current bootstrap helpers try to stabilize local signing automatically. They
+create or reuse a self-signed local development identity, re-sign
+`PressTalk.app`, then start the LaunchAgent. Disable that behavior only for
+debugging:
+
+```bash
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
+
+For repeated local development builds from the source tree, prefer a stable
+signing identity:
 
 ```bash
 bash scripts/create_presstalk_local_codesign_identity.sh

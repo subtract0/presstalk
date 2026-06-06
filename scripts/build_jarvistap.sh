@@ -34,6 +34,8 @@ cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/
 chmod 755 "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
 cp "$PKG_DIR/scripts/presstalk_karabiner_fallback.sh" "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
+cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
+chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 
 cat >"$APP_INFO_PLIST" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

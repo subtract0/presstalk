@@ -25,6 +25,10 @@ Verified on `studio1` on 2026-06-06:
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
   build with `PRESSTALK_TRIGGER_KEY=fn`.
+- The bundled bootstrap path was tested on `studio1`: a normal ad-hoc build was
+  re-signed by the app-bundled local-signing helper before launchd started it.
+  The resulting app reports `Authority=PressTalk Local Development Code
+  Signing`, and launchd is running it with `PRESSTALK_TRIGGER_KEY=fn`.
 
 Known current blocker:
 

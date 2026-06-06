@@ -271,6 +271,27 @@ Verified on `studio1` on 2026-06-06:
   `setupRetryActive=false`, `permissionPaneOpeningAllowed=false`,
   `accessibilityStatus=ax_false_copy_fallback`, `status.speechModel=Ready`,
   and `status.triggerPath=Fn / Globe ready`.
+- Post-rc38 local debugging tested whether the Accessibility mismatch was caused
+  by the app path. Copying the same `com.am.jarvistap` stable-signed app to
+  `/Applications/PressTalk.app` and bootstrapping with no-pane flags still
+  reported `accessibilityStatus=ax_false_copy_fallback`, so the current
+  `AXIsProcessTrusted=false` blocker is not fixed by switching from
+  `~/Applications/PressTalk.app` to `/Applications/PressTalk.app`.
+- Post-rc38 local debugging fixed a smoke-status blind spot: the bundled
+  collector now derives the inspected app bundle from the live PressTalk process
+  before falling back to install defaults, and it prints both
+  `Status bundle path` and `App bundle path`. This prevents path/signature
+  mismatch audits from accidentally inspecting `~/Applications/PressTalk.app`
+  while launchd is running `/Applications/PressTalk.app`.
+- Post-rc38 InputMethodKit debugging removed the stale
+  `com.am.presstalk.inputmethod.dictation` mode assumption from the status and
+  client probes. The generated input method now uses the single source id
+  `com.am.presstalk.inputmethod` with Apple-documented IMK metadata. On
+  `studio1`, `TISRegisterInputSource=0`, but
+  `recognizedSourceCount=0`, `recognizedEnabledSourceCount=0`, and
+  `recognizedAllSourceCount=0` remain after installing, registering, moving aside
+  `~/Library/Caches/com.apple.tiswitcher.cache`, and restarting text-input
+  agents.
 - After publishing `v0.1.5-rc37`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,

@@ -55,9 +55,9 @@ The installed bundle path is:
 
 Current builds sign the prototype with the same local development identity as
 `PressTalk.app` unless `PRESSTALK_BUILD_STABLE_SIGNING=0` is set. The generated
-bundle also carries the IMK metadata keys `LSBackgroundOnly`, `CFBundleIconFile`,
-`LSUIElement`, `tsInputMethodIconFileKey`, and
-`tsInputMethodCharacterRepertoireKey`.
+bundle uses a single source id, `com.am.presstalk.inputmethod`, and carries the
+IMK metadata keys `LSBackgroundOnly`, `CFBundleIconFile`, `LSUIElement`,
+`tsInputMethodIconFileKey`, and `tsInputMethodCharacterRepertoireKey`.
 
 Installing the bundle does not select it as the active input source. macOS may
 require logout/login or manual input-source selection before the input method
@@ -108,13 +108,15 @@ If `reason=input_method_not_selectable`, TIS did not expose the installed input
 method as an enable/select-capable source. In that state, manual notification
 probes are not meaningful yet because no focused client can be attached.
 
-Current studio1 evidence after the stable-signing and metadata pass:
+Current studio1 evidence after the stable-signing and metadata passes:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the
 app, and `PressTalkIMController` is exported under that Objective-C class name.
-TIS still reports `recognizedSourceCount=0`. Treat that as a macOS input-source
-discovery/trust blocker, not a missing Microphone, Input Monitoring, or
-Accessibility permission.
+Both the richer input-mode plist and the current single-source plist still
+report `recognizedSourceCount=0`, even after moving aside
+`~/Library/Caches/com.apple.tiswitcher.cache` and restarting text-input agents.
+Treat that as a macOS input-source discovery/trust blocker, not a missing
+Microphone, Input Monitoring, or Accessibility permission.
 
 The non-IMK event route is also ruled out on `studio1` while
 `AXIsProcessTrusted=false`. The bundled `presstalk-unicode-event-insert-probe`

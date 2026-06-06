@@ -29,7 +29,6 @@ done
 PRODUCT="presstalk-input-method"
 APP_NAME="PressTalkInputMethod.app"
 INPUT_METHOD_BUNDLE_ID="com.am.presstalk.inputmethod"
-INPUT_MODE_ID="com.am.presstalk.inputmethod.dictation"
 BUILD_DIR="$ROOT/.build/presstalk-input-method"
 APP_BUNDLE="${APP_BUNDLE_OVERRIDE:-$BUILD_DIR/$APP_NAME}"
 APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
@@ -114,41 +113,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>3</string>
-  <key>ComponentInputModeDict</key>
-  <dict>
-    <key>tsInputModeListKey</key>
-    <dict>
-      <key>$INPUT_MODE_ID</key>
-      <dict>
-        <key>TISInputSourceID</key>
-        <string>$INPUT_MODE_ID</string>
-        <key>TISIconLabels</key>
-        <dict>
-          <key>Primary</key>
-          <string>PT</string>
-        </dict>
-        <key>TISIntendedLanguage</key>
-        <string>en</string>
-        <key>tsInputModeMenuIconFileKey</key>
-        <string>$ICON_FILE</string>
-        <key>tsInputModePaletteIconFileKey</key>
-        <string>$ICON_FILE</string>
-        <key>tsInputModeDefaultStateKey</key>
-        <true/>
-        <key>tsInputModeIsVisibleKey</key>
-        <true/>
-        <key>tsInputModePrimaryInScriptKey</key>
-        <true/>
-        <key>tsInputModeScriptKey</key>
-        <string>smUnicodeScript</string>
-      </dict>
-  </dict>
-  <key>tsVisibleInputModeOrderedArrayKey</key>
-  <array>
-      <string>$INPUT_MODE_ID</string>
-  </array>
-  </dict>
+  <string>4</string>
   <key>InputMethodConnectionName</key>
   <string>PressTalkInputMethod_1_Connection</string>
   <key>InputMethodServerControllerClass</key>
@@ -160,7 +125,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
-  <string>1</string>
+  <true/>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
   <key>NSSupportsSuddenTermination</key>
@@ -173,7 +138,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>en</string>
   <key>tsInputMethodCharacterRepertoireKey</key>
   <array>
-    <string>Latn</string>
+    <string>en</string>
   </array>
   <key>tsInputMethodIconFileKey</key>
   <string>$ICON_FILE</string>

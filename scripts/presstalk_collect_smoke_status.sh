@@ -2,11 +2,6 @@
 set -euo pipefail
 
 LABEL="${PRESSTALK_LAUNCH_LABEL:-com.am.jarvistap}"
-APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-$HOME/Applications/PressTalk.app}"
-if [[ ! -d "$APP_BUNDLE" && -d "/Applications/PressTalk.app" ]]; then
-  APP_BUNDLE="/Applications/PressTalk.app"
-fi
-
 STATUS_JSON="${PRESSTALK_STATUS_JSON:-$HOME/Library/Application Support/JarvisTap/runtime-status.json}"
 TRACE_LOG="${PRESSTALK_TRACE_LOG:-$HOME/Library/Logs/jarvistap_trace.log}"
 
@@ -184,6 +179,34 @@ presstalk_processes() {
     '
 }
 
+live_app_bundle() {
+  printf '%s\n' "$1" |
+    awk '
+      {
+        for (i = 3; i <= NF; i++) {
+          if ($i ~ /\/(PressTalk|JarvisTap)\.app\/Contents\/MacOS\/jarvistap$/) {
+            sub(/\/Contents\/MacOS\/jarvistap$/, "", $i)
+            print $i
+            exit
+          }
+        }
+      }
+    '
+}
+
+LIVE_PROCESSES="$(presstalk_processes || true)"
+if [[ -n "${PRESSTALK_APP_BUNDLE:-}" ]]; then
+  APP_BUNDLE="$PRESSTALK_APP_BUNDLE"
+else
+  APP_BUNDLE="$(live_app_bundle "$LIVE_PROCESSES")"
+  if [[ -z "$APP_BUNDLE" ]]; then
+    APP_BUNDLE="$HOME/Applications/PressTalk.app"
+    if [[ ! -d "$APP_BUNDLE" && -d "/Applications/PressTalk.app" ]]; then
+      APP_BUNDLE="/Applications/PressTalk.app"
+    fi
+  fi
+fi
+
 section "Machine"
 hostname || true
 uname -m || true
@@ -207,7 +230,6 @@ launchctl print "gui/$(id -u)/$LABEL" 2>&1 |
   awk '/state =|program =|pid =|PRESSTALK_TRIGGER_KEY|job state =/ { print }' || true
 
 section "PressTalk Process"
-LIVE_PROCESSES="$(presstalk_processes || true)"
 if [[ -n "$LIVE_PROCESSES" ]]; then
   printf '%s\n' "$LIVE_PROCESSES"
 else
@@ -227,6 +249,7 @@ if [[ -f "$STATUS_JSON" ]]; then
   STATUS_PID="$(json_value app.processID)"
   STATUS_GENERATED_AT="$(json_value generatedAt)"
   STATUS_BUNDLE_IDENTIFIER="$(json_value app.bundleIdentifier)"
+  STATUS_BUNDLE_PATH="$(json_value app.bundlePath)"
   STATUS_CDHASH="$(status_signature_value CDHash)"
   APP_BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
   APP_CDHASH="$(app_signature_value CDHash)"
@@ -239,6 +262,8 @@ if [[ -f "$STATUS_JSON" ]]; then
   echo "Status processID: ${STATUS_PID:-unknown}"
   echo "Live processIDs: ${LIVE_PIDS:-none}"
   echo "Status bundle identifier: ${STATUS_BUNDLE_IDENTIFIER:-unknown}"
+  echo "Status bundle path: ${STATUS_BUNDLE_PATH:-unknown}"
+  echo "App bundle path: ${APP_BUNDLE:-unknown}"
   echo "App bundle identifier: ${APP_BUNDLE_IDENTIFIER:-unknown}"
   echo "Status CDHash: ${STATUS_CDHASH:-unknown}"
   echo "App CDHash: ${APP_CDHASH:-unknown}"
@@ -250,6 +275,9 @@ if [[ -f "$STATUS_JSON" ]]; then
   fi
   if [[ -n "$STATUS_BUNDLE_IDENTIFIER" && -n "$APP_BUNDLE_IDENTIFIER" && "$STATUS_BUNDLE_IDENTIFIER" != "$APP_BUNDLE_IDENTIFIER" ]]; then
     echo "Warning: runtime-status.json bundle identifier differs from the installed app."
+  fi
+  if [[ -n "$STATUS_BUNDLE_PATH" && -n "$APP_BUNDLE" && "$STATUS_BUNDLE_PATH" != "$APP_BUNDLE" ]]; then
+    echo "Warning: runtime-status.json bundle path differs from the inspected app."
   fi
   if [[ -n "$STATUS_CDHASH" && -n "$APP_CDHASH" && "$STATUS_CDHASH" != "$APP_CDHASH" ]]; then
     echo "Warning: runtime-status.json code signature differs from the installed app."

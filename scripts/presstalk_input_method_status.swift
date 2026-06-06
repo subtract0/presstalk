@@ -3,7 +3,7 @@ import Carbon
 import Foundation
 
 private let inputMethodSourceID = "com.am.presstalk.inputmethod"
-private let inputModeSourceID = "com.am.presstalk.inputmethod.dictation"
+private let inputModeSourceID = inputMethodSourceID
 private let bundleIdentifier = "com.am.presstalk.inputmethod"
 private let appName = "PressTalkInputMethod.app"
 

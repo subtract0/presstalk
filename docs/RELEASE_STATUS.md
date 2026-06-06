@@ -46,6 +46,9 @@ Verified on `studio1` on 2026-06-06:
   `/usr/bin/open -gjW` so macOS privacy identity is app-bundle based, and they
   no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
   is set.
+- Current startup/setup checks no longer call macOS permission-request APIs
+  automatically. They only preflight and attempt the real listener capability,
+  so repeated restarts do not keep prompting for already-approved permissions.
 - After the rc6 publish path, the local app was re-bootstrapped and re-signed as
   `Authority=PressTalk Local Development Code Signing`; the collector reports
   LaunchAgent `program = /usr/bin/open`, `Open permission panes: 0`,

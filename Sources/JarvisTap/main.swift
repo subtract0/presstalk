@@ -1218,31 +1218,25 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func completeStartupIfPossible(
         showSetupWindowOnFailure: Bool,
         forcePresentSetupWindow: Bool = false,
-        presentFailureStatus: Bool = true
+        presentFailureStatus: Bool = true,
+        requestPermissionPrompts: Bool = false
     ) {
         refreshRuntimeStatusUI()
-        let permissions = checkSetupPermissions(requestPrompts: presentFailureStatus)
+        let permissions = checkSetupPermissions(requestPrompts: requestPermissionPrompts)
 
         if presentFailureStatus {
             print("Checking Input Monitoring permission...")
             fflush(stdout)
         }
-        guard permissions.inputMonitoringGranted else {
+        if permissions.inputMonitoringGranted {
+            traceLogger.log("Input Monitoring permission OK")
+        } else {
+            traceLogger.log("Input Monitoring preflight unavailable; attempting listener capability probe")
             if presentFailureStatus {
-                traceLogger.log("Startup blocked: Input Monitoring permission missing")
-                printInputMonitoringHelp()
-                present(.setupRequired("Allow Input Monitoring, then run Setup Check."))
+                print("Input Monitoring preflight unavailable; trying the key listener anyway.")
+                fflush(stdout)
             }
-            refreshRuntimeStatusUI()
-            scheduleSetupRetry()
-            if showSetupWindowOnFailure || forcePresentSetupWindow {
-                DispatchQueue.main.async { [weak self] in
-                    self?.settingsWindowController?.present()
-                }
-            }
-            return
         }
-        traceLogger.log("Input Monitoring permission OK")
 
         if presentFailureStatus {
             print("Checking microphone permission...")
@@ -1273,22 +1267,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             print("Checking Accessibility permission...")
             fflush(stdout)
         }
-        guard permissions.accessibilityGranted else {
+        if permissions.accessibilityGranted {
+            traceLogger.log("Accessibility permission OK")
+        } else {
+            traceLogger.log("Accessibility preflight unavailable; paste will use capability probe")
             if presentFailureStatus {
-                traceLogger.log("Startup blocked: Accessibility permission missing")
-                printAccessibilityHelp()
-                present(.setupRequired("Allow Accessibility, then run Setup Check."))
+                print("Accessibility preflight unavailable; continuing and testing paste when needed.")
+                fflush(stdout)
             }
-            refreshRuntimeStatusUI()
-            scheduleSetupRetry()
-            if showSetupWindowOnFailure || forcePresentSetupWindow {
-                DispatchQueue.main.async { [weak self] in
-                    self?.settingsWindowController?.present()
-                }
-            }
-            return
         }
-        traceLogger.log("Accessibility permission OK")
 
         if !inputPipelineReady {
             installDarwinTriggerNotifications()
@@ -1356,7 +1343,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             self.completeStartupIfPossible(
                 showSetupWindowOnFailure: false,
                 forcePresentSetupWindow: false,
-                presentFailureStatus: false
+                presentFailureStatus: false,
+                requestPermissionPrompts: false
             )
         }
         setupRetryTimer = timer
@@ -2939,16 +2927,31 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return app.handle(eventType: type, event: event)
         }
 
-        guard let tap = CGEvent.tapCreate(
-            tap: .cghidEventTap,
-            place: .headInsertEventTap,
-            options: .defaultTap,
-            eventsOfInterest: CGEventMask(mask),
-            callback: callback,
-            userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-        ) else {
-            return false
+        let tapLocations: [(CGEventTapLocation, String)] = [
+            (.cghidEventTap, "hid"),
+            (.cgSessionEventTap, "session"),
+        ]
+
+        var selectedTap: CFMachPort?
+        var selectedTapName = ""
+        for (location, name) in tapLocations {
+            guard let tap = CGEvent.tapCreate(
+                tap: location,
+                place: .headInsertEventTap,
+                options: .defaultTap,
+                eventsOfInterest: CGEventMask(mask),
+                callback: callback,
+                userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+            ) else {
+                traceLogger.log("Global event tap create failed location=\(name)")
+                continue
+            }
+            selectedTap = tap
+            selectedTapName = name
+            break
         }
+
+        guard let tap = selectedTap else { return false }
 
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
             return false
@@ -2958,6 +2961,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        traceLogger.log("Global event tap installed location=\(selectedTapName)")
         return true
     }
 
@@ -4042,8 +4046,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func insertTranscriptIntoFocusedApp(_ transcript: String) throws {
-        guard AXIsProcessTrusted() else {
-            throw JarvisTapError.accessibilityPermissionMissing
+        if !AXIsProcessTrusted() {
+            traceLogger.log("Accessibility preflight unavailable before paste; attempting event synthesis anyway")
         }
 
         let preparedTranscript = transcriptForInsertion(transcript)

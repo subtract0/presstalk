@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc26`
-- Commit: `99b27713178188f829d71d2d73f9c0e451263db8`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc26`
-- Asset: `PressTalk-0.1.5-rc26-macos-arm64.zip`
-- SHA-256: `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a`
+- Tag: `v0.1.5-rc27`
+- Commit: `cf1131444a66475fd70e1ffe693b8eee051d41f6`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc27`
+- Asset: `PressTalk-0.1.5-rc27-macos-arm64.zip`
+- SHA-256: `b8291aad43d3d7445274840e5606f9e3d0745de39bb960a1a3aa346f25f01ee6`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc26` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc27` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc26` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc27` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, and bundled automated F5 smoke helper.
@@ -68,6 +68,16 @@ Verified on `studio1` on 2026-06-06:
   `permissions.microphoneStatus`, and `permissions.accessibilityStatus` strings
   so raw macOS preflight misses are visibly separate from effective runtime
   readiness.
+- `v0.1.5-rc27` adds `permissions.microphoneAuthorizationStatus` to
+  `runtime-status.json`, Settings, diagnostics export, and both smoke helpers.
+  A blocked machine now distinguishes `authorized`, `denied`, `restricted`,
+  `not_determined`, and `unknown` microphone preflight states without opening
+  System Settings.
+- `v0.1.5-rc27` also adds a read-only `TCC Rows` section to the bundled
+  smoke-status collector. It reports `com.am.presstalk` and
+  `com.am.jarvistap` rows for Microphone, Input Monitoring, and Accessibility
+  from the user/system TCC databases when readable; it does not reset TCC or
+  open privacy panes.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.
@@ -171,32 +181,35 @@ Known current proof gaps:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `studio2`: `v0.1.5-rc26` was downloaded from GitHub with SHA-256
-  `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a` and
+- `studio2`: `v0.1.5-rc27` was downloaded from GitHub with SHA-256
+  `b8291aad43d3d7445274840e5606f9e3d0745de39bb960a1a3aa346f25f01ee6` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts and
   `permissionPaneOpeningAllowed=false`, but runtime is blocked before dictation
   because `microphoneGranted=false`,
-  `microphoneStatus=preflight_unavailable`,
+  `microphoneAuthorizationStatus=not_determined`,
+  `microphoneStatus=preflight_not_determined`,
   `inputMonitoringEffective=false`,
   `inputMonitoringStatus=preflight_unavailable`,
   `inputListener=not_installed`, `inputPipelineReady=false`, and
-  `setupRetryActive=true`. Prior read-only TCC inspection returned no
-  `com.am.presstalk` or `com.am.jarvistap` rows on `studio2`, so this remains a
-  first-grant/setup gap rather than the already-granted-but-reported-missing
-  bug. `Status Consistency` reports matching live process ID, bundle identifier
-  `com.am.presstalk`, and CDHash
-  `ed29e75d9e73c621a6f69200e8ae79fd0ea8e929`.
-- `mbp1`: `v0.1.5-rc26` was downloaded from GitHub with SHA-256
-  `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a` and
+  `setupRetryActive=true`. The rc27 read-only TCC audit reports no user TCC rows
+  for `com.am.presstalk` or `com.am.jarvistap`; system TCC only contains a
+  denied Accessibility row for `com.am.presstalk`. This is a first-grant/setup
+  gap, not an already-granted false-missing state. `Status Consistency` reports
+  matching live process ID, bundle identifier `com.am.presstalk`, and CDHash
+  `52db8c8f5ad0bbd735881c7a65d7d8003aef2d89`.
+- `mbp1`: `v0.1.5-rc27` was downloaded from GitHub with SHA-256
+  `b8291aad43d3d7445274840e5606f9e3d0745de39bb960a1a3aa346f25f01ee6` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. The installed app is ad-hoc signed
   with bundle identifier `com.am.presstalk` and CDHash
-  `ed29e75d9e73c621a6f69200e8ae79fd0ea8e929`.
+  `e621fe76aa15b0d838b05bf53caf45c2b7935fdc` after the final restored Fn
+  bootstrap.
 - `mbp1` no longer has the rc15 microphone/listener blocker. Runtime status
-  after rc26 reports `microphoneGranted=true`,
+  after rc27 reports `microphoneGranted=true`,
+  `microphoneAuthorizationStatus=authorized`,
   `microphoneStatus=preflight_granted`, `inputMonitoringEffective=true`,
   `inputMonitoringStatus=listener_ready_preflight_unavailable`,
   `accessibilityStatus=copy_fallback_accessibility_untrusted`,
@@ -205,6 +218,15 @@ Known current proof gaps:
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
   `Status Consistency` reports matching live process ID, bundle identifier, and
   CDHash.
+- `mbp1` rc27 TCC audit explains the apparent settings mismatch: Microphone
+  rows exist for both `com.am.presstalk` and `com.am.jarvistap`; Input
+  Monitoring rows exist for both identities in system TCC; Accessibility has an
+  allowed row for stale `com.am.jarvistap` but a denied row for
+  `com.am.presstalk`. A no-pane rc27 bootstrap under `com.am.jarvistap` did not
+  satisfy the old row's code requirement and regressed to
+  `microphoneAuthorizationStatus=not_determined`, `inputPipelineReady=false`,
+  and `accessibilityGranted=false`, so mbp1 was restored to the working
+  `com.am.presstalk` Fn path.
 - `mbp1` rc24 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
   level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
   Result JSON:
@@ -234,7 +256,20 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. This proves
   the app no longer posts a fake paste command on mbp1 when Accessibility is not
   trusted; active-field paste remains unproven until Accessibility trust exists.
-- `v0.1.5-rc26` includes the listen-only event-tap fallback, WhisperKit cache
+- `mbp1` rc27 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
+  level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
+  Result JSON:
+  `~/Library/Application Support/JarvisTap/Diagnostics/automated-f5-smoke-2026-06-06T19-32-00.323Z.json`
+  reported `success=true`, `reason=trace_pipeline_copy_fallback`,
+  `physicalTriggerProof=false`, `microphoneAuthorizationStatus=authorized`,
+  `traceCopyFallback=true`, `tracePasteCommandPosted=false`,
+  `tracePasteCompleted=false`,
+  `traceFinalTranscript="Press-Tag Automated Smoke Test"`,
+  `targetCaptureSuccess=false`, and
+  `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
+  restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
+  `speechModel=Ready`.
+- `v0.1.5-rc27` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle

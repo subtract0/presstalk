@@ -1,0 +1,136 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SYSTEM_APP_BINARY="/Applications/PressTalk.app/Contents/MacOS/jarvistap"
+USER_APP_BINARY="$HOME/Applications/PressTalk.app/Contents/MacOS/jarvistap"
+LEGACY_SYSTEM_APP_BINARY="/Applications/JarvisTap.app/Contents/MacOS/jarvistap"
+LEGACY_USER_APP_BINARY="$HOME/Applications/JarvisTap.app/Contents/MacOS/jarvistap"
+APP_BINARY="$USER_APP_BINARY"
+if [[ ! -x "$APP_BINARY" && -x "$SYSTEM_APP_BINARY" ]]; then
+  APP_BINARY="$SYSTEM_APP_BINARY"
+fi
+if [[ ! -x "$APP_BINARY" && -x "$LEGACY_USER_APP_BINARY" ]]; then
+  APP_BINARY="$LEGACY_USER_APP_BINARY"
+fi
+if [[ ! -x "$APP_BINARY" && -x "$LEGACY_SYSTEM_APP_BINARY" ]]; then
+  APP_BINARY="$LEGACY_SYSTEM_APP_BINARY"
+fi
+PLIST="$HOME/Library/LaunchAgents/com.am.jarvistap.plist"
+WORKDIR="$HOME/Library/Application Support/JarvisTap"
+LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
+LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
+TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
+
+if [[ ! -x "$APP_BINARY" ]]; then
+  echo "PressTalk.app is missing. Build it first:"
+  echo "  bash $ROOT/scripts/build_jarvistap.sh"
+  echo "Or install the public cask:"
+  echo "  brew tap subtract0/presstalk && brew install --cask presstalk"
+  exit 1
+fi
+
+mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
+touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
+
+JARVISTAP_AGENT_MODE="${JARVISTAP_AGENT_MODE:-dictation}"
+JARVISTAP_WHISPERKIT_MODEL="${JARVISTAP_WHISPERKIT_MODEL:-openai_whisper-large-v3-v20240930_turbo_632MB}"
+JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-de}"
+JARVISTAP_SAY_VOICE="${JARVISTAP_SAY_VOICE:-Samantha}"
+JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
+JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS:-0.35}"
+PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-fn}}"
+JARVISTAP_TRACE_LOG="${JARVISTAP_TRACE_LOG:-$TRACE_LOG}"
+PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+
+ENV_BLOCK="  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key>
+    <string>${HOME}</string>
+    <key>PATH</key>
+    <string>${PATH_VALUE}</string>
+    <key>JARVISTAP_AGENT_MODE</key>
+    <string>${JARVISTAP_AGENT_MODE}</string>
+    <key>JARVISTAP_REQUEST_TIMEOUT_SECONDS</key>
+    <string>${JARVISTAP_REQUEST_TIMEOUT_SECONDS}</string>
+    <key>JARVISTAP_RELEASE_TAIL_PADDING_SECONDS</key>
+    <string>${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS}</string>
+    <key>PRESSTALK_TRIGGER_KEY</key>
+    <string>${PRESSTALK_TRIGGER_KEY}</string>
+    <key>JARVISTAP_TRACE_LOG</key>
+    <string>${JARVISTAP_TRACE_LOG}</string>
+    <key>JARVISTAP_WHISPERKIT_MODEL</key>
+    <string>${JARVISTAP_WHISPERKIT_MODEL}</string>
+    <key>JARVISTAP_WHISPER_LANGUAGE</key>
+    <string>${JARVISTAP_WHISPER_LANGUAGE}</string>
+    <key>JARVISTAP_SAY_VOICE</key>
+    <string>${JARVISTAP_SAY_VOICE}</string>"
+
+if [[ -n "${JARVISTAP_PRINT_PARTIALS:-}" ]]; then
+  ENV_BLOCK="$ENV_BLOCK
+    <key>JARVISTAP_PRINT_PARTIALS</key>
+    <string>${JARVISTAP_PRINT_PARTIALS}</string>"
+fi
+
+if [[ "$JARVISTAP_AGENT_MODE" == "codex-confirm-execute" ]]; then
+  ENV_BLOCK="$ENV_BLOCK
+    <key>JARVISTAP_CODEX_COMMAND</key>
+    <string>${JARVISTAP_CODEX_COMMAND:-codex}</string>
+    <key>JARVISTAP_CODEX_MODEL</key>
+    <string>${JARVISTAP_CODEX_MODEL:-gpt-5.4}</string>
+    <key>JARVISTAP_CODEX_PLAN_REASONING_EFFORT</key>
+    <string>${JARVISTAP_CODEX_PLAN_REASONING_EFFORT:-medium}</string>
+    <key>JARVISTAP_CODEX_EXEC_REASONING_EFFORT</key>
+    <string>${JARVISTAP_CODEX_EXEC_REASONING_EFFORT:-high}</string>
+    <key>JARVISTAP_CODEX_PLAN_TIMEOUT_SECONDS</key>
+    <string>${JARVISTAP_CODEX_PLAN_TIMEOUT_SECONDS:-120}</string>
+    <key>JARVISTAP_CODEX_WORKDIR</key>
+    <string>${JARVISTAP_CODEX_WORKDIR:-$HOME}</string>"
+fi
+
+ENV_BLOCK="$ENV_BLOCK
+  </dict>"
+
+cat >"$PLIST" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.am.jarvistap</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$APP_BINARY</string>
+  </array>
+$ENV_BLOCK
+  <key>WorkingDirectory</key>
+  <string>$WORKDIR</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+  <key>LimitLoadToSessionType</key>
+  <array>
+    <string>Aqua</string>
+  </array>
+  <key>StandardOutPath</key>
+  <string>$LOG_OUT</string>
+  <key>StandardErrorPath</key>
+  <string>$LOG_ERR</string>
+</dict>
+</plist>
+PLIST
+
+chmod 644 "$PLIST"
+plutil -lint "$PLIST" >/dev/null
+
+launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
+launchctl bootstrap "gui/$(id -u)" "$PLIST"
+launchctl kickstart -k "gui/$(id -u)/com.am.jarvistap"
+
+echo "Installed and started: com.am.jarvistap"
+echo "Mode: $JARVISTAP_AGENT_MODE"
+echo "Trigger: $PRESSTALK_TRIGGER_KEY"
+echo "Trace: $JARVISTAP_TRACE_LOG"
+echo "Tail live logs with:"
+echo "  tail -f $JARVISTAP_TRACE_LOG"

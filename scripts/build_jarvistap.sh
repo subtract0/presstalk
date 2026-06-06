@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PKG_DIR="$ROOT"
+OUT_DIR="$PKG_DIR/bin"
+OUT_BIN="$OUT_DIR/jarvistap"
+APP_BUNDLE="$HOME/Applications/PressTalk.app"
+LEGACY_APP_BUNDLE="$HOME/Applications/JarvisTap.app"
+APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
+APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
+APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
+APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+
+mkdir -p "$OUT_DIR"
+rm -rf "$APP_BUNDLE"
+
+pushd "$PKG_DIR" >/dev/null
+swift package clean
+swift build -c release
+BINARY_DIR="$(swift build -c release --show-bin-path)"
+popd >/dev/null
+
+cp "$BINARY_DIR/jarvistap" "$OUT_BIN"
+chmod 755 "$OUT_BIN"
+
+mkdir -p "$APP_MACOS_DIR"
+mkdir -p "$APP_RESOURCES_DIR"
+cp "$BINARY_DIR/jarvistap" "$APP_MACOS_DIR/jarvistap"
+chmod 755 "$APP_MACOS_DIR/jarvistap"
+cp "$PKG_DIR/scripts/presstalk_bootstrap.sh" "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
+cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
+cp "$PKG_DIR/scripts/presstalk_karabiner_fallback.sh" "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
+
+cat >"$APP_INFO_PLIST" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>PressTalk</string>
+  <key>CFBundleExecutable</key>
+  <string>jarvistap</string>
+  <key>CFBundleIdentifier</key>
+  <string>com.am.jarvistap</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>PressTalk</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>0.1.5</string>
+  <key>CFBundleVersion</key>
+  <string>6</string>
+  <key>LSUIElement</key>
+  <true/>
+  <key>NSMicrophoneUsageDescription</key>
+  <string>PressTalk needs microphone access to capture your voice commands.</string>
+  <key>NSAccessibilityUsageDescription</key>
+  <string>PressTalk needs accessibility access to paste transcribed text into the focused app.</string>
+  <key>NSInputMonitoringUsageDescription</key>
+  <string>PressTalk needs input monitoring access to detect the push-to-talk trigger key.</string>
+</dict>
+</plist>
+PLIST
+
+codesign --force --sign - --timestamp=none --identifier "com.am.jarvistap" "$APP_MACOS_DIR/jarvistap" >/dev/null 2>&1 || true
+codesign --force --sign - --timestamp=none "$APP_BUNDLE" >/dev/null 2>&1 || true
+
+if [[ -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
+  rm -rf "$LEGACY_APP_BUNDLE"
+fi
+
+echo "Built: $OUT_BIN"
+echo "App:   $APP_BUNDLE"

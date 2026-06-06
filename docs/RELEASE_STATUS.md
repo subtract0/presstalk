@@ -30,6 +30,9 @@ Verified on `studio1` on 2026-06-06:
   re-signed by the app-bundled local-signing helper before launchd started it.
   The resulting app reports `Authority=PressTalk Local Development Code
   Signing`, and launchd is running it with `PRESSTALK_TRIGGER_KEY=fn`.
+- While blocked on Input Monitoring, the local app now starts a quiet setup retry
+  timer. Trace evidence on `studio1`: `Setup retry timer started
+  interval_seconds=5.0`.
 
 Known current blocker:
 

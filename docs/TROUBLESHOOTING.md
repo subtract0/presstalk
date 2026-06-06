@@ -33,6 +33,11 @@ off and on again for the newly built `PressTalk.app`, then rerun:
 PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
+Current builds keep a quiet setup retry loop running while blocked on
+permissions. After you approve the current PressTalk build in macOS Privacy &
+Security, the app should notice within a few seconds and continue setup without
+requiring a full restart.
+
 If macOS keeps showing a stale enabled row, reset only PressTalk's TCC entries
 and approve the current build again:
 

@@ -1087,6 +1087,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
     private let trackpadPreviewTickSeconds: TimeInterval = 1.0 / 30.0
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
+    private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let stateLock = NSLock()
 
     private var eventTap: CFMachPort?
@@ -1142,6 +1143,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var settingsWindowController: PressTalkSettingsWindowController?
     private var hudController: PressTalkHUDController?
     private var readyResetWorkItem: DispatchWorkItem?
+    private var setupRetryTimer: Timer?
     private var singletonLockFileDescriptor: Int32 = -1
 
     private func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
@@ -1163,6 +1165,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        stopSetupRetry()
         if singletonLockFileDescriptor >= 0 {
             flock(singletonLockFileDescriptor, LOCK_UN)
             close(singletonLockFileDescriptor)
@@ -1205,16 +1208,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func completeStartupIfPossible(
         showSetupWindowOnFailure: Bool,
-        forcePresentSetupWindow: Bool = false
+        forcePresentSetupWindow: Bool = false,
+        presentFailureStatus: Bool = true
     ) {
         refreshRuntimeStatusUI()
-        print("Checking Input Monitoring permission...")
-        fflush(stdout)
+        if presentFailureStatus {
+            print("Checking Input Monitoring permission...")
+            fflush(stdout)
+        }
         guard ensureListenEventPermission() else {
-            traceLogger.log("Startup blocked: Input Monitoring permission missing")
-            printInputMonitoringHelp()
+            if presentFailureStatus {
+                traceLogger.log("Startup blocked: Input Monitoring permission missing")
+                printInputMonitoringHelp()
+                present(.setupRequired("Allow Input Monitoring, then run Setup Check."))
+            }
             refreshRuntimeStatusUI()
-            present(.setupRequired("Allow Input Monitoring, then run Setup Check."))
+            scheduleSetupRetry()
             if showSetupWindowOnFailure || forcePresentSetupWindow {
                 DispatchQueue.main.async { [weak self] in
                     self?.settingsWindowController?.present()
@@ -1224,13 +1233,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         traceLogger.log("Input Monitoring permission OK")
 
-        print("Checking microphone permission...")
-        fflush(stdout)
+        if presentFailureStatus {
+            print("Checking microphone permission...")
+            fflush(stdout)
+        }
         guard ensureMicrophonePermissionSync() else {
-            traceLogger.log("Startup blocked: microphone permission missing")
-            printMicrophoneHelp()
+            if presentFailureStatus {
+                traceLogger.log("Startup blocked: microphone permission missing")
+                printMicrophoneHelp()
+                present(.setupRequired("Allow microphone access, then run Setup Check."))
+            }
             refreshRuntimeStatusUI()
-            present(.setupRequired("Allow microphone access, then run Setup Check."))
+            scheduleSetupRetry()
             if showSetupWindowOnFailure || forcePresentSetupWindow {
                 DispatchQueue.main.async { [weak self] in
                     self?.settingsWindowController?.present()
@@ -1239,16 +1253,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return
         }
         traceLogger.log("Microphone permission OK")
-        print("Microphone permission OK.")
-        fflush(stdout)
+        if presentFailureStatus {
+            print("Microphone permission OK.")
+            fflush(stdout)
+        }
 
-        print("Checking Accessibility permission...")
-        fflush(stdout)
+        if presentFailureStatus {
+            print("Checking Accessibility permission...")
+            fflush(stdout)
+        }
         guard ensureAccessibilityPermission() else {
-            traceLogger.log("Startup blocked: Accessibility permission missing")
-            printAccessibilityHelp()
+            if presentFailureStatus {
+                traceLogger.log("Startup blocked: Accessibility permission missing")
+                printAccessibilityHelp()
+                present(.setupRequired("Allow Accessibility, then run Setup Check."))
+            }
             refreshRuntimeStatusUI()
-            present(.setupRequired("Allow Accessibility, then run Setup Check."))
+            scheduleSetupRetry()
             if showSetupWindowOnFailure || forcePresentSetupWindow {
                 DispatchQueue.main.async { [weak self] in
                     self?.settingsWindowController?.present()
@@ -1262,10 +1283,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             installDarwinTriggerNotifications()
 
             guard installEventTap() else {
-                traceLogger.log("Startup blocked: global event tap install failed")
-                printTapFailureHelp()
+                if presentFailureStatus {
+                    traceLogger.log("Startup blocked: global event tap install failed")
+                    printTapFailureHelp()
+                    present(.setupRequired("PressTalk could not attach the global key listener."))
+                }
                 refreshRuntimeStatusUI()
-                present(.setupRequired("PressTalk could not attach the global key listener."))
+                scheduleSetupRetry()
                 if showSetupWindowOnFailure || forcePresentSetupWindow {
                     DispatchQueue.main.async { [weak self] in
                         self?.settingsWindowController?.present()
@@ -1276,6 +1300,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             installSystemDefinedMonitor()
             inputPipelineReady = true
+            stopSetupRetry()
             traceLogger.log("Global key listeners installed")
             print("Global key listeners installed.")
             fflush(stdout)
@@ -1306,6 +1331,32 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         present(.warming)
         startWhisperWarmupIfNeeded()
+    }
+
+    private func scheduleSetupRetry() {
+        guard setupRetryTimer == nil else { return }
+        traceLogger.log("Setup retry timer started interval_seconds=\(String(format: "%.1f", setupRetryIntervalSeconds))")
+        let timer = Timer(timeInterval: setupRetryIntervalSeconds, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            if self.inputPipelineReady {
+                self.stopSetupRetry()
+                return
+            }
+            self.completeStartupIfPossible(
+                showSetupWindowOnFailure: false,
+                forcePresentSetupWindow: false,
+                presentFailureStatus: false
+            )
+        }
+        setupRetryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    private func stopSetupRetry() {
+        guard let setupRetryTimer else { return }
+        setupRetryTimer.invalidate()
+        self.setupRetryTimer = nil
+        traceLogger.log("Setup retry timer stopped")
     }
 
     private func acquireSingletonLock() -> Bool {

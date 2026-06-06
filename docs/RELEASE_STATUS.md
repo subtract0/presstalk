@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc3`
-- Commit: `95ae172578e524e19d08ddc8dec0102d9594e95d`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc3`
-- Asset: `PressTalk-0.1.5-rc3-macos-arm64.zip`
-- SHA-256: `608b8c1b0adc38694cb32fc54a4bd9f8213cffa817882f706120fff99df576fd`
+- Tag: `v0.1.5-rc4`
+- Commit: `844e30aa71fdc69c26d8b562731d9e4ef03459af`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc4`
+- Asset: `PressTalk-0.1.5-rc4-macos-arm64.zip`
+- SHA-256: `be8f988c70331de752cbf2e191240e8aae78f18a8e893c9ba7e8919a53247a56`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc3` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc4` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc3` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc4` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper, and
   bundled local-signing helper.
 - A local development code-signing identity was created on `studio1`, and a
@@ -42,7 +42,7 @@ Known current blocker:
   `Startup blocked: Input Monitoring permission missing`. `studio1` now has a
   stable local development signing identity, so refresh the permission toggle
   once for the stable-signed build before attempting the Fn dictation smoke.
-- `v0.1.5-rc3` includes the settings-window fix for this case: the UI now
+- `v0.1.5-rc4` includes the settings-window fix for this case: the UI now
   distinguishes "not granted to this rebuilt ad-hoc copy" from a generic missing
   permission, and diagnostics include the app code-signature summary.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not

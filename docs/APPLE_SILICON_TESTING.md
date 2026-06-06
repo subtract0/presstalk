@@ -106,17 +106,37 @@ Supported values:
 
 ## Smoke Test
 
-1. Click into any text field.
-2. Hold `Fn / Globe`.
-3. Speak a short sentence.
-4. Release `Fn / Globe`.
+First confirm readiness:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
+```
+
+Expected readiness fields:
+
+- `runtime.inputPipelineReady=true`
+- `runtime.inputListener` is not `failed`
+- `status.speechModel=Ready`
+- `status.triggerPath=Fn / Globe ready`
+
+Then run the bundled manual smoke helper:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-manual-fn-smoke.swift"
+```
+
+The helper opens a focused text window. Hold `Fn / Globe`, say a short sentence,
+then release. It writes a machine-readable result under
+`~/Library/Application Support/JarvisTap/Diagnostics/` with the captured text,
+runtime status, and trace lines since the helper started.
 
 Expected:
 
 - no Apple Dictation popup
 - no stray `^P`
 - listening light appears
-- transcript is inserted into the focused app
+- transcript is inserted into the helper window
+- the helper result JSON has `"success": true`
 
 If you need to force the F5 bridge manually on that Mac, use:
 

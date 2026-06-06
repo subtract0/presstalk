@@ -38,6 +38,8 @@ cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCE
 chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
 
 cat >"$APP_INFO_PLIST" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

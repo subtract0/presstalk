@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc25`
-- Commit: `9cecf8e815217786652de7fa1291bab266c72caf`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc25`
-- Asset: `PressTalk-0.1.5-rc25-macos-arm64.zip`
-- SHA-256: `faf8b7e01b903f561d60c66e3709088f8192849d1edd898e2335105f778aa106`
+- Tag: `v0.1.5-rc26`
+- Commit: `99b27713178188f829d71d2d73f9c0e451263db8`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc26`
+- Asset: `PressTalk-0.1.5-rc26-macos-arm64.zip`
+- SHA-256: `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc25` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc26` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc25` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc26` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, and bundled automated F5 smoke helper.
@@ -47,7 +47,7 @@ Verified on `studio1` on 2026-06-06:
   no longer open System Settings panes unless `PRESSTALK_OPEN_PERMISSION_PANES=1`
   is set.
 - `v0.1.5-rc21` passes `PRESSTALK_OPEN_PERMISSION_PANES` into the running app.
-  With the default value `0`, `v0.1.5-rc24` hides the Settings window's
+  With the default value `0`, current builds hide the Settings window's
   Microphone, Input Monitoring, and Accessibility buttons and suppress
   privacy-pane open calls, so no-pane smoke runs cannot accidentally reopen
   System Settings or suggest another approval pass.
@@ -63,7 +63,7 @@ Verified on `studio1` on 2026-06-06:
   listener-ready and `runtime-status.json` records
   `permissions.inputMonitoringEffective=true` instead of sending the user back
   through already-enabled macOS privacy toggles. Accessibility is treated as a
-  paste probe unless paste actually fails. `v0.1.5-rc24` records
+  paste probe unless paste actually fails. Current builds record
   machine-readable `permissions.inputMonitoringStatus`,
   `permissions.microphoneStatus`, and `permissions.accessibilityStatus` strings
   so raw macOS preflight misses are visibly separate from effective runtime
@@ -137,6 +137,13 @@ Verified on `studio1` on 2026-06-06:
   across several CGEvent source/tap combinations and records `pasteSelfTest`
   plus `targetCaptureFailureHint`. This separates STT/trigger success from a
   local paste-event synthesis blocker.
+- `v0.1.5-rc26` changes production insertion behavior. If Accessibility is
+  trusted, PressTalk first tries direct AX insertion into the focused text
+  element, then falls back to pasteboard plus Cmd-V. If Accessibility is not
+  trusted, PressTalk copies the transcript to the clipboard and records
+  `dictation_copy_fallback` instead of posting a Cmd-V command that cannot land.
+  Runtime status reports `accessibilityStatus=copy_fallback_accessibility_untrusted`
+  in that state.
 - `studio1` local post-rc22 synthetic F5/Darwin/TTS smoke with the revised
   helper and paste path reported `success=true`,
   `reason=trace_pipeline_command_posted`,
@@ -164,8 +171,8 @@ Known current proof gaps:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `studio2`: `v0.1.5-rc24` was downloaded from GitHub with SHA-256
-  `30d4a21c8a4ab37bca1fda140a7dd0d9db0c351bb795c576d5b842f6c02cf775` and
+- `studio2`: `v0.1.5-rc26` was downloaded from GitHub with SHA-256
+  `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts and
@@ -180,19 +187,19 @@ Known current proof gaps:
   first-grant/setup gap rather than the already-granted-but-reported-missing
   bug. `Status Consistency` reports matching live process ID, bundle identifier
   `com.am.presstalk`, and CDHash
-  `119e9241b17903f631b0f8bce84a8f7f05bdf5b3`.
-- `mbp1`: `v0.1.5-rc25` was downloaded from GitHub with SHA-256
-  `faf8b7e01b903f561d60c66e3709088f8192849d1edd898e2335105f778aa106` and
+  `ed29e75d9e73c621a6f69200e8ae79fd0ea8e929`.
+- `mbp1`: `v0.1.5-rc26` was downloaded from GitHub with SHA-256
+  `be3db5871eeeb352c09e5e436bd52f104ff9a33e5c5b6f72b4234b8a7839c59a` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. The installed app is ad-hoc signed
   with bundle identifier `com.am.presstalk` and CDHash
-  `20f283423cad5a74406b2786b8d0c12ac3aeea4e`.
+  `ed29e75d9e73c621a6f69200e8ae79fd0ea8e929`.
 - `mbp1` no longer has the rc15 microphone/listener blocker. Runtime status
-  after rc25 reports `microphoneGranted=true`,
+  after rc26 reports `microphoneGranted=true`,
   `microphoneStatus=preflight_granted`, `inputMonitoringEffective=true`,
   `inputMonitoringStatus=listener_ready_preflight_unavailable`,
-  `accessibilityStatus=paste_probe_pending`,
+  `accessibilityStatus=copy_fallback_accessibility_untrusted`,
   `permissionPaneOpeningAllowed=false`, `inputListener=hid:listen_only`,
   `inputPipelineReady=true`, `setupRetryActive=false`,
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
@@ -218,7 +225,16 @@ Known current proof gaps:
   CDHash after the restored Fn restart. Read-only TCC inspection on mbp1 shows
   microphone rows for `com.am.presstalk` and `com.am.jarvistap`, but no
   Accessibility row for PressTalk, matching the paste self-test result.
-- `v0.1.5-rc25` includes the listen-only event-tap fallback, WhisperKit cache
+- `mbp1` rc26 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
+  level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
+  Result JSON: `success=true`, `reason=trace_pipeline_copy_fallback`,
+  `physicalTriggerProof=false`, `traceCopyFallback=true`,
+  `tracePasteCommandPosted=false`, `tracePasteCompleted=false`,
+  `targetCaptureSuccess=false`, and
+  `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. This proves
+  the app no longer posts a fake paste command on mbp1 when Accessibility is not
+  trusted; active-field paste remains unproven until Accessibility trust exists.
+- `v0.1.5-rc26` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle

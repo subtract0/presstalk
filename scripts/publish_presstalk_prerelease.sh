@@ -120,6 +120,10 @@ com.am.presstalk and com.am.jarvistap across Microphone, Input Monitoring, and
 Accessibility. It does not reset TCC or open privacy panes; it only reports
 whether the current user/system TCC databases contain matching rows.
 
+The collector also decodes matching TCC code-requirement blobs with csreq and
+prints the current app designated requirement. This makes stale grants tied to
+an old certificate root or old CDHash visible without changing permissions.
+
 WhisperKit now defaults to a no-Neural-Engine compute preset
 (mel/audio encoder/text decoder on CPU+GPU, prefill on CPU) because mbp1 on
 macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via

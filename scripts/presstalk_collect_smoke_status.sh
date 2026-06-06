@@ -109,6 +109,70 @@ print_tcc_rows() {
   fi
 }
 
+print_tcc_code_requirements() {
+  local label="$1"
+  local db="$2"
+
+  echo "$label: $db"
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    echo "sqlite3 unavailable"
+    return
+  fi
+  if ! command -v csreq >/dev/null 2>&1; then
+    echo "csreq unavailable"
+    return
+  fi
+  if [[ ! -e "$db" ]]; then
+    echo "TCC database missing"
+    return
+  fi
+  if [[ ! -r "$db" ]]; then
+    echo "TCC database not readable by this process"
+    return
+  fi
+
+  local services="'kTCCServiceMicrophone','kTCCServiceListenEvent','kTCCServiceAccessibility'"
+  local clients="'com.am.presstalk','com.am.jarvistap'"
+  local rows
+  rows="$(
+    sqlite3 -csv "$db" "
+      SELECT service, client
+      FROM access
+      WHERE service IN ($services)
+        AND client IN ($clients)
+        AND csreq IS NOT NULL
+      ORDER BY service, client;
+    " 2>/dev/null || true
+  )"
+
+  if [[ -z "$rows" ]]; then
+    echo "No decodable PressTalk/JarvisTap code requirements"
+    return
+  fi
+
+  local tmpdir
+  tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-tcc-csreq.XXXXXX")"
+  while IFS=, read -r service client; do
+    [[ -z "$service" || -z "$client" ]] && continue
+    local path="$tmpdir/$service-$client.csreq"
+    if ! sqlite3 "$db" "
+      SELECT writefile('$path', csreq)
+      FROM access
+      WHERE service='$service'
+        AND client='$client'
+        AND csreq IS NOT NULL
+      LIMIT 1;
+    " >/dev/null 2>&1; then
+      echo "$service $client: could not write temporary csreq blob"
+      continue
+    fi
+    local requirement
+    requirement="$(csreq -r "$path" -t 2>&1 | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+    echo "$service $client: ${requirement:-unavailable}"
+  done <<<"$rows"
+  rm -rf "$tmpdir"
+}
+
 presstalk_processes() {
   ps -axo pid=,ppid=,command= |
     awk '
@@ -132,6 +196,8 @@ if [[ -d "$APP_BUNDLE" ]]; then
   /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
   codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 |
     awk '/^Identifier=|^CDHash=|^Signature=|^Authority=|^TeamIdentifier=/ { print }'
+  codesign -dr - "$APP_BUNDLE" 2>&1 |
+    awk '/designated =>/ { sub(/^.*designated => /, "DesignatedRequirement="); print }'
 else
   echo "PressTalk.app not found"
 fi
@@ -195,6 +261,10 @@ fi
 section "TCC Rows Read-Only"
 print_tcc_rows "User TCC" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 print_tcc_rows "System TCC" "/Library/Application Support/com.apple.TCC/TCC.db"
+
+section "TCC Code Requirements Read-Only"
+print_tcc_code_requirements "User TCC" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
+print_tcc_code_requirements "System TCC" "/Library/Application Support/com.apple.TCC/TCC.db"
 
 section "Trace Tail"
 if [[ -f "$TRACE_LOG" ]]; then

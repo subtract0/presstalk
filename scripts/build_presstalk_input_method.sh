@@ -28,8 +28,7 @@ done
 
 PRODUCT="presstalk-input-method"
 APP_NAME="PressTalkInputMethod.app"
-INPUT_METHOD_BUNDLE_ID="com.am.presstalk.inputmethod"
-INPUT_MODE_ID="$INPUT_METHOD_BUNDLE_ID.dictation"
+INPUT_METHOD_BUNDLE_ID="com.am.presstalk.inputmethod.container"
 BUILD_DIR="$ROOT/.build/presstalk-input-method"
 APP_BUNDLE="${APP_BUNDLE_OVERRIDE:-$BUILD_DIR/$APP_NAME}"
 APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
@@ -115,41 +114,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>5</string>
-  <key>ComponentInputModeDict</key>
-  <dict>
-    <key>tsInputModeListKey</key>
-    <dict>
-      <key>$INPUT_MODE_ID</key>
-      <dict>
-        <key>TISIconLabels</key>
-        <dict>
-          <key>Primary</key>
-          <string>PT</string>
-        </dict>
-        <key>TISInputSourceID</key>
-        <string>$INPUT_MODE_ID</string>
-        <key>TISIntendedLanguage</key>
-        <string>en</string>
-        <key>tsInputModeDefaultStateKey</key>
-        <true/>
-        <key>tsInputModeIsVisibleKey</key>
-        <true/>
-        <key>tsInputModeMenuIconFileKey</key>
-        <string>$ICON_FILE</string>
-        <key>tsInputModePaletteIconFileKey</key>
-        <string>$ICON_FILE</string>
-        <key>tsInputModePrimaryInScriptKey</key>
-        <true/>
-        <key>tsInputModeScriptKey</key>
-        <string>smUnicodeScript</string>
-      </dict>
-    </dict>
-    <key>tsVisibleInputModeOrderedArrayKey</key>
-    <array>
-      <string>$INPUT_MODE_ID</string>
-    </array>
-  </dict>
+  <string>6</string>
   <key>InputMethodConnectionName</key>
   <string>PressTalkInputMethod_1_Connection</string>
   <key>InputMethodServerControllerClass</key>

@@ -4302,6 +4302,228 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         pasteboard.setString(preparedTranscript, forType: .string)
     }
 
+    private func inputSourceProperty(_ source: TISInputSource, _ key: CFString) -> Any? {
+        guard let unmanaged = TISGetInputSourceProperty(source, key) else { return nil }
+        return Unmanaged<AnyObject>.fromOpaque(unmanaged).takeUnretainedValue()
+    }
+
+    private func inputSourceStringProperty(_ source: TISInputSource, _ key: CFString) -> String? {
+        inputSourceProperty(source, key) as? String
+    }
+
+    private func inputSourceBoolProperty(_ source: TISInputSource, _ key: CFString) -> Bool? {
+        guard let value = inputSourceProperty(source, key) else { return nil }
+        if let bool = value as? Bool {
+            return bool
+        }
+        if let number = value as? NSNumber {
+            return number.boolValue
+        }
+        return nil
+    }
+
+    private func inputSourceIdentityKey(_ source: TISInputSource) -> String {
+        let keyParts = [
+            inputSourceStringProperty(source, kTISPropertyInputSourceID),
+            inputSourceStringProperty(source, kTISPropertyBundleID),
+        ].compactMap { $0 }
+        return keyParts.isEmpty ? "\(Unmanaged.passUnretained(source).toOpaque())" : keyParts.joined(separator: "|")
+    }
+
+    private func inputSourceList(properties: CFDictionary?, includeAllInstalled: Bool) -> [TISInputSource] {
+        guard let list = TISCreateInputSourceList(properties, includeAllInstalled) else {
+            return []
+        }
+        return (list.takeRetainedValue() as NSArray as Array).compactMap { object in
+            guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { return nil }
+            return (object as! TISInputSource)
+        }
+    }
+
+    private func installedInputMethodBundleURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Input Methods", isDirectory: true)
+            .appendingPathComponent("PressTalkInputMethod.app", isDirectory: true)
+    }
+
+    private func inputMethodBundleHasCurrentSourceID(_ bundleURL: URL) -> Bool {
+        let infoURL = bundleURL.appendingPathComponent("Contents/Info.plist")
+        guard let info = NSDictionary(contentsOf: infoURL) as? [String: Any] else {
+            return false
+        }
+        return info["CFBundleIdentifier"] as? String == "com.am.presstalk.inputmethod.container" &&
+            info["TISInputSourceID"] as? String == "com.am.presstalk.inputmethod.container"
+    }
+
+    private func ensureInputMethodInstalledForInsertion() -> URL? {
+        let installedURL = installedInputMethodBundleURL()
+        let executableURL = installedURL.appendingPathComponent("Contents/MacOS/presstalk-input-method")
+        if FileManager.default.isExecutableFile(atPath: executableURL.path),
+           inputMethodBundleHasCurrentSourceID(installedURL) {
+            return installedURL
+        }
+
+        guard let bundledURL = Bundle.main.resourceURL?.appendingPathComponent("PressTalkInputMethod.app", isDirectory: true) else {
+            traceLogger.log("Input method insertion unavailable reason=bundled_input_method_missing")
+            return nil
+        }
+
+        do {
+            try FileManager.default.createDirectory(
+                at: installedURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            if FileManager.default.fileExists(atPath: installedURL.path) {
+                try FileManager.default.removeItem(at: installedURL)
+            }
+            try FileManager.default.copyItem(at: bundledURL, to: installedURL)
+            traceLogger.log("Input method installed for insertion path=\(installedURL.path)")
+            return installedURL
+        } catch {
+            traceLogger.log("Input method insertion unavailable reason=install_failed error=\(error)")
+            return nil
+        }
+    }
+
+    private func pressTalkInputMethodSources(includeAllInstalled: Bool) -> [TISInputSource] {
+        let sourceID = "com.am.presstalk.inputmethod.container"
+        let legacySourceIDs = [
+            "com.am.presstalk.inputmethod.dictation",
+            "com.am.presstalk.inputmethod",
+        ]
+        let sourceIDs = [sourceID] + legacySourceIDs
+
+        func sources(matching key: CFString, value: String) -> [TISInputSource] {
+            inputSourceList(
+                properties: [key: value] as CFDictionary,
+                includeAllInstalled: includeAllInstalled
+            )
+        }
+
+        let directSources = sourceIDs.flatMap { sources(matching: kTISPropertyInputSourceID, value: $0) }
+            + sourceIDs.flatMap { sources(matching: kTISPropertyBundleID, value: $0) }
+        let fullScanSources = inputSourceList(properties: nil, includeAllInstalled: includeAllInstalled)
+            .filter { source in
+                let values = [
+                    inputSourceStringProperty(source, kTISPropertyInputSourceID),
+                    inputSourceStringProperty(source, kTISPropertyBundleID),
+                    inputSourceStringProperty(source, kTISPropertyLocalizedName),
+                ].compactMap { $0?.lowercased() }
+                return values.contains { value in
+                    sourceIDs.contains { value == $0.lowercased() } ||
+                        value.contains("presstalk")
+                }
+            }
+
+        var seen = Set<String>()
+        var result: [TISInputSource] = []
+        for source in directSources + fullScanSources {
+            let key = inputSourceIdentityKey(source)
+            guard !seen.contains(key) else { continue }
+            seen.insert(key)
+            result.append(source)
+        }
+        return result
+    }
+
+    private func preferredPressTalkInputMethodSource(from sources: [TISInputSource]) -> TISInputSource? {
+        sources.first {
+            inputSourceStringProperty($0, kTISPropertyInputSourceID) == "com.am.presstalk.inputmethod.container" &&
+                (inputSourceBoolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? true)
+        } ?? sources.first {
+            inputSourceBoolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? false
+        } ?? sources.first
+    }
+
+    private func insertPreparedTranscriptUsingInputMethod(_ preparedTranscript: String) -> String? {
+        guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
+            return nil
+        }
+
+        let registerStatus = TISRegisterInputSource(bundleURL as CFURL)
+        guard registerStatus == 0 else {
+            traceLogger.log("Input method insertion unavailable reason=register_failed status=\(registerStatus)")
+            return nil
+        }
+
+        let originalSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        let enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
+        var allSources = pressTalkInputMethodSources(includeAllInstalled: true)
+        guard let candidate = preferredPressTalkInputMethodSource(from: allSources) else {
+            traceLogger.log("Input method insertion unavailable reason=source_not_recognized")
+            return nil
+        }
+
+        func disableIfEnabledOnlyForInsertion(_ sources: [TISInputSource]) {
+            var disabled = Set<String>()
+            for source in sources {
+                let key = inputSourceIdentityKey(source)
+                guard !enabledBeforeKeys.contains(key), !disabled.contains(key) else { continue }
+                disabled.insert(key)
+                let disableStatus = TISDisableInputSource(source)
+                if disableStatus != 0 {
+                    traceLogger.log("Input method insertion disable failed status=\(disableStatus)")
+                }
+            }
+        }
+
+        if !enabledBeforeKeys.contains(inputSourceIdentityKey(candidate)) {
+            let enableStatus = TISEnableInputSource(candidate)
+            guard enableStatus == 0 else {
+                traceLogger.log("Input method insertion unavailable reason=enable_failed status=\(enableStatus)")
+                return nil
+            }
+        }
+
+        allSources = pressTalkInputMethodSources(includeAllInstalled: false)
+        guard let enabledSource = preferredPressTalkInputMethodSource(from: allSources) else {
+            traceLogger.log("Input method insertion unavailable reason=source_not_enabled")
+            disableIfEnabledOnlyForInsertion([candidate])
+            return nil
+        }
+
+        let selectStatus = TISSelectInputSource(enabledSource)
+        guard selectStatus == 0 else {
+            traceLogger.log("Input method insertion unavailable reason=select_failed status=\(selectStatus)")
+            disableIfEnabledOnlyForInsertion([enabledSource, candidate])
+            return nil
+        }
+        defer {
+            let restoreStatus = TISSelectInputSource(originalSource)
+            if restoreStatus != 0 {
+                traceLogger.log("Input method insertion restore failed status=\(restoreStatus)")
+            }
+            disableIfEnabledOnlyForInsertion([enabledSource, candidate])
+        }
+
+        do {
+            let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
+                .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
+            try preparedTranscript.write(
+                to: supportDirectory.appendingPathComponent("input-method-insert.txt"),
+                atomically: true,
+                encoding: .utf8
+            )
+        } catch {
+            traceLogger.log("Input method insertion unavailable reason=payload_write_failed error=\(error)")
+            return nil
+        }
+
+        Thread.sleep(forTimeInterval: 0.75)
+        CFNotificationCenterPostNotification(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            CFNotificationName("com.am.presstalk.inputmethod.insert" as CFString),
+            nil,
+            nil,
+            true
+        )
+        Thread.sleep(forTimeInterval: 0.25)
+
+        traceLogger.log("Input method insertion notification posted source=com.am.presstalk.inputmethod.container")
+        return "input_method_notification"
+    }
+
     private func insertPreparedTranscriptUsingAccessibility(_ preparedTranscript: String) -> String? {
         let systemWideElement = AXUIElementCreateSystemWide()
         var focusedObject: CFTypeRef?
@@ -4406,7 +4628,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         guard AXIsProcessTrusted() else {
-            traceLogger.log("Accessibility preflight unavailable before paste; copying transcript instead of posting unreachable paste event")
+            if let method = insertPreparedTranscriptUsingInputMethod(preparedTranscript) {
+                return .inserted(method: method)
+            }
+            traceLogger.log("Accessibility preflight unavailable and input method insertion unavailable; copying transcript")
             copyPreparedTranscriptToPasteboard(preparedTranscript)
             return .copiedFallback(reason: "accessibility_preflight_unavailable")
         }

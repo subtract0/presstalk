@@ -161,14 +161,14 @@ PressTalk process before falling back to install defaults, and prints both the
 status bundle path and inspected app bundle path. This makes stale or mismatched
 diagnostics visible when a machine is blocked before dictation.
 
-The InputMethodKit diagnostics now use a parent source id
-com.am.presstalk.inputmethod plus visible mode id
-com.am.presstalk.inputmethod.dictation. The generated input method has
-Contents/PkgInfo, no LSBackgroundOnly flag, and script repertoire Latn. It still
-registers without opening System Settings, but on studio1 TIS continues to report
-recognizedSourceCount=0 and the full installed-source scan reports
-pressTalkLikeAllInstalledSourceCount=0, so the input-method insertion path
-remains a discovery blocker rather than a proven paste fallback.
+The InputMethodKit fallback now uses a no-mode source id
+com.am.presstalk.inputmethod.container. On studio1 TIS reports it as
+TISTypeKeyboardInputMethodWithoutModes with recognizedSourceCount=1,
+recognizedEnabledSourceCount=1, and selectCapable=true. The focused client probe
+selects it, posts the insert notification, observes the payload in the local text
+view, and restores the original input source. Production dictation now attempts
+this input-method insertion route before copy fallback when Accessibility is
+untrusted.
 
 The bundle also includes presstalk-actual-accessibility-probe.sh. It launches
 the installed PressTalk.app itself in a diagnostic mode with the Accessibility

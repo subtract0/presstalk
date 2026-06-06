@@ -3,7 +3,9 @@ import Foundation
 import InputMethodKit
 
 private enum PressTalkInputMethodConfig {
-    static let bundleIdentifier = "com.am.presstalk.inputmethod"
+    static var bundleIdentifier: String {
+        Bundle.main.bundleIdentifier ?? "com.am.presstalk.inputmethod.container"
+    }
     static let connectionName = "PressTalkInputMethod_1_Connection"
     static let insertNotification = "com.am.presstalk.inputmethod.insert"
 

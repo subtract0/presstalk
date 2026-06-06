@@ -4,7 +4,10 @@ PressTalk's current production insertion path is:
 
 1. direct Accessibility insertion when `AXIsProcessTrusted()` is true
 2. pasteboard plus Cmd-V when Accessibility is trusted but direct AX insertion fails
-3. copy fallback when Accessibility is not trusted
+3. temporary PressTalk input-method selection plus Darwin insert notification
+   when Accessibility is not trusted
+4. copy fallback when both Accessibility and input-method insertion are
+   unavailable
 
 The automated paste self-test has already shown that synthetic Cmd-V events do
 not reliably land in a focused text field without Accessibility trust. Keep that
@@ -29,9 +32,10 @@ current `IMKTextInput` client, and listens for the Darwin notification
 and asks the active input client to insert that text at the current insertion
 point.
 
-This is intentionally not wired into production PressTalk yet. The goal is to
-prove whether an installed and selected PressTalk input method can insert into a
-focused client on Apple Silicon without Accessibility trust.
+Production PressTalk now uses this as the first fallback when Accessibility is
+not trusted. It installs/registers the bundled input method if needed, briefly
+selects it, posts the same Darwin notification, restores the previous input
+source, and copies only if that setup fails.
 
 ## Build
 
@@ -55,8 +59,10 @@ The installed bundle path is:
 
 Current builds sign the prototype with the same local development identity as
 `PressTalk.app` unless `PRESSTALK_BUILD_STABLE_SIGNING=0` is set. The generated
-bundle uses a single source id, `com.am.presstalk.inputmethod`, and carries the
-IMK metadata keys `LSBackgroundOnly`, `CFBundleIconFile`, `LSUIElement`,
+bundle uses a no-mode source id, `com.am.presstalk.inputmethod.container`, and
+carries the IMK metadata keys `CFBundleIconFile`, `LSUIElement`,
+`InputMethodConnectionName`, `InputMethodServerControllerClass`,
+`InputMethodServerDelegateClass`, `TISInputSourceID`,
 `tsInputMethodIconFileKey`, and `tsInputMethodCharacterRepertoireKey`.
 
 Installing the bundle does not select it as the active input source. macOS may
@@ -108,22 +114,21 @@ If `reason=input_method_not_selectable`, TIS did not expose the installed input
 method as an enable/select-capable source. In that state, manual notification
 probes are not meaningful yet because no focused client can be attached.
 
-Current studio1 evidence after the stable-signing and metadata passes:
+Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the
 app, and `PressTalkIMController` is exported under that Objective-C class name.
-The generated bundle now matches Apple input-method bundle shape more closely:
-it has `Contents/PkgInfo`, no `LSBackgroundOnly`, script repertoire `Latn`, and a
-visible mode id `com.am.presstalk.inputmethod.dictation`.
+The status helper reports `recognizedSourceCount=1`,
+`recognizedEnabledSourceCount=1`, source id
+`com.am.presstalk.inputmethod.container`, type
+`TISTypeKeyboardInputMethodWithoutModes`, and `selectCapable=true`.
 
-That still does not prove insertion. The status helper scans the full installed
-TIS table, and on studio1 it reports `allInstalledInputSourceCount=318`,
-`pressTalkLikeAllInstalledSourceCount=0`, `recognizedSourceCount=0`, and
-`registerStatus=0` after explicit registration and a text-input agent restart.
-The client probe exits with `reason=input_method_not_selectable` before selecting
-anything, with the final input source still `com.apple.keylayout.German`. Treat
-that as a macOS input-source discovery/trust blocker, not a missing Microphone,
-Input Monitoring, or Accessibility permission.
+The focused client probe now succeeds on `studio1` while
+`AXIsProcessTrusted=false`: `success=true`, `reason=payload_inserted`,
+`selectStatus=0`, `restoreStatus=0`, `observedText="PressTalk input method
+client probe"`, and the input-method log records `client updated context=init`,
+`controller initialized`, `insert requested`, and `insert notification handled
+inserted=1`.
 
 The non-IMK event route is also ruled out on `studio1` while
 `AXIsProcessTrusted=false`. The bundled `presstalk-unicode-event-insert-probe`
@@ -157,7 +162,7 @@ appears, the client accepted the request path but insertion is still not proven.
 
 ## Promotion Rule
 
-Do not wire this into production dictation until the probe succeeds in a focused
-editable field on at least one target Mac. After that, PressTalk can write the
-final transcript to the pending insert file and post the same Darwin
-notification instead of copy fallback when Accessibility is untrusted.
+The focused editable-field probe has succeeded on `studio1`, so production
+dictation may use the same pending-insert file plus Darwin notification path
+before falling back to copy when Accessibility is untrusted. It still needs
+cross-machine smoke on `s1`, `s2`, and `mbp1` before the full app goal is proven.

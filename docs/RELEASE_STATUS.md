@@ -365,6 +365,41 @@ Verified on `studio1` on 2026-06-06:
   `codeSignatureCDHash=c068e650a2f3a6ea7762920994eb2361efb7a1b5`, and
   `codeSignatureAuthority=PressTalk Local Development Code Signing` for
   `/Users/am/Applications/PressTalk.app`.
+- Post-rc41 InputMethodKit debugging found the selectable source shape for
+  macOS 26.5 on `studio1`: a no-mode input method with bundle/source id
+  `com.am.presstalk.inputmethod.container`. The generated bundle no longer uses
+  the visible `.dictation` mode id for the active source. Current status helper
+  evidence after install/register: `recognizedSourceCount=1`,
+  `recognizedEnabledSourceCount=1`, `source.id=com.am.presstalk.inputmethod.container`,
+  `type=TISTypeKeyboardInputMethodWithoutModes`, `selectCapable=true`, and
+  `registerStatus=0`.
+- The focused input-method client probe now succeeds on `studio1` without
+  opening System Settings and while the restored app remains
+  `AXIsProcessTrusted=false`: `success=true`, `reason=payload_inserted`,
+  `selectStatus=0`, `restoreStatus=0`, `observedText="PressTalk input method
+  client probe"`. The input-method log records `client updated context=init`,
+  `controller initialized`, `insert requested characters=35`, and
+  `insert notification handled inserted=1`.
+- Production dictation now attempts this input-method insertion route before
+  copy fallback when Accessibility is untrusted. It installs/registers the
+  bundled `PressTalkInputMethod.app` if needed, selects
+  `com.am.presstalk.inputmethod.container`, writes the transcript to
+  `~/Library/Application Support/JarvisTap/input-method-insert.txt`, posts
+  `com.am.presstalk.inputmethod.insert`, restores the original input source, and
+  only copies if that setup fails. This proves the local focused-client insertion
+  mechanism, but it is not yet cross-machine proof for `s1`, `s2`, or `mbp1`.
+- After wiring the no-mode input-method fallback, `studio1` was rebuilt and
+  restored again with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`. Runtime
+  status reports `codeSignatureCDHash=3296f1ac70d02790393362f84a99cf5c74e741f9`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `permissionPaneOpeningAllowed=false`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`. The bundled input-method status helper
+  reports `registerStatus=0`, `recognizedSourceCount=1`,
+  `recognizedEnabledSourceCount=1`, `source.id=com.am.presstalk.inputmethod.container`,
+  and `type=TISTypeKeyboardInputMethodWithoutModes`.
 - After publishing `v0.1.5-rc39`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,

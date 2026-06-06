@@ -2,9 +2,19 @@
 import Carbon
 import Foundation
 
-private let inputMethodSourceID = "com.am.presstalk.inputmethod"
-private let inputModeSourceID = "\(inputMethodSourceID).dictation"
-private let bundleIdentifier = "com.am.presstalk.inputmethod"
+private let inputMethodSourceID = "com.am.presstalk.inputmethod.container"
+private let legacyInputMethodSourceID = "com.am.presstalk.inputmethod"
+private let legacyInputModeSourceID = "\(legacyInputMethodSourceID).dictation"
+private let bundleIdentifier = inputMethodSourceID
+private let sourceIDs = [
+    inputMethodSourceID,
+    legacyInputModeSourceID,
+    legacyInputMethodSourceID,
+]
+private let bundleIdentifiers = [
+    bundleIdentifier,
+    legacyInputMethodSourceID,
+]
 private let appName = "PressTalkInputMethod.app"
 
 private struct Options {
@@ -34,8 +44,8 @@ private func parseOptions() -> Options {
             PressTalk input method and which input source is currently selected.
 
             --register  Register ~/Library/Input Methods/PressTalkInputMethod.app
-            --enable    Enable com.am.presstalk.inputmethod if macOS recognizes it
-            --select    Select com.am.presstalk.inputmethod if it is enabled
+            --enable    Enable the PressTalk input method if macOS recognizes it
+            --select    Select the PressTalk input method if it is enabled
             --json      Emit machine-readable JSON
             """)
             exit(0)
@@ -104,8 +114,8 @@ private func pressTalkLikeSource(_ source: TISInputSource) -> Bool {
         stringProperty(source, kTISPropertyLocalizedName),
     ].compactMap { $0?.lowercased() }
     return values.contains { value in
-        value == inputMethodSourceID.lowercased() ||
-            value == bundleIdentifier.lowercased() ||
+        sourceIDs.contains(where: { value == $0.lowercased() }) ||
+            bundleIdentifiers.contains(where: { value == $0.lowercased() }) ||
             value.contains("presstalk") ||
             value.contains("jarvistap")
     }
@@ -116,15 +126,18 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
         inputSourceList(properties: properties as CFDictionary, includeAllInstalled: includeAllInstalled)
     }
 
-    let byMethodID = createList([kTISPropertyInputSourceID: inputMethodSourceID])
-    let byModeID = createList([kTISPropertyInputSourceID: inputModeSourceID])
-    let byBundle = createList([kTISPropertyBundleID: bundleIdentifier])
+    let bySourceID = sourceIDs.flatMap { sourceID in
+        createList([kTISPropertyInputSourceID: sourceID])
+    }
+    let byBundle = bundleIdentifiers.flatMap { bundleIdentifier in
+        createList([kTISPropertyBundleID: bundleIdentifier])
+    }
     let byFullScan = inputSourceList(properties: nil, includeAllInstalled: includeAllInstalled)
         .filter(pressTalkLikeSource)
 
     var sources: [TISInputSource] = []
     var seen = Set<String>()
-    for source in byMethodID + byModeID + byBundle + byFullScan {
+    for source in bySourceID + byBundle + byFullScan {
         let key = sourceKey(source)
         let fallbackKey = "\(Unmanaged.passUnretained(source).toOpaque())"
         let uniqueKey = key.isEmpty ? fallbackKey : key
@@ -137,7 +150,10 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
 
 private func preferredSelectableSource(from sources: [TISInputSource]) -> TISInputSource? {
     sources.first {
-        stringProperty($0, kTISPropertyInputSourceID) == inputModeSourceID &&
+        stringProperty($0, kTISPropertyInputSourceID) == inputMethodSourceID &&
+            (boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? true)
+    } ?? sources.first {
+        stringProperty($0, kTISPropertyInputSourceID) == legacyInputModeSourceID &&
             (boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? true)
     } ?? sources.first {
         boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? false
@@ -241,7 +257,8 @@ private let payload: [String: Any] = [
     "installedBundlePath": bundleURL.path,
     "installedBundleExists": installedBundleExists,
     "inputMethodSourceID": inputMethodSourceID,
-    "inputModeSourceID": inputModeSourceID,
+    "legacyInputMethodSourceID": legacyInputMethodSourceID,
+    "legacyInputModeSourceID": legacyInputModeSourceID,
     "currentInputSourceID": current["id"] ?? NSNull(),
     "currentInputSource": current,
     "allInstalledInputSourceCount": allInstalledSources.count,

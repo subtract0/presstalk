@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc9`
-- Commit: `0a44c7c3463b975e167535ba279d11008cf01ba8`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc9`
-- Asset: `PressTalk-0.1.5-rc9-macos-arm64.zip`
-- SHA-256: `9af82b1fabd646b33f8b97412fc1766ad1eed8656a8dc09ccdce13722f81d249`
+- Tag: `v0.1.5-rc10`
+- Commit: `f0df8249c129cc5cdbd0a9a11d8a6ef79ed01d2f`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc10`
+- Asset: `PressTalk-0.1.5-rc10-macos-arm64.zip`
+- SHA-256: `fd315be754cb7e74a17f04b4f5d9cec3158fcf9a3ad5ba3fd0fb4ebbbad45995`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc9` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc10` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc9` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc10` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, and bundled smoke-status collector.
 - A local development code-signing identity was created on `studio1`, and a
@@ -52,6 +52,12 @@ Verified on `studio1` on 2026-06-06:
   and session event taps before falling back to writable taps. Runtime status
   records `runtime.inputListener` so smoke tests can distinguish
   `hid:listen_only`, `session:listen_only`, `hid:default`, and `failed`.
+- On `studio1`, a no-pane/no-auto-window restart of the rc10-equivalent local
+  build reports `runtime.inputListener=hid:listen_only`,
+  `runtime.inputPipelineReady=true`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`. Trace evidence also shows the actual
+  WhisperKit cache layout under `Models/models/...` and the local tokenizer
+  folder under `Models/models/openai/whisper-large-v3`.
 - After the rc6 publish path, the local app was re-bootstrapped and re-signed as
   `Authority=PressTalk Local Development Code Signing`; the collector reports
   LaunchAgent `program = /usr/bin/open`, `Open permission panes: 0`,
@@ -60,20 +66,19 @@ Verified on `studio1` on 2026-06-06:
 
 Known current blocker:
 
-- On `studio1`, macOS Settings can show PressTalk as enabled while the current
-  PressTalk runtime still reports Input Monitoring and Accessibility preflight
-  unavailable, and the HID/session event-tap listener probes fail. Treat this as
-  a listener/probe blocker; do not keep reopening panes or re-granting
-  permissions as the default response.
-- `v0.1.5-rc9` includes the listen-only event-tap fallback plus the
-  no-automatic-prompt/no-auto-settings-window fixes and is the artifact to use
-  for the next cross-machine smoke attempts.
+- `studio1` no longer has a listener/probe setup blocker after the listen-only
+  event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
+  dictation and paste smoke; a synthetic Fn event was not counted as proof.
+- `v0.1.5-rc10` includes the listen-only event-tap fallback, WhisperKit cache
+  layout/tokenizer prefetch fixes, and the no-automatic-prompt/no-auto-settings
+  window fixes. It is the artifact to use for the next cross-machine smoke
+  attempts.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
   configured on `studio1`, and `mbp1` currently resolves but SSH times out.
 
 Do not claim full release coverage until these are recorded:
 
-- `studio1`: Fn dictation smoke after the listener/probe blocker is resolved.
+- `studio1`: physical Fn dictation and paste smoke.
 - `s1`: install plus Fn dictation smoke.
 - `s2`: install plus Fn dictation smoke.
 - `mbp1`: M1 Max install plus Fn or Option dictation smoke.

@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc9-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc9/PressTalk-0.1.5-rc9-macos-arm64.zip
-echo "9af82b1fabd646b33f8b97412fc1766ad1eed8656a8dc09ccdce13722f81d249  $tmpdir/PressTalk-0.1.5-rc9-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc9-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc10-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc10/PressTalk-0.1.5-rc10-macos-arm64.zip
+echo "fd315be754cb7e74a17f04b4f5d9cec3158fcf9a3ad5ba3fd0fb4ebbbad45995  $tmpdir/PressTalk-0.1.5-rc10-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc10-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -33,7 +33,7 @@ PRESSTALK_TRIGGER_KEY=fn /bin/bash "$HOME/Applications/PressTalk.app/Contents/Re
 Expected SHA-256:
 
 ```text
-9af82b1fabd646b33f8b97412fc1766ad1eed8656a8dc09ccdce13722f81d249
+fd315be754cb7e74a17f04b4f5d9cec3158fcf9a3ad5ba3fd0fb4ebbbad45995
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is

@@ -65,6 +65,13 @@ traceCopyFallback, targetCaptureSuccess, and targetCaptureFailureHint, so a
 physical trigger/STT success is visibly separate from an active-field insertion
 failure.
 
+The bundle now also carries a separate PressTalkInputMethod.app prototype plus
+presstalk-install-input-method.sh and presstalk-input-method-insert-probe.sh.
+This is an explicit, opt-in InputMethodKit insertion experiment for the current
+active-field blocker. It is not selected or installed automatically and does not
+open System Settings; it only gives testers a concrete path to verify whether a
+selected PressTalk input method can insert text without Accessibility trust.
+
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
 phrase through system audio, and records whether PressTalk transcribes, posts

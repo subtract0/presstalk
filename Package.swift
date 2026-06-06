@@ -12,6 +12,10 @@ let package = Package(
             name: "jarvistap",
             targets: ["JarvisTap"]
         ),
+        .executable(
+            name: "presstalk-input-method",
+            targets: ["PressTalkInputMethod"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
@@ -22,6 +26,10 @@ let package = Package(
             dependencies: [
                 "WhisperKit",
             ]
+        ),
+        .executableTarget(
+            name: "PressTalkInputMethod",
+            dependencies: []
         ),
     ]
 )

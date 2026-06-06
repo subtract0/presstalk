@@ -184,6 +184,33 @@ trace evidence for transcription and paste completion. Its JSON result sets
 `tracePasteCompleted` for whether the helper text window captured enough pasted
 text. Use it to debug STT/paste separately from the real Fn/Option trigger.
 
+## Optional Input Method Probe
+
+The release bundle includes an opt-in InputMethodKit prototype for the
+Accessibility-untrusted active-field insertion blocker. It is not installed or
+selected automatically.
+
+Install the prototype without opening System Settings:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-install-input-method.sh"
+```
+
+After macOS recognizes and you select `PressTalk Input Method`, focus an
+editable text field and run:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-insert-probe.sh" "PressTalk input method probe"
+```
+
+Then inspect:
+
+```bash
+tail -n 40 ~/Library/Logs/presstalk_input_method.log
+```
+
+This is not release success until the probe text appears in the focused field.
+
 If you need to force the F5 bridge manually on that Mac, use:
 
 ```bash

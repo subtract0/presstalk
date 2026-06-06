@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc40`
-- Commit: `8e88a2c2714e4d4713f6b953008e5872b4014620`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc40`
-- Asset: `PressTalk-0.1.5-rc40-macos-arm64.zip`
-- SHA-256: `1125ec492764f718580a3c3f68985bddadc0fce72629d664bf267a4734e83406`
+- Tag: `v0.1.5-rc41`
+- Commit: `ce8f3c48e32afec990f843d8549c4ebd5561af6b`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc41`
+- Asset: `PressTalk-0.1.5-rc41-macos-arm64.zip`
+- SHA-256: `4bd725368218416afdaf097a992783010cbd6e83e211211d3d795e7abdc06ddb`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,12 +17,13 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc31` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc41` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc31` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc41` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
-  Fn smoke helper, and bundled automated F5 smoke helper.
+  Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
+  Accessibility probe, and bundled input-method prototype with `PkgInfo`.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -329,6 +330,41 @@ Verified on `studio1` on 2026-06-06:
   `codeSignatureCDHash=fb494efe3b8cacf28cc2130e6693a4a498dfd0c1`, and
   `codeSignatureAuthority=PressTalk Local Development Code Signing` for
   `/Users/am/Applications/PressTalk.app`.
+- `v0.1.5-rc41` publishes the adjusted InputMethodKit diagnostics. The generated
+  input-method prototype now includes `Contents/PkgInfo`, a visible mode id
+  `com.am.presstalk.inputmethod.dictation`, no `LSBackgroundOnly`, and script
+  repertoire `Latn`. The status helper also scans the full installed TIS table
+  for PressTalk-like sources. On `studio1`, `TISRegisterInputSource` still
+  returns `0`, but `recognizedSourceCount=0` and
+  `pressTalkLikeAllInstalledSourceCount=0`, so this remains an input-source
+  discovery blocker rather than a missing Microphone, Input Monitoring, or
+  Accessibility permission. The GitHub release asset digest is
+  `sha256:4bd725368218416afdaf097a992783010cbd6e83e211211d3d795e7abdc06ddb`,
+  and the remote tag points at
+  `ce8f3c48e32afec990f843d8549c4ebd5561af6b`.
+- After publishing `v0.1.5-rc41`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `bundlePath=/Users/am/Applications/PressTalk.app`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `codeSignatureCDHash=c068e650a2f3a6ea7762920994eb2361efb7a1b5`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `microphoneStatus=preflight_granted`,
+  `inputMonitoringEffective=true`,
+  `inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `inputListener=hid:listen_only`, `inputPipelineReady=true`,
+  `setupRetryActive=false`, `permissionPaneOpeningAllowed=false`,
+  `accessibilityStatus=ax_false_copy_fallback`, `status.speechModel=Ready`,
+  and `status.triggerPath=Fn / Globe ready`. Status consistency reports matching
+  live process, status bundle path, app bundle path, bundle id, and CDHash.
+- The restored `studio1` actual-bundle probe ran without prompts and reported
+  `status=ran`, `promptRequested=false`, `accessibilityTrusted=false`,
+  `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureCDHash=c068e650a2f3a6ea7762920994eb2361efb7a1b5`, and
+  `codeSignatureAuthority=PressTalk Local Development Code Signing` for
+  `/Users/am/Applications/PressTalk.app`.
 - After publishing `v0.1.5-rc39`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
@@ -610,14 +646,15 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc31` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc41` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
   identifier fix, the no-ANE WhisperKit compute preset,
   `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, the smoke-status
   consistency checker, decoded TCC code-requirement diagnostics, app-level
-  no-pane enforcement, and
+  no-pane enforcement, the actual-bundle Accessibility trust probe, adjusted
+  InputMethodKit diagnostics, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It also includes the
   rc29 success-path setup-window fix, the rc30 manual-smoke insertion evidence

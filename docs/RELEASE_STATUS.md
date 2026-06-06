@@ -703,13 +703,13 @@ Known current proof gaps:
   Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
   only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or
   `studio2-tb`; `mbp1` is reachable via `mbp1-tb`.
-- `mbp1` rc43 was installed from the GitHub release artifact over SSH with
+- `mbp1` rc44 was installed from the GitHub release artifact over SSH with
   SHA-256 verified as
-  `7df81ffc3540d83166495951ab960f33213c059d274b58d7a4ee0795b4dcdd6d`.
+  `a5f4308d988feec28058c76a7f5679b644732c94820b25a9f7bb06747ba9bba6`.
   Bootstrap used `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
   After startup delay, `presstalk-collect-smoke-status.sh` reported matching
-  live process/status/app CDHash `30e9b4cd72207ec5eb3bc40b7c62c3511534055f`,
+  live process/status/app CDHash `31069dcf3663a68a87f02e35002c6ecc963bf336`,
   `bundleIdentifier=com.am.presstalk`,
   `permissions.microphoneAuthorizationStatus=authorized`,
   `permissions.microphoneGranted=true`,
@@ -723,8 +723,10 @@ Known current proof gaps:
 - On `mbp1`, bootstrap over SSH could not create a trusted local development
   signing identity because macOS denied Keychain trust changes without user
   interaction. The app therefore ran ad-hoc for the SSH install
-  (`status.adHocSigned=true`). Treat that as a signing/identity caveat for
-  remote installs, not as a missing microphone/input permission.
+  (`status.adHocSigned=true`), and the rc44 bootstrap summary correctly reported
+  `Stable local signing requested: 1` and `Stable local signing applied: 0`.
+  Treat that as a signing/identity caveat for remote installs, not as a missing
+  microphone/input permission.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to
   emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility

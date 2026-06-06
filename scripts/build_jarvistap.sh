@@ -53,7 +53,7 @@ cat >"$APP_INFO_PLIST" <<'PLIST'
   <key>CFBundleExecutable</key>
   <string>jarvistap</string>
   <key>CFBundleIdentifier</key>
-  <string>com.am.jarvistap</string>
+  <string>com.am.presstalk</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -92,7 +92,7 @@ if [[ -n "$SIGN_KEYCHAIN" ]]; then
   codesign_args+=(--keychain "$SIGN_KEYCHAIN")
 fi
 
-codesign "${codesign_args[@]}" --identifier "com.am.jarvistap" "$APP_MACOS_DIR/jarvistap"
+codesign "${codesign_args[@]}" --identifier "com.am.presstalk" "$APP_MACOS_DIR/jarvistap"
 codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
 if [[ -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then

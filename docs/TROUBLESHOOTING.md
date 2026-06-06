@@ -40,7 +40,8 @@ fails.
 If Microphone is unavailable even though macOS already shows PressTalk enabled,
 check the app signature and TCC identity before re-granting. Ad-hoc builds can
 change CDHash between releases, leaving old TCC rows that no longer match the
-current binary.
+current binary. Current PressTalk app bundles identify as `com.am.presstalk`;
+`com.am.jarvistap` is retained as the legacy launchd/helper label.
 
 On a machine where launchd reports `Bootstrap failed: 5: Input/output error`,
 first check whether the label was disabled:
@@ -74,9 +75,11 @@ Use TCC reset only as an explicit last-resort debugging step, because it discard
 the already-approved state:
 
 ```bash
-tccutil reset ListenEvent com.am.jarvistap
-tccutil reset Microphone com.am.jarvistap
-tccutil reset Accessibility com.am.jarvistap
+for bundle_id in com.am.presstalk com.am.jarvistap; do
+  tccutil reset ListenEvent "$bundle_id"
+  tccutil reset Microphone "$bundle_id"
+  tccutil reset Accessibility "$bundle_id"
+done
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```

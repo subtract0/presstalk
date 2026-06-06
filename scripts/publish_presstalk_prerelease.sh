@@ -69,6 +69,11 @@ bootstrapping. This fixes the mbp1 failure mode where launchd had the label
 disabled and returned "5: Input/output error" even though the same app could
 launch through LaunchServices.
 
+The app bundle identifier is now com.am.presstalk while the launchd label
+remains com.am.jarvistap for compatibility. This matches older PressTalk TCC
+rows on mbp1 and avoids the microphone block caused by the previous
+com.am.jarvistap code requirement drift.
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

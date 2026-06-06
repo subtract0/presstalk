@@ -8,8 +8,10 @@ Homebrew cask name: `presstalk`
 
 Production naming:
 - shipped app bundle: `PressTalk.app`
+- app bundle identifier: `com.am.presstalk`
 - product name: `PressTalk`
-- internal compatibility identifiers such as `com.am.jarvistap` and `JARVISTAP_*` stay stable for now
+- internal launchd/helper identifiers such as `com.am.jarvistap` and
+  `JARVISTAP_*` stay stable for now
 
 Current packaged behavior:
 - hold `Fn / Globe` by default to bring up the light and start recording

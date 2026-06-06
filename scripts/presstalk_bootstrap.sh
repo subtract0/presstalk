@@ -88,7 +88,7 @@ resign_with_local_identity_if_possible() {
   fi
 
   echo "Stable local signing identity: $identity_hash"
-  if codesign --force --sign "$identity_hash" --timestamp=none --identifier "com.am.jarvistap" "$APP_BINARY" &&
+  if codesign --force --sign "$identity_hash" --timestamp=none --identifier "com.am.presstalk" "$APP_BINARY" &&
     codesign --force --sign "$identity_hash" --timestamp=none "$APP_BUNDLE"; then
     echo "Stable local signing applied to PressTalk.app."
   else

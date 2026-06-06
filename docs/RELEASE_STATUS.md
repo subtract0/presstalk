@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc12`
-- Commit: `d0f17f874a2366aef76546a9eb19f4f2af8f3218`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc12`
-- Asset: `PressTalk-0.1.5-rc12-macos-arm64.zip`
-- SHA-256: `3297ffab9f78b00238562048be1104ba715f921fa503b85e003cf682579d91a8`
+- Tag: `v0.1.5-rc14`
+- Commit: `8e5b159772823545a6f038feaf06ef1679670046`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc14`
+- Asset: `PressTalk-0.1.5-rc14-macos-arm64.zip`
+- SHA-256: `28558a1f05cc12500e2fad9a24f747e42e967ae93c84c53ddb936b3f4efd9c25`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc12` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc14` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc12` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc14` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -58,7 +58,12 @@ Verified on `studio1` on 2026-06-06:
   listener-ready and `runtime-status.json` records
   `permissions.inputMonitoringEffective=true` instead of sending the user back
   through already-enabled macOS privacy toggles. Accessibility is treated as a
-  paste probe unless paste actually fails.
+  paste probe unless paste actually fails. Microphone now reports as unavailable
+  to the current build rather than claiming the user failed to grant it, which
+  matters when ad-hoc code identity drift invalidates an older TCC row.
+- Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
+  explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
+  a failed launchd bootstrap as success.
 - On `studio1`, a no-pane/no-auto-window restart of the rc10-equivalent local
   build reports `runtime.inputListener=hid:listen_only`,
   `runtime.inputPipelineReady=true`, `status.speechModel=Ready`, and
@@ -76,14 +81,32 @@ Known current blocker:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `v0.1.5-rc12` includes the listen-only event-tap fallback, WhisperKit cache
+- `mbp1`: `v0.1.5-rc13` was downloaded from GitHub with SHA-256
+  `4a1ccbc3c1b58a71a48125b6d9a2ead9ee3a7f4edae6ae77cae88ee1888e692a` and
+  bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  The old `launchctl` blocker was reproduced as a disabled
+  `com.am.jarvistap` label, then fixed by enabling the label; after rc13
+  bootstrap, `launchctl` reports `state = running`, `program = /usr/bin/open`,
+  and a live `/Users/alexandermonas/Applications/PressTalk.app/Contents/MacOS/jarvistap`
+  process. No quarantine/provenance xattrs remain on the installed app.
+- `mbp1` current blocker: runtime status reports `microphoneGranted=false`,
+  `inputMonitoringEffective=false`, `inputListener=not_installed`, and
+  `setupRetryActive=true`. Read-only TCC inspection shows old microphone rows
+  for `com.am.jarvistap` and `com.am.presstalk`, so the likely cause is ad-hoc
+  CDHash/code-requirement drift rather than a launchd failure. The local signing
+  helper still times out while adding trust on mbp1 and leaves the installed app
+  ad-hoc signed.
+- `v0.1.5-rc14` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, and the no-automatic-prompt/no-auto-settings
   window fixes. It also includes the settings status fix for already-granted
-  permission toggles and `presstalk-manual-fn-smoke.swift`, which opens a
-  focused text window and records physical Fn dictation smoke results as JSON.
-  It is the artifact to use for the next cross-machine smoke attempts.
-- Remote verification has not started: local SSH aliases `s1` and `s2` are not
-  configured on `studio1`, and `mbp1` currently resolves but SSH times out.
+  permission toggles, the mbp1 launchd disabled-label/provenance fix, microphone
+  availability wording for ad-hoc TCC drift, and
+  `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
+  records physical Fn dictation smoke results as JSON. It is the artifact to use
+  for the next cross-machine smoke attempts.
+- Local SSH aliases `s1` and `s2` are still not configured on `studio1`; `mbp1`
+  is reachable via `mbp1-tb`.
 
 Do not claim full release coverage until these are recorded:
 

@@ -37,6 +37,22 @@ If `permissions.inputMonitoringGranted=false` but
 Settings window should show Input Monitoring as listener-ready, not missing.
 Treat Accessibility false-preflight as a paste probe unless paste actually
 fails.
+If Microphone is unavailable even though macOS already shows PressTalk enabled,
+check the app signature and TCC identity before re-granting. Ad-hoc builds can
+change CDHash between releases, leaving old TCC rows that no longer match the
+current binary.
+
+On a machine where launchd reports `Bootstrap failed: 5: Input/output error`,
+first check whether the label was disabled:
+
+```bash
+launchctl print-disabled "gui/$(id -u)" | grep com.am.jarvistap
+launchctl enable "gui/$(id -u)/com.am.jarvistap"
+```
+
+Current bootstrap helpers do this automatically and also remove
+`com.apple.quarantine` and `com.apple.provenance` xattrs from the installed app
+bundle before launch.
 
 If you are deliberately refreshing a development process after changing code,
 restart the LaunchAgent without opening panes:

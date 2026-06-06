@@ -216,11 +216,20 @@ Verified on `studio1` on 2026-06-06:
   discovery/trust blocker, not as missing Microphone, Input Monitoring, or
   Accessibility permissions.
 - Post-rc35 local debugging made the generated input-method bundle more
-  Apple-like by removing `LSBackgroundOnly`, using string-valued `LSUIElement`,
-  adding `CFBundleIconFile`, and making the build-script `--install` path
-  attempt quarantine/provenance cleanup. Rebuild/install/register still reports
-  `TISRegisterInputSource=0` and `recognizedSourceCount=0`, so these metadata
-  changes are not sufficient to solve TIS discovery on `studio1`.
+  Apple-like by using string-valued `LSUIElement`, adding `CFBundleIconFile`,
+  and making the build-script `--install` path attempt quarantine/provenance
+  cleanup. Post-rc36 debugging restored the docs-required `LSBackgroundOnly=1`
+  key for `IMKServer.init(name:bundleIdentifier:)`. Rebuild/install/register
+  still reports `TISRegisterInputSource=0` and `recognizedSourceCount=0`, so
+  these metadata changes are not sufficient to solve TIS discovery on
+  `studio1`.
+- Post-rc36 local debugging added `presstalk-accessibility-identity-probe.sh`.
+  It launches no-prompt background probes for `com.am.jarvistap` and
+  `com.am.presstalk`, both stable-signed and ad-hoc. On `studio1`,
+  `accessibility-identity-probe-2026-06-06T22-13-46Z.json` reported
+  `accessibilityTrusted=false` for all four candidates. This supports the
+  running app's `AXIsProcessTrusted=false` result and means there is no broad
+  Accessibility trust currently visible to those PressTalk identities.
 - After publishing `v0.1.5-rc36`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
@@ -239,8 +248,8 @@ Verified on `studio1` on 2026-06-06:
   CDHash, and signing authority first.
 - `v0.1.5-rc35` updates the bundled automated F5 smoke helper to classify
   near-silent TTS captures as an audio-routing failure instead of a generic STT
-  timeout. If `/usr/bin/say` playback goes only to AirPods or other headphones,
-  helper JSON reports `reason=tts_audio_not_captured_by_microphone`,
+  timeout. If `/usr/bin/say` playback is routed somewhere the microphone cannot
+  hear, helper JSON reports `reason=tts_audio_not_captured_by_microphone`,
   `targetCaptureFailureHint=tts_output_not_heard_by_microphone`, and
   `traceAudioCapture` RMS/peak evidence.
 - After publishing `v0.1.5-rc35`, `studio1` was restored to

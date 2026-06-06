@@ -131,6 +131,14 @@ First confirm readiness:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
 ```
 
+If Accessibility appears enabled in macOS but PressTalk still reports
+`accessibilityGranted=false`, run the bundled identity probe. It does not open
+permission panes and does not request prompts:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-identity-probe.sh"
+```
+
 Expected readiness fields:
 
 - `runtime.inputPipelineReady=true`
@@ -187,10 +195,9 @@ trace evidence for transcription and paste completion. Its JSON result sets
 `tracePasteCompleted` for whether the helper text window captured enough pasted
 text. Use it to debug STT/paste separately from the real Fn/Option trigger.
 
-Do not use AirPods or other headphones for this automated helper unless the
-microphone can actually hear the playback. The helper uses `/usr/bin/say` as an
-acoustic source; if output goes only to headphones, the app may record near
-silence. Current helper JSON reports that as
+For this automated helper, the `/usr/bin/say` playback must be physically
+audible to the microphone. If the system output route is isolated from the
+microphone, the app may record near silence. Current helper JSON reports that as
 `reason=tts_audio_not_captured_by_microphone` with `traceAudioCapture` RMS/peak
 evidence rather than a generic STT failure.
 

@@ -55,8 +55,9 @@ The installed bundle path is:
 
 Current builds sign the prototype with the same local development identity as
 `PressTalk.app` unless `PRESSTALK_BUILD_STABLE_SIGNING=0` is set. The generated
-bundle also carries the IMK metadata keys `CFBundleIconFile`, `LSUIElement`,
-`tsInputMethodIconFileKey`, and `tsInputMethodCharacterRepertoireKey`.
+bundle also carries the IMK metadata keys `LSBackgroundOnly`, `CFBundleIconFile`,
+`LSUIElement`, `tsInputMethodIconFileKey`, and
+`tsInputMethodCharacterRepertoireKey`.
 
 Installing the bundle does not select it as the active input source. macOS may
 require logout/login or manual input-source selection before the input method

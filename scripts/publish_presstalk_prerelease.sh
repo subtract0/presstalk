@@ -97,8 +97,8 @@ trigger failures. Results are marked physicalTriggerProof=false, and
 targetCaptureSuccess is tracked separately, so this does not replace physical
 Fn/Option smoke.
 
-If automated F5 helper playback goes only to AirPods or other
-headphones, the microphone may capture near silence. The helper reports this as
+If automated F5 helper playback is routed somewhere the microphone cannot hear,
+the microphone may capture near silence. The helper reports this as
 reason=tts_audio_not_captured_by_microphone with traceAudioCapture RMS/peak
 evidence, not as generic STT failure.
 
@@ -152,6 +152,12 @@ The bundled smoke-status collector now reports a Status Consistency section
 that compares runtime-status.json against the live PressTalk process and the
 installed app signature. This makes stale or mismatched diagnostics visible
 when a machine is blocked before dictation.
+
+The bundle also includes presstalk-accessibility-identity-probe.sh. It launches
+small background probe apps for com.am.jarvistap and com.am.presstalk with the
+Accessibility prompt flag disabled, records each probe signing identity, and
+reports whether either identity is already trusted for Accessibility without
+opening System Settings.
 
 The same collector now includes a read-only TCC Rows section for
 com.am.presstalk and com.am.jarvistap across Microphone, Input Monitoring, and

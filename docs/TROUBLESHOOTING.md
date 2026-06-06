@@ -57,6 +57,15 @@ for `com.am.presstalk` and `com.am.jarvistap` across Microphone, Input
 Monitoring, and Accessibility. Use that section to detect missing, stale, or
 wrong-identity TCC rows without opening System Settings or resetting TCC.
 
+If the TCC databases are not readable, run the bundled Accessibility identity
+probe. It launches tiny background probes for `com.am.jarvistap` and
+`com.am.presstalk` with the prompt flag disabled, then reports whether either
+identity is already trusted for Accessibility:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-identity-probe.sh"
+```
+
 Some development machines have their existing working microphone/input grants
 under the older `com.am.jarvistap` app identity. If a no-pane restart with
 `com.am.presstalk` regresses a machine that was previously working, preserve the

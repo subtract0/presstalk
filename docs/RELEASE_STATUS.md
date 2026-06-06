@@ -89,6 +89,10 @@ Verified on `studio1` on 2026-06-06:
 - `v0.1.5-rc19` adds a `Status Consistency` section to the bundled smoke-status
   collector. It compares `runtime-status.json` with the live PressTalk process
   and installed app signature, so stale or mismatched diagnostics are visible.
+- Current unreleased changes improve `presstalk-manual-fn-smoke.swift`: the
+  helper now reads the configured runtime trigger key, labels Fn/Option/F5 or
+  trackpad smoke correctly, and records readiness before and after the manual
+  paste attempt.
 - `studio1`: rc19 was downloaded from GitHub with SHA-256
   `ff5e56ebb8fde1be69bcc36461534ab71edea21f728823625d6eb11d77103c98`, then
   bootstrapped with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,

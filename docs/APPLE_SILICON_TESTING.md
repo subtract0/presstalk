@@ -139,10 +139,12 @@ Then run the bundled manual smoke helper:
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-manual-fn-smoke.swift"
 ```
 
-The helper opens a focused text window. Hold `Fn / Globe`, say a short sentence,
-then release. It writes a machine-readable result under
+The helper opens a focused text window and reads the configured PressTalk
+trigger from `runtime-status.json`. Hold that physical trigger, say a short
+sentence, then release. It writes a machine-readable result under
 `~/Library/Application Support/JarvisTap/Diagnostics/` with the captured text,
-runtime status, and trace lines since the helper started.
+expected trigger, runtime readiness before and after the attempt, runtime status,
+and trace lines since the helper started.
 
 Expected:
 
@@ -151,6 +153,8 @@ Expected:
 - listening light appears
 - transcript is inserted into the helper window
 - the helper result JSON has `"success": true`
+- the helper result JSON has the expected `expectedTriggerKey` and readiness
+  fields for the tested machine
 
 If you need to force the F5 bridge manually on that Mac, use:
 

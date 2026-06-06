@@ -52,8 +52,10 @@ small Whisper tokenizer files explicitly, so a populated model cache does not
 leave the app stuck at "Warming up".
 
 The app bundle includes presstalk-manual-fn-smoke.swift, a focused-window helper
-that records physical Fn dictation smoke results as JSON without opening macOS
-permission panes.
+that records physical trigger dictation smoke results as JSON without opening
+macOS permission panes. It now reads the configured runtime trigger key, supports
+Fn/Option/F5/trackpad labels, and records readiness before and after the manual
+paste smoke.
 
 Settings now distinguish read-only permission preflight results from effective
 runtime capability. If the real input listener is armed, Input Monitoring shows

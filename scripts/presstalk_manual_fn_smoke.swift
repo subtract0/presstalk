@@ -9,6 +9,9 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private let statusURL: URL
     private let outputURL: URL
     private let initialTraceLineCount: Int
+    private let initialRuntimeStatus: [String: Any]?
+    private let triggerKey: String
+    private let triggerLabel: String
 
     private var window: NSWindow!
     private var textView: NSTextView!
@@ -23,11 +26,19 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             .flatMap(TimeInterval.init) ?? 90
         traceLogURL = URL(fileURLWithPath: env["PRESSTALK_TRACE_LOG"] ?? "\(home.path)/Library/Logs/jarvistap_trace.log")
         statusURL = URL(fileURLWithPath: env["PRESSTALK_STATUS_JSON"] ?? "\(home.path)/Library/Application Support/JarvisTap/runtime-status.json")
+        initialRuntimeStatus = Self.runtimeStatusDictionary(from: statusURL)
+        triggerKey =
+            env["PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY"] ??
+            Self.stringValue(initialRuntimeStatus, path: ["runtime", "triggerKey"]) ??
+            "fn"
+        triggerLabel =
+            env["PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL"] ??
+            Self.triggerDisplayName(for: triggerKey)
 
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let stamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        outputURL = URL(fileURLWithPath: env["PRESSTALK_MANUAL_SMOKE_OUTPUT"] ?? "\(home.path)/Library/Application Support/JarvisTap/Diagnostics/manual-fn-smoke-\(stamp).json")
+        outputURL = URL(fileURLWithPath: env["PRESSTALK_MANUAL_SMOKE_OUTPUT"] ?? "\(home.path)/Library/Application Support/JarvisTap/Diagnostics/manual-trigger-smoke-\(stamp).json")
 
         initialTraceLineCount = Self.traceLines(from: traceLogURL).count
         super.init()
@@ -52,17 +63,17 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "PressTalk Manual Fn Smoke"
+        window.title = "PressTalk Manual Trigger Smoke"
         window.center()
 
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
         window.contentView = contentView
 
-        let titleLabel = NSTextField(labelWithString: "Physical Fn / Globe Smoke")
+        let titleLabel = NSTextField(labelWithString: "Physical \(triggerLabel) Smoke")
         titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
 
-        let instructionLabel = NSTextField(wrappingLabelWithString: "Click the empty box below, hold Fn / Globe, say a short sentence such as 'PressTalk smoke test', then release. This window records whether text is pasted here.")
+        let instructionLabel = NSTextField(wrappingLabelWithString: "Click the empty box below, hold \(triggerLabel), say a short sentence such as 'PressTalk smoke test', then release. This window records whether text is pasted here.")
         instructionLabel.font = NSFont.systemFont(ofSize: 13)
         instructionLabel.textColor = .secondaryLabelColor
 
@@ -78,7 +89,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         textView.string = ""
         scrollView.documentView = textView
 
-        statusLabel = NSTextField(labelWithString: "Waiting for pasted text. Timeout: \(Int(timeoutSeconds)) seconds.")
+        statusLabel = NSTextField(labelWithString: "Waiting for pasted text. \(Self.readinessSummary(from: initialRuntimeStatus)) Timeout: \(Int(timeoutSeconds)) seconds.")
         statusLabel.font = NSFont.systemFont(ofSize: 12)
         statusLabel.textColor = .secondaryLabelColor
 
@@ -109,7 +120,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             return
         }
 
-        statusLabel.stringValue = "Waiting for pasted text. Elapsed: \(Int(elapsed)) / \(Int(timeoutSeconds)) seconds."
+        statusLabel.stringValue = "Waiting for pasted text from \(triggerLabel). Elapsed: \(Int(elapsed)) / \(Int(timeoutSeconds)) seconds."
         if elapsed >= timeoutSeconds {
             finish(success: false, reason: "timeout", capturedText: capturedText)
         }
@@ -123,17 +134,24 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let traceLines = Self.traceLines(from: traceLogURL)
         let traceSinceStart = Array(traceLines.dropFirst(initialTraceLineCount).suffix(160))
+        let finalRuntimeStatus = Self.runtimeStatusDictionary(from: statusURL)
 
         let payload: [String: Any] = [
+            "smokeVersion": 2,
             "generatedAt": formatter.string(from: Date()),
             "startedAt": formatter.string(from: startedAt),
             "success": success,
             "reason": reason,
             "capturedText": capturedText,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
+            "expectedTriggerKey": triggerKey,
+            "expectedTriggerLabel": triggerLabel,
+            "readinessAtStart": Self.readinessPayload(from: initialRuntimeStatus),
+            "readinessAtFinish": Self.readinessPayload(from: finalRuntimeStatus),
             "traceLogPath": traceLogURL.path,
             "runtimeStatusPath": statusURL.path,
-            "runtimeStatus": Self.runtimeStatus(from: statusURL) ?? NSNull(),
+            "runtimeStatusAtStart": initialRuntimeStatus ?? NSNull(),
+            "runtimeStatusAtFinish": finalRuntimeStatus ?? NSNull(),
             "traceSinceStart": traceSinceStart,
         ]
 
@@ -142,7 +160,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
             try data.write(to: outputURL, options: [.atomic])
             statusLabel.stringValue = success
-                ? "Captured pasted text. Result: \(outputURL.path)"
+                ? "Captured pasted text from \(triggerLabel). Result: \(outputURL.path)"
                 : "Timed out. Result: \(outputURL.path)"
             print(outputURL.path)
             fflush(stdout)
@@ -161,9 +179,73 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         return text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
     }
 
-    private static func runtimeStatus(from url: URL) -> Any? {
+    private static func runtimeStatusDictionary(from url: URL) -> [String: Any]? {
         guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? JSONSerialization.jsonObject(with: data)
+        guard let object = try? JSONSerialization.jsonObject(with: data) else { return nil }
+        return object as? [String: Any]
+    }
+
+    private static func stringValue(_ dictionary: [String: Any]?, path: [String]) -> String? {
+        var current: Any? = dictionary
+        for key in path {
+            current = (current as? [String: Any])?[key]
+        }
+        let value = current as? String
+        return value?.isEmpty == false ? value : nil
+    }
+
+    private static func boolValue(_ dictionary: [String: Any]?, path: [String]) -> Bool? {
+        var current: Any? = dictionary
+        for key in path {
+            current = (current as? [String: Any])?[key]
+        }
+        return current as? Bool
+    }
+
+    private static func triggerDisplayName(for triggerKey: String) -> String {
+        switch triggerKey {
+        case "fn":
+            return "Fn / Globe"
+        case "option":
+            return "Option"
+        case "left_option":
+            return "Left Option"
+        case "right_option":
+            return "Right Option"
+        case "f5":
+            return "F5"
+        case "trackpad_hold":
+            return "trackpad hold"
+        default:
+            return triggerKey
+        }
+    }
+
+    private static func readinessSummary(from runtimeStatus: [String: Any]?) -> String {
+        let pipeline = boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"]) == true
+        let microphone = boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"]) == true
+        let speechModel = stringValue(runtimeStatus, path: ["status", "speechModel"]) ?? "unknown"
+        let triggerPath = stringValue(runtimeStatus, path: ["status", "triggerPath"]) ?? "unknown"
+        return "Ready: mic=\(microphone ? "yes" : "no"), input=\(pipeline ? "yes" : "no"), speech=\(speechModel), trigger=\(triggerPath)."
+    }
+
+    private static func readinessPayload(from runtimeStatus: [String: Any]?) -> [String: Any] {
+        [
+            "microphoneGranted": jsonValue(boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"])),
+            "inputMonitoringEffective": jsonValue(boolValue(runtimeStatus, path: ["permissions", "inputMonitoringEffective"])),
+            "inputPipelineReady": jsonValue(boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"])),
+            "inputListener": stringValue(runtimeStatus, path: ["runtime", "inputListener"]) ?? NSNull(),
+            "speechModel": stringValue(runtimeStatus, path: ["status", "speechModel"]) ?? NSNull(),
+            "triggerKey": stringValue(runtimeStatus, path: ["runtime", "triggerKey"]) ?? NSNull(),
+            "triggerPath": stringValue(runtimeStatus, path: ["status", "triggerPath"]) ?? NSNull(),
+        ]
+    }
+
+    private static func jsonValue(_ value: Bool?) -> Any {
+        if let value {
+            return value
+        }
+        return NSNull()
     }
 }
 

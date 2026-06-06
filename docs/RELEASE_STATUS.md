@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc8`
-- Commit: `294ae81bb85e7cdf7e20dc2766bae6cec333f051`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc8`
-- Asset: `PressTalk-0.1.5-rc8-macos-arm64.zip`
-- SHA-256: `72d6fd232edfdbb672ce0f15740cd1c09f5dd15223fc43785cc956f75c9dc34c`
+- Tag: `v0.1.5-rc9`
+- Commit: `0a44c7c3463b975e167535ba279d11008cf01ba8`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc9`
+- Asset: `PressTalk-0.1.5-rc9-macos-arm64.zip`
+- SHA-256: `9af82b1fabd646b33f8b97412fc1766ad1eed8656a8dc09ccdce13722f81d249`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc8` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc9` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc8` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc9` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, and bundled smoke-status collector.
 - A local development code-signing identity was created on `studio1`, and a
@@ -48,6 +48,10 @@ Verified on `studio1` on 2026-06-06:
 - Current startup/setup checks no longer call macOS permission-request APIs
   automatically. They only preflight and attempt the real listener capability,
   so repeated restarts do not keep prompting for already-approved permissions.
+- For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID
+  and session event taps before falling back to writable taps. Runtime status
+  records `runtime.inputListener` so smoke tests can distinguish
+  `hid:listen_only`, `session:listen_only`, `hid:default`, and `failed`.
 - After the rc6 publish path, the local app was re-bootstrapped and re-signed as
   `Authority=PressTalk Local Development Code Signing`; the collector reports
   LaunchAgent `program = /usr/bin/open`, `Open permission panes: 0`,
@@ -61,8 +65,9 @@ Known current blocker:
   unavailable, and the HID/session event-tap listener probes fail. Treat this as
   a listener/probe blocker; do not keep reopening panes or re-granting
   permissions as the default response.
-- `v0.1.5-rc8` includes the no-automatic-prompt/no-auto-settings-window fixes
-  and is the artifact to use for the next cross-machine smoke attempts.
+- `v0.1.5-rc9` includes the listen-only event-tap fallback plus the
+  no-automatic-prompt/no-auto-settings-window fixes and is the artifact to use
+  for the next cross-machine smoke attempts.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
   configured on `studio1`, and `mbp1` currently resolves but SSH times out.
 

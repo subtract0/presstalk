@@ -28,6 +28,11 @@ Settings panes, do not auto-show the PressTalk Settings window unless
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is set, and do not call macOS
 permission-request APIs during startup/setup.
 
+For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID and
+session event taps before falling back to writable taps. Check
+`runtime.inputListener` in the collected status to see which path armed, for
+example `hid:listen_only`, `session:listen_only`, `hid:default`, or `failed`.
+
 If you are deliberately refreshing a development process after changing code,
 restart the LaunchAgent without opening panes:
 

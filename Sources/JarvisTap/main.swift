@@ -1102,6 +1102,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let stateLock = NSLock()
 
     private var eventTap: CFMachPort?
+    private var eventTapInstallSummary = "not_installed"
     private var runLoopSource: CFRunLoopSource?
     private var specialKeyMonitor: Any?
     private var whisperKit: WhisperKit?
@@ -1880,6 +1881,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             ],
             "runtime": [
                 "inputPipelineReady": inputPipelineReady,
+                "inputListener": eventTapInstallSummary,
                 "setupRetryActive": setupRetryTimer != nil,
                 "agentMode": config.agentMode,
                 "triggerKey": settingsStore.triggerKey.rawValue,
@@ -1979,6 +1981,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Runtime
             - Speech model: \(runtimeStatus.speechModelStatus)
             - Trigger path: \(runtimeStatus.f5BridgeStatus)
+            - Input listener: \(eventTapInstallSummary)
             - Native calibration: \(currentNativeCalibrationSummary())
             - Trigger sources seen: \(bridgeDetails.sourcesSummary)
             - Last trigger source: \(bridgeDetails.lastSource ?? "none")
@@ -2881,33 +2884,52 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             (.cghidEventTap, "hid"),
             (.cgSessionEventTap, "session"),
         ]
+        let tapOptions: [(CGEventTapOptions, String)] = {
+            let listenOnly = (CGEventTapOptions.listenOnly, "listen_only")
+            let writable = (CGEventTapOptions.defaultTap, "default")
+
+            if settingsStore.triggerKey == .f5 {
+                return [writable, listenOnly]
+            }
+            return [listenOnly, writable]
+        }()
 
         var selectedTap: CFMachPort?
         var selectedTapName = ""
-        for (location, name) in tapLocations {
-            guard let tap = CGEvent.tapCreate(
-                tap: location,
-                place: .headInsertEventTap,
-                options: .defaultTap,
-                eventsOfInterest: CGEventMask(mask),
-                callback: callback,
-                userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
-            ) else {
-                traceLogger.log("Global event tap create failed location=\(name)")
-                continue
+        for (option, optionName) in tapOptions {
+            for (location, locationName) in tapLocations {
+                guard let tap = CGEvent.tapCreate(
+                    tap: location,
+                    place: option == .listenOnly ? .tailAppendEventTap : .headInsertEventTap,
+                    options: option,
+                    eventsOfInterest: CGEventMask(mask),
+                    callback: callback,
+                    userInfo: UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+                ) else {
+                    traceLogger.log("Global event tap create failed location=\(locationName) mode=\(optionName)")
+                    continue
+                }
+                selectedTap = tap
+                selectedTapName = "\(locationName):\(optionName)"
+                break
             }
-            selectedTap = tap
-            selectedTapName = name
-            break
+            if selectedTap != nil {
+                break
+            }
         }
 
-        guard let tap = selectedTap else { return false }
+        guard let tap = selectedTap else {
+            eventTapInstallSummary = "failed"
+            return false
+        }
 
         guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else {
+            eventTapInstallSummary = "\(selectedTapName):run_loop_source_failed"
             return false
         }
 
         eventTap = tap
+        eventTapInstallSummary = selectedTapName
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetCurrent(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)

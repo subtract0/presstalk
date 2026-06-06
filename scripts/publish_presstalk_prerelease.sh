@@ -41,6 +41,11 @@ timer running. Startup/setup checks use read-only preflights and real listener
 capability probes by default; the setup window is not auto-shown unless
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 is explicitly set.
 
+For Fn, Option, and trackpad triggers, PressTalk now attempts listen-only HID
+and session event taps before falling back to writable taps. Runtime status
+records the selected input listener mode so cross-machine smoke tests can tell
+whether the lower-permission path armed successfully.
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

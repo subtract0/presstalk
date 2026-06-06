@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc27`
-- Commit: `cf1131444a66475fd70e1ffe693b8eee051d41f6`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc27`
-- Asset: `PressTalk-0.1.5-rc27-macos-arm64.zip`
-- SHA-256: `b8291aad43d3d7445274840e5606f9e3d0745de39bb960a1a3aa346f25f01ee6`
+- Tag: `v0.1.5-rc28`
+- Commit: `8cd6b88e3368ef917ed1f6695b3614caec01957d`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc28`
+- Asset: `PressTalk-0.1.5-rc28-macos-arm64.zip`
+- SHA-256: `394068aba3662093d1d0a04d3b856c8577446fbd2147c4d4f40fd252095b3a50`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc27` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc28` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc27` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc28` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, and bundled automated F5 smoke helper.
@@ -78,6 +78,9 @@ Verified on `studio1` on 2026-06-06:
   `com.am.jarvistap` rows for Microphone, Input Monitoring, and Accessibility
   from the user/system TCC databases when readable; it does not reset TCC or
   open privacy panes.
+- `v0.1.5-rc28` adds decoded TCC code requirements to the same collector and
+  prints the running app's designated requirement. This makes stale grants tied
+  to an old certificate root or CDHash visible without opening System Settings.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.
@@ -240,6 +243,14 @@ Known current proof gaps:
   `microphoneAuthorizationStatus=not_determined`, `inputPipelineReady=false`,
   and `accessibilityGranted=false`, so mbp1 was restored to the working
   `com.am.presstalk` Fn path.
+- The rc28 collector decoded the mbp1 requirements: the running
+  `com.am.presstalk` app is ad-hoc signed with designated requirement
+  `cdhash H"e621fe76aa15b0d838b05bf53caf45c2b7935fdc"`. The stale allowed
+  `com.am.jarvistap` Microphone/Input Monitoring/Accessibility rows require
+  `identifier "com.am.jarvistap" and certificate root =
+  H"f2671c00575e4d2f123bb3c28ab3e2461de33fb3"`, and that certificate/private
+  signing identity was not found on mbp1, studio1, or studio2. A normal new
+  local signing identity would not match those old grants.
 - `mbp1` rc24 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
   level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
   Result JSON:
@@ -282,13 +293,14 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc27` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc28` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
   identifier fix, the no-ANE WhisperKit compute preset,
   `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, the smoke-status
-  consistency checker, app-level no-pane enforcement, and
+  consistency checker, decoded TCC code-requirement diagnostics, app-level
+  no-pane enforcement, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It is the artifact to use
   for the next cross-machine smoke attempts.

@@ -80,6 +80,11 @@ presstalk-bootstrap.sh. This is for machines whose existing microphone/input
 grants are under the older JarvisTap identity; new installs continue to default
 to com.am.presstalk.
 
+The bundled smoke-status collector now reports a Status Consistency section
+that compares runtime-status.json against the live PressTalk process and the
+installed app signature. This makes stale or mismatched diagnostics visible
+when a machine is blocked before dictation.
+
 WhisperKit now defaults to a no-Neural-Engine compute preset
 (mel/audio encoder/text decoder on CPU+GPU, prefill on CPU) because mbp1 on
 macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via

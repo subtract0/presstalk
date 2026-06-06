@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc36`
-- Commit: `29d5798d1fc8900ff470f30eb8e91e775f8fbc57`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc36`
-- Asset: `PressTalk-0.1.5-rc36-macos-arm64.zip`
-- SHA-256: `b0c809b669bafd6ea8d428f65a5d1f2bc87b2c6ed0e4ed6b42bfcae14e17d236`
+- Tag: `v0.1.5-rc37`
+- Commit: `b3922ee42bc382e6c026104147539f10bf91ab3c`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc37`
+- Asset: `PressTalk-0.1.5-rc37-macos-arm64.zip`
+- SHA-256: `f6fd25c8fa018f7115df8e1eba64b246adc49065c038fbc6b714e7dae4b91c96`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -231,6 +231,22 @@ Verified on `studio1` on 2026-06-06:
   running app's `AXIsProcessTrusted=false` result and means there is no broad
   Accessibility trust currently visible to those PressTalk identities.
 - After publishing `v0.1.5-rc36`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `permissionPaneOpeningAllowed=false`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`.
+- `v0.1.5-rc37` includes the no-prompt Accessibility identity probe, restores
+  `LSBackgroundOnly=1` in the bundled input-method prototype, and replaces
+  product-specific automated-smoke audio-route wording with the generic rule:
+  `/usr/bin/say` playback must be audible to the microphone for acoustic TTS
+  smoke tests to be meaningful.
+- After publishing `v0.1.5-rc37`, `studio1` was restored to
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.

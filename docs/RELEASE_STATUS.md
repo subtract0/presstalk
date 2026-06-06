@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc2`
-- Commit: `0d891c0c26413744e5020e49f91b0a79273de81d`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc2`
-- Asset: `PressTalk-0.1.5-rc2-macos-arm64.zip`
-- SHA-256: `0d825aa1de0ee0adc861cf277bd45415c80d0a250e14c075df2d5082aae56a92`
+- Tag: `v0.1.5-rc3`
+- Commit: `95ae172578e524e19d08ddc8dec0102d9594e95d`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc3`
+- Asset: `PressTalk-0.1.5-rc3-macos-arm64.zip`
+- SHA-256: `608b8c1b0adc38694cb32fc54a4bd9f8213cffa817882f706120fff99df576fd`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,10 +17,11 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc2` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc3` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc2` zip was unpacked locally and contains the expected arm64
-  `PressTalk.app`, permission usage descriptions, and ad-hoc app signature.
+- The `v0.1.5-rc3` zip was inspected locally and contains the expected arm64
+  `PressTalk.app`, permission usage descriptions, bundled bootstrap helper, and
+  bundled local-signing helper.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -38,7 +39,7 @@ Known current blocker:
   `Startup blocked: Input Monitoring permission missing`. `studio1` now has a
   stable local development signing identity, so refresh the permission toggle
   once for the stable-signed build before attempting the Fn dictation smoke.
-- `v0.1.5-rc2` includes the settings-window fix for this case: the UI now
+- `v0.1.5-rc3` includes the settings-window fix for this case: the UI now
   distinguishes "not granted to this rebuilt ad-hoc copy" from a generic missing
   permission, and diagnostics include the app code-signature summary.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not

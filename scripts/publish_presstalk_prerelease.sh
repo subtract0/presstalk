@@ -29,6 +29,11 @@ PressTalk ${VERSION} prerelease smoke artifact for Apple Silicon macOS.
 
 Default trigger: Fn / Globe.
 
+The bundled bootstrap creates or reuses a local development code-signing
+identity on the target Mac, re-signs PressTalk.app before launchd starts it,
+and then opens the macOS permission panes. This is intended to avoid repeated
+ad-hoc TCC identity drift during smoke testing and updates.
+
 This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
 
 SHA-256:

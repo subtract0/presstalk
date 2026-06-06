@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc11`
-- Commit: `154d93dd40f027b39b6a5820243ea6e358bd4417`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc11`
-- Asset: `PressTalk-0.1.5-rc11-macos-arm64.zip`
-- SHA-256: `18f3e81acb92b0e62968bb6c35412940bc2bfd63c7f480d4c37e28eebdaaaa8c`
+- Tag: `v0.1.5-rc12`
+- Commit: `d0f17f874a2366aef76546a9eb19f4f2af8f3218`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc12`
+- Asset: `PressTalk-0.1.5-rc12-macos-arm64.zip`
+- SHA-256: `3297ffab9f78b00238562048be1104ba715f921fa503b85e003cf682579d91a8`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc11` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc12` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc11` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc12` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -53,6 +53,12 @@ Verified on `studio1` on 2026-06-06:
   and session event taps before falling back to writable taps. Runtime status
   records `runtime.inputListener` so smoke tests can distinguish
   `hid:listen_only`, `session:listen_only`, `hid:default`, and `failed`.
+- Settings now distinguish read-only permission preflights from effective
+  runtime capability. If the real listener is armed, Input Monitoring renders as
+  listener-ready and `runtime-status.json` records
+  `permissions.inputMonitoringEffective=true` instead of sending the user back
+  through already-enabled macOS privacy toggles. Accessibility is treated as a
+  paste probe unless paste actually fails.
 - On `studio1`, a no-pane/no-auto-window restart of the rc10-equivalent local
   build reports `runtime.inputListener=hid:listen_only`,
   `runtime.inputPipelineReady=true`, `status.speechModel=Ready`, and
@@ -70,10 +76,11 @@ Known current blocker:
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `v0.1.5-rc11` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc12` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, and the no-automatic-prompt/no-auto-settings
-  window fixes. It also includes `presstalk-manual-fn-smoke.swift`, which opens
-  a focused text window and records physical Fn dictation smoke results as JSON.
+  window fixes. It also includes the settings status fix for already-granted
+  permission toggles and `presstalk-manual-fn-smoke.swift`, which opens a
+  focused text window and records physical Fn dictation smoke results as JSON.
   It is the artifact to use for the next cross-machine smoke attempts.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
   configured on `studio1`, and `mbp1` currently resolves but SSH times out.

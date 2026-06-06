@@ -32,6 +32,11 @@ For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID and
 session event taps before falling back to writable taps. Check
 `runtime.inputListener` in the collected status to see which path armed, for
 example `hid:listen_only`, `session:listen_only`, `hid:default`, or `failed`.
+If `permissions.inputMonitoringGranted=false` but
+`permissions.inputMonitoringEffective=true`, the listener is armed and the
+Settings window should show Input Monitoring as listener-ready, not missing.
+Treat Accessibility false-preflight as a paste probe unless paste actually
+fails.
 
 If you are deliberately refreshing a development process after changing code,
 restart the LaunchAgent without opening panes:

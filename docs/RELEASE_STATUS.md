@@ -19,6 +19,8 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
 - `v0.1.5-rc2` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
+- The `v0.1.5-rc2` zip was unpacked locally and contains the expected arm64
+  `PressTalk.app`, permission usage descriptions, and ad-hoc app signature.
 
 Known current blocker:
 
@@ -31,6 +33,8 @@ Known current blocker:
 - `v0.1.5-rc2` includes the settings-window fix for this case: the UI now
   distinguishes "not granted to this rebuilt ad-hoc copy" from a generic missing
   permission, and diagnostics include the app code-signature summary.
+- Remote verification has not started: local SSH aliases `s1` and `s2` are not
+  configured on `studio1`, and `mbp1` currently resolves but SSH times out.
 
 Do not claim full release coverage until these are recorded:
 

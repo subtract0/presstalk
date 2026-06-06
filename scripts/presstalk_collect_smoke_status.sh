@@ -35,6 +35,80 @@ status_signature_value() {
     awk -F= -v key="$key" '$1 == key { value = $2 } END { if (value != "") print value }'
 }
 
+sqlite_has_column() {
+  local db="$1"
+  local table="$2"
+  local column="$3"
+  sqlite3 "$db" "PRAGMA table_info($table);" 2>/dev/null |
+    awk -F'|' -v column="$column" '$2 == column { found = 1 } END { exit found ? 0 : 1 }'
+}
+
+print_tcc_rows() {
+  local label="$1"
+  local db="$2"
+
+  echo "$label: $db"
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    echo "sqlite3 unavailable"
+    return
+  fi
+  if [[ ! -e "$db" ]]; then
+    echo "TCC database missing"
+    return
+  fi
+  if [[ ! -r "$db" ]]; then
+    echo "TCC database not readable by this process"
+    return
+  fi
+
+  local services="'kTCCServiceMicrophone','kTCCServiceListenEvent','kTCCServiceAccessibility'"
+  local clients="'com.am.presstalk','com.am.jarvistap'"
+  local query
+  if sqlite_has_column "$db" access auth_value; then
+    query="
+      SELECT
+        service,
+        client,
+        client_type,
+        auth_value,
+        auth_reason,
+        auth_version,
+        CASE WHEN csreq IS NULL THEN 0 ELSE 1 END AS has_csreq,
+        datetime(last_modified, 'unixepoch', 'localtime') AS last_modified
+      FROM access
+      WHERE service IN ($services)
+        AND client IN ($clients)
+      ORDER BY service, client;
+    "
+  elif sqlite_has_column "$db" access allowed; then
+    query="
+      SELECT
+        service,
+        client,
+        client_type,
+        allowed,
+        prompt_count,
+        CASE WHEN csreq IS NULL THEN 0 ELSE 1 END AS has_csreq,
+        datetime(last_modified, 'unixepoch', 'localtime') AS last_modified
+      FROM access
+      WHERE service IN ($services)
+        AND client IN ($clients)
+      ORDER BY service, client;
+    "
+  else
+    echo "TCC access table schema is not recognized"
+    return
+  fi
+
+  local rows
+  rows="$(sqlite3 -header -column "$db" "$query" 2>/dev/null || true)"
+  if [[ -n "$rows" ]]; then
+    printf '%s\n' "$rows"
+  else
+    echo "No PressTalk/JarvisTap rows for Microphone, Input Monitoring, or Accessibility"
+  fi
+}
+
 presstalk_processes() {
   ps -axo pid=,ppid=,command= |
     awk '
@@ -117,6 +191,10 @@ if [[ -f "$STATUS_JSON" ]]; then
 else
   echo "Runtime status file missing: $STATUS_JSON"
 fi
+
+section "TCC Rows Read-Only"
+print_tcc_rows "User TCC" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
+print_tcc_rows "System TCC" "/Library/Application Support/com.apple.TCC/TCC.db"
 
 section "Trace Tail"
 if [[ -f "$TRACE_LOG" ]]; then

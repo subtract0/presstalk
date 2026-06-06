@@ -224,14 +224,16 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private static func readinessSummary(from runtimeStatus: [String: Any]?) -> String {
         let pipeline = boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"]) == true
         let microphone = boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"]) == true
+        let microphoneStatus = stringValue(runtimeStatus, path: ["permissions", "microphoneAuthorizationStatus"]) ?? "unknown"
         let speechModel = stringValue(runtimeStatus, path: ["status", "speechModel"]) ?? "unknown"
         let triggerPath = stringValue(runtimeStatus, path: ["status", "triggerPath"]) ?? "unknown"
-        return "Ready: mic=\(microphone ? "yes" : "no"), input=\(pipeline ? "yes" : "no"), speech=\(speechModel), trigger=\(triggerPath)."
+        return "Ready: mic=\(microphone ? "yes" : "no")(\(microphoneStatus)), input=\(pipeline ? "yes" : "no"), speech=\(speechModel), trigger=\(triggerPath)."
     }
 
     private static func readinessPayload(from runtimeStatus: [String: Any]?) -> [String: Any] {
         [
             "microphoneGranted": jsonValue(boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"])),
+            "microphoneAuthorizationStatus": stringValue(runtimeStatus, path: ["permissions", "microphoneAuthorizationStatus"]) ?? NSNull(),
             "inputMonitoringEffective": jsonValue(boolValue(runtimeStatus, path: ["permissions", "inputMonitoringEffective"])),
             "inputPipelineReady": jsonValue(boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"])),
             "inputListener": stringValue(runtimeStatus, path: ["runtime", "inputListener"]) ?? NSNull(),

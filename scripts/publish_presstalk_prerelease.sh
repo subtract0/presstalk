@@ -75,6 +75,10 @@ fails. Runtime status also records inputMonitoringStatus, microphoneStatus, and
 accessibilityStatus so raw macOS preflight misses are visibly separate from
 effective readiness.
 
+Runtime status also records microphoneAuthorizationStatus, so a blocked machine
+can distinguish authorized, denied, restricted, not_determined, and unknown
+microphone preflight states without opening System Settings.
+
 For insertion, PressTalk now tries direct Accessibility insertion into the
 focused text element when Accessibility is trusted. If Accessibility is not
 trusted, it copies the transcript to the clipboard and records a copy fallback
@@ -110,6 +114,11 @@ The bundled smoke-status collector now reports a Status Consistency section
 that compares runtime-status.json against the live PressTalk process and the
 installed app signature. This makes stale or mismatched diagnostics visible
 when a machine is blocked before dictation.
+
+The same collector now includes a read-only TCC Rows section for
+com.am.presstalk and com.am.jarvistap across Microphone, Input Monitoring, and
+Accessibility. It does not reset TCC or open privacy panes; it only reports
+whether the current user/system TCC databases contain matching rows.
 
 WhisperKit now defaults to a no-Neural-Engine compute preset
 (mel/audio encoder/text decoder on CPU+GPU, prefill on CPU) because mbp1 on

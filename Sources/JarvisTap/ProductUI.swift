@@ -20,6 +20,7 @@ struct PressTalkCommerceConfig {
 struct PressTalkRuntimeStatus {
     let inputMonitoringGranted: Bool
     let microphoneGranted: Bool
+    let microphoneAuthorizationStatus: String
     let accessibilityGranted: Bool
     let inputPipelineReady: Bool
     let inputListenerStatus: String
@@ -37,6 +38,7 @@ struct PressTalkRuntimeStatus {
     static let placeholder = PressTalkRuntimeStatus(
         inputMonitoringGranted: false,
         microphoneGranted: false,
+        microphoneAuthorizationStatus: "unknown",
         accessibilityGranted: false,
         inputPipelineReady: false,
         inputListenerStatus: "Checking...",
@@ -1234,6 +1236,15 @@ final class PressTalkSettingsWindowController: NSWindowController {
         if runtimeStatus.microphoneGranted {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
+        } else if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
+            label.stringValue = "Not determined"
+            label.textColor = .systemOrange
+        } else if runtimeStatus.microphoneAuthorizationStatus == "denied" {
+            label.stringValue = "Preflight denied"
+            label.textColor = .systemOrange
+        } else if runtimeStatus.microphoneAuthorizationStatus == "restricted" {
+            label.stringValue = "Restricted"
+            label.textColor = .systemOrange
         } else {
             label.stringValue = "Preflight unavailable"
             label.textColor = .systemOrange
@@ -1242,6 +1253,12 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     private func permissionHintText() -> String {
         if !runtimeStatus.microphoneGranted {
+            if runtimeStatus.microphoneAuthorizationStatus == "denied" {
+                return "Microphone preflight denies this app identity. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
+            }
+            if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
+                return "Microphone preflight has no approval record for this app identity. Export diagnostics before changing settings."
+            }
             if runtimeStatus.adHocSigned {
                 return "Microphone preflight is unavailable to this ad-hoc build. If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly."
             }

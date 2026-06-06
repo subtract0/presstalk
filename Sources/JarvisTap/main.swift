@@ -1090,6 +1090,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private struct PermissionCheckResult {
         let inputMonitoringGranted: Bool
         let microphoneGranted: Bool
+        let microphoneAuthorizationStatus: String
         let accessibilityGranted: Bool
     }
 
@@ -1275,9 +1276,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         guard permissions.microphoneGranted else {
             if presentFailureStatus {
-                traceLogger.log("Startup blocked: microphone unavailable to current build")
+                traceLogger.log("Startup blocked: microphone unavailable to current build status=\(permissions.microphoneAuthorizationStatus)")
                 printMicrophoneHelp()
-                present(.setupRequired("Microphone is not available to this PressTalk build."))
+                present(.setupRequired("Microphone preflight is \(permissions.microphoneAuthorizationStatus). Export diagnostics before changing settings."))
             }
             refreshRuntimeStatusUI()
             scheduleSetupRetry()
@@ -1868,6 +1869,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func currentRuntimeStatus() -> PressTalkRuntimeStatus {
+        let microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         let whisperStatus: String = withStateLock {
             switch whisperLoadState {
             case .idle:
@@ -1885,7 +1887,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         return PressTalkRuntimeStatus(
             inputMonitoringGranted: CGPreflightListenEventAccess(),
-            microphoneGranted: AVCaptureDevice.authorizationStatus(for: .audio) == .authorized,
+            microphoneGranted: microphoneAuthorizationStatus == .authorized,
+            microphoneAuthorizationStatus: microphoneAuthorizationStatusDescription(microphoneAuthorizationStatus),
             accessibilityGranted: AXIsProcessTrusted(),
             inputPipelineReady: inputPipelineReady,
             inputListenerStatus: eventTapInstallSummary,
@@ -1928,7 +1931,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "inputMonitoringEffective": status.inputMonitoringEffective,
                 "inputMonitoringStatus": status.inputMonitoringGranted ? "preflight_granted" : (status.inputMonitoringEffective ? "listener_ready_preflight_unavailable" : "preflight_unavailable"),
                 "microphoneGranted": status.microphoneGranted,
-                "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_unavailable",
+                "microphoneAuthorizationStatus": status.microphoneAuthorizationStatus,
+                "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_\(status.microphoneAuthorizationStatus)",
                 "accessibilityGranted": status.accessibilityGranted,
                 "accessibilityStatus": status.accessibilityGranted ? "preflight_granted" : (status.pasteAutomatically ? "copy_fallback_accessibility_untrusted" : "copy_only"),
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
@@ -2024,7 +2028,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
             - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
-            - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : "unavailable")
+            - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : runtimeStatus.microphoneAuthorizationStatus)
             - Accessibility status: \(runtimeStatus.accessibilityGranted ? "preflight granted" : (runtimeStatus.pasteAutomatically ? "copy fallback; preflight unavailable" : "copy-only mode"))
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
@@ -2634,14 +2638,31 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func checkSetupPermissions() -> PermissionCheckResult {
         let inputMonitoringGranted = CGPreflightListenEventAccess()
-        let microphoneGranted = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
+        let microphoneGranted = microphoneAuthorizationStatus == .authorized
         let accessibilityGranted = AXIsProcessTrusted()
 
         return PermissionCheckResult(
             inputMonitoringGranted: inputMonitoringGranted,
             microphoneGranted: microphoneGranted,
+            microphoneAuthorizationStatus: microphoneAuthorizationStatusDescription(microphoneAuthorizationStatus),
             accessibilityGranted: accessibilityGranted
         )
+    }
+
+    private func microphoneAuthorizationStatusDescription(_ status: AVAuthorizationStatus) -> String {
+        switch status {
+        case .authorized:
+            return "authorized"
+        case .denied:
+            return "denied"
+        case .restricted:
+            return "restricted"
+        case .notDetermined:
+            return "not_determined"
+        @unknown default:
+            return "unknown"
+        }
     }
 
     private func loadWhisperKitSync() throws {

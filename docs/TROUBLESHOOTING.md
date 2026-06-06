@@ -46,6 +46,15 @@ check the app signature and TCC identity before re-granting. Ad-hoc builds can
 change CDHash between releases, leaving old TCC rows that no longer match the
 current binary. Current PressTalk app bundles identify as `com.am.presstalk`;
 `com.am.jarvistap` is retained as the legacy launchd/helper label.
+Current builds write `permissions.microphoneAuthorizationStatus` into
+`runtime-status.json`, so first distinguish `denied`, `not_determined`,
+`restricted`, `authorized`, and `unknown` instead of treating every false
+preflight as the same problem.
+
+The bundled smoke-status collector also prints a read-only `TCC Rows` section
+for `com.am.presstalk` and `com.am.jarvistap` across Microphone, Input
+Monitoring, and Accessibility. Use that section to detect missing, stale, or
+wrong-identity TCC rows without opening System Settings or resetting TCC.
 
 Some development machines have their existing working microphone/input grants
 under the older `com.am.jarvistap` app identity. If a no-pane restart with

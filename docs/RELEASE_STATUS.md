@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc41`
-- Commit: `ce8f3c48e32afec990f843d8549c4ebd5561af6b`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc41`
-- Asset: `PressTalk-0.1.5-rc41-macos-arm64.zip`
-- SHA-256: `4bd725368218416afdaf097a992783010cbd6e83e211211d3d795e7abdc06ddb`
+- Tag: `v0.1.5-rc42`
+- Commit: `3da33a24e542734ac3b5dc105e684a0503f08761`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc42`
+- Asset: `PressTalk-0.1.5-rc42-macos-arm64.zip`
+- SHA-256: `caf5bedc8da03a63fb19f880e4f59978787222337093265d7ed76e4dfc163e5c`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,13 +17,13 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc41` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc42` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc41` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc42` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
-  Accessibility probe, and bundled input-method prototype with `PkgInfo`.
+  Accessibility probe, and bundled input-method app/helpers with `PkgInfo`.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -681,15 +681,16 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc41` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc42` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
   identifier fix, the no-ANE WhisperKit compute preset,
   `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, the smoke-status
   consistency checker, decoded TCC code-requirement diagnostics, app-level
-  no-pane enforcement, the actual-bundle Accessibility trust probe, adjusted
-  InputMethodKit diagnostics, and
+  no-pane enforcement, the actual-bundle Accessibility trust probe, the no-mode
+  InputMethodKit fallback before copy fallback when Accessibility is untrusted,
+  adjusted InputMethodKit diagnostics, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It also includes the
   rc29 success-path setup-window fix, the rc30 manual-smoke insertion evidence

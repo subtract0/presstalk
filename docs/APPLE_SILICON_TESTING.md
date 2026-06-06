@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc41-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc41/PressTalk-0.1.5-rc41-macos-arm64.zip
-echo "4bd725368218416afdaf097a992783010cbd6e83e211211d3d795e7abdc06ddb  $tmpdir/PressTalk-0.1.5-rc41-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc41-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc42-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc42/PressTalk-0.1.5-rc42-macos-arm64.zip
+echo "caf5bedc8da03a63fb19f880e4f59978787222337093265d7ed76e4dfc163e5c  $tmpdir/PressTalk-0.1.5-rc42-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc42-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-4bd725368218416afdaf097a992783010cbd6e83e211211d3d795e7abdc06ddb
+caf5bedc8da03a63fb19f880e4f59978787222337093265d7ed76e4dfc163e5c
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -215,13 +215,15 @@ microphone, the app may record near silence. Current helper JSON reports that as
 `reason=tts_audio_not_captured_by_microphone` with `traceAudioCapture` RMS/peak
 evidence rather than a generic STT failure.
 
-## Optional Input Method Probe
+## Input Method Fallback Diagnostics
 
-The release bundle includes an opt-in InputMethodKit prototype for the
-Accessibility-untrusted active-field insertion blocker. It is not installed or
-selected automatically.
+The release bundle includes the InputMethodKit fallback used when Accessibility
+is untrusted. Production dictation installs/registers the bundled input method
+if needed, temporarily selects it for insertion, restores the original input
+source, and does not open System Settings.
 
-Install the prototype without opening System Settings:
+Install the input method without opening System Settings if you want to inspect
+it before dictation reaches the fallback path:
 
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-install-input-method.sh"

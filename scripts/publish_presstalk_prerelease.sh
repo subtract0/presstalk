@@ -67,18 +67,17 @@ traceCopyFallback, targetCaptureSuccess, and targetCaptureFailureHint, so a
 physical trigger/STT success is visibly separate from an active-field insertion
 failure.
 
-The bundle now also carries a separate PressTalkInputMethod.app prototype plus
+The bundle now also carries a separate PressTalkInputMethod.app plus
 presstalk-install-input-method.sh, presstalk-input-method-status.swift,
 presstalk-input-method-client-probe.swift, and
-presstalk-input-method-insert-probe.sh. This is an explicit, opt-in
-InputMethodKit insertion experiment for the current active-field blocker. It is
-not selected or installed automatically and does not open System Settings; it
-gives testers a concrete path to verify whether a selected PressTalk input
-method can insert text without Accessibility trust. The status helper is
-read-only by default; registration, enabling, and selection require explicit
-flags. The client probe temporarily enables/selects the source, focuses a local
-text view, posts a payload, records whether text lands, and restores the
-original input source.
+presstalk-input-method-insert-probe.sh. These helpers diagnose the
+InputMethodKit fallback used when Accessibility is untrusted. Production
+dictation installs/registers the bundled input method if needed, temporarily
+selects it for insertion, restores the original input source, and does not open
+System Settings. The status helper is read-only by default; registration,
+enabling, and selection require explicit flags. The client probe temporarily
+enables/selects the source, focuses a local text view, posts a payload, records
+whether text lands, and restores the original input source.
 
 The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
 local text view and posts per-character Unicode CGEvents without opening System
@@ -122,10 +121,10 @@ microphone preflight states without opening System Settings.
 
 For insertion, PressTalk now tries direct Accessibility insertion into the
 focused text element when Accessibility is trusted. If Accessibility is not
-trusted, it copies the transcript to the clipboard and records a copy fallback
-instead of posting a Cmd-V event that cannot land. The automated smoke helper
-records traceInserted, traceCopyFallback, and targetCaptureFailureHint so these
-paths are visible in JSON.
+trusted, it tries the InputMethodKit insertion fallback before copying the
+transcript to the clipboard. It does not post a Cmd-V event that cannot land.
+The automated smoke helper records traceInserted, traceCopyFallback, and
+targetCaptureFailureHint so these paths are visible in JSON.
 
 The running app now receives PRESSTALK_OPEN_PERMISSION_PANES from bootstrap and
 launchd. When that value is 0, the Settings window hides the Microphone, Input

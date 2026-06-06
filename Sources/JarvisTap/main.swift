@@ -453,6 +453,12 @@ enum JarvisTapError: Error, CustomStringConvertible {
     }
 }
 
+enum TranscriptInsertionResult {
+    case inserted(method: String)
+    case pasteCommandPosted
+    case copiedFallback(reason: String)
+}
+
 struct MemoryTurn: Codable {
     let timestamp: String
     let role: String
@@ -1924,7 +1930,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "microphoneGranted": status.microphoneGranted,
                 "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_unavailable",
                 "accessibilityGranted": status.accessibilityGranted,
-                "accessibilityStatus": status.accessibilityGranted ? "preflight_granted" : (status.pasteAutomatically ? "paste_probe_pending" : "copy_only"),
+                "accessibilityStatus": status.accessibilityGranted ? "preflight_granted" : (status.pasteAutomatically ? "copy_fallback_accessibility_untrusted" : "copy_only"),
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
                 "permissionPaneOpeningAllowed": status.permissionPaneOpeningAllowed,
             ],
@@ -2019,7 +2025,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
             - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
             - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : "unavailable")
-            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "preflight granted" : (runtimeStatus.pasteAutomatically ? "paste probe pending" : "copy-only mode"))
+            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "preflight granted" : (runtimeStatus.pasteAutomatically ? "copy fallback; preflight unavailable" : "copy-only mode"))
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature
@@ -4198,25 +4204,99 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let preparedTranscript = transcriptForInsertion(transcript)
         guard !preparedTranscript.isEmpty else { return }
 
+        copyPreparedTranscriptToPasteboard(preparedTranscript)
+    }
+
+    private func copyPreparedTranscriptToPasteboard(_ preparedTranscript: String) {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.setString(preparedTranscript, forType: .string)
     }
 
-    private func insertTranscriptIntoFocusedApp(_ transcript: String) throws {
-        if !AXIsProcessTrusted() {
-            traceLogger.log("Accessibility preflight unavailable before paste; attempting event synthesis anyway")
+    private func insertPreparedTranscriptUsingAccessibility(_ preparedTranscript: String) -> String? {
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedObject: CFTypeRef?
+        let focusedError = AXUIElementCopyAttributeValue(
+            systemWideElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        )
+        guard focusedError == .success, let focusedObject else {
+            traceLogger.log("AX direct insertion unavailable reason=focused_element error=\(focusedError.rawValue)")
+            return nil
         }
 
-        let preparedTranscript = transcriptForInsertion(transcript)
-        guard !preparedTranscript.isEmpty else { return }
+        guard CFGetTypeID(focusedObject) == AXUIElementGetTypeID() else {
+            traceLogger.log("AX direct insertion unavailable reason=focused_object_not_ax_element")
+            return nil
+        }
 
-        let pasteboardSnapshot = snapshotPasteboardItems()
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(preparedTranscript, forType: .string)
-        let pasteboardChangeCount = pasteboard.changeCount
+        let focusedElement = unsafeBitCast(focusedObject, to: AXUIElement.self)
+        let selectedTextError = AXUIElementSetAttributeValue(
+            focusedElement,
+            kAXSelectedTextAttribute as CFString,
+            preparedTranscript as CFTypeRef
+        )
+        if selectedTextError == .success {
+            return "ax_selected_text"
+        }
 
+        var selectedRangeObject: CFTypeRef?
+        let selectedRangeError = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRangeObject
+        )
+        var selectedRange = CFRange(location: 0, length: 0)
+        let hasSelectedRange = selectedRangeError == .success
+            && selectedRangeObject.map { CFGetTypeID($0) == AXValueGetTypeID() } == true
+            && AXValueGetValue(unsafeBitCast(selectedRangeObject!, to: AXValue.self), .cfRange, &selectedRange)
+
+        var valueObject: CFTypeRef?
+        let valueError = AXUIElementCopyAttributeValue(
+            focusedElement,
+            kAXValueAttribute as CFString,
+            &valueObject
+        )
+        guard valueError == .success, let currentValue = valueObject as? String, hasSelectedRange else {
+            traceLogger.log(
+                "AX direct insertion unavailable reason=value_range selected_text_error=\(selectedTextError.rawValue) selected_range_error=\(selectedRangeError.rawValue) value_error=\(valueError.rawValue)"
+            )
+            return nil
+        }
+
+        let currentNSString = currentValue as NSString
+        let safeLocation = min(max(selectedRange.location, 0), currentNSString.length)
+        let safeLength = min(max(selectedRange.length, 0), currentNSString.length - safeLocation)
+        let updatedValue = currentNSString.replacingCharacters(
+            in: NSRange(location: safeLocation, length: safeLength),
+            with: preparedTranscript
+        )
+        let setValueError = AXUIElementSetAttributeValue(
+            focusedElement,
+            kAXValueAttribute as CFString,
+            updatedValue as CFTypeRef
+        )
+        guard setValueError == .success else {
+            traceLogger.log("AX direct insertion unavailable reason=set_value error=\(setValueError.rawValue)")
+            return nil
+        }
+
+        var updatedRange = CFRange(
+            location: safeLocation + (preparedTranscript as NSString).length,
+            length: 0
+        )
+        if let updatedRangeValue = AXValueCreate(.cfRange, &updatedRange) {
+            _ = AXUIElementSetAttributeValue(
+                focusedElement,
+                kAXSelectedTextRangeAttribute as CFString,
+                updatedRangeValue
+            )
+        }
+        return "ax_value_range"
+    }
+
+    private func postPasteShortcut() throws {
         guard let source = CGEventSource(stateID: .hidSystemState),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
@@ -4228,7 +4308,33 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         keyUp.flags = .maskCommand
         keyDown.post(tap: .cgSessionEventTap)
         keyUp.post(tap: .cgSessionEventTap)
+    }
+
+    private func insertTranscriptIntoFocusedApp(_ transcript: String) throws -> TranscriptInsertionResult {
+        let preparedTranscript = transcriptForInsertion(transcript)
+        guard !preparedTranscript.isEmpty else {
+            return .copiedFallback(reason: "empty_transcript")
+        }
+
+        guard AXIsProcessTrusted() else {
+            traceLogger.log("Accessibility preflight unavailable before paste; copying transcript instead of posting unreachable paste event")
+            copyPreparedTranscriptToPasteboard(preparedTranscript)
+            return .copiedFallback(reason: "accessibility_preflight_unavailable")
+        }
+
+        if let method = insertPreparedTranscriptUsingAccessibility(preparedTranscript) {
+            return .inserted(method: method)
+        }
+
+        let pasteboardSnapshot = snapshotPasteboardItems()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(preparedTranscript, forType: .string)
+        let pasteboardChangeCount = pasteboard.changeCount
+
+        try postPasteShortcut()
         restorePasteboardItems(pasteboardSnapshot, expectedChangeCount: pasteboardChangeCount)
+        return .pasteCommandPosted
     }
 
     private func recordTriggerSource(_ source: TriggerSource, phase: TriggerPhase) {
@@ -4656,10 +4762,21 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if agentMode == "dictation" {
                     if pasteAutomatically {
                         traceLogger.log("Pasting dictated transcript into focused app")
-                        try insertTranscriptIntoFocusedApp(transcript)
-                        traceLogger.log("Dictation paste command posted")
-                        present(.inserted(transcript))
-                        finishProcessing(reason: "dictation_paste")
+                        let insertionResult = try insertTranscriptIntoFocusedApp(transcript)
+                        switch insertionResult {
+                        case .inserted(let method):
+                            traceLogger.log("Dictation inserted method=\(method)")
+                            present(.inserted(transcript))
+                            finishProcessing(reason: "dictation_insert")
+                        case .pasteCommandPosted:
+                            traceLogger.log("Dictation paste command posted")
+                            present(.inserted(transcript))
+                            finishProcessing(reason: "dictation_paste")
+                        case .copiedFallback(let reason):
+                            traceLogger.log("Dictation copied because paste unavailable reason=\(reason)")
+                            present(.copied(transcript))
+                            finishProcessing(reason: "dictation_copy_fallback")
+                        }
                     } else {
                         copyTranscriptToPasteboard(transcript)
                         traceLogger.log("Dictation copy completed")
@@ -4774,8 +4891,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             if config.agentMode == "dictation" {
                 traceLogger.log("Pasting dictated transcript into focused app")
-                try insertTranscriptIntoFocusedApp(transcript)
-                traceLogger.log("Dictation paste command posted")
+                let insertionResult = try insertTranscriptIntoFocusedApp(transcript)
+                switch insertionResult {
+                case .inserted(let method):
+                    traceLogger.log("Dictation inserted method=\(method)")
+                case .pasteCommandPosted:
+                    traceLogger.log("Dictation paste command posted")
+                case .copiedFallback(let reason):
+                    traceLogger.log("Dictation copied because paste unavailable reason=\(reason)")
+                }
                 return
             }
 

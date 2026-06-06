@@ -75,6 +75,13 @@ fails. Runtime status also records inputMonitoringStatus, microphoneStatus, and
 accessibilityStatus so raw macOS preflight misses are visibly separate from
 effective readiness.
 
+For insertion, PressTalk now tries direct Accessibility insertion into the
+focused text element when Accessibility is trusted. If Accessibility is not
+trusted, it copies the transcript to the clipboard and records a copy fallback
+instead of posting a Cmd-V event that cannot land. The automated smoke helper
+records traceInserted, traceCopyFallback, and targetCaptureFailureHint so these
+paths are visible in JSON.
+
 The running app now receives PRESSTALK_OPEN_PERMISSION_PANES from bootstrap and
 launchd. When that value is 0, the Settings window hides the Microphone, Input
 Monitoring, and Accessibility privacy-pane buttons, suppresses any attempted

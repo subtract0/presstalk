@@ -1222,7 +1222,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
         } else if runtimeStatus.pasteAutomatically {
-            label.stringValue = "Paste probe pending"
+            label.stringValue = "Copy fallback"
             label.textColor = .systemOrange
         } else {
             label.stringValue = "Copy-only mode"
@@ -1253,7 +1253,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            return "Input listener is ready. Accessibility preflight is unavailable, so paste will be verified on the next dictation."
+            return "Input listener is ready. Auto-paste is not trusted by this build, so dictation will be copied instead."
         }
 
         if !runtimeStatus.accessibilityGranted {

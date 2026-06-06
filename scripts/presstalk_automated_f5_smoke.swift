@@ -25,6 +25,8 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
     private var tracePipelineCompletedAt: Date?
     private var traceFinalTranscript: String?
     private var tracePasteCommandPosted = false
+    private var traceInserted = false
+    private var traceCopyFallback = false
     private var pasteSelfTestResults: [[String: Any]] = []
     private var pasteSelfTestSucceeded = false
     private let pasteSelfTestCases: [(label: String, sourceStateID: CGEventSourceStateID, tap: CGEventTapLocation)] = [
@@ -223,12 +225,12 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         }
 
         refreshTracePipelineState()
-        if tracePasteCommandPosted, traceFinalTranscript?.isEmpty == false {
+        if tracePipelineComplete, traceFinalTranscript?.isEmpty == false {
             if tracePipelineCompletedAt == nil {
                 tracePipelineCompletedAt = Date()
-                statusLabel.stringValue = "PressTalk trace reports transcript and paste command. Waiting briefly for target text capture."
+                statusLabel.stringValue = "PressTalk trace reports transcript and insertion/copy completion. Waiting briefly for target text capture."
             } else if Date().timeIntervalSince(tracePipelineCompletedAt ?? Date()) >= 1.5 {
-                finish(success: true, reason: "trace_pipeline_command_posted", capturedText: capturedText)
+                finish(success: true, reason: tracePipelineReason, capturedText: capturedText)
                 return
             }
         }
@@ -256,7 +258,30 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             if line.contains("Dictation paste completed") || line.contains("Dictation paste command posted") {
                 tracePasteCommandPosted = true
             }
+            if line.contains("Dictation inserted method=") {
+                traceInserted = true
+            }
+            if line.contains("Dictation copied because paste unavailable") {
+                traceCopyFallback = true
+            }
         }
+    }
+
+    private var tracePipelineComplete: Bool {
+        tracePasteCommandPosted || traceInserted || traceCopyFallback
+    }
+
+    private var tracePipelineReason: String {
+        if traceInserted {
+            return "trace_pipeline_inserted"
+        }
+        if tracePasteCommandPosted {
+            return "trace_pipeline_command_posted"
+        }
+        if traceCopyFallback {
+            return "trace_pipeline_copy_fallback"
+        }
+        return "trace_pipeline_incomplete"
     }
 
     private func finish(success: Bool, reason: String, capturedText: String) {
@@ -274,7 +299,7 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         let targetCaptureSuccess = trimmedCapturedText.count >= minCapturedTextLength
         let targetCaptureFailureHint: Any = targetCaptureSuccess
             ? NSNull()
-            : (pasteSelfTestSucceeded ? "target_capture_failed_after_paste_self_test_success" : "local_cmd_v_event_synthesis_unavailable")
+            : (traceCopyFallback ? "accessibility_untrusted_copy_fallback" : (pasteSelfTestSucceeded ? "target_capture_failed_after_paste_self_test_success" : "local_cmd_v_event_synthesis_unavailable"))
 
         let payload: [String: Any] = [
             "smokeVersion": 1,
@@ -296,6 +321,8 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             ],
             "traceFinalTranscript": traceFinalTranscript ?? NSNull(),
             "tracePasteCommandPosted": tracePasteCommandPosted,
+            "traceInserted": traceInserted,
+            "traceCopyFallback": traceCopyFallback,
             "tracePasteCompleted": targetCaptureSuccess,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": "f5",

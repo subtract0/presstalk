@@ -65,10 +65,44 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>PressTalkInputMethod</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
+  <key>CFBundleSignature</key>
+  <string>????</string>
   <key>CFBundleShortVersionString</key>
   <string>0.1.5</string>
+  <key>CFBundleSupportedPlatforms</key>
+  <array>
+    <string>MacOSX</string>
+  </array>
   <key>CFBundleVersion</key>
-  <string>1</string>
+  <string>3</string>
+  <key>ComponentInputModeDict</key>
+  <dict>
+    <key>tsInputModeListKey</key>
+    <dict>
+      <key>com.am.presstalk.inputmethod</key>
+      <dict>
+        <key>TISInputSourceID</key>
+        <string>com.am.presstalk.inputmethod</string>
+        <key>TISIconLabels</key>
+        <dict>
+          <key>Primary</key>
+          <string>PT</string>
+        </dict>
+        <key>TISIntendedLanguage</key>
+        <string>en</string>
+        <key>tsInputModeIsVisibleKey</key>
+        <true/>
+        <key>tsInputModePrimaryInScriptKey</key>
+        <true/>
+        <key>tsInputModeScriptKey</key>
+        <string>smUnicodeScript</string>
+      </dict>
+    </dict>
+    <key>tsVisibleInputModeOrderedArrayKey</key>
+    <array>
+      <string>com.am.presstalk.inputmethod</string>
+    </array>
+  </dict>
   <key>InputMethodConnectionName</key>
   <string>PressTalkInputMethod_1_Connection</string>
   <key>InputMethodServerControllerClass</key>
@@ -81,6 +115,10 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <true/>
   <key>NSPrincipalClass</key>
   <string>NSApplication</string>
+  <key>NSSupportsSuddenTermination</key>
+  <true/>
+  <key>TISIconIsTemplate</key>
+  <true/>
   <key>TISInputSourceID</key>
   <string>com.am.presstalk.inputmethod</string>
   <key>TISIntendedLanguage</key>

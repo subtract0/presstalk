@@ -216,6 +216,13 @@ swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-metho
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-status.swift" --select
 ```
 
+Or run the reversible client probe, which temporarily handles enable/select,
+posts a payload into a local text view, and restores the original input source:
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-client-probe.swift" --json
+```
+
 After macOS recognizes and you select `PressTalk Input Method`, focus an
 editable text field and run:
 

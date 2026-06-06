@@ -56,28 +56,28 @@ private final class InputMethodLog {
 private let inputMethodLog = InputMethodLog()
 
 @objc(PressTalkIMController)
-final class PressTalkIMController: IMKInputController {
+public final class PressTalkIMController: IMKInputController {
     private static weak var activeController: PressTalkIMController?
 
     private var currentClient: IMKTextInput?
 
-    override init!(server: IMKServer!, delegate: Any!, client: Any!) {
+    public override init!(server: IMKServer!, delegate: Any!, client: Any!) {
         super.init(server: server, delegate: delegate, client: client)
         updateClient(client, context: "init")
         inputMethodLog.write("controller initialized")
     }
 
-    override func inputText(_ string: String!, client sender: Any!) -> Bool {
+    public override func inputText(_ string: String!, client sender: Any!) -> Bool {
         updateClient(sender, context: "inputText")
         return false
     }
 
-    override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
+    public override func handle(_ event: NSEvent!, client sender: Any!) -> Bool {
         updateClient(sender, context: "handle")
         return false
     }
 
-    override func didCommand(by aSelector: Selector!, client sender: Any!) -> Bool {
+    public override func didCommand(by aSelector: Selector!, client sender: Any!) -> Bool {
         updateClient(sender, context: "didCommand")
         return false
     }
@@ -112,8 +112,7 @@ final class PressTalkIMController: IMKInputController {
     }
 }
 
-@main
-final class PressTalkInputMethodApp: NSObject, NSApplicationDelegate {
+private final class PressTalkInputMethodAppDelegate: NSObject, NSApplicationDelegate {
     private var server: IMKServer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -141,7 +140,7 @@ final class PressTalkInputMethodApp: NSObject, NSApplicationDelegate {
             observer,
             { _, observer, _, _, _ in
                 guard let observer else { return }
-                let app = Unmanaged<PressTalkInputMethodApp>
+                let app = Unmanaged<PressTalkInputMethodAppDelegate>
                     .fromOpaque(observer)
                     .takeUnretainedValue()
                 app.handleInsertNotification()
@@ -169,5 +168,16 @@ final class PressTalkInputMethodApp: NSObject, NSApplicationDelegate {
         } catch {
             inputMethodLog.write("insert notification failed reason=read_payload error=\(error)")
         }
+    }
+}
+
+@main
+private enum PressTalkInputMethodMain {
+    static func main() {
+        let app = NSApplication.shared
+        let delegate = PressTalkInputMethodAppDelegate()
+        app.setActivationPolicy(.accessory)
+        app.delegate = delegate
+        app.run()
     }
 }

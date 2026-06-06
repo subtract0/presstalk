@@ -52,6 +52,8 @@ cp "$PKG_DIR/scripts/presstalk_input_method_insert_probe.sh" "$APP_RESOURCES_DIR
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
 cp "$PKG_DIR/scripts/presstalk_input_method_status.swift" "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
+cp "$PKG_DIR/scripts/presstalk_input_method_client_probe.swift" "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
 cp "$PKG_DIR/scripts/presstalk_install_input_method.sh" "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 bash "$PKG_DIR/scripts/build_presstalk_input_method.sh" \

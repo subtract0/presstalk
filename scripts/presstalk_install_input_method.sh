@@ -14,6 +14,8 @@ fi
 mkdir -p "$TARGET_DIR"
 rm -rf "$TARGET_BUNDLE"
 ditto "$SOURCE_BUNDLE" "$TARGET_BUNDLE"
+/usr/bin/xattr -dr com.apple.quarantine "$TARGET_BUNDLE" >/dev/null 2>&1 || true
+/usr/bin/xattr -dr com.apple.provenance "$TARGET_BUNDLE" >/dev/null 2>&1 || true
 
 cat <<EOF
 Installed PressTalk input method prototype:

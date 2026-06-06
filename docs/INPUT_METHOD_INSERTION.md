@@ -89,6 +89,19 @@ source so you can restore your normal keyboard/input method after the probe.
 
 ## Probe
 
+The bundled client probe performs the full reversible sequence without opening
+System Settings: register, temporarily enable/select the PressTalk input method,
+focus a local text view, post a payload, verify whether it lands, then restore
+the original input source.
+
+```bash
+swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-client-probe.swift" --json
+```
+
+If `reason=input_method_not_selectable`, TIS did not expose the installed input
+method as an enable/select-capable source. In that state, manual notification
+probes are not meaningful yet because no focused client can be attached.
+
 After the input method is installed, selected, and focused in an editable text
 field, post a probe insert:
 

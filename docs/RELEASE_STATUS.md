@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc34`
-- Commit: `212ca227bd97ab4e8d2f4e16c483951e4890ee9a`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc34`
-- Asset: `PressTalk-0.1.5-rc34-macos-arm64.zip`
-- SHA-256: `74eb415184773e31a9e2fb36902ffdf48ea56c8f15e509dc54d551257868a859`
+- Tag: `v0.1.5-rc35`
+- Commit: `af8b562f5414122cdaafa5f3a05d6a4ef008fe5b`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc35`
+- Asset: `PressTalk-0.1.5-rc35-macos-arm64.zip`
+- SHA-256: `808ae31787962ea335deae80b45500340e018b30c81ece9337b3234b852629f8`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -216,6 +216,23 @@ Verified on `studio1` on 2026-06-06:
   self-signed development identity is not a production Gatekeeper approval. Do
   not reopen privacy panes repeatedly in this state; inspect the bundle id,
   CDHash, and signing authority first.
+- `v0.1.5-rc35` updates the bundled automated F5 smoke helper to classify
+  near-silent TTS captures as an audio-routing failure instead of a generic STT
+  timeout. If `/usr/bin/say` playback goes only to AirPods or other headphones,
+  helper JSON reports `reason=tts_audio_not_captured_by_microphone`,
+  `targetCaptureFailureHint=tts_output_not_heard_by_microphone`, and
+  `traceAudioCapture` RMS/peak evidence.
+- After publishing `v0.1.5-rc35`, `studio1` was restored to
+  `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `bundleIdentifier=com.am.jarvistap`,
+  `codeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `microphoneAuthorizationStatus=authorized`, `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `permissionPaneOpeningAllowed=false`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.

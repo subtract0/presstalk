@@ -96,6 +96,11 @@ trigger failures. Results are marked physicalTriggerProof=false, and
 targetCaptureSuccess is tracked separately, so this does not replace physical
 Fn/Option smoke.
 
+If automated F5 helper playback goes only to AirPods or other
+headphones, the microphone may capture near silence. The helper reports this as
+reason=tts_audio_not_captured_by_microphone with traceAudioCapture RMS/peak
+evidence, not as generic STT failure.
+
 Settings now distinguish read-only permission preflight results from effective
 runtime capability. If the real input listener is armed, Input Monitoring shows
 as listener-ready instead of sending users back through already-granted macOS

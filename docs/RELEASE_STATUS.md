@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc29`
-- Commit: `abb2bfb477db3bbe56cdea7f14e1af6ac50afa27`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc29`
-- Asset: `PressTalk-0.1.5-rc29-macos-arm64.zip`
-- SHA-256: `7c56e29f0bc6e284a065b3d8cee2bc3050c55185fed5bd93a5b9f81f83bf9ac0`
+- Tag: `v0.1.5-rc30`
+- Commit: `e22a0797f2cc8e7b771c68f137566b930afbfa0a`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc30`
+- Asset: `PressTalk-0.1.5-rc30-macos-arm64.zip`
+- SHA-256: `4d78dd720e2b5e1fc62c2eab205b110efb7887485487854d94d46400af1ab95a`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc29` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc30` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc29` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc30` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, and bundled automated F5 smoke helper.
@@ -88,6 +88,10 @@ Verified on `studio1` on 2026-06-06:
 - `v0.1.5-rc29` closes the remaining success-path setup-window regression:
   a machine with working microphone/listener runtime proof is not sent back to
   the PressTalk Settings permission UI just because this is the first launch.
+- `v0.1.5-rc30` upgrades the bundled manual physical-trigger smoke helper to
+  record `traceFinalTranscript`, `traceInserted`, `traceCopyFallback`,
+  `targetCaptureSuccess`, and `targetCaptureFailureHint`. This separates
+  physical trigger/STT proof from active-field insertion proof.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.
@@ -198,7 +202,7 @@ Verified on `studio1` on 2026-06-06:
   `status.speechModel=Ready`. `Status Consistency` reports matching live
   process ID, bundle identifier `com.am.jarvistap`, and CDHash
   `66f3283b9e152b633bb4102603d3c6f9bd61699e`.
-- `studio1`: after publishing `v0.1.5-rc29`, the local app was restored with
+- `studio1`: after publishing `v0.1.5-rc30`, the local app was restored with
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
   `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
@@ -206,15 +210,16 @@ Verified on `studio1` on 2026-06-06:
   `inputMonitoringEffective=true`, `permissionPaneOpeningAllowed=false`,
   `inputListener=hid:listen_only`, `inputPipelineReady=true`,
   `setupRetryActive=false`, `status.triggerPath=Fn / Globe ready`, and
-  `status.speechModel=Ready`.
+  `status.speechModel=Ready`. The local installed manual smoke helper is schema
+  `smokeVersion=3`.
 
 Known current proof gaps:
 
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
-- `studio2`: `v0.1.5-rc29` was downloaded from GitHub with SHA-256
-  `7c56e29f0bc6e284a065b3d8cee2bc3050c55185fed5bd93a5b9f81f83bf9ac0` and
+- `studio2`: `v0.1.5-rc30` was downloaded from GitHub with SHA-256
+  `4d78dd720e2b5e1fc62c2eab205b110efb7887485487854d94d46400af1ab95a` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts and
@@ -226,22 +231,26 @@ Known current proof gaps:
   `inputMonitoringStatus=preflight_unavailable`,
   `inputListener=not_installed`, `inputPipelineReady=false`, and
   `setupRetryActive=true`. The current ad-hoc CDHash is
-  `bd097fb791b09f015f67b34ce42bb533471c1016`. The rc28 read-only TCC audit
+  `2841d5816ea8e63b46ba2e3a75522f21045b35ed`. The installed manual smoke
+  helper is schema `smokeVersion=3` with `targetCaptureSuccess` and
+  `traceCopyFallback` fields. The rc28 read-only TCC audit
   reported no user TCC rows for `com.am.presstalk` or `com.am.jarvistap`;
   system TCC only contained a denied Accessibility row for `com.am.presstalk`
   with requirement `cdhash H"ede4ea701e897b06b9d7817353f228c192602161"`,
   while the rc28 app had designated requirement
   `cdhash H"3021d05388aae5e1a73d6dc9c02947e4e319a40b"`. This remains a
   first-grant/setup gap, not an already-granted false-missing state.
-- `mbp1`: `v0.1.5-rc29` was downloaded from GitHub with SHA-256
-  `7c56e29f0bc6e284a065b3d8cee2bc3050c55185fed5bd93a5b9f81f83bf9ac0` and
+- `mbp1`: `v0.1.5-rc30` was downloaded from GitHub with SHA-256
+  `4d78dd720e2b5e1fc62c2eab205b110efb7887485487854d94d46400af1ab95a` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. The installed app is ad-hoc signed
   with bundle identifier `com.am.presstalk` and CDHash
-  `bd097fb791b09f015f67b34ce42bb533471c1016`.
+  `2841d5816ea8e63b46ba2e3a75522f21045b35ed`. The installed manual smoke
+  helper is schema `smokeVersion=3` with `targetCaptureSuccess` and
+  `traceCopyFallback` fields.
 - `mbp1` no longer has the rc15 microphone/listener blocker. Runtime status
-  after rc29 reports `microphoneGranted=true`,
+  after rc30 reports `microphoneGranted=true`,
   `microphoneAuthorizationStatus=authorized`,
   `microphoneStatus=preflight_granted`, `inputMonitoringEffective=true`,
   `inputMonitoringStatus=listener_ready_preflight_unavailable`,
@@ -310,7 +319,7 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc29` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc30` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
@@ -320,8 +329,9 @@ Known current proof gaps:
   no-pane enforcement, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It also includes the
-  rc29 success-path setup-window fix. It is the artifact to use for the next
-  cross-machine smoke attempts.
+  rc29 success-path setup-window fix and the rc30 manual-smoke insertion
+  evidence fields. It is the artifact to use for the next cross-machine smoke
+  attempts.
 - Local SSH aliases `s1` and `s2` are still not configured on `studio1`.
   Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
   only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or

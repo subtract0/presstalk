@@ -20,20 +20,22 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc11-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc11/PressTalk-0.1.5-rc11-macos-arm64.zip
-echo "18f3e81acb92b0e62968bb6c35412940bc2bfd63c7f480d4c37e28eebdaaaa8c  $tmpdir/PressTalk-0.1.5-rc11-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc11-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc18/PressTalk-0.1.5-rc18-macos-arm64.zip
+echo "8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307  $tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc18-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
-PRESSTALK_TRIGGER_KEY=fn /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
 Expected SHA-256:
 
 ```text
-18f3e81acb92b0e62968bb6c35412940bc2bfd63c7f480d4c37e28eebdaaaa8c
+8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -76,6 +78,18 @@ Approve the prompts for:
 If macOS already shows PressTalk enabled but PressTalk reports a preflight as
 unavailable, stop re-approving and collect diagnostics. That state is a
 listener/probe blocker, not proof that the user skipped a permission.
+
+If a machine was already working under the older JarvisTap privacy identity and
+regresses after a new install, preserve that identity instead of reopening
+privacy panes:
+
+```bash
+PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
+PRESSTALK_OPEN_PERMISSION_PANES=0 \
+PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
 
 Karabiner is only needed when testing the optional `F5` fallback path. The default
 trigger is native `Fn / Globe`.

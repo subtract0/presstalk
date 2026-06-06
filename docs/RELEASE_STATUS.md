@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc17`
-- Commit: `bf9f31a42f4717e6b78fd89abdba19c2d2417487`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc17`
-- Asset: `PressTalk-0.1.5-rc17-macos-arm64.zip`
-- SHA-256: `10de71442fe1d54465f71d9e463456b9dc259b6e8e6b10b5de0f697d22467911`
+- Tag: `v0.1.5-rc18`
+- Commit: `53f8b42edfe4e6a1cb738edebbc8567ac9dcc10a`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc18`
+- Asset: `PressTalk-0.1.5-rc18-macos-arm64.zip`
+- SHA-256: `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -17,9 +17,9 @@ Verified on `studio1` on 2026-06-06:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc17` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc18` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc17` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc18` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, and bundled
   manual Fn smoke helper.
@@ -82,12 +82,37 @@ Verified on `studio1` on 2026-06-06:
   `.all`, and for `AudioEncoder` with `.cpuAndNeuralEngine` and `.all`.
 - `PRESSTALK_WHISPER_COMPUTE=default` is retained as an escape hatch for
   WhisperKit's upstream compute defaults when explicitly desired.
+- `v0.1.5-rc18` adds `PRESSTALK_BUNDLE_IDENTIFIER` for the build/bootstrap
+  path. The default app identity remains `com.am.presstalk`, but a machine with
+  older working grants can preserve `com.am.jarvistap` without opening privacy
+  panes.
+- `studio1`: rc18 was downloaded from GitHub with SHA-256
+  `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307`, then
+  bootstrapped with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status reports `microphoneGranted=true`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`,
+  `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
+  Trace evidence shows `WhisperKit ready` at `2026-06-06T17:25:35Z`.
 
 Known current blocker:
 
 - `studio1` no longer has a listener/probe setup blocker after the listen-only
   event-tap fix. The remaining `studio1` proof gap is a physical Fn hold
   dictation and paste smoke; a synthetic Fn event was not counted as proof.
+- `studio2`: rc18 was downloaded from GitHub with SHA-256
+  `8512db4ea2e2d36b3c291df8bed3d7e1eacb98a1ca5436c48f13ed5e99bdb307` and
+  bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, `PRESSTALK_TRIGGER_KEY=fn`, and
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`. LaunchAgent starts, but runtime is
+  blocked before dictation because `microphoneGranted=false`,
+  `inputMonitoringEffective=false`, `inputListener=not_installed`,
+  `inputPipelineReady=false`, and `setupRetryActive=true`. Read-only TCC
+  inspection returned no `com.am.presstalk` or `com.am.jarvistap` rows on
+  `studio2`, so this is a first-grant/setup gap rather than the
+  already-granted-but-reported-missing bug.
 - `mbp1`: `v0.1.5-rc17` was downloaded from GitHub with SHA-256
   `10de71442fe1d54465f71d9e463456b9dc259b6e8e6b10b5de0f697d22467911` and
   bootstrapped with `PRESSTALK_OPEN_PERMISSION_PANES=0`,
@@ -102,20 +127,22 @@ Known current blocker:
   `status.triggerPath=Fn / Globe ready`, and `status.speechModel=Ready`.
   Trace evidence shows the no-ANE compute preset at `2026-06-06T17:09:50Z`
   and `WhisperKit ready` at `2026-06-06T17:10:21Z`.
-- `v0.1.5-rc17` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc18` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
-  identifier fix, the no-ANE WhisperKit compute preset, and
+  identifier fix, the no-ANE WhisperKit compute preset,
+  `PRESSTALK_BUNDLE_IDENTIFIER` for legacy identity fallback, and
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON. It is the artifact to use
   for the next cross-machine smoke attempts.
-- Local SSH aliases `s1` and `s2` are still not configured on `studio1`; `mbp1`
-  is reachable via `mbp1-tb`.
+- Local SSH aliases `s1` and `s2` are still not configured on `studio1`.
+  `studio2` is reachable as `studio2` or `studio2-tb`; `mbp1` was previously
+  reachable via `mbp1-tb` but timed out during the rc18 continuation pass.
 
 Do not claim full release coverage until these are recorded:
 
 - `studio1`: physical Fn dictation and paste smoke.
 - `s1`: install plus Fn dictation smoke.
-- `s2`: install plus Fn dictation smoke.
+- `s2`/`studio2`: first-time grants, then Fn dictation smoke.
 - `mbp1`: M1 Max physical Fn or Option dictation and paste smoke.

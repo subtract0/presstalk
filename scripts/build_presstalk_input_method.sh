@@ -28,6 +28,8 @@ done
 
 PRODUCT="presstalk-input-method"
 APP_NAME="PressTalkInputMethod.app"
+INPUT_METHOD_BUNDLE_ID="com.am.presstalk.inputmethod"
+INPUT_MODE_ID="com.am.presstalk.inputmethod.dictation"
 BUILD_DIR="$ROOT/.build/presstalk-input-method"
 APP_BUNDLE="${APP_BUNDLE_OVERRIDE:-$BUILD_DIR/$APP_NAME}"
 APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
@@ -35,6 +37,36 @@ APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
 APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
 INSTALLED_BUNDLE="$HOME/Library/Input Methods/$APP_NAME"
+LOCAL_CODESIGN_HELPER="$ROOT/scripts/create_presstalk_local_codesign_identity.sh"
+
+resolve_signing_identity() {
+  if [[ -n "${PRESSTALK_INPUT_METHOD_CODESIGN_IDENTITY:-}" ]]; then
+    printf '%s' "$PRESSTALK_INPUT_METHOD_CODESIGN_IDENTITY"
+    return
+  fi
+  if [[ -n "${PRESSTALK_CODESIGN_IDENTITY:-}" ]]; then
+    printf '%s' "$PRESSTALK_CODESIGN_IDENTITY"
+    return
+  fi
+  if [[ -n "${CODESIGN_IDENTITY:-}" ]]; then
+    printf '%s' "$CODESIGN_IDENTITY"
+    return
+  fi
+  if [[ "${PRESSTALK_BUILD_STABLE_SIGNING:-1}" == "1" && -x "$LOCAL_CODESIGN_HELPER" ]]; then
+    local output identity_hash
+    if output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+      identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
+      if [[ -n "$identity_hash" ]]; then
+        printf '%s' "$identity_hash"
+        return
+      fi
+    else
+      printf '%s\n' "$output" >&2
+      printf '%s\n' "Input method stable local signing skipped: could not prepare local code-signing identity." >&2
+    fi
+  fi
+  printf '%s' "-"
+}
 
 pushd "$ROOT" >/dev/null
 swift build -c release --product "$PRODUCT"
@@ -45,6 +77,12 @@ rm -rf "$APP_BUNDLE"
 mkdir -p "$APP_MACOS_DIR" "$APP_RESOURCES_DIR"
 cp "$BINARY_DIR/$PRODUCT" "$APP_MACOS_DIR/$PRODUCT"
 chmod 755 "$APP_MACOS_DIR/$PRODUCT"
+
+ICON_FILE="PressTalkInputMethod.tiff"
+ICON_SOURCE="/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/GenericApplicationIcon.icns"
+if [[ -f "$ICON_SOURCE" ]] && command -v sips >/dev/null 2>&1; then
+  sips -s format tiff "$ICON_SOURCE" --out "$APP_RESOURCES_DIR/$ICON_FILE" >/dev/null 2>&1 || true
+fi
 
 cat >"$APP_INFO_PLIST" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -58,7 +96,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>CFBundleExecutable</key>
   <string>$PRODUCT</string>
   <key>CFBundleIdentifier</key>
-  <string>com.am.presstalk.inputmethod</string>
+  <string>$INPUT_METHOD_BUNDLE_ID</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -79,10 +117,10 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <dict>
     <key>tsInputModeListKey</key>
     <dict>
-      <key>com.am.presstalk.inputmethod</key>
+      <key>$INPUT_MODE_ID</key>
       <dict>
         <key>TISInputSourceID</key>
-        <string>com.am.presstalk.inputmethod</string>
+        <string>$INPUT_MODE_ID</string>
         <key>TISIconLabels</key>
         <dict>
           <key>Primary</key>
@@ -90,6 +128,12 @@ cat >"$APP_INFO_PLIST" <<PLIST
         </dict>
         <key>TISIntendedLanguage</key>
         <string>en</string>
+        <key>tsInputModeMenuIconFileKey</key>
+        <string>$ICON_FILE</string>
+        <key>tsInputModePaletteIconFileKey</key>
+        <string>$ICON_FILE</string>
+        <key>tsInputModeDefaultStateKey</key>
+        <true/>
         <key>tsInputModeIsVisibleKey</key>
         <true/>
         <key>tsInputModePrimaryInScriptKey</key>
@@ -97,11 +141,11 @@ cat >"$APP_INFO_PLIST" <<PLIST
         <key>tsInputModeScriptKey</key>
         <string>smUnicodeScript</string>
       </dict>
-    </dict>
-    <key>tsVisibleInputModeOrderedArrayKey</key>
-    <array>
-      <string>com.am.presstalk.inputmethod</string>
-    </array>
+  </dict>
+  <key>tsVisibleInputModeOrderedArrayKey</key>
+  <array>
+      <string>$INPUT_MODE_ID</string>
+  </array>
   </dict>
   <key>InputMethodConnectionName</key>
   <string>PressTalkInputMethod_1_Connection</string>
@@ -109,6 +153,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>PressTalkIMController</string>
   <key>InputMethodServerDelegateClass</key>
   <string>PressTalkIMController</string>
+  <key>LSBackgroundOnly</key>
+  <true/>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -118,18 +164,30 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>NSSupportsSuddenTermination</key>
   <true/>
   <key>TISIconIsTemplate</key>
-  <true/>
+  <false/>
   <key>TISInputSourceID</key>
-  <string>com.am.presstalk.inputmethod</string>
+  <string>$INPUT_METHOD_BUNDLE_ID</string>
   <key>TISIntendedLanguage</key>
   <string>en</string>
+  <key>tsInputMethodCharacterRepertoireKey</key>
+  <array>
+    <string>Latn</string>
+  </array>
+  <key>tsInputMethodIconFileKey</key>
+  <string>$ICON_FILE</string>
 </dict>
 </plist>
 PLIST
 
 plutil -lint "$APP_INFO_PLIST" >/dev/null
-codesign --force --sign - --timestamp=none "$APP_MACOS_DIR/$PRODUCT"
-codesign --force --sign - --timestamp=none "$APP_BUNDLE"
+SIGN_IDENTITY="$(resolve_signing_identity)"
+SIGN_KEYCHAIN="${PRESSTALK_INPUT_METHOD_CODESIGN_KEYCHAIN:-${PRESSTALK_CODESIGN_KEYCHAIN:-}}"
+codesign_args=(--force --sign "$SIGN_IDENTITY" --timestamp=none)
+if [[ -n "$SIGN_KEYCHAIN" ]]; then
+  codesign_args+=(--keychain "$SIGN_KEYCHAIN")
+fi
+codesign "${codesign_args[@]}" "$APP_MACOS_DIR/$PRODUCT"
+codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
 echo "Built input method prototype: $APP_BUNDLE"
 echo "Notification: com.am.presstalk.inputmethod.insert"

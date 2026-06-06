@@ -167,3 +167,11 @@ the user search list. It stores the keychain password locally under
 `~/Library/Application Support/PressTalk/` with user-only permissions. This is
 for development builds only; public release artifacts still need normal release
 signing/notarization before they are treated as production-grade.
+
+If macOS asks for a password while creating or trusting the local signing
+identity and the prompt is cancelled, a build can still be signed but remain a
+local self-signed development artifact. Do not respond by reopening permission
+panes repeatedly. First inspect `runtime-status.json` and the app signature
+fields (`codeSignatureIdentifier`, `codeSignatureCDHash`, and
+`codeSignatureAuthority`) to confirm whether the bundle id or signing identity
+changed.

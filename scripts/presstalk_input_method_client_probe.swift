@@ -3,7 +3,8 @@ import AppKit
 import Carbon
 import Foundation
 
-private let inputSourceID = "com.am.presstalk.inputmethod"
+private let inputMethodSourceID = "com.am.presstalk.inputmethod"
+private let inputModeSourceID = "com.am.presstalk.inputmethod.dictation"
 private let bundleIdentifier = "com.am.presstalk.inputmethod"
 private let appName = "PressTalkInputMethod.app"
 private let notificationName = "com.am.presstalk.inputmethod.insert"
@@ -99,12 +100,13 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
         return list.takeRetainedValue() as NSArray as Array
     }
 
-    let byID = createList([kTISPropertyInputSourceID: inputSourceID])
+    let byMethodID = createList([kTISPropertyInputSourceID: inputMethodSourceID])
+    let byModeID = createList([kTISPropertyInputSourceID: inputModeSourceID])
     let byBundle = createList([kTISPropertyBundleID: bundleIdentifier])
 
     var sources: [TISInputSource] = []
     var seen = Set<String>()
-    for object in byID + byBundle {
+    for object in byMethodID + byModeID + byBundle {
         guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { continue }
         let source = object as! TISInputSource
         let key = sourceKey(source)
@@ -115,6 +117,15 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
         sources.append(source)
     }
     return sources
+}
+
+private func preferredSelectableSource(from sources: [TISInputSource]) -> TISInputSource? {
+    sources.first {
+        stringProperty($0, kTISPropertyInputSourceID) == inputModeSourceID &&
+            (boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? true)
+    } ?? sources.first {
+        boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? false
+    } ?? sources.first
 }
 
 private func installedBundleURL() -> URL {
@@ -219,7 +230,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         wasEnabledBeforeProbe = !enabledBefore.isEmpty
 
         var allSources = findPressTalkSources(includeAllInstalled: true)
-        guard let allSource = allSources.first else {
+        guard let allSource = preferredSelectableSource(from: allSources) ?? allSources.first else {
             return false
         }
         pressTalkSourceBeforeProbe = sourceSummary(allSource)
@@ -231,14 +242,14 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         }
 
         let enabledSources = findPressTalkSources(includeAllInstalled: false)
-        guard let enabledSource = enabledSources.first else {
+        guard let enabledSource = preferredSelectableSource(from: enabledSources) ?? enabledSources.first else {
             return false
         }
         selectStatus = Int(TISSelectInputSource(enabledSource))
 
         allSources = findPressTalkSources(includeAllInstalled: true)
         if let selected = allSources.first(where: { boolProperty($0, kTISPropertyInputSourceIsSelected) == true }),
-           stringProperty(selected, kTISPropertyInputSourceID) == inputSourceID {
+           stringProperty(selected, kTISPropertyInputSourceID) == inputModeSourceID {
             return true
         }
 

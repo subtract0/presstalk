@@ -200,6 +200,22 @@ Verified on `studio1` on 2026-06-06:
   `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
   `inputPipelineReady=true`, `setupRetryActive=false`,
   `status.speechModel=Ready`, and `status.triggerPath=Fn / Globe ready`.
+- Post-rc34 local debugging tightened the bundled InputMethodKit prototype:
+  generated metadata now includes a separate visible input mode id,
+  background-only IMK metadata, a bundled TIFF icon, and a character repertoire;
+  the input-method bundle signs with the same
+  `PressTalk Local Development Code Signing` identity by default. Verification
+  still shows `TISRegisterInputSource=0` but `recognizedSourceCount=0`, even
+  after LaunchServices registration and a TextInputMenuAgent restart. The
+  exported `PressTalkIMController` Objective-C class and on-disk code signature
+  both verify. Treat the remaining IMK failure as a macOS input-source
+  discovery/trust blocker, not as missing Microphone, Input Monitoring, or
+  Accessibility permissions.
+- A skipped macOS signing/trust password prompt can explain earlier unstable
+  local identity behavior: builds may still receive a code signature, but a
+  self-signed development identity is not a production Gatekeeper approval. Do
+  not reopen privacy panes repeatedly in this state; inspect the bundle id,
+  CDHash, and signing authority first.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.

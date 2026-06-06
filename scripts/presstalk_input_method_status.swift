@@ -2,7 +2,8 @@
 import Carbon
 import Foundation
 
-private let inputSourceID = "com.am.presstalk.inputmethod"
+private let inputMethodSourceID = "com.am.presstalk.inputmethod"
+private let inputModeSourceID = "com.am.presstalk.inputmethod.dictation"
 private let bundleIdentifier = "com.am.presstalk.inputmethod"
 private let appName = "PressTalkInputMethod.app"
 
@@ -94,12 +95,13 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
         return list.takeRetainedValue() as NSArray as Array
     }
 
-    let byID = createList([kTISPropertyInputSourceID: inputSourceID])
+    let byMethodID = createList([kTISPropertyInputSourceID: inputMethodSourceID])
+    let byModeID = createList([kTISPropertyInputSourceID: inputModeSourceID])
     let byBundle = createList([kTISPropertyBundleID: bundleIdentifier])
 
     var sources: [TISInputSource] = []
     var seen = Set<String>()
-    for object in byID + byBundle {
+    for object in byMethodID + byModeID + byBundle {
         guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { continue }
         let source = object as! TISInputSource
         let key = sourceKey(source)
@@ -110,6 +112,15 @@ private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource]
         sources.append(source)
     }
     return sources
+}
+
+private func preferredSelectableSource(from sources: [TISInputSource]) -> TISInputSource? {
+    sources.first {
+        stringProperty($0, kTISPropertyInputSourceID) == inputModeSourceID &&
+            (boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? true)
+    } ?? sources.first {
+        boolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? false
+    } ?? sources.first
 }
 
 private func installedBundleURL() -> URL {
@@ -183,7 +194,7 @@ if options.enable {
     if allSources.isEmpty {
         enableStatus = "source_not_recognized"
     } else {
-        let source = allSources[0]
+        let source = preferredSelectableSource(from: allSources) ?? allSources[0]
         enableStatus = Int(TISEnableInputSource(source))
         enabledSources = findPressTalkSources(includeAllInstalled: false)
         allSources = findPressTalkSources(includeAllInstalled: true)
@@ -195,7 +206,7 @@ if options.select {
     if enabledSources.isEmpty {
         selectStatus = allSources.isEmpty ? "source_not_recognized" : "source_not_enabled"
     } else {
-        let source = enabledSources[0]
+        let source = preferredSelectableSource(from: enabledSources) ?? enabledSources[0]
         selectStatus = Int(TISSelectInputSource(source))
         enabledSources = findPressTalkSources(includeAllInstalled: false)
         allSources = findPressTalkSources(includeAllInstalled: true)
@@ -206,7 +217,8 @@ private let current = currentInputSourceSummary()
 private let payload: [String: Any] = [
     "installedBundlePath": bundleURL.path,
     "installedBundleExists": installedBundleExists,
-    "inputSourceID": inputSourceID,
+    "inputMethodSourceID": inputMethodSourceID,
+    "inputModeSourceID": inputModeSourceID,
     "currentInputSourceID": current["id"] ?? NSNull(),
     "currentInputSource": current,
     "recognizedSourceCount": allSources.count,

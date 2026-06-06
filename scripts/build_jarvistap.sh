@@ -36,6 +36,8 @@ cp "$PKG_DIR/scripts/presstalk_karabiner_fallback.sh" "$APP_RESOURCES_DIR/presst
 chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
 cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
+cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 
 cat >"$APP_INFO_PLIST" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>

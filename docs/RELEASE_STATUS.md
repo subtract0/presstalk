@@ -33,6 +33,15 @@ Verified on `studio1` on 2026-06-06:
 - While blocked on Input Monitoring, the local app now starts a quiet setup retry
   timer. Trace evidence on `studio1`: `Setup retry timer started
   interval_seconds=5.0`.
+- Current builds write machine-readable runtime status to
+  `~/Library/Application Support/JarvisTap/runtime-status.json`; the bundled
+  `presstalk-collect-smoke-status.sh` helper collects that file together with
+  app signature, launchd state, machine info, and trace tail for cross-machine
+  proof.
+- Current local builds also stop reopening the settings window after the first
+  setup guide, add a `Restart PressTalk` settings action for refreshing macOS
+  permission state, and run all permission requests/checks during setup instead
+  of stopping at the first missing permission.
 
 Known current blocker:
 
@@ -42,9 +51,9 @@ Known current blocker:
   `Startup blocked: Input Monitoring permission missing`. `studio1` now has a
   stable local development signing identity, so refresh the permission toggle
   once for the stable-signed build before attempting the Fn dictation smoke.
-- `v0.1.5-rc4` includes the settings-window fix for this case: the UI now
-  distinguishes "not granted to this rebuilt ad-hoc copy" from a generic missing
-  permission, and diagnostics include the app code-signature summary.
+- `v0.1.5-rc4` does not include the latest settings restart/status-collector
+  fixes yet. Publish a new prerelease before asking other Macs to use the
+  improved diagnostics flow.
 - Remote verification has not started: local SSH aliases `s1` and `s2` are not
   configured on `studio1`, and `mbp1` currently resolves but SSH times out.
 

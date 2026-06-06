@@ -1056,6 +1056,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         case setupRequired(String)
     }
 
+    private struct PermissionCheckResult {
+        let inputMonitoringGranted: Bool
+        let microphoneGranted: Bool
+        let accessibilityGranted: Bool
+    }
+
     private enum DarwinTriggerNotification {
         static let press = "com.am.jarvistap.trigger.press"
         static let release = "com.am.jarvistap.trigger.release"
@@ -1202,7 +1208,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             settingsStore.hasSeenSetupGuide = true
         }
 
-        completeStartupIfPossible(showSetupWindowOnFailure: true, forcePresentSetupWindow: shouldPresentSetupGuide)
+        completeStartupIfPossible(
+            showSetupWindowOnFailure: shouldPresentSetupGuide,
+            forcePresentSetupWindow: shouldPresentSetupGuide
+        )
         return 0
     }
 
@@ -1212,11 +1221,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         presentFailureStatus: Bool = true
     ) {
         refreshRuntimeStatusUI()
+        let permissions = checkSetupPermissions(requestPrompts: presentFailureStatus)
+
         if presentFailureStatus {
             print("Checking Input Monitoring permission...")
             fflush(stdout)
         }
-        guard ensureListenEventPermission() else {
+        guard permissions.inputMonitoringGranted else {
             if presentFailureStatus {
                 traceLogger.log("Startup blocked: Input Monitoring permission missing")
                 printInputMonitoringHelp()
@@ -1237,7 +1248,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             print("Checking microphone permission...")
             fflush(stdout)
         }
-        guard ensureMicrophonePermissionSync() else {
+        guard permissions.microphoneGranted else {
             if presentFailureStatus {
                 traceLogger.log("Startup blocked: microphone permission missing")
                 printMicrophoneHelp()
@@ -1262,7 +1273,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             print("Checking Accessibility permission...")
             fflush(stdout)
         }
-        guard ensureAccessibilityPermission() else {
+        guard permissions.accessibilityGranted else {
             if presentFailureStatus {
                 traceLogger.log("Startup blocked: Accessibility permission missing")
                 printAccessibilityHelp()
@@ -1350,6 +1361,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         setupRetryTimer = timer
         RunLoop.main.add(timer, forMode: .common)
+        refreshRuntimeStatusUI()
     }
 
     private func stopSetupRetry() {
@@ -1357,6 +1369,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         setupRetryTimer.invalidate()
         self.setupRetryTimer = nil
         traceLogger.log("Setup retry timer stopped")
+        refreshRuntimeStatusUI()
     }
 
     private func acquireSingletonLock() -> Bool {
@@ -1412,6 +1425,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         settingsWindowController.onExportDiagnostics = { [weak self] in
             self?.exportDiagnostics()
+        }
+        settingsWindowController.onRestartApp = { [weak self] in
+            self?.restartPressTalkFromSettings()
         }
         settingsWindowController.onOpenMicrophoneSettings = { [weak self] in
             self?.openMicrophonePrivacyPane()
@@ -1823,6 +1839,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func refreshRuntimeStatusUI() {
         refreshKarabinerFallbackState()
         let status = currentRuntimeStatus()
+        writeRuntimeStatusSnapshot(status)
         DispatchQueue.main.async { [weak self] in
             self?.settingsWindowController?.updateRuntimeStatus(status)
         }
@@ -1853,6 +1870,56 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             speechModelStatus: whisperStatus,
             f5BridgeStatus: bridgeStatus
         )
+    }
+
+    private func writeRuntimeStatusSnapshot(_ status: PressTalkRuntimeStatus) {
+        let statusURL = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap/runtime-status.json")
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let payload: [String: Any] = [
+            "generatedAt": formatter.string(from: Date()),
+            "app": [
+                "name": "PressTalk",
+                "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown",
+                "bundleIdentifier": Bundle.main.bundleIdentifier ?? "unknown",
+                "bundlePath": Bundle.main.bundleURL.path,
+                "executablePath": Bundle.main.executableURL?.path ?? "unknown",
+                "processID": ProcessInfo.processInfo.processIdentifier,
+            ],
+            "runtime": [
+                "inputPipelineReady": inputPipelineReady,
+                "setupRetryActive": setupRetryTimer != nil,
+                "agentMode": config.agentMode,
+                "triggerKey": settingsStore.triggerKey.rawValue,
+                "whisperModel": config.whisperModel,
+                "whisperLanguage": config.whisperLanguage ?? "auto",
+                "traceLogPath": config.traceLogPath,
+            ],
+            "permissions": [
+                "inputMonitoringGranted": status.inputMonitoringGranted,
+                "microphoneGranted": status.microphoneGranted,
+                "accessibilityGranted": status.accessibilityGranted,
+                "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
+            ],
+            "status": [
+                "speechModel": status.speechModelStatus,
+                "triggerPath": status.f5BridgeStatus,
+                "adHocSigned": status.adHocSigned,
+            ],
+            "codeSignatureSummary": appCodeSignatureSummary,
+        ]
+
+        do {
+            try FileManager.default.createDirectory(
+                at: statusURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: statusURL, options: [.atomic])
+        } catch {
+            traceLogger.log("Runtime status snapshot write failed error=\(error)")
+        }
     }
 
     private func openMicrophonePrivacyPane() {
@@ -1947,6 +2014,35 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Diagnostics export failed error=\(error)")
             present(.error("Diagnostics export failed."))
         }
+    }
+
+    private func restartPressTalkFromSettings() {
+        traceLogger.log("Restart requested from settings")
+        present(.setupRequired("Restarting PressTalk to refresh macOS permissions."))
+
+        let bundlePath = shellQuoted(Bundle.main.bundleURL.path)
+        let launchLabel = "gui/\(getuid())/com.am.jarvistap"
+        let script = """
+        sleep 0.4
+        /bin/launchctl kickstart -k \(launchLabel) >/dev/null 2>&1 || /usr/bin/open -g \(bundlePath) >/dev/null 2>&1
+        """
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-lc", script]
+        do {
+            try process.run()
+        } catch {
+            traceLogger.log("Restart helper launch failed error=\(error)")
+            present(.error("Could not restart PressTalk: \(error.localizedDescription)"))
+            return
+        }
+
+        NSApp.terminate(nil)
+    }
+
+    private func shellQuoted(_ value: String) -> String {
+        "'\(value.replacingOccurrences(of: "'", with: "'\\''"))'"
     }
 
     private func configureKarabinerFallback(enabled: Bool) {
@@ -2493,6 +2589,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func ensureAccessibilityPermission() -> Bool {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
+    }
+
+    private func checkSetupPermissions(requestPrompts: Bool) -> PermissionCheckResult {
+        let inputMonitoringGranted = requestPrompts ? ensureListenEventPermission() : CGPreflightListenEventAccess()
+        let microphoneGranted = requestPrompts
+            ? ensureMicrophonePermissionSync()
+            : AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        let accessibilityGranted = requestPrompts ? ensureAccessibilityPermission() : AXIsProcessTrusted()
+
+        return PermissionCheckResult(
+            inputMonitoringGranted: inputMonitoringGranted,
+            microphoneGranted: microphoneGranted,
+            accessibilityGranted: accessibilityGranted
+        )
     }
 
     private func ensureListenEventPermission() -> Bool {

@@ -59,6 +59,7 @@ The cask should:
 - run the bundled bootstrap helper
 - create or reuse a local development code-signing identity, then re-sign
   `PressTalk.app` before launchd starts it
+- write `~/Library/Application Support/JarvisTap/runtime-status.json`
 - write the LaunchAgent
 - open the macOS permission panes
 
@@ -118,6 +119,7 @@ Then approve Karabiner-Elements if macOS asks.
 ```bash
 tail -f ~/Library/Logs/jarvistap_trace.log
 launchctl print gui/$(id -u)/com.am.jarvistap | sed -n '1,80p'
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
 ```
 
 ## Success Criteria
@@ -136,3 +138,8 @@ Record each machine result before claiming release coverage:
 - `s1`: install + Fn smoke
 - `s2`: install + Fn smoke
 - `mbp1`: M1 Max install + Fn or Option smoke
+
+Attach or paste the output of `presstalk-collect-smoke-status.sh` for each
+machine. A successful smoke should show `inputPipelineReady: true`, the trigger
+key used, `WhisperKit ready` / `PressTalk armed` in the trace, and a completed
+dictation paste line.

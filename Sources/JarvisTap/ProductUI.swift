@@ -817,6 +817,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     var onSettingsChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
     var onExportDiagnostics: (() -> Void)?
+    var onRestartApp: (() -> Void)?
     var onOpenMicrophoneSettings: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenAccessibilitySettings: (() -> Void)?
@@ -850,6 +851,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let speechModelValueLabel = NSTextField(labelWithString: "")
     private let f5BridgeValueLabel = NSTextField(labelWithString: "")
     private let runSetupCheckButton = NSButton(title: "Run Setup Check", target: nil, action: nil)
+    private let restartAppButton = NSButton(title: "Restart PressTalk", target: nil, action: nil)
     private let exportDiagnosticsButton = NSButton(title: "Export Diagnostics", target: nil, action: nil)
     private let microphoneSettingsButton = NSButton(title: "Microphone", target: nil, action: nil)
     private let inputMonitoringSettingsButton = NSButton(title: "Input Monitoring", target: nil, action: nil)
@@ -985,6 +987,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         for button in [
             runSetupCheckButton,
+            restartAppButton,
             exportDiagnosticsButton,
             microphoneSettingsButton,
             inputMonitoringSettingsButton,
@@ -1003,7 +1006,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         setupButtonsRow.alignment = .centerY
         setupButtonsRow.spacing = 8
 
-        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, exportDiagnosticsButton])
+        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, exportDiagnosticsButton])
         diagnosticsButtonsRow.orientation = .horizontal
         diagnosticsButtonsRow.alignment = .centerY
         diagnosticsButtonsRow.spacing = 8
@@ -1123,6 +1126,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         runSetupCheckButton.target = self
         runSetupCheckButton.action = #selector(runSetupCheck(_:))
 
+        restartAppButton.target = self
+        restartAppButton.action = #selector(restartApp(_:))
+
         exportDiagnosticsButton.target = self
         exportDiagnosticsButton.action = #selector(exportDiagnostics(_:))
 
@@ -1176,7 +1182,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func configureStatusLabel(_ label: NSTextField, granted: Bool) {
-        label.stringValue = granted ? "Granted" : "Not granted"
+        label.stringValue = granted ? "Granted" : "Not available"
         label.textColor = granted ? .systemGreen : .systemOrange
     }
 
@@ -1197,10 +1203,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         let missingText = missing.joined(separator: ", ")
+        let verb = missing.count == 1 ? "is" : "are"
         if runtimeStatus.adHocSigned {
-            return "\(missingText) is not granted to this rebuilt ad-hoc copy. If macOS already shows PressTalk enabled, toggle it off and on for the current build, then run Setup Check."
+            return "\(missingText) \(verb) not available to this rebuilt ad-hoc copy. If macOS already shows PressTalk enabled, toggle it off and on for the current build, then run Setup Check."
         }
-        return "\(missingText) is not granted to the current PressTalk build. Approve it in macOS Privacy & Security, then run Setup Check."
+        return "\(missingText) \(verb) not available to this running PressTalk process. If macOS already shows PressTalk enabled, click Restart PressTalk; otherwise approve it in Privacy & Security, then run Setup Check."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {
@@ -1265,6 +1272,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func runSetupCheck(_ sender: Any?) {
         onRunSetupCheck?()
+    }
+
+    @objc private func restartApp(_ sender: Any?) {
+        onRestartApp?()
     }
 
     @objc private func exportDiagnostics(_ sender: Any?) {

@@ -1,6 +1,6 @@
 # Troubleshooting
 
-## Permission Toggle Is On, But PressTalk Still Says Missing
+## Permission Toggle Is On, But PressTalk Still Cannot Use It
 
 This usually means the running process and the app entry in macOS Privacy
 settings do not match closely enough for TCC.
@@ -9,8 +9,15 @@ Common causes:
 
 - A stale manually opened PressTalk process is still holding the singleton lock.
 - PressTalk was rebuilt after the permission was granted.
+- macOS has granted the app, but the already-running process has not refreshed
+  the TCC state yet.
 - The local development build is ad-hoc signed, so macOS may treat a new build as
   a different privacy client even if the app name looks unchanged.
+
+If macOS already shows PressTalk enabled, use `Restart PressTalk` in PressTalk
+Settings first. Current builds do not reopen the setup window after the first
+setup guide; the restart button is the intended way to refresh a running
+process after permission changes.
 
 First reset the running process:
 
@@ -26,17 +33,18 @@ open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibil
 open "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
 ```
 
-If a toggle is already on but PressTalk still reports it missing, turn the toggle
-off and on again for the newly built `PressTalk.app`, then rerun:
+If a toggle is already on but PressTalk still reports it unavailable after
+restart, turn the toggle off and on again for the newly built `PressTalk.app`,
+then rerun:
 
 ```bash
 PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
 ```
 
-Current builds keep a quiet setup retry loop running while blocked on
-permissions. After you approve the current PressTalk build in macOS Privacy &
-Security, the app should notice within a few seconds and continue setup without
-requiring a full restart.
+Current builds check all three permissions during setup instead of stopping at
+Input Monitoring first. They also keep a quiet setup retry loop running while
+blocked on permissions, but some TCC changes still require a fresh process
+before macOS reports them through the preflight APIs.
 
 If macOS keeps showing a stale enabled row, reset only PressTalk's TCC entries
 and approve the current build again:

@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc24-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc24/PressTalk-0.1.5-rc24-macos-arm64.zip
-echo "30d4a21c8a4ab37bca1fda140a7dd0d9db0c351bb795c576d5b842f6c02cf775  $tmpdir/PressTalk-0.1.5-rc24-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc24-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc25-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc25/PressTalk-0.1.5-rc25-macos-arm64.zip
+echo "faf8b7e01b903f561d60c66e3709088f8192849d1edd898e2335105f778aa106  $tmpdir/PressTalk-0.1.5-rc25-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc25-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-30d4a21c8a4ab37bca1fda140a7dd0d9db0c351bb795c576d5b842f6c02cf775
+faf8b7e01b903f561d60c66e3709088f8192849d1edd898e2335105f778aa106
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -171,13 +171,14 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
-This helper posts the PressTalk F5 bridge notifications, speaks a local phrase,
-and records PressTalk trace evidence for transcription and paste completion.
-Its JSON result sets `physicalTriggerProof=false`, includes
-`traceFinalTranscript` / `tracePasteCommandPosted`, and separately reports
-`targetCaptureSuccess` plus `tracePasteCompleted` for whether the helper text
-window captured enough pasted text. Use it to debug STT/paste separately from
-the real Fn/Option trigger.
+This helper first runs a focused-window paste-event self-test, then posts the
+PressTalk F5 bridge notifications, speaks a local phrase, and records PressTalk
+trace evidence for transcription and paste completion. Its JSON result sets
+`physicalTriggerProof=false`, includes `pasteSelfTest`,
+`targetCaptureFailureHint`, `traceFinalTranscript` /
+`tracePasteCommandPosted`, and separately reports `targetCaptureSuccess` plus
+`tracePasteCompleted` for whether the helper text window captured enough pasted
+text. Use it to debug STT/paste separately from the real Fn/Option trigger.
 
 If you need to force the F5 bridge manually on that Mac, use:
 

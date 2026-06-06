@@ -18,6 +18,13 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private var statusLabel: NSTextField!
     private var timer: Timer?
     private var completed = false
+    private var tracePipelineCompletedAt: Date?
+    private var traceFinalTranscript: String?
+    private var tracePasteCommandPosted = false
+    private var traceInserted = false
+    private var traceCopyFallback = false
+    private var traceTriggerPressed = false
+    private var traceTriggerReleased = false
 
     override init() {
         let env = ProcessInfo.processInfo.environment
@@ -115,15 +122,71 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
 
         let elapsed = Date().timeIntervalSince(startedAt)
         let capturedText = textView.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        refreshTracePipelineState()
+
         if !capturedText.isEmpty {
             finish(success: true, reason: "captured_text", capturedText: capturedText)
             return
+        }
+
+        if tracePipelineComplete, traceFinalTranscript?.isEmpty == false {
+            if tracePipelineCompletedAt == nil {
+                tracePipelineCompletedAt = Date()
+                statusLabel.stringValue = "PressTalk trace reports transcript and insertion/copy completion. Waiting briefly for target text capture."
+            } else if Date().timeIntervalSince(tracePipelineCompletedAt ?? Date()) >= 1.5 {
+                finish(success: false, reason: tracePipelineReason, capturedText: capturedText)
+                return
+            }
         }
 
         statusLabel.stringValue = "Waiting for pasted text from \(triggerLabel). Elapsed: \(Int(elapsed)) / \(Int(timeoutSeconds)) seconds."
         if elapsed >= timeoutSeconds {
             finish(success: false, reason: "timeout", capturedText: capturedText)
         }
+    }
+
+    private func refreshTracePipelineState() {
+        let traceSinceStart = Array(Self.traceLines(from: traceLogURL).dropFirst(initialTraceLineCount))
+        for line in traceSinceStart {
+            if line.contains("pressed: recording started") || line.contains("armed: recording started") {
+                traceTriggerPressed = true
+            }
+            if line.contains("released: recording ended") {
+                traceTriggerReleased = true
+            }
+            if let range = line.range(of: "Transkription abgeschlossen:") {
+                let transcript = line[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
+                if !transcript.isEmpty {
+                    traceFinalTranscript = transcript
+                }
+            }
+            if line.contains("Dictation paste completed") || line.contains("Dictation paste command posted") {
+                tracePasteCommandPosted = true
+            }
+            if line.contains("Dictation inserted method=") {
+                traceInserted = true
+            }
+            if line.contains("Dictation copied because paste unavailable") {
+                traceCopyFallback = true
+            }
+        }
+    }
+
+    private var tracePipelineComplete: Bool {
+        tracePasteCommandPosted || traceInserted || traceCopyFallback
+    }
+
+    private var tracePipelineReason: String {
+        if traceInserted {
+            return "trace_pipeline_inserted"
+        }
+        if tracePasteCommandPosted {
+            return "trace_pipeline_command_posted"
+        }
+        if traceCopyFallback {
+            return "trace_pipeline_copy_fallback"
+        }
+        return "trace_pipeline_incomplete"
     }
 
     private func finish(success: Bool, reason: String, capturedText: String) {
@@ -135,14 +198,42 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         let traceLines = Self.traceLines(from: traceLogURL)
         let traceSinceStart = Array(traceLines.dropFirst(initialTraceLineCount).suffix(160))
         let finalRuntimeStatus = Self.runtimeStatusDictionary(from: statusURL)
+        refreshTracePipelineState()
+        let trimmedCapturedText = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let targetCaptureSuccess = !trimmedCapturedText.isEmpty
+        let targetCaptureFailureHint: Any
+        if targetCaptureSuccess {
+            targetCaptureFailureHint = NSNull()
+        } else if traceCopyFallback {
+            targetCaptureFailureHint = "accessibility_untrusted_copy_fallback"
+        } else if traceInserted {
+            targetCaptureFailureHint = "target_capture_failed_after_ax_insert_trace"
+        } else if tracePasteCommandPosted {
+            targetCaptureFailureHint = "target_capture_failed_after_paste_command_trace"
+        } else if traceFinalTranscript != nil {
+            targetCaptureFailureHint = "trace_transcript_without_insertion"
+        } else {
+            targetCaptureFailureHint = NSNull()
+        }
 
         let payload: [String: Any] = [
-            "smokeVersion": 2,
+            "smokeVersion": 3,
+            "smokeKind": "manual_physical_trigger",
+            "physicalTriggerProof": traceTriggerPressed || traceTriggerReleased,
             "generatedAt": formatter.string(from: Date()),
             "startedAt": formatter.string(from: startedAt),
             "success": success,
             "reason": reason,
-            "capturedText": capturedText,
+            "capturedText": trimmedCapturedText,
+            "targetCaptureSuccess": targetCaptureSuccess,
+            "targetCaptureFailureHint": targetCaptureFailureHint,
+            "traceFinalTranscript": traceFinalTranscript ?? NSNull(),
+            "tracePasteCommandPosted": tracePasteCommandPosted,
+            "traceInserted": traceInserted,
+            "traceCopyFallback": traceCopyFallback,
+            "tracePipelineComplete": tracePipelineComplete,
+            "traceTriggerPressed": traceTriggerPressed,
+            "traceTriggerReleased": traceTriggerReleased,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": triggerKey,
             "expectedTriggerLabel": triggerLabel,
@@ -161,7 +252,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             try data.write(to: outputURL, options: [.atomic])
             statusLabel.stringValue = success
                 ? "Captured pasted text from \(triggerLabel). Result: \(outputURL.path)"
-                : "Timed out. Result: \(outputURL.path)"
+                : "Did not capture target text; reason=\(reason). Result: \(outputURL.path)"
             print(outputURL.path)
             fflush(stdout)
         } catch {

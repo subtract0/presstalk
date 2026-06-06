@@ -146,7 +146,10 @@ trigger from `runtime-status.json`. Hold that physical trigger, say a short
 sentence, then release. It writes a machine-readable result under
 `~/Library/Application Support/JarvisTap/Diagnostics/` with the captured text,
 expected trigger, runtime readiness before and after the attempt, runtime status,
-and trace lines since the helper started.
+and trace lines since the helper started. Current helpers also record
+`traceFinalTranscript`, `traceInserted`, `traceCopyFallback`,
+`targetCaptureSuccess`, and `targetCaptureFailureHint`, so physical trigger/STT
+proof is separate from active-field insertion proof.
 
 Expected:
 
@@ -155,6 +158,7 @@ Expected:
 - listening light appears
 - transcript is inserted into the helper window
 - the helper result JSON has `"success": true`
+- the helper result JSON has `"targetCaptureSuccess": true`
 - the helper result JSON has the expected `expectedTriggerKey` and readiness
   fields for the tested machine
 

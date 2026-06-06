@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc32`
-- Commit: `b08f648b8535207a0a105593e2e9ff330b787016`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc32`
-- Asset: `PressTalk-0.1.5-rc32-macos-arm64.zip`
-- SHA-256: `ed7d0ac9274253982d1dbc790e28b93b28d0d1c150e8aa51ba89fa932be29537`
+- Tag: `v0.1.5-rc33`
+- Commit: `37dbb045e44142daa46c5045805f1dc1a3686918`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc33`
+- Asset: `PressTalk-0.1.5-rc33-macos-arm64.zip`
+- SHA-256: `462256f9b9d775b548aec2334ac7f087b874ff62767e48aa775cd7bce8d86e40`
 
 Verified on `studio1` on 2026-06-06:
 
@@ -128,6 +128,42 @@ Verified on `studio1` on 2026-06-06:
   `sha256:ed7d0ac9274253982d1dbc790e28b93b28d0d1c150e8aa51ba89fa932be29537`,
   and the remote tag was corrected to point at
   `b08f648b8535207a0a105593e2e9ff330b787016` after publish.
+- `v0.1.5-rc33` adds `presstalk-input-method-client-probe.swift` to the
+  release bundle. The probe performs the reversible end-to-end IMK test:
+  register, temporarily enable/select the PressTalk input method, focus a local
+  `NSTextView`, post the insert payload, check whether text appears, write JSON
+  diagnostics, and restore the original input source.
+- `v0.1.5-rc33` fixes the input-method server startup path by replacing the
+  delegate-as-`@main` pattern with an explicit `NSApplication.shared` run loop.
+  A manual background launch of the installed input-method app now writes
+  `app launched` and `insert notification observer installed` to
+  `~/Library/Logs/presstalk_input_method.log`.
+- `v0.1.5-rc33` also hardens the generated input-method bundle metadata:
+  `CFBundleSupportedPlatforms`, `CFBundleSignature`,
+  `NSSupportsSuddenTermination`, `TISIconIsTemplate`, a visible
+  `ComponentInputModeDict`, and exported `PressTalkIMController` ObjC class.
+  The installer clears quarantine/provenance metadata from the copied
+  `~/Library/Input Methods/PressTalkInputMethod.app`.
+- Current `studio1` rc33 evidence: the bundled client probe from
+  `~/Applications/PressTalk.app` fails cleanly with
+  `success=false`, `reason=input_method_not_selectable`, `registerStatus=0`,
+  `recognizedSourceCount=0`, `observedText=""`, and final input source restored
+  to `com.apple.keylayout.German`. This means active-field insertion through
+  IMK is still not proven; current TIS state does not expose the PressTalk input
+  method as an enable/select-capable source.
+- After publishing `v0.1.5-rc33`, `studio1` was restored to the legacy working
+  privacy identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  Runtime status after restore: `permissionPaneOpeningAllowed=false`,
+  `setupRetryActive=false`, `microphoneAuthorizationStatus=authorized`,
+  `microphoneGranted=true`, `inputMonitoringEffective=true`,
+  `inputListener=hid:listen_only`, `inputPipelineReady=true`,
+  `status.speechModel=Ready`, and `status.triggerPath=Fn / Globe ready`.
+- The `v0.1.5-rc33` GitHub release asset digest is
+  `sha256:462256f9b9d775b548aec2334ac7f087b874ff62767e48aa775cd7bce8d86e40`,
+  and the remote tag points at
+  `37dbb045e44142daa46c5045805f1dc1a3686918`.
 - Bootstrap now clears `com.apple.quarantine` and `com.apple.provenance` xattrs,
   explicitly re-enables `gui/$UID/com.am.jarvistap`, and does not silently treat
   a failed launchd bootstrap as success.

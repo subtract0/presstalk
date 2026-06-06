@@ -1213,6 +1213,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     func runStartup() -> Int32 {
+        if ProcessInfo.processInfo.environment["PRESSTALK_ACCESSIBILITY_TRUST_PROBE"] == "1" {
+            printAccessibilityTrustProbe()
+            DispatchQueue.main.async {
+                NSApp.terminate(nil)
+            }
+            return 0
+        }
+
         traceLogger.log("Startup initiated trace_log=\(config.traceLogPath)")
         guard acquireSingletonLock() else {
             traceLogger.log("Duplicate PressTalk instance detected; exiting secondary process")
@@ -2663,6 +2671,37 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 return value.isEmpty ? nil : value
             }
             .first ?? "unknown"
+    }
+
+    private func printAccessibilityTrustProbe() {
+        let promptOptions = [
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false,
+        ] as CFDictionary
+        let accessibilityTrusted = AXIsProcessTrustedWithOptions(promptOptions)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let payload: [String: Any] = [
+            "generatedAt": formatter.string(from: Date()),
+            "probeKind": "actual_bundle_accessibility_trust",
+            "promptRequested": false,
+            "accessibilityTrusted": accessibilityTrusted,
+            "bundleIdentifier": Bundle.main.bundleIdentifier ?? "unknown",
+            "bundlePath": Bundle.main.bundleURL.path,
+            "executablePath": Bundle.main.executableURL?.path ?? "unknown",
+            "processID": ProcessInfo.processInfo.processIdentifier,
+            "codeSignatureIdentifier": codeSignatureValue(prefix: "Identifier="),
+            "codeSignatureCDHash": codeSignatureValue(prefix: "CDHash="),
+            "codeSignatureAuthority": codeSignatureValue(prefix: "Authority="),
+            "codeSignatureSummary": appCodeSignatureSummary,
+        ]
+
+        do {
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            FileHandle.standardOutput.write(data)
+            FileHandle.standardOutput.write(Data("\n".utf8))
+        } catch {
+            fputs("[PressTalk] Accessibility trust probe JSON failed: \(error)\n", stderr)
+        }
     }
 
     private func checkSetupPermissions() -> PermissionCheckResult {

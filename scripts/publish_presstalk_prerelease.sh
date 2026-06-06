@@ -167,6 +167,12 @@ input method still registers without opening System Settings, but on studio1 TIS
 continues to report recognizedSourceCount=0, so the input-method insertion path
 remains a discovery blocker rather than a proven paste fallback.
 
+The bundle also includes presstalk-actual-accessibility-probe.sh. It launches
+the installed PressTalk.app itself in a diagnostic mode with the Accessibility
+prompt flag disabled, records the exact bundle path, bundle id, CDHash, signing
+authority, and AX trust result, then exits before normal startup. This checks the
+actual signed app identity before asking anyone to re-grant permissions.
+
 The bundle also includes presstalk-accessibility-identity-probe.sh. It launches
 small background probe apps for com.am.jarvistap and com.am.presstalk with the
 Accessibility prompt flag disabled, records each probe signing identity, and

@@ -57,10 +57,21 @@ for `com.am.presstalk` and `com.am.jarvistap` across Microphone, Input
 Monitoring, and Accessibility. Use that section to detect missing, stale, or
 wrong-identity TCC rows without opening System Settings or resetting TCC.
 
-If the TCC databases are not readable, run the bundled Accessibility identity
-probe. It launches tiny background probes for `com.am.jarvistap` and
-`com.am.presstalk` with the prompt flag disabled, then reports whether either
-identity is already trusted for Accessibility:
+If Accessibility still reports false after macOS already shows PressTalk
+enabled, first run the bundled actual-bundle Accessibility probe. It launches
+the installed PressTalk app in a diagnostic mode with the prompt flag disabled,
+prints the exact bundle path, bundle id, CDHash, signing authority, and
+`accessibilityTrusted`, then exits before normal startup:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-actual-accessibility-probe.sh"
+```
+
+If the TCC databases are not readable or the actual bundle probe still leaves
+the identity question unclear, run the bundled Accessibility identity probe. It
+launches tiny background probes for `com.am.jarvistap` and `com.am.presstalk`
+with the prompt flag disabled, then reports whether either identity is already
+trusted for Accessibility:
 
 ```bash
 "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-identity-probe.sh"

@@ -138,8 +138,16 @@ First confirm readiness:
 ```
 
 If Accessibility appears enabled in macOS but PressTalk still reports
-`accessibilityGranted=false`, run the bundled identity probe. It does not open
-permission panes and does not request prompts:
+`accessibilityGranted=false`, run the bundled actual-bundle probe. It does not
+open permission panes, does not request prompts, and reports trust for the exact
+installed app bundle:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-actual-accessibility-probe.sh"
+```
+
+If that still leaves an identity question, run the bundled identity probe for
+the legacy and public bundle ids:
 
 ```bash
 "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-identity-probe.sh"

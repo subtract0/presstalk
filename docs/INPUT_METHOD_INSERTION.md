@@ -112,11 +112,18 @@ Current studio1 evidence after the stable-signing and metadata passes:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the
 app, and `PressTalkIMController` is exported under that Objective-C class name.
-Both the richer input-mode plist and the current single-source plist still
-report `recognizedSourceCount=0`, even after moving aside
-`~/Library/Caches/com.apple.tiswitcher.cache` and restarting text-input agents.
-Treat that as a macOS input-source discovery/trust blocker, not a missing
-Microphone, Input Monitoring, or Accessibility permission.
+The generated bundle now matches Apple input-method bundle shape more closely:
+it has `Contents/PkgInfo`, no `LSBackgroundOnly`, script repertoire `Latn`, and a
+visible mode id `com.am.presstalk.inputmethod.dictation`.
+
+That still does not prove insertion. The status helper scans the full installed
+TIS table, and on studio1 it reports `allInstalledInputSourceCount=318`,
+`pressTalkLikeAllInstalledSourceCount=0`, `recognizedSourceCount=0`, and
+`registerStatus=0` after explicit registration and a text-input agent restart.
+The client probe exits with `reason=input_method_not_selectable` before selecting
+anything, with the final input source still `com.apple.keylayout.German`. Treat
+that as a macOS input-source discovery/trust blocker, not a missing Microphone,
+Input Monitoring, or Accessibility permission.
 
 The non-IMK event route is also ruled out on `studio1` while
 `AXIsProcessTrusted=false`. The bundled `presstalk-unicode-event-insert-probe`

@@ -29,12 +29,14 @@ done
 PRODUCT="presstalk-input-method"
 APP_NAME="PressTalkInputMethod.app"
 INPUT_METHOD_BUNDLE_ID="com.am.presstalk.inputmethod"
+INPUT_MODE_ID="$INPUT_METHOD_BUNDLE_ID.dictation"
 BUILD_DIR="$ROOT/.build/presstalk-input-method"
 APP_BUNDLE="${APP_BUNDLE_OVERRIDE:-$BUILD_DIR/$APP_NAME}"
 APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
 APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
 APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+APP_PKG_INFO="$APP_CONTENTS_DIR/PkgInfo"
 INSTALLED_BUNDLE="$HOME/Library/Input Methods/$APP_NAME"
 LOCAL_CODESIGN_HELPER="$ROOT/scripts/create_presstalk_local_codesign_identity.sh"
 
@@ -113,15 +115,47 @@ cat >"$APP_INFO_PLIST" <<PLIST
     <string>MacOSX</string>
   </array>
   <key>CFBundleVersion</key>
-  <string>4</string>
+  <string>5</string>
+  <key>ComponentInputModeDict</key>
+  <dict>
+    <key>tsInputModeListKey</key>
+    <dict>
+      <key>$INPUT_MODE_ID</key>
+      <dict>
+        <key>TISIconLabels</key>
+        <dict>
+          <key>Primary</key>
+          <string>PT</string>
+        </dict>
+        <key>TISInputSourceID</key>
+        <string>$INPUT_MODE_ID</string>
+        <key>TISIntendedLanguage</key>
+        <string>en</string>
+        <key>tsInputModeDefaultStateKey</key>
+        <true/>
+        <key>tsInputModeIsVisibleKey</key>
+        <true/>
+        <key>tsInputModeMenuIconFileKey</key>
+        <string>$ICON_FILE</string>
+        <key>tsInputModePaletteIconFileKey</key>
+        <string>$ICON_FILE</string>
+        <key>tsInputModePrimaryInScriptKey</key>
+        <true/>
+        <key>tsInputModeScriptKey</key>
+        <string>smUnicodeScript</string>
+      </dict>
+    </dict>
+    <key>tsVisibleInputModeOrderedArrayKey</key>
+    <array>
+      <string>$INPUT_MODE_ID</string>
+    </array>
+  </dict>
   <key>InputMethodConnectionName</key>
   <string>PressTalkInputMethod_1_Connection</string>
   <key>InputMethodServerControllerClass</key>
   <string>PressTalkIMController</string>
   <key>InputMethodServerDelegateClass</key>
   <string>PressTalkIMController</string>
-  <key>LSBackgroundOnly</key>
-  <string>1</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
   <key>LSUIElement</key>
@@ -138,7 +172,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>en</string>
   <key>tsInputMethodCharacterRepertoireKey</key>
   <array>
-    <string>en</string>
+    <string>Latn</string>
   </array>
   <key>tsInputMethodIconFileKey</key>
   <string>$ICON_FILE</string>
@@ -147,6 +181,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
 PLIST
 
 plutil -lint "$APP_INFO_PLIST" >/dev/null
+printf 'APPL????' >"$APP_PKG_INFO"
 SIGN_IDENTITY="$(resolve_signing_identity)"
 SIGN_KEYCHAIN="${PRESSTALK_INPUT_METHOD_CODESIGN_KEYCHAIN:-${PRESSTALK_CODESIGN_KEYCHAIN:-}}"
 codesign_args=(--force --sign "$SIGN_IDENTITY" --timestamp=none)

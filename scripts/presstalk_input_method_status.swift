@@ -3,7 +3,7 @@ import Carbon
 import Foundation
 
 private let inputMethodSourceID = "com.am.presstalk.inputmethod"
-private let inputModeSourceID = inputMethodSourceID
+private let inputModeSourceID = "\(inputMethodSourceID).dictation"
 private let bundleIdentifier = "com.am.presstalk.inputmethod"
 private let appName = "PressTalkInputMethod.app"
 
@@ -87,23 +87,44 @@ private func sourceKey(_ source: TISInputSource) -> String {
     return [id, bundleID].compactMap { $0 }.joined(separator: "|")
 }
 
+private func inputSourceList(properties: CFDictionary?, includeAllInstalled: Bool) -> [TISInputSource] {
+    guard let list = TISCreateInputSourceList(properties, includeAllInstalled) else {
+        return []
+    }
+    return (list.takeRetainedValue() as NSArray as Array).compactMap { object in
+        guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { return nil }
+        return (object as! TISInputSource)
+    }
+}
+
+private func pressTalkLikeSource(_ source: TISInputSource) -> Bool {
+    let values = [
+        stringProperty(source, kTISPropertyInputSourceID),
+        stringProperty(source, kTISPropertyBundleID),
+        stringProperty(source, kTISPropertyLocalizedName),
+    ].compactMap { $0?.lowercased() }
+    return values.contains { value in
+        value == inputMethodSourceID.lowercased() ||
+            value == bundleIdentifier.lowercased() ||
+            value.contains("presstalk") ||
+            value.contains("jarvistap")
+    }
+}
+
 private func findPressTalkSources(includeAllInstalled: Bool) -> [TISInputSource] {
-    func createList(_ properties: [CFString: Any]) -> [Any] {
-        guard let list = TISCreateInputSourceList(properties as CFDictionary, includeAllInstalled) else {
-            return []
-        }
-        return list.takeRetainedValue() as NSArray as Array
+    func createList(_ properties: [CFString: Any]) -> [TISInputSource] {
+        inputSourceList(properties: properties as CFDictionary, includeAllInstalled: includeAllInstalled)
     }
 
     let byMethodID = createList([kTISPropertyInputSourceID: inputMethodSourceID])
     let byModeID = createList([kTISPropertyInputSourceID: inputModeSourceID])
     let byBundle = createList([kTISPropertyBundleID: bundleIdentifier])
+    let byFullScan = inputSourceList(properties: nil, includeAllInstalled: includeAllInstalled)
+        .filter(pressTalkLikeSource)
 
     var sources: [TISInputSource] = []
     var seen = Set<String>()
-    for object in byMethodID + byModeID + byBundle {
-        guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { continue }
-        let source = object as! TISInputSource
+    for source in byMethodID + byModeID + byBundle + byFullScan {
         let key = sourceKey(source)
         let fallbackKey = "\(Unmanaged.passUnretained(source).toOpaque())"
         let uniqueKey = key.isEmpty ? fallbackKey : key
@@ -189,6 +210,8 @@ if options.register {
 
 private var enabledSources = findPressTalkSources(includeAllInstalled: false)
 private var allSources = findPressTalkSources(includeAllInstalled: true)
+private let allInstalledSources = inputSourceList(properties: nil, includeAllInstalled: true)
+private let pressTalkLikeAllInstalledSources = allInstalledSources.filter(pressTalkLikeSource)
 private var enableStatus: Any = "not_requested"
 if options.enable {
     if allSources.isEmpty {
@@ -221,6 +244,9 @@ private let payload: [String: Any] = [
     "inputModeSourceID": inputModeSourceID,
     "currentInputSourceID": current["id"] ?? NSNull(),
     "currentInputSource": current,
+    "allInstalledInputSourceCount": allInstalledSources.count,
+    "pressTalkLikeAllInstalledSourceCount": pressTalkLikeAllInstalledSources.count,
+    "pressTalkLikeAllInstalledSources": pressTalkLikeAllInstalledSources.map(sourceSummary),
     "recognizedSourceCount": allSources.count,
     "recognizedEnabledSourceCount": enabledSources.count,
     "recognizedAllSourceCount": allSources.count,

@@ -27,6 +27,10 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
     private var tracePasteCommandPosted = false
     private var traceInserted = false
     private var traceCopyFallback = false
+    private var traceNoSpeechAfterRelease = false
+    private var traceAudioRMS: Double?
+    private var traceAudioPeak: Double?
+    private var traceAudioDurationSeconds: Double?
     private var pasteSelfTestResults: [[String: Any]] = []
     private var pasteSelfTestSucceeded = false
     private let pasteSelfTestCases: [(label: String, sourceStateID: CGEventSourceStateID, tap: CGEventTapLocation)] = [
@@ -225,6 +229,14 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         }
 
         refreshTracePipelineState()
+        if automationFinished, traceNoSpeechAfterRelease {
+            finish(
+                success: false,
+                reason: ttsAudioLikelyNotCaptured ? "tts_audio_not_captured_by_microphone" : "no_speech_captured_after_tts",
+                capturedText: capturedText
+            )
+            return
+        }
         if tracePipelineComplete, traceFinalTranscript?.isEmpty == false {
             if tracePipelineCompletedAt == nil {
                 tracePipelineCompletedAt = Date()
@@ -264,6 +276,14 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             if line.contains("Dictation copied because paste unavailable") {
                 traceCopyFallback = true
             }
+            if line.contains("No speech captured after release") {
+                traceNoSpeechAfterRelease = true
+            }
+            if line.contains("Audio capture frozen") {
+                traceAudioDurationSeconds = Self.doubleValue(after: "duration_seconds=", in: line)
+                traceAudioRMS = Self.doubleValue(after: "rms=", in: line)
+                traceAudioPeak = Self.doubleValue(after: "peak=", in: line)
+            }
         }
     }
 
@@ -284,6 +304,13 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         return "trace_pipeline_incomplete"
     }
 
+    private var ttsAudioLikelyNotCaptured: Bool {
+        guard traceNoSpeechAfterRelease else { return false }
+        let rms = traceAudioRMS ?? 1
+        let peak = traceAudioPeak ?? 1
+        return rms < 0.002 && peak < 0.02
+    }
+
     private func finish(success: Bool, reason: String, capturedText: String) {
         guard !completed else { return }
         completed = true
@@ -297,9 +324,18 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         refreshTracePipelineState()
         let trimmedCapturedText = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let targetCaptureSuccess = trimmedCapturedText.count >= minCapturedTextLength
-        let targetCaptureFailureHint: Any = targetCaptureSuccess
-            ? NSNull()
-            : (traceCopyFallback ? "accessibility_untrusted_copy_fallback" : (pasteSelfTestSucceeded ? "target_capture_failed_after_paste_self_test_success" : "local_cmd_v_event_synthesis_unavailable"))
+        let targetCaptureFailureHint: Any
+        if targetCaptureSuccess {
+            targetCaptureFailureHint = NSNull()
+        } else if ttsAudioLikelyNotCaptured {
+            targetCaptureFailureHint = "tts_output_not_heard_by_microphone"
+        } else if traceCopyFallback {
+            targetCaptureFailureHint = "accessibility_untrusted_copy_fallback"
+        } else if pasteSelfTestSucceeded {
+            targetCaptureFailureHint = "target_capture_failed_after_paste_self_test_success"
+        } else {
+            targetCaptureFailureHint = "local_cmd_v_event_synthesis_unavailable"
+        }
 
         let payload: [String: Any] = [
             "smokeVersion": 1,
@@ -323,6 +359,13 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             "tracePasteCommandPosted": tracePasteCommandPosted,
             "traceInserted": traceInserted,
             "traceCopyFallback": traceCopyFallback,
+            "traceNoSpeechAfterRelease": traceNoSpeechAfterRelease,
+            "traceAudioCapture": [
+                "durationSeconds": Self.jsonValue(traceAudioDurationSeconds),
+                "rms": Self.jsonValue(traceAudioRMS),
+                "peak": Self.jsonValue(traceAudioPeak),
+                "ttsLikelyNotCapturedByMicrophone": ttsAudioLikelyNotCaptured,
+            ],
             "tracePasteCompleted": targetCaptureSuccess,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": "f5",
@@ -409,6 +452,15 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         return current as? Bool
     }
 
+    private static func doubleValue(after marker: String, in line: String) -> Double? {
+        guard let range = line.range(of: marker) else { return nil }
+        let suffix = line[range.upperBound...]
+        let token = suffix.prefix { character in
+            character.isNumber || character == "." || character == "-"
+        }
+        return Double(token)
+    }
+
     private static func readinessSummary(from runtimeStatus: [String: Any]?) -> String {
         let pipeline = boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"]) == true
         let microphone = boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"]) == true
@@ -433,6 +485,13 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
     }
 
     private static func jsonValue(_ value: Bool?) -> Any {
+        if let value {
+            return value
+        }
+        return NSNull()
+    }
+
+    private static func jsonValue(_ value: Double?) -> Any {
         if let value {
             return value
         }

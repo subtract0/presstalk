@@ -187,6 +187,13 @@ trace evidence for transcription and paste completion. Its JSON result sets
 `tracePasteCompleted` for whether the helper text window captured enough pasted
 text. Use it to debug STT/paste separately from the real Fn/Option trigger.
 
+Do not use AirPods or other headphones for this automated helper unless the
+microphone can actually hear the playback. The helper uses `/usr/bin/say` as an
+acoustic source; if output goes only to headphones, the app may record near
+silence. Current helper JSON reports that as
+`reason=tts_audio_not_captured_by_microphone` with `traceAudioCapture` RMS/peak
+evidence rather than a generic STT failure.
+
 ## Optional Input Method Probe
 
 The release bundle includes an opt-in InputMethodKit prototype for the

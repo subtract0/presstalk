@@ -100,11 +100,11 @@ Verified on `studio1` on 2026-06-06:
 - `v0.1.5-rc22` adds `presstalk-automated-f5-smoke.swift`, an explicit
   synthetic pipeline helper. It posts the F5 Darwin trigger bridge, speaks a
   local phrase through system audio, and records PressTalk trace evidence for
-  transcription and paste completion. Its JSON result sets
+  transcription and paste command posting. Its JSON result sets
   `physicalTriggerProof=false`, includes `traceFinalTranscript` and
-  `tracePasteCompleted`, and separately reports `targetCaptureSuccess`, so it
-  helps isolate STT/paste failures but does not replace physical Fn or Option
-  smoke.
+  `tracePasteCommandPosted`, and separately reports `targetCaptureSuccess` /
+  `tracePasteCompleted`, so it helps isolate STT/paste failures but does not
+  replace physical Fn or Option smoke.
 - `studio1` local synthetic F5/Darwin/TTS smoke on 2026-06-06 succeeded at the
   trace pipeline level after a temporary no-pane F5 bootstrap. Result JSON:
   `success=true`, `reason=trace_pipeline_completed`,
@@ -113,6 +113,20 @@ Verified on `studio1` on 2026-06-06:
   `targetCaptureSuccess=false`, with runtime readiness true at start and finish.
   The app was restored to `PRESSTALK_TRIGGER_KEY=fn` afterward and status
   consistency was clean.
+- Current post-rc22 paste work changes insertion to pasteboard plus Cmd-V
+  instead of per-code-unit Unicode key events, delays pasteboard restore to 1.0s,
+  and changes trace wording from `Dictation paste completed` to
+  `Dictation paste command posted`. The revised synthetic helper now separates
+  `tracePasteCommandPosted` from `tracePasteCompleted`.
+- `studio1` local post-rc22 synthetic F5/Darwin/TTS smoke with the revised
+  helper and paste path reported `success=true`,
+  `reason=trace_pipeline_command_posted`,
+  `traceFinalTranscript="Press Teig Automated Smoke Test."`,
+  `tracePasteCommandPosted=true`, `tracePasteCompleted=false`, and
+  `targetCaptureSuccess=false`. Runtime readiness was true, and the app was
+  restored to Fn with clean status consistency. This shows STT and paste-command
+  posting work, but target-field insertion remains unproven while
+  `accessibilityGranted=false`.
 - `studio1`: a no-pane rc21-equivalent local install from commit
   `f92daebee990f7d45d66cb577cce05e250894d4b` was bootstrapped with
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,

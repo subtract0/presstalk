@@ -59,9 +59,10 @@ paste smoke.
 
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
-phrase through system audio, and records whether PressTalk transcribes and
-pastes into a focused window. Results are marked physicalTriggerProof=false, so
-this does not replace physical Fn/Option smoke.
+phrase through system audio, and records whether PressTalk transcribes, posts
+the paste command, and actually lands text in the focused helper window. Results
+are marked physicalTriggerProof=false, and targetCaptureSuccess is tracked
+separately, so this does not replace physical Fn/Option smoke.
 
 Settings now distinguish read-only permission preflight results from effective
 runtime capability. If the real input listener is armed, Input Monitoring shows

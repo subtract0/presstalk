@@ -174,9 +174,10 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 This helper posts the PressTalk F5 bridge notifications, speaks a local phrase,
 and records PressTalk trace evidence for transcription and paste completion.
 Its JSON result sets `physicalTriggerProof=false`, includes
-`traceFinalTranscript` / `tracePasteCompleted`, and separately reports
-`targetCaptureSuccess` for whether the helper text window captured enough pasted
-text. Use it to debug STT/paste separately from the real Fn/Option trigger.
+`traceFinalTranscript` / `tracePasteCommandPosted`, and separately reports
+`targetCaptureSuccess` plus `tracePasteCompleted` for whether the helper text
+window captured enough pasted text. Use it to debug STT/paste separately from
+the real Fn/Option trigger.
 
 If you need to force the F5 bridge manually on that Mac, use:
 
@@ -200,7 +201,7 @@ launchctl print gui/$(id -u)/com.am.jarvistap | sed -n '1,80p'
 - `PressTalk armed`
 - `🎙️ Fn / Globe pressed: recording started`
 - `📝 Transkription abgeschlossen: ...`
-- `Dictation paste completed`
+- `targetCaptureSuccess: true` in the manual or automated smoke JSON
 
 ## Machine Matrix
 

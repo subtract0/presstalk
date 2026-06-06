@@ -4168,7 +4168,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func restorePasteboardItems(_ items: [[NSPasteboard.PasteboardType: Data]], expectedChangeCount: Int) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             let pasteboard = NSPasteboard.general
             guard pasteboard.changeCount == expectedChangeCount else { return }
 
@@ -4203,22 +4203,24 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let preparedTranscript = transcriptForInsertion(transcript)
         guard !preparedTranscript.isEmpty else { return }
 
+        let pasteboardSnapshot = snapshotPasteboardItems()
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(preparedTranscript, forType: .string)
+        let pasteboardChangeCount = pasteboard.changeCount
+
         guard let source = CGEventSource(stateID: .hidSystemState),
-              let keyDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true),
-              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false)
+              let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
+              let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
         else {
             throw JarvisTapError.eventSynthesisUnavailable
         }
 
-        for codeUnit in preparedTranscript.utf16 {
-            var unit = codeUnit
-            keyDown.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
-            keyUp.keyboardSetUnicodeString(stringLength: 1, unicodeString: &unit)
-            keyDown.flags = []
-            keyUp.flags = []
-            keyDown.post(tap: .cghidEventTap)
-            keyUp.post(tap: .cghidEventTap)
-        }
+        keyDown.flags = .maskCommand
+        keyUp.flags = .maskCommand
+        keyDown.post(tap: .cgSessionEventTap)
+        keyUp.post(tap: .cgSessionEventTap)
+        restorePasteboardItems(pasteboardSnapshot, expectedChangeCount: pasteboardChangeCount)
     }
 
     private func recordTriggerSource(_ source: TriggerSource, phase: TriggerPhase) {
@@ -4647,7 +4649,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     if pasteAutomatically {
                         traceLogger.log("Pasting dictated transcript into focused app")
                         try insertTranscriptIntoFocusedApp(transcript)
-                        traceLogger.log("Dictation paste completed")
+                        traceLogger.log("Dictation paste command posted")
                         present(.inserted(transcript))
                         finishProcessing(reason: "dictation_paste")
                     } else {
@@ -4765,7 +4767,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             if config.agentMode == "dictation" {
                 traceLogger.log("Pasting dictated transcript into focused app")
                 try insertTranscriptIntoFocusedApp(transcript)
-                traceLogger.log("Dictation paste completed")
+                traceLogger.log("Dictation paste command posted")
                 return
             }
 

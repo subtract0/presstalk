@@ -23,7 +23,7 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
     private var automationError: String?
     private var tracePipelineCompletedAt: Date?
     private var traceFinalTranscript: String?
-    private var tracePasteCompleted = false
+    private var tracePasteCommandPosted = false
 
     override init() {
         let env = ProcessInfo.processInfo.environment
@@ -162,7 +162,7 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
 
     private func tick() {
         guard !completed else { return }
-        if automationStarted, !automationFinished {
+        if automationStarted, !tracePasteCommandPosted {
             focusCaptureWindow()
         }
 
@@ -174,12 +174,12 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
         }
 
         refreshTracePipelineState()
-        if tracePasteCompleted, traceFinalTranscript?.isEmpty == false {
+        if tracePasteCommandPosted, traceFinalTranscript?.isEmpty == false {
             if tracePipelineCompletedAt == nil {
                 tracePipelineCompletedAt = Date()
-                statusLabel.stringValue = "PressTalk trace reports transcript and paste completion. Waiting briefly for target text capture."
+                statusLabel.stringValue = "PressTalk trace reports transcript and paste command. Waiting briefly for target text capture."
             } else if Date().timeIntervalSince(tracePipelineCompletedAt ?? Date()) >= 1.5 {
-                finish(success: true, reason: "trace_pipeline_completed", capturedText: capturedText)
+                finish(success: true, reason: "trace_pipeline_command_posted", capturedText: capturedText)
                 return
             }
         }
@@ -204,8 +204,8 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
                     traceFinalTranscript = transcript
                 }
             }
-            if line.contains("Dictation paste completed") {
-                tracePasteCompleted = true
+            if line.contains("Dictation paste completed") || line.contains("Dictation paste command posted") {
+                tracePasteCommandPosted = true
             }
         }
     }
@@ -237,7 +237,8 @@ final class AutomatedF5SmokeDelegate: NSObject, NSApplicationDelegate {
             "targetCaptureSuccess": trimmedCapturedText.count >= minCapturedTextLength,
             "minCapturedTextLength": minCapturedTextLength,
             "traceFinalTranscript": traceFinalTranscript ?? NSNull(),
-            "tracePasteCompleted": tracePasteCompleted,
+            "tracePasteCommandPosted": tracePasteCommandPosted,
+            "tracePasteCompleted": trimmedCapturedText.count >= minCapturedTextLength,
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": "f5",
             "expectedTriggerLabel": "F5 Darwin notification bridge",

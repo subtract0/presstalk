@@ -163,6 +163,19 @@ Verified on `studio1` on 2026-06-06:
   restored to Fn with clean status consistency. This shows STT and paste-command
   posting work, but target-field insertion remains unproven while
   `accessibilityGranted=false`.
+- `studio1` rc27 synthetic F5/Darwin/TTS smoke succeeded at the trace pipeline
+  level after a temporary no-pane F5 bootstrap, then the app was restored to Fn.
+  Result JSON:
+  `~/Library/Application Support/JarvisTap/Diagnostics/automated-f5-smoke-2026-06-06T19-36-28.582Z.json`
+  reported `success=true`, `reason=trace_pipeline_copy_fallback`,
+  `physicalTriggerProof=false`, `microphoneAuthorizationStatus=authorized`,
+  `traceCopyFallback=true`, `tracePasteCommandPosted=false`,
+  `tracePasteCompleted=false`,
+  `traceFinalTranscript="Press type automated smoke test."`,
+  `targetCaptureSuccess=false`, and
+  `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
+  restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
+  `speechModel=Ready`.
 - `studio1`: a no-pane rc21-equivalent local install from commit
   `f92daebee990f7d45d66cb577cce05e250894d4b` was bootstrapped with
   `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`,
@@ -280,8 +293,13 @@ Known current proof gaps:
   records physical Fn dictation smoke results as JSON. It is the artifact to use
   for the next cross-machine smoke attempts.
 - Local SSH aliases `s1` and `s2` are still not configured on `studio1`.
-  `studio2` is reachable as `studio2` or `studio2-tb`; `mbp1` is reachable via
-  `mbp1-tb`.
+  Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
+  only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or
+  `studio2-tb`; `mbp1` is reachable via `mbp1-tb`.
+- Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
+  profile/device/variable management. It does not provide a direct command to
+  emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility
+  fallback for active-field insertion.
 
 Do not claim full release coverage until these are recorded:
 

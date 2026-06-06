@@ -70,7 +70,7 @@ PRESSTALK_TRIGGER_KEY=fn \
 ```
 
 Use `com.am.presstalk` for new installs or machines where that identity already
-works, such as the current mbp1 rc17 smoke path. Use `com.am.jarvistap` only as
+works, such as the current mbp1 rc27 smoke path. Use `com.am.jarvistap` only as
 a compatibility fallback for machines with older grants.
 
 On a machine where launchd reports `Bootstrap failed: 5: Input/output error`,

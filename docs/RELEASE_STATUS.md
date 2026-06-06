@@ -702,14 +702,38 @@ Known current proof gaps:
   Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
   only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or
   `studio2-tb`; `mbp1` is reachable via `mbp1-tb`.
+- `mbp1` rc43 was installed from the GitHub release artifact over SSH with
+  SHA-256 verified as
+  `7df81ffc3540d83166495951ab960f33213c059d274b58d7a4ee0795b4dcdd6d`.
+  Bootstrap used `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
+  After startup delay, `presstalk-collect-smoke-status.sh` reported matching
+  live process/status/app CDHash `30e9b4cd72207ec5eb3bc40b7c62c3511534055f`,
+  `bundleIdentifier=com.am.presstalk`,
+  `permissions.microphoneAuthorizationStatus=authorized`,
+  `permissions.microphoneGranted=true`,
+  `permissions.inputMonitoringEffective=true`,
+  `permissions.inputMonitoringStatus=listener_ready_preflight_unavailable`,
+  `permissions.accessibilityStatus=ax_false_input_method_fallback`,
+  `runtime.inputListener=hid:listen_only`, `runtime.inputPipelineReady=true`,
+  `runtime.setupRetryActive=false`, `status.speechModel=Ready`, and
+  `status.triggerPath=Fn / Globe ready`. This is runtime-readiness evidence,
+  not physical Fn dictation/paste proof.
+- On `mbp1`, bootstrap over SSH could not create a trusted local development
+  signing identity because macOS denied Keychain trust changes without user
+  interaction. The app therefore ran ad-hoc for the SSH install
+  (`status.adHocSigned=true`). Treat that as a signing/identity caveat for
+  remote installs, not as a missing microphone/input permission.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to
   emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility
   fallback for active-field insertion.
+- `studio2` is intentionally excluded from current smoke coverage because it has
+  no attached microphone.
 
 Do not claim full release coverage until these are recorded:
 
 - `studio1`: physical Fn dictation and paste smoke.
 - `s1`: install plus Fn dictation smoke.
-- `s2`/`studio2`: first-time grants, then Fn dictation smoke.
+- `s2`: install plus Fn dictation smoke after a microphone is available.
 - `mbp1`: M1 Max physical Fn or Option dictation and paste smoke.

@@ -30,12 +30,14 @@ PressTalk ${VERSION} prerelease smoke artifact for Apple Silicon macOS.
 Default trigger: Fn / Globe.
 
 The bundled bootstrap creates or reuses a local development code-signing
-identity on the target Mac, re-signs PressTalk.app before launchd starts it,
-and leaves macOS permission panes closed. Bootstrap never opens System Settings;
-the permission-pane flag only controls whether the app manual Settings
-buttons are enabled. This is intended to avoid repeated ad-hoc TCC identity
-drift without repeatedly prompting for already approved permissions during smoke
-testing and updates.
+identity on the target Mac, re-signs PressTalk.app before launchd starts it
+when macOS allows the noninteractive Keychain trust update, and leaves macOS
+permission panes closed. Bootstrap never opens System Settings; the
+permission-pane flag only controls whether the app manual Settings buttons are
+enabled. The bootstrap summary reports both whether stable signing was requested
+and whether it was actually applied. This is intended to avoid repeated ad-hoc
+TCC identity drift without repeatedly prompting for already approved permissions
+during smoke testing and updates.
 
 While blocked on macOS privacy approvals, PressTalk keeps a quiet setup retry
 timer running. Startup/setup checks use read-only preflights and real listener

@@ -60,12 +60,20 @@ The cask should:
 - install `PressTalk.app`
 - run the bundled bootstrap helper
 - create or reuse a local development code-signing identity, then re-sign
-  `PressTalk.app` before launchd starts it
+  `PressTalk.app` before launchd starts it when macOS allows noninteractive
+  Keychain trust changes
 - write `~/Library/Application Support/JarvisTap/runtime-status.json`
 - write the LaunchAgent
 - leave macOS permission panes closed during bootstrap
 - pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
   macOS privacy panes during no-pane smoke runs
+
+When bootstrap is run over SSH on a Mac that has not already trusted the local
+PressTalk signing certificate, macOS may deny the Keychain trust update because
+no user interaction is possible. In that case the app still starts, but
+`status.adHocSigned=true` and the bootstrap summary reports stable signing
+requested but not applied. That is a signing/identity blocker, not a reason to
+open privacy panes repeatedly.
 
 ## Runtime Checks
 

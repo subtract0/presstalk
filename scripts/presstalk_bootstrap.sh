@@ -20,6 +20,7 @@ PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-0}"
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-0}"
 PRESSTALK_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-}}"
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED=0
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -134,6 +135,7 @@ resign_with_local_identity_if_possible() {
 
   echo "Stable local signing identity: $identity_hash"
   if sign_app "$identity_hash"; then
+    PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED=1
     echo "Stable local signing applied to PressTalk.app."
   else
     echo "Stable local signing skipped: codesign failed."
@@ -273,7 +275,8 @@ PressTalk bootstrap completed.
 Installed:
 - LaunchAgent: $PLIST
 - Bundle identifier: $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER
-- Stable local signing: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
+- Stable local signing requested: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
+- Stable local signing applied: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED
 - Open permission panes: $PRESSTALK_OPEN_PERMISSION_PANES
 - Auto-show setup window: $PRESSTALK_AUTO_SHOW_SETUP_WINDOW
 

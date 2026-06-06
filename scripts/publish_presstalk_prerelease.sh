@@ -41,6 +41,11 @@ timer running. Startup/setup checks use read-only preflights and real listener
 capability probes by default; the setup window is not auto-shown unless
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 is explicitly set.
 
+Even when the first-run setup guide is explicitly enabled, successful startup no
+longer force-presents the Settings window. The setup window is only auto-shown
+for a real startup failure, so a machine with working microphone/listener
+runtime proof will not be sent back through the permission UI.
+
 For Fn, Option, and trackpad triggers, PressTalk now attempts listen-only HID
 and session event taps before falling back to writable taps. Runtime status
 records the selected input listener mode so cross-machine smoke tests can tell
@@ -89,9 +94,9 @@ paths are visible in JSON.
 The running app now receives PRESSTALK_OPEN_PERMISSION_PANES from bootstrap and
 launchd. When that value is 0, the Settings window hides the Microphone, Input
 Monitoring, and Accessibility privacy-pane buttons, suppresses any attempted
-privacy pane opens, and does not auto-present setup windows from setup checks.
-This keeps no-pane smoke tests from accidentally reopening System Settings or
-suggesting another approval pass.
+privacy pane opens, and does not auto-present setup windows from setup checks or
+successful startup. This keeps no-pane smoke tests from accidentally reopening
+System Settings or suggesting another approval pass.
 
 Bootstrap now clears both quarantine and provenance metadata from the installed
 app bundle and explicitly re-enables the com.am.jarvistap launchd label before

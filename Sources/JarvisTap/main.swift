@@ -1243,7 +1243,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         completeStartupIfPossible(
             showSetupWindowOnFailure: shouldPresentSetupGuide,
-            forcePresentSetupWindow: shouldPresentSetupGuide
+            forcePresentSetupWindow: false
         )
         return 0
     }

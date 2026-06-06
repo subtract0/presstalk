@@ -24,9 +24,10 @@ bash scripts/presstalk_collect_smoke_status.sh
 ```
 
 Current builds keep the setup retry loop quiet. They do not auto-open System
-Settings panes, do not auto-show the PressTalk Settings window unless
-`PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is set, and do not call macOS
-permission-request APIs during startup/setup.
+Settings panes, do not call macOS permission-request APIs during startup/setup,
+and do not auto-show the PressTalk Settings window after successful startup.
+Even when `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is deliberately set for a
+first-run guide, the window is only auto-shown for a real startup failure.
 When launched with `PRESSTALK_OPEN_PERMISSION_PANES=0`, the Settings window's
 Microphone, Input Monitoring, and Accessibility buttons are hidden too. This
 keeps a no-pane diagnostic run from reopening System Settings or suggesting

@@ -52,13 +52,25 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `latestManualPhysicalTriggerSmoke.path=none`; physical `Option + Space`
   STT/paste proof remains the studio1 blocker.
 - The latest rc84 readiness matrix at
-  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc84-20260607T215335Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc84-mbp1-updated-20260607T215824Z.json`
   required `local` and `mbp1-tb`. It reports `local` as ready for physical
   dictation smoke and `mbp1-tb` as reachable with speech ready but
   `activeFieldSmokeReady=false`. The matching rc84 proof gate at
-  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc84-20260607T215335Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc84-mbp1-updated-20260607T215824Z.json`
   is still `proven=false` with `failureCount=1`, failing only `mbp1-tb` for
   `active_field_not_ready`.
+- `mbp1` was updated from the public rc84 artifact over `mbp1-tb` with the
+  expected SHA and no-pane bootstrap flags. It now reports
+  `triggerPath=Option + Space ready`, `inputListener=carbon:registered`,
+  `speechModel=Ready`, and `microphoneAuthorizationStatus=authorized`.
+  Active-field insertion is still blocked by signing repair:
+  `activeFieldInsertionStatus=needs_signing_repair`,
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
+  The rc84 repair preflight reports `RunningOverSSH=true`,
+  `RepairAllowedHere=false`, `SigningTrustPromptNeeded=true`, and
+  `ExistingSigningIdentity=untrusted` with hash
+  `2EA0B09365E72779413B98BA6319E5D9FBA09205`; it did not start a trust prompt,
+  sign or restart PressTalk, run an insertion probe, or open System Settings.
 - `v0.1.5-rc83` added the
   `Option + Space` registered-hotkey default, manual physical-trigger smoke
   `smokeVersion=4` with `expectedTriggerProof`, and readiness/smoke collectors

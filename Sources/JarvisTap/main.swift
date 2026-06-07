@@ -4467,7 +4467,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
         }
 
-        if !enabledBeforeKeys.contains(inputSourceIdentityKey(candidate)) {
+        let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
+        if !candidateWasEnabledBefore {
             let enableStatus = TISEnableInputSource(candidate)
             guard enableStatus == 0 else {
                 traceLogger.log("Input method insertion unavailable reason=enable_failed status=\(enableStatus)")
@@ -4480,6 +4481,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         if allSources.isEmpty {
             traceLogger.log("Input method insertion selecting recognized source because enabled-source requery is empty")
         }
+        let enableNoEffect = !candidateWasEnabledBefore && allSources.isEmpty
+        if enableNoEffect {
+            traceLogger.log("Input method insertion enable had no visible effect")
+        }
         let selectableSourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
         let allInstalledCountAfterEnable = pressTalkInputMethodSources(includeAllInstalled: true).count
         traceLogger.log(
@@ -4488,7 +4493,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let selectStatus = TISSelectInputSource(enabledSource)
         guard selectStatus == 0 else {
-            traceLogger.log("Input method insertion unavailable reason=select_failed status=\(selectStatus)")
+            let reason = enableNoEffect ? "enable_no_effect" : "select_failed"
+            traceLogger.log("Input method insertion unavailable reason=\(reason) status=\(selectStatus)")
             disableIfEnabledOnlyForInsertion([enabledSource, candidate])
             return nil
         }

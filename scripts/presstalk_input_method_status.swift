@@ -191,6 +191,7 @@ private func printHuman(_ payload: [String: Any]) {
     print("Recognized all-installed source count: \(payload["recognizedAllSourceCount"] ?? 0)")
     print("Register status: \(payload["registerStatus"] ?? "not_requested")")
     print("Enable status: \(payload["enableStatus"] ?? "not_requested")")
+    print("Enable no effect: \(payload["enableNoEffect"] ?? false)")
     print("Select status: \(payload["selectStatus"] ?? "not_requested")")
 
     guard let sources = payload["sources"] as? [[String: Any]], !sources.isEmpty else {
@@ -229,6 +230,7 @@ private var allSources = findPressTalkSources(includeAllInstalled: true)
 private let allInstalledSources = inputSourceList(properties: nil, includeAllInstalled: true)
 private let pressTalkLikeAllInstalledSources = allInstalledSources.filter(pressTalkLikeSource)
 private var enableStatus: Any = "not_requested"
+private var enableNoEffect = false
 if options.enable {
     if allSources.isEmpty {
         enableStatus = "source_not_recognized"
@@ -237,6 +239,7 @@ if options.enable {
         enableStatus = Int(TISEnableInputSource(source))
         enabledSources = findPressTalkSources(includeAllInstalled: false)
         allSources = findPressTalkSources(includeAllInstalled: true)
+        enableNoEffect = "\(enableStatus)" == "0" && enabledSources.isEmpty
     }
 }
 
@@ -272,6 +275,7 @@ private let payload: [String: Any] = [
     "sources": allSources.map(sourceSummary),
     "registerStatus": registerStatus,
     "enableStatus": enableStatus,
+    "enableNoEffect": enableNoEffect,
     "selectStatus": selectStatus,
 ]
 

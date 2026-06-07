@@ -191,6 +191,13 @@ Production insertion also attempts direct selection from the recognized source
 when the enabled-source requery is stale or empty, and logs the enabled/all
 installed source counts before selection.
 
+If TISEnableInputSource returns 0 but the enabled-source requery still shows no
+PressTalk source, the client probe now reports
+reason=input_method_enable_no_effect and enableNoEffect=true. Production traces
+the same state as reason=enable_no_effect, and manual physical-trigger smoke
+sets targetCaptureFailureHint=input_method_enable_no_effect when the transcript
+path worked but insertion was blocked by that TIS state.
+
 The bundle also includes presstalk-actual-accessibility-probe.sh. It launches
 the installed PressTalk.app itself in a diagnostic mode with the Accessibility
 prompt flag disabled, records the exact bundle path, bundle id, CDHash, signing

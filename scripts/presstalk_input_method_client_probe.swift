@@ -234,6 +234,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
     private var allSourcesAfterSelect: [[String: Any]] = []
     private var currentInputSourceAfterSelect: [String: Any] = [:]
     private var selectedPressTalkSourceAfterSelect: [String: Any] = [:]
+    private var enableNoEffect = false
     private var prepareFailureReason = "input_method_not_selectable"
 
     init(options: Options) {
@@ -297,6 +298,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         let enabledSources = findPressTalkSources(includeAllInstalled: false)
         enabledSourcesAfterEnable = enabledSources.map(sourceSummary)
         allSourcesAfterEnable = findPressTalkSources(includeAllInstalled: true).map(sourceSummary)
+        enableNoEffect = !wasEnabledBeforeProbe && enabledSources.isEmpty && "\(enableStatus)" == "0"
         let enabledSource = preferredSelectableSource(from: enabledSources) ?? enabledSources.first ?? allSource
         selectStatus = Int(TISSelectInputSource(enabledSource))
         let currentAfterSelect = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
@@ -307,7 +309,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
             selectedPressTalkSourceAfterSelect = sourceSummary(selected)
         }
         if "\(selectStatus)" != "0" {
-            prepareFailureReason = "input_method_select_failed"
+            prepareFailureReason = enableNoEffect ? "input_method_enable_no_effect" : "input_method_select_failed"
             return false
         }
 
@@ -461,6 +463,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
             "allSourcesAfterSelect": allSourcesAfterSelect,
             "currentInputSourceAfterSelect": currentInputSourceAfterSelect,
             "selectedPressTalkSourceAfterSelect": selectedPressTalkSourceAfterSelect,
+            "enableNoEffect": enableNoEffect,
             "registerStatus": registerStatus,
             "enableStatus": enableStatus,
             "selectStatus": selectStatus,

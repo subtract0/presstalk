@@ -26,6 +26,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private var traceTriggerPressed = false
     private var traceTriggerReleased = false
     private var traceInputMethodSelectFailed = false
+    private var traceInputMethodEnableNoEffect = false
     private var traceInputMethodFailure: String?
 
     override init() {
@@ -177,6 +178,9 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
                 if line.contains("reason=select_failed") {
                     traceInputMethodSelectFailed = true
                 }
+                if line.contains("reason=enable_no_effect") {
+                    traceInputMethodEnableNoEffect = true
+                }
             }
         }
     }
@@ -213,6 +217,8 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         let targetCaptureFailureHint: Any
         if targetCaptureSuccess {
             targetCaptureFailureHint = NSNull()
+        } else if traceInputMethodEnableNoEffect {
+            targetCaptureFailureHint = "input_method_enable_no_effect"
         } else if traceInputMethodSelectFailed {
             targetCaptureFailureHint = "input_method_select_failed"
         } else if traceCopyFallback {
@@ -243,6 +249,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             "traceInserted": traceInserted,
             "traceCopyFallback": traceCopyFallback,
             "traceInputMethodSelectFailed": traceInputMethodSelectFailed,
+            "traceInputMethodEnableNoEffect": traceInputMethodEnableNoEffect,
             "traceInputMethodFailure": traceInputMethodFailure ?? NSNull(),
             "tracePipelineComplete": tracePipelineComplete,
             "traceTriggerPressed": traceTriggerPressed,

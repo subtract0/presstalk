@@ -143,6 +143,13 @@ presstalk-input-method-status.swift. This makes the mbp1 post-repair checklist
 visible in one command: stable app signing, matching input-method signing, and
 recognized/enabled/select-capable PressTalk input source.
 
+The same collector now includes a Repair And Probe Status section. It reports
+the current ad-hoc/input-method repair state, shows the latest signing repair
+log if one exists, summarizes the latest production insertion probe JSON, and
+for the ad-hoc recognized_disabled state explicitly points to desktop Repair
+Signing instead of another Microphone/Input Monitoring/Accessibility permission
+loop.
+
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
 phrase through system audio, and records whether PressTalk transcribes, posts

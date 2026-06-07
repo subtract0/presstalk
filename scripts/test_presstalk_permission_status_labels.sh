@@ -73,6 +73,7 @@ enum PermissionStatusLabelTest {
         require(registeredHotkeyReady.inputMonitoringStatus == "registered_hotkey_ready", "registered hotkey status should not ask for Input Monitoring")
         require(registeredHotkeyReady.inputMonitoringPermissionLabel.text == "Registered hotkey ready", "registered hotkey should have a specific ready label")
         require(registeredHotkeyReady.inputMonitoringPermissionLabel.tone == .ready, "registered hotkey ready label should use ready tone")
+        require(registeredHotkeyReady.readyWithoutPermissionPaneWork, "registered hotkey with input method insertion should be ready without permission pane work")
 
         let registeredHotkeyUnavailable = makeStatus(inputListenerStatus: "carbon:register_failed_-9878", triggerKey: "option_space")
         require(!registeredHotkeyUnavailable.inputMonitoringEffective, "failed registered hotkey trigger should not be effective")
@@ -98,6 +99,7 @@ enum PermissionStatusLabelTest {
         let mbp1Repair = makeStatus(inputMethodFallbackStatus: "recognized_disabled", adHocSigned: true)
         require(mbp1Repair.accessibilityPermissionLabel.text == "Needs signing repair", "ad-hoc recognized-disabled state should point to signing repair")
         require(mbp1Repair.activeFieldInsertionStatus == "needs_signing_repair", "ad-hoc recognized-disabled state should not ask for permission re-grants")
+        require(!mbp1Repair.readyWithoutPermissionPaneWork, "signing repair state should not be marked ready without pane work")
 
         let mbp1TrustRepair = makeStatus(inputMethodFallbackStatus: "recognized_disabled", adHocSigned: false)
         require(mbp1TrustRepair.accessibilityPermissionLabel.text == "Needs signing repair", "local-signing recognized-disabled state should point to signing repair")

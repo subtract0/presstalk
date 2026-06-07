@@ -4802,6 +4802,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return "recognized_not_selectable"
     }
 
+    private func inputMethodInsertionAcknowledgementInserted(at url: URL) -> Bool? {
+        guard let data = try? Data(contentsOf: url),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
+            return nil
+        }
+        return object["inserted"] as? Bool
+    }
+
     private func accessibilityStatusDescription(_ status: PressTalkRuntimeStatus) -> String {
         if status.accessibilityGranted {
             return "ax_trusted"
@@ -4896,12 +4905,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             disableIfEnabledOnlyForInsertion([enabledSource, candidate])
         }
 
+        let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+        let payloadURL = supportDirectory.appendingPathComponent("input-method-insert.txt")
+        let acknowledgementURL = supportDirectory.appendingPathComponent("input-method-insert-ack.json")
+
         do {
-            let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
             try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
+            try? FileManager.default.removeItem(at: acknowledgementURL)
             try preparedTranscript.write(
-                to: supportDirectory.appendingPathComponent("input-method-insert.txt"),
+                to: payloadURL,
                 atomically: true,
                 encoding: .utf8
             )
@@ -4921,7 +4934,21 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         Thread.sleep(forTimeInterval: 0.25)
 
         traceLogger.log("Input method insertion notification posted source=com.am.presstalk.inputmethod.container")
-        return "input_method_notification"
+        let acknowledgementDeadline = Date().addingTimeInterval(2.0)
+        while Date() < acknowledgementDeadline {
+            if let inserted = inputMethodInsertionAcknowledgementInserted(at: acknowledgementURL) {
+                if inserted {
+                    traceLogger.log("Input method insertion acknowledgement inserted=1")
+                    return "input_method_notification"
+                }
+                traceLogger.log("Input method insertion unavailable reason=input_method_ack_false")
+                return nil
+            }
+            Thread.sleep(forTimeInterval: 0.05)
+        }
+
+        traceLogger.log("Input method insertion unavailable reason=input_method_ack_timeout")
+        return nil
     }
 
     private func insertPreparedTranscriptUsingAccessibility(_ preparedTranscript: String) -> String? {

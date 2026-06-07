@@ -113,6 +113,10 @@ struct PressTalkRuntimeStatus {
         pasteAutomatically && (accessibilityGranted || inputMethodFallbackStatus == "ready")
     }
 
+    var readyWithoutPermissionPaneWork: Bool {
+        inputMonitoringEffective && microphoneGranted && activeFieldInsertionReady
+    }
+
     var localSigningRepairNeeded: Bool {
         inputMethodFallbackStatus == "recognized_disabled" &&
             (adHocSigned || codeSignatureAuthority == "PressTalk Local Development Code Signing")

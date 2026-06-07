@@ -910,7 +910,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let titleLabel = NSTextField(labelWithString: "Hold a key. Speak. Release.")
         titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
 
-        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Option, Fn, or the trackpad to bring up the light, speak, then release to paste cleaned dictation into the focused app. F5 / Mic is a legacy fallback. These settings apply immediately.")
+        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Option + Space to bring up the light, speak, then release to paste cleaned dictation into the focused app. Fn, bare Option, trackpad hold, and F5 / Mic are advanced fallback triggers. These settings apply immediately.")
         subtitleLabel.font = NSFont.systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabelColor
 
@@ -1013,9 +1013,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         fallbackButtonsRow.alignment = .centerY
         fallbackButtonsRow.spacing = 8
 
-        let inputMonitoringRow = makeStatusRow(title: "Input Monitoring", valueLabel: inputMonitoringValueLabel)
+        let inputMonitoringRow = makeStatusRow(title: "Trigger listener", valueLabel: inputMonitoringValueLabel)
         let microphoneRow = makeStatusRow(title: "Microphone", valueLabel: microphoneValueLabel)
-        let accessibilityRow = makeStatusRow(title: "Accessibility", valueLabel: accessibilityValueLabel)
+        let accessibilityRow = makeStatusRow(title: "Insertion", valueLabel: accessibilityValueLabel)
         let systemDictationRow = makeStatusRow(title: "Apple Dictation key", valueLabel: systemDictationValueLabel)
         let speechModelRow = makeStatusRow(title: "Speech model", valueLabel: speechModelValueLabel)
         let f5BridgeRow = makeStatusRow(title: "Trigger path", valueLabel: f5BridgeValueLabel)
@@ -1205,11 +1205,43 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private func configurePermissionPaneButtons() {
         let enabled = runtimeStatus.permissionPaneOpeningAllowed
         let tooltip = enabled ? nil : "System Settings opening is disabled for this run. Export diagnostics instead of re-granting repeatedly."
-        for button in [microphoneSettingsButton, inputMonitoringSettingsButton, accessibilitySettingsButton] {
-            button.isEnabled = enabled
-            button.isHidden = !enabled
-            button.toolTip = tooltip
-        }
+        let microphoneNeedsPane = !runtimeStatus.microphoneGranted
+        let inputMonitoringNeedsPane = !runtimeStatus.inputMonitoringEffective &&
+            !runtimeStatus.triggerUsesRegisteredHotKey &&
+            !runtimeStatus.localSigningRepairNeeded
+        let accessibilityNeedsPane = runtimeStatus.pasteAutomatically &&
+            !runtimeStatus.activeFieldInsertionReady &&
+            !runtimeStatus.localSigningRepairNeeded
+
+        configurePermissionPaneButton(
+            microphoneSettingsButton,
+            enabled: enabled,
+            shouldShow: microphoneNeedsPane,
+            tooltip: tooltip
+        )
+        configurePermissionPaneButton(
+            inputMonitoringSettingsButton,
+            enabled: enabled,
+            shouldShow: inputMonitoringNeedsPane,
+            tooltip: tooltip
+        )
+        configurePermissionPaneButton(
+            accessibilitySettingsButton,
+            enabled: enabled,
+            shouldShow: accessibilityNeedsPane,
+            tooltip: tooltip
+        )
+    }
+
+    private func configurePermissionPaneButton(
+        _ button: NSButton,
+        enabled: Bool,
+        shouldShow: Bool,
+        tooltip: String?
+    ) {
+        button.isEnabled = enabled && shouldShow
+        button.isHidden = !enabled || !shouldShow
+        button.toolTip = tooltip
     }
 
     private func configureInputMonitoringLabel(_ label: NSTextField) {
@@ -1260,6 +1292,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
                 return "\(runtimeStatus.inputMonitoringPermissionLabel.text) for \(identity). Modifier-only Option/Fn triggers need a writable event tap; this run only has \(runtimeStatus.inputListenerStatus). Export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
             return "Input listener is not ready for \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+        }
+
+        if runtimeStatus.readyWithoutPermissionPaneWork {
+            return "PressTalk is ready for \(identity): trigger listener, microphone, and insertion path are working. No permission pane changes are needed.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {

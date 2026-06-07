@@ -18,6 +18,10 @@ private enum PressTalkInputMethodConfig {
         supportDirectory.appendingPathComponent("input-method-insert.txt")
     }
 
+    static var insertionAcknowledgementURL: URL {
+        supportDirectory.appendingPathComponent("input-method-insert-ack.json")
+    }
+
     static var logURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/presstalk_input_method.log")
@@ -166,9 +170,28 @@ private final class PressTalkInputMethodAppDelegate: NSObject, NSApplicationDele
             }
 
             let inserted = PressTalkIMController.insertIntoActiveClient(text)
+            writeInsertionAcknowledgement(inserted: inserted, characters: text.count)
             inputMethodLog.write("insert notification handled inserted=\(inserted ? 1 : 0)")
         } catch {
             inputMethodLog.write("insert notification failed reason=read_payload error=\(error)")
+        }
+    }
+
+    private func writeInsertionAcknowledgement(inserted: Bool, characters: Int) {
+        let payload: [String: Any] = [
+            "generatedAt": ISO8601DateFormatter().string(from: Date()),
+            "inserted": inserted,
+            "characters": characters,
+        ]
+        do {
+            try FileManager.default.createDirectory(
+                at: PressTalkInputMethodConfig.supportDirectory,
+                withIntermediateDirectories: true
+            )
+            let data = try JSONSerialization.data(withJSONObject: payload, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: PressTalkInputMethodConfig.insertionAcknowledgementURL, options: .atomic)
+        } catch {
+            inputMethodLog.write("insert acknowledgement failed error=\(error)")
         }
     }
 }

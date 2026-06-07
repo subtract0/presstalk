@@ -4992,28 +4992,54 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        Thread.sleep(forTimeInterval: 0.75)
-        CFNotificationCenterPostNotification(
-            CFNotificationCenterGetDarwinNotifyCenter(),
-            CFNotificationName("com.am.presstalk.inputmethod.insert" as CFString),
-            nil,
-            nil,
-            true
-        )
-        Thread.sleep(forTimeInterval: 0.25)
+        func postInsertionNotification(attempt: Int) {
+            CFNotificationCenterPostNotification(
+                CFNotificationCenterGetDarwinNotifyCenter(),
+                CFNotificationName("com.am.presstalk.inputmethod.insert" as CFString),
+                nil,
+                nil,
+                true
+            )
+            traceLogger.log("Input method insertion notification posted source=com.am.presstalk.inputmethod.container attempt=\(attempt)")
+        }
 
-        traceLogger.log("Input method insertion notification posted source=com.am.presstalk.inputmethod.container")
-        let acknowledgementDeadline = Date().addingTimeInterval(2.0)
-        while Date() < acknowledgementDeadline {
-            if let inserted = inputMethodInsertionAcknowledgementInserted(at: acknowledgementURL) {
+        func waitForInsertionAcknowledgement(timeout: TimeInterval) -> Bool? {
+            let acknowledgementDeadline = Date().addingTimeInterval(timeout)
+            while Date() < acknowledgementDeadline {
+                if let inserted = inputMethodInsertionAcknowledgementInserted(at: acknowledgementURL) {
+                    return inserted
+                }
+                Thread.sleep(forTimeInterval: 0.05)
+            }
+            return nil
+        }
+
+        for attempt in 1...2 {
+            Thread.sleep(forTimeInterval: attempt == 1 ? 0.75 : 0.35)
+            postInsertionNotification(attempt: attempt)
+            Thread.sleep(forTimeInterval: 0.25)
+
+            if let inserted = waitForInsertionAcknowledgement(timeout: attempt == 1 ? 2.0 : 3.0) {
                 if inserted {
-                    traceLogger.log("Input method insertion acknowledgement inserted=1")
+                    traceLogger.log("Input method insertion acknowledgement inserted=1 attempt=\(attempt)")
                     return "input_method_notification"
                 }
                 traceLogger.log("Input method insertion unavailable reason=input_method_ack_false")
                 return nil
             }
-            Thread.sleep(forTimeInterval: 0.05)
+
+            guard attempt == 1 else { break }
+            traceLogger.log("Input method insertion acknowledgement retrying reason=input_method_ack_timeout attempt=1")
+            let restoreStatus = TISSelectInputSource(originalSource)
+            if restoreStatus != 0 {
+                traceLogger.log("Input method insertion retry restore failed status=\(restoreStatus)")
+            }
+            Thread.sleep(forTimeInterval: 0.2)
+            let reselectStatus = TISSelectInputSource(enabledSource)
+            if reselectStatus != 0 {
+                traceLogger.log("Input method insertion unavailable reason=retry_select_failed status=\(reselectStatus)")
+                return nil
+            }
         }
 
         traceLogger.log("Input method insertion unavailable reason=input_method_ack_timeout")

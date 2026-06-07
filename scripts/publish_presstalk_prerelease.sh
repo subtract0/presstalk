@@ -187,6 +187,14 @@ input_method_notification as inserted. If the helper never handles the
 notification, PressTalk logs input_method_ack_timeout and falls back instead of
 treating a posted Darwin notification as proof that text landed.
 
+When bootstrap refreshes the installed PressTalkInputMethod.app, it also
+restarts the per-user InputMethodKit launch agent so macOS cannot keep a stale
+input-method server path after an app update. The production insertion path now
+also retries once after the first acknowledgement timeout by restoring and
+reselecting the user's original input source and PressTalk's input source before
+posting the insert notification again. This keeps update-time IMK launch races
+from turning a ready input-method fallback into copy-only behavior.
+
 The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
 local text view and posts per-character Unicode CGEvents without opening System
 Settings. It tests HID, session, annotated-session, and PID-targeted event

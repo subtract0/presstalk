@@ -103,6 +103,39 @@ terminate_existing_input_method() {
   done
 }
 
+terminate_existing_imk_launch_agent() {
+  local pids=""
+  pids="$(ps -axo pid=,command= | awk '
+    index($0, "/InputMethodKit.framework/Resources/imklaunchagent") {
+      print $1
+    }
+  ')"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  for _ in {1..20}; do
+    local remaining=""
+    for pid in $pids; do
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        remaining="$remaining $pid"
+      fi
+    done
+    if [[ -z "$remaining" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  for pid in $pids; do
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
 # Homebrew-installed GitHub app archives can still arrive with Gatekeeper
 # metadata on a fresh Mac. Clear that before launchd/LaunchServices tries to
 # open the app, otherwise the first start can fail before PressTalk writes logs.
@@ -235,6 +268,7 @@ refresh_installed_input_method_if_possible() {
   ditto "$INPUT_METHOD_BUNDLE" "$INSTALLED_INPUT_METHOD_BUNDLE"
   /usr/bin/xattr -dr com.apple.quarantine "$INSTALLED_INPUT_METHOD_BUNDLE" >/dev/null 2>&1 || true
   /usr/bin/xattr -dr com.apple.provenance "$INSTALLED_INPUT_METHOD_BUNDLE" >/dev/null 2>&1 || true
+  terminate_existing_imk_launch_agent
   PRESSTALK_BOOTSTRAP_INPUT_METHOD_REFRESHED=1
   echo "Installed PressTalk input method refreshed."
 }

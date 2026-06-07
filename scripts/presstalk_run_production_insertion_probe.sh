@@ -31,13 +31,7 @@ fi
 
 trigger_key="${PRESSTALK_TRIGGER_KEY:-fn}"
 if [[ -f "$STATUS_JSON" ]]; then
-  detected_trigger="$(/usr/bin/python3 - "$STATUS_JSON" <<'PY' 2>/dev/null || true
-import json, sys
-with open(sys.argv[1]) as f:
-    data = json.load(f)
-print(data.get("runtime", {}).get("triggerKey", ""))
-PY
-)"
+  detected_trigger="$(plutil -extract runtime.triggerKey raw -o - "$STATUS_JSON" 2>/dev/null || true)"
   if [[ -n "$detected_trigger" ]]; then
     trigger_key="$detected_trigger"
   fi

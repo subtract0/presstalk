@@ -740,6 +740,25 @@ Known current proof gaps:
   `disableStatus=0`. This means macOS recognizes the input method but refuses
   selection on the ad-hoc mbp1 install; active-field insertion remains blocked
   there unless Accessibility is trusted or input-method selectability is fixed.
+- Rebootstrapping the same rc45 install on `mbp1` as the legacy
+  `com.am.jarvistap` identity did not recover the old TCC grants, because stable
+  local signing still could not be applied over SSH and bootstrap fell back to a
+  new ad-hoc signature. Runtime status under that ad-hoc legacy id reported
+  `microphoneAuthorizationStatus=not_determined`,
+  `inputMonitoringEffective=false`, `inputPipelineReady=false`,
+  `accessibilityGranted=false`, and `status.speechModel=Waiting for setup`.
+  The actual-bundle Accessibility probe also reported
+  `accessibilityTrusted=false` for
+  `/Users/alexandermonas/Applications/PressTalk.app`.
+- `mbp1` still has an older `/Applications/PressTalk.app` signed as
+  `com.am.jarvistap` by `Authority=JarvisTap Local Code Signing`, with
+  designated requirement `identifier "com.am.jarvistap" and certificate root =
+  H"f2671c00575e4d2f123bb3c28ab3e2461de33fb3"`, matching the old
+  Microphone/Input Monitoring/Accessibility TCC rows. However,
+  `security find-identity -v -p codesigning` reports `0 valid identities` in
+  the login keychain, the PressTalk local-dev keychain, and the System keychain,
+  so the current rc45 app cannot be re-signed with that historical trusted
+  identity from SSH.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to
   emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility

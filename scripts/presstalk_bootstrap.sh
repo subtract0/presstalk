@@ -18,7 +18,7 @@ LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
 LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
 TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
-PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-option}"
+PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-option_space}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING+x}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 if [[ -z "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT" && -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
@@ -128,11 +128,18 @@ if [[ ! "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ 
   exit 2
 fi
 
+seed_trigger_key_default() {
+  local bundle_id="$1"
+  [[ -n "$bundle_id" ]] || return 0
+  /usr/bin/defaults write "$bundle_id" JarvisTap.TriggerKey -string "$PRESSTALK_TRIGGER_KEY" >/dev/null 2>&1 || true
+}
+
 BUNDLE_IDENTIFIER_CHANGED=0
 if [[ "$(current_bundle_identifier)" != "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" ]]; then
   /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" "$APP_INFO_PLIST"
   BUNDLE_IDENTIFIER_CHANGED=1
 fi
+seed_trigger_key_default "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER"
 
 sign_app() {
   local identity="$1"
@@ -377,10 +384,10 @@ Installed:
 
 Next:
 1. Use the PressTalk menu bar icon for Settings or diagnostics
-2. Hold Option to speak, then release to paste
+2. Hold Option + Space to speak, then release to paste
 
 To use another trigger, set PRESSTALK_TRIGGER_KEY before bootstrapping.
-Supported values: option, left_option, right_option, fn, trackpad_hold, f5.
+Supported values: option_space, option, left_option, right_option, fn, trackpad_hold, f5.
 
 Optional legacy F5 fallback:
 - PressTalk still ships a built-in F5 bridge helper:

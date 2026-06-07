@@ -8,7 +8,7 @@ PressTalk is a local-first Apple Silicon dictation tool.
 
 That means the monetization should feel lighter and fairer than cloud transcription products. The core promise is:
 
-- hold `Fn / Globe`, `Option`, `F5`, or trackpad hold
+- hold `Option + Space`, `Fn / Globe`, `Option`, `F5`, or trackpad hold
 - speak
 - release
 - get text locally

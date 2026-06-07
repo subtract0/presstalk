@@ -132,10 +132,10 @@ struct JarvisTapConfig {
         let triggerKeyValue =
             env["PRESSTALK_TRIGGER_KEY"] ??
             env["JARVISTAP_TRIGGER_KEY"] ??
-            "option"
+            "option_space"
         let triggerKey =
             JarvisTapSettingsStore.TriggerKeyOption(rawValue: triggerKeyValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ??
-            .option
+            .optionSpace
 
         let enableNativeMicrophoneKey =
             env["PRESSTALK_ENABLE_NATIVE_MICROPHONE_KEY"] == "1" ||
@@ -1009,6 +1009,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private enum TriggerSource: String {
         case trackpadHold = "trackpad_hold"
+        case registeredHotKey = "registered_hotkey"
         case modifierKey = "modifier_key"
         case darwinNotification = "darwin_notification"
         case nativeSystemDefined = "native_system_defined"
@@ -1018,6 +1019,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             switch self {
             case .trackpadHold:
                 return "Trackpad hold"
+            case .registeredHotKey:
+                return "Registered hotkey"
             case .modifierKey:
                 return "Modifier key"
             case .darwinNotification:
@@ -1057,6 +1060,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private struct TriggerBridgeTelemetry {
         var trackpadHoldSeen = false
+        var registeredHotKeySeen = false
         var modifierKeySeen = false
         var nativeSystemDefinedSeen = false
         var darwinNotificationSeen = false
@@ -1115,6 +1119,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let speaker = NativeSpeaker()
 
     private let f5KeyCode = CGKeyCode(kVK_F5)
+    private let optionSpaceHotKeyCode = UInt32(kVK_Space)
+    private let optionSpaceHotKeyID = UInt32(1)
+    private let registeredHotKeySignature = OSType(0x50544B59)
     private let remappedMicrophoneKeyCode = CGKeyCode(kVK_F20)
     private let systemDefinedEventType = CGEventType(rawValue: UInt32(NX_SYSDEFINED))!
     private let mediaKeySubtype = Int16(NX_SUBTYPE_AUX_CONTROL_BUTTONS)
@@ -1136,6 +1143,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var eventTap: CFMachPort?
     private var eventTapInstallSummary = "not_installed"
     private var runLoopSource: CFRunLoopSource?
+    private var registeredHotKeyRef: EventHotKeyRef?
+    private var registeredHotKeyEventHandler: EventHandlerRef?
     private var specialKeyMonitor: Any?
     private var whisperKit: WhisperKit?
     private var streamTranscriber: AudioStreamTranscriber?
@@ -1329,11 +1338,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         if !inputPipelineReady {
             installDarwinTriggerNotifications()
 
-            guard installEventTap() else {
+            guard installInputTriggerListener() else {
                 if presentFailureStatus {
-                    traceLogger.log("Startup blocked: global event tap install failed")
+                    traceLogger.log("Startup blocked: input trigger listener install failed")
                     printTapFailureHelp()
-                    present(.setupRequired("PressTalk could not attach the global key listener."))
+                    present(.setupRequired("PressTalk could not attach the input trigger listener."))
                 }
                 refreshRuntimeStatusUI()
                 scheduleSetupRetry()
@@ -1348,8 +1357,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             installSystemDefinedMonitor()
             inputPipelineReady = true
             stopSetupRetry()
-            traceLogger.log("Global key listeners installed")
-            print("Global key listeners installed.")
+            traceLogger.log("Input trigger listeners installed")
+            print("Input trigger listeners installed.")
             fflush(stdout)
             traceLogger.log("PressTalk armed")
             print("PressTalk armed. Hold \(settingsStore.triggerKey.displayName) to speak, then release to finalize.")
@@ -1932,6 +1941,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func selectedTriggerObservedForRuntimeStatus() -> Bool {
         let telemetry = withStateLock { triggerBridgeTelemetry }
         switch settingsStore.triggerKey {
+        case .optionSpace:
+            return telemetry.registeredHotKeySeen
         case .trackpadHold:
             return telemetry.trackpadHoldSeen
         case .fn, .option, .leftOption, .rightOption:
@@ -2336,6 +2347,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         let telemetry = withStateLock { triggerBridgeTelemetry }
+        if settingsStore.triggerKey == .optionSpace {
+            if telemetry.registeredHotKeySeen {
+                return "Option + Space trigger"
+            }
+            if eventTapInstallSummary.contains("carbon:registered") {
+                return "Option + Space ready"
+            }
+            return "Option + Space unavailable: registered hotkey not installed"
+        }
         if settingsStore.triggerKey == .trackpadHold && !telemetry.trackpadHoldSeen {
             return "Trackpad Hold waiting for pointer event"
         }
@@ -2344,6 +2364,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             var alternates: [String] = []
             if telemetry.trackpadHoldSeen {
                 alternates.append(TriggerSource.trackpadHold.bridgeLabel)
+            }
+            if telemetry.registeredHotKeySeen {
+                alternates.append(TriggerSource.registeredHotKey.bridgeLabel)
             }
             if telemetry.darwinNotificationSeen {
                 alternates.append(TriggerSource.darwinNotification.bridgeLabel)
@@ -2364,6 +2387,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             var alternates: [String] = []
             if telemetry.darwinNotificationSeen {
                 alternates.append(TriggerSource.darwinNotification.bridgeLabel)
+            }
+            if telemetry.registeredHotKeySeen {
+                alternates.append(TriggerSource.registeredHotKey.bridgeLabel)
             }
             if telemetry.cgFunctionKeySeen {
                 alternates.append(TriggerSource.cgFunctionKey.bridgeLabel)
@@ -2508,6 +2534,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         var sources: [String] = []
         if telemetry.trackpadHoldSeen {
             sources.append(TriggerSource.trackpadHold.rawValue)
+        }
+        if telemetry.registeredHotKeySeen {
+            sources.append(TriggerSource.registeredHotKey.rawValue)
         }
         if telemetry.modifierKeySeen {
             sources.append(TriggerSource.modifierKey.rawValue)
@@ -3342,6 +3371,97 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func installInputTriggerListener() -> Bool {
+        if settingsStore.triggerKey == .optionSpace {
+            return installRegisteredHotKey()
+        }
+        return installEventTap()
+    }
+
+    private func installRegisteredHotKey() -> Bool {
+        if registeredHotKeyRef != nil {
+            eventTapInstallSummary = "carbon:registered"
+            return true
+        }
+
+        var eventTypes = [
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed)),
+            EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyReleased)),
+        ]
+        var handlerRef: EventHandlerRef?
+        let callback: EventHandlerUPP = { _, eventRef, userData in
+            guard let eventRef, let userData else {
+                return noErr
+            }
+
+            let app = Unmanaged<JarvisTapApp>.fromOpaque(userData).takeUnretainedValue()
+            var hotKeyID = EventHotKeyID()
+            let parameterStatus = GetEventParameter(
+                eventRef,
+                EventParamName(kEventParamDirectObject),
+                EventParamType(typeEventHotKeyID),
+                nil,
+                MemoryLayout<EventHotKeyID>.size,
+                nil,
+                &hotKeyID
+            )
+            guard parameterStatus == noErr,
+                  hotKeyID.signature == app.registeredHotKeySignature,
+                  hotKeyID.id == app.optionSpaceHotKeyID
+            else {
+                return noErr
+            }
+
+            let eventKind = GetEventKind(eventRef)
+            DispatchQueue.main.async { [weak app] in
+                guard let app else { return }
+                if eventKind == UInt32(kEventHotKeyPressed) {
+                    app.handlePress(.configuredKey, source: .registeredHotKey)
+                } else if eventKind == UInt32(kEventHotKeyReleased) {
+                    app.handleRelease(.configuredKey, source: .registeredHotKey)
+                }
+            }
+            return noErr
+        }
+
+        let handlerStatus = InstallEventHandler(
+            GetApplicationEventTarget(),
+            callback,
+            eventTypes.count,
+            &eventTypes,
+            UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()),
+            &handlerRef
+        )
+        guard handlerStatus == noErr, let handlerRef else {
+            eventTapInstallSummary = "carbon:handler_failed_\(handlerStatus)"
+            traceLogger.log("Registered hotkey handler install failed status=\(handlerStatus)")
+            return false
+        }
+
+        let hotKeyID = EventHotKeyID(signature: registeredHotKeySignature, id: optionSpaceHotKeyID)
+        var hotKeyRef: EventHotKeyRef?
+        let registerStatus = RegisterEventHotKey(
+            optionSpaceHotKeyCode,
+            UInt32(optionKey),
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+        guard registerStatus == noErr, let hotKeyRef else {
+            RemoveEventHandler(handlerRef)
+            eventTapInstallSummary = "carbon:register_failed_\(registerStatus)"
+            traceLogger.log("Registered hotkey install failed status=\(registerStatus)")
+            return false
+        }
+
+        registeredHotKeyEventHandler = handlerRef
+        registeredHotKeyRef = hotKeyRef
+        eventTapInstallSummary = "carbon:registered"
+        traceLogger.log("Registered hotkey installed trigger=option_space")
+        return true
+    }
+
     private func installEventTap() -> Bool {
         let pointerEventTypes: [CGEventType] = [
             .leftMouseDown,
@@ -4026,7 +4146,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         switch triggerKey {
         case .fn, .option, .leftOption, .rightOption:
             return true
-        case .f5, .trackpadHold:
+        case .optionSpace, .f5, .trackpadHold:
             return false
         }
     }
@@ -4044,7 +4164,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return keyCode == CGKeyCode(kVK_Option)
         case .rightOption:
             return keyCode == CGKeyCode(kVK_RightOption)
-        case .f5, .trackpadHold:
+        case .optionSpace, .f5, .trackpadHold:
             return false
         }
     }
@@ -4062,7 +4182,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return flags.contains(leftOptionModifierMask)
         case .rightOption:
             return flags.contains(rightOptionModifierMask)
-        case .f5, .trackpadHold:
+        case .optionSpace, .f5, .trackpadHold:
             return false
         }
     }
@@ -4938,6 +5058,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             case .trackpadHold:
                 shouldLogObservation = !triggerBridgeTelemetry.trackpadHoldSeen
                 triggerBridgeTelemetry.trackpadHoldSeen = true
+            case .registeredHotKey:
+                shouldLogObservation = !triggerBridgeTelemetry.registeredHotKeySeen
+                triggerBridgeTelemetry.registeredHotKeySeen = true
             case .modifierKey:
                 shouldLogObservation = !triggerBridgeTelemetry.modifierKeySeen
                 triggerBridgeTelemetry.modifierKeySeen = true

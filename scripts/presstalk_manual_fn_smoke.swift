@@ -315,6 +315,8 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
 
     private static func triggerDisplayName(for triggerKey: String) -> String {
         switch triggerKey {
+        case "option_space":
+            return "Option + Space"
         case "fn":
             return "Fn / Globe"
         case "option":

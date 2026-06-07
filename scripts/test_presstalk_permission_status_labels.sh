@@ -68,6 +68,17 @@ enum PermissionStatusLabelTest {
         require(modifierWritable.inputMonitoringPermissionLabel.text == "Listener ready", "writable listener without preflight should be labelled ready")
         require(modifierWritable.inputMonitoringPermissionLabel.tone == .ready, "writable listener should use ready tone")
 
+        let registeredHotkeyReady = makeStatus(inputListenerStatus: "carbon:registered", triggerKey: "option_space")
+        require(registeredHotkeyReady.inputMonitoringEffective, "registered hotkey trigger should be effective without writable event tap")
+        require(registeredHotkeyReady.inputMonitoringStatus == "registered_hotkey_ready", "registered hotkey status should not ask for Input Monitoring")
+        require(registeredHotkeyReady.inputMonitoringPermissionLabel.text == "Registered hotkey ready", "registered hotkey should have a specific ready label")
+        require(registeredHotkeyReady.inputMonitoringPermissionLabel.tone == .ready, "registered hotkey ready label should use ready tone")
+
+        let registeredHotkeyUnavailable = makeStatus(inputListenerStatus: "carbon:register_failed_-9878", triggerKey: "option_space")
+        require(!registeredHotkeyUnavailable.inputMonitoringEffective, "failed registered hotkey trigger should not be effective")
+        require(registeredHotkeyUnavailable.inputMonitoringStatus == "registered_hotkey_unavailable", "failed registered hotkey should report hotkey unavailability")
+        require(registeredHotkeyUnavailable.inputMonitoringPermissionLabel.text == "Registered hotkey unavailable", "failed registered hotkey should not be labelled as a permission grant")
+
         let trackpadListenOnly = makeStatus(triggerKey: "trackpad_hold")
         require(!trackpadListenOnly.inputMonitoringEffective, "trackpad hold should wait for observed pointer input")
         require(trackpadListenOnly.inputMonitoringStatus == "waiting_for_trackpad_event", "trackpad listen-only status should wait for observed pointer input")

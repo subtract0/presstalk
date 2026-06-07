@@ -21,7 +21,7 @@ cat >"$pass_matrix" <<'JSON'
         "machineHost": "studio1",
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
-        "nextAction": "Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+        "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
       }
     },
     {
@@ -32,7 +32,7 @@ cat >"$pass_matrix" <<'JSON'
         "machineHost": "mbp1",
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
-        "nextAction": "Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+        "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
       }
     }
   ]
@@ -51,7 +51,7 @@ cat >"$blocked_matrix" <<'JSON'
         "machineHost": "studio1",
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
-        "nextAction": "Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+        "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
       }
     },
     {

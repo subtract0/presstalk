@@ -30,6 +30,17 @@ if [[ ! -x "$APP_BINARY" ]]; then
   exit 1
 fi
 APP_BUNDLE="$(cd "$(dirname "$APP_BINARY")/../.." && pwd)"
+APP_INFO_PLIST="$APP_BUNDLE/Contents/Info.plist"
+
+current_bundle_identifier() {
+  /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_INFO_PLIST" 2>/dev/null || true
+}
+
+seed_trigger_key_default() {
+  local bundle_id="$1"
+  [[ -n "$bundle_id" ]] || return 0
+  /usr/bin/defaults write "$bundle_id" JarvisTap.TriggerKey -string "$PRESSTALK_TRIGGER_KEY" >/dev/null 2>&1 || true
+}
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -73,12 +84,13 @@ JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-de}"
 JARVISTAP_SAY_VOICE="${JARVISTAP_SAY_VOICE:-Samantha}"
 JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
 JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS:-0.35}"
-PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-option}}"
+PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-option_space}}"
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-${JARVISTAP_AUTO_SHOW_SETUP_WINDOW:-0}}"
 PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-${JARVISTAP_OPEN_PERMISSION_PANES:-0}}"
 PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE="${PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE:-0}"
 JARVISTAP_TRACE_LOG="${JARVISTAP_TRACE_LOG:-$TRACE_LOG}"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+seed_trigger_key_default "$(current_bundle_identifier)"
 
 /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
 /usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true

@@ -369,6 +369,7 @@ final class JarvisTapSettingsStore {
     }
 
     enum TriggerKeyOption: String, CaseIterable {
+        case optionSpace = "option_space"
         case option = "option"
         case leftOption = "left_option"
         case rightOption = "right_option"
@@ -378,6 +379,8 @@ final class JarvisTapSettingsStore {
 
         var displayName: String {
             switch self {
+            case .optionSpace:
+                return "Option + Space"
             case .fn:
                 return "Fn / Globe"
             case .option:
@@ -467,7 +470,7 @@ final class JarvisTapSettingsStore {
 
     var triggerKey: TriggerKeyOption {
         get {
-            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .option
+            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .optionSpace
         }
         set {
             defaults.set(newValue.rawValue, forKey: Key.triggerKey)
@@ -1254,7 +1257,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         if !runtimeStatus.inputMonitoringEffective {
             if runtimeStatus.triggerRequiresWritableEventTap && runtimeStatus.inputListenerInstalled {
-                return "\(runtimeStatus.inputMonitoringPermissionLabel.text) for \(identity). Option/Fn triggers need a writable event tap; this run only has \(runtimeStatus.inputListenerStatus). Export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+                return "\(runtimeStatus.inputMonitoringPermissionLabel.text) for \(identity). Modifier-only Option/Fn triggers need a writable event tap; this run only has \(runtimeStatus.inputListenerStatus). Export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
             return "Input listener is not ready for \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }

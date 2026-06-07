@@ -11,7 +11,7 @@ Verify that a fresh machine can install PressTalk with minimal thinking:
 
 1. install
 2. approve permissions if the machine has not already granted PressTalk
-3. hold `Option`
+3. hold `Option + Space`
 4. dictate
 
 ## Machine Readiness Preflight
@@ -110,7 +110,7 @@ mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=option \
+  PRESSTALK_TRIGGER_KEY=option_space \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -276,20 +276,21 @@ privacy panes:
 PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
 PRESSTALK_OPEN_PERMISSION_PANES=0 \
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-PRESSTALK_TRIGGER_KEY=option \
+PRESSTALK_TRIGGER_KEY=option_space \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
 Karabiner is only needed when testing the optional `F5` fallback path. The
-default trigger is `Option`. `Fn / Globe` remains supported where the keyboard
-emits a normal Fn modifier event, but do not treat an inert Fn key as a
+default trigger is `Option + Space`, which uses a registered macOS hotkey rather
+than a modifier-only event tap. `Fn / Globe` remains supported where the
+keyboard emits a normal Fn modifier event, but do not treat an inert Fn key as a
 permission problem.
 
 For a fresh machine, keep bootstrap quiet and inspect diagnostics before opening
 any macOS privacy panes manually:
 
 ```bash
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=option \
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=option_space \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -298,11 +299,12 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_T
 The default LaunchAgent value is:
 
 ```bash
-PRESSTALK_TRIGGER_KEY=option
+PRESSTALK_TRIGGER_KEY=option_space
 ```
 
 Supported values:
 
+- `option_space`
 - `option`
 - `left_option`
 - `right_option`
@@ -381,7 +383,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-automated-f5-smoke.swift"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=option \
+  PRESSTALK_TRIGGER_KEY=option_space \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -392,7 +394,7 @@ trace evidence for transcription and paste completion. Its JSON result sets
 `targetCaptureFailureHint`, `traceFinalTranscript` /
 `tracePasteCommandPosted`, and separately reports `targetCaptureSuccess` plus
 `tracePasteCompleted` for whether the helper text window captured enough pasted
-text. Use it to debug STT/paste separately from the real Fn/Option trigger.
+text. Use it to debug STT/paste separately from the real Option + Space trigger.
 
 For this automated helper, the `/usr/bin/say` playback must be physically
 audible to the microphone. If the system output route is isolated from the

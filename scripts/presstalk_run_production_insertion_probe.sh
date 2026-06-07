@@ -29,7 +29,7 @@ if [[ ! -f "$PROBE" ]]; then
   exit 1
 fi
 
-trigger_key="${PRESSTALK_TRIGGER_KEY:-option}"
+trigger_key="${PRESSTALK_TRIGGER_KEY:-option_space}"
 if [[ -f "$STATUS_JSON" ]]; then
   detected_trigger="$(plutil -extract runtime.triggerKey raw -o - "$STATUS_JSON" 2>/dev/null || true)"
   if [[ -n "$detected_trigger" ]]; then

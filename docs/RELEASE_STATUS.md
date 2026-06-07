@@ -16,14 +16,14 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `swift build -c release` succeeds.
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
-- `scripts/install_jarvistap_launchd.sh` now defaults to `PRESSTALK_TRIGGER_KEY=option`.
+- `scripts/install_jarvistap_launchd.sh` now defaults to `PRESSTALK_TRIGGER_KEY=option_space`.
 - Current studio1 manual trigger triage: physical F5/Mic generated
   `systemDefined subtype=7 mediaKeyCode=0` debug events and system beeps but no
   PressTalk capture because the app was configured for Fn; physical Fn did not
-  emit the expected modifier event in the trace. The local studio1 LaunchAgent
-  has therefore been switched to `PRESSTALK_TRIGGER_KEY=option` for the next
-  meatspace smoke test. Treat Option as the primary portability route until Fn
-  is proven per keyboard and keep F5/Mic as a legacy fallback.
+  emit the expected modifier event in the trace. Bare Option also hit the
+  writable event-tap blocker on studio1. The current direct portability route is
+  `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
+  advanced modifier-only triggers and F5/Mic as a legacy fallback.
 - `v0.1.5-rc82` adds read-only `known_hosts` fingerprint matching to the
   bundled host-discovery helper. The helper now records local known-host
   fingerprints and adds `knownHostMatches` to scanned ARP fingerprints that
@@ -1282,9 +1282,9 @@ Earlier prerelease notes retained for provenance:
   collector. It compares `runtime-status.json` with the live PressTalk process
   and installed app signature, so stale or mismatched diagnostics are visible.
 - `v0.1.5-rc20` and later improve `presstalk-manual-fn-smoke.swift`: the
-  helper reads the configured runtime trigger key, labels Fn/Option/F5 or
-  trackpad smoke correctly, and records readiness before and after the manual
-  paste attempt.
+  helper reads the configured runtime trigger key, labels Option + Space,
+  Fn/Option/F5, or trackpad smoke correctly, and records readiness before and
+  after the manual paste attempt.
 - `v0.1.5-rc22` adds `presstalk-automated-f5-smoke.swift`, an explicit
   synthetic pipeline helper. It posts the F5 Darwin trigger bridge, speaks a
   local phrase through system audio, and records PressTalk trace evidence for

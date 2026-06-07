@@ -16,9 +16,9 @@ Production naming:
   the legacy app identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`
 
 Current packaged behavior:
-- hold `Option` by default to bring up the light and start recording
+- hold `Option + Space` by default to bring up the light and start recording
 - release the trigger key to finalize transcription with silence-aware tail capture
-- choose either `Option`, left/right `Option`, `Fn`, `F5`, or trackpad hold from settings
+- choose `Option + Space`, `Option`, left/right `Option`, `Fn`, `F5`, or trackpad hold from settings
 - moving too far while using the trackpad trigger cancels the capture instead of pasting garbage
 - paste the final transcript into the currently focused app
 - no cloud round-trip in the default path
@@ -46,7 +46,7 @@ The Homebrew cask runs the bundled bootstrap helper so a fresh Mac lands closer 
 
 - install
 - approve only any fresh macOS prompts that have not already been granted
-- hold `Option` to dictate
+- hold `Option + Space` to dictate
 
 Legacy F5 compatibility still ships as an optional helper, but it is no longer the default path:
 
@@ -104,9 +104,10 @@ That installs `com.am.jarvistap` with these defaults:
 - `JARVISTAP_WHISPER_LANGUAGE=de`
 - `JARVISTAP_SAY_VOICE=Samantha`
 - `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.35`
-- `PRESSTALK_TRIGGER_KEY=option`
+- `PRESSTALK_TRIGGER_KEY=option_space`
 
 Supported trigger values:
+- `option_space`
 - `option`
 - `left_option`
 - `right_option`
@@ -161,8 +162,8 @@ Other runtime logs:
 ## Permissions
 Grant `PressTalk.app`:
 - Microphone
-- Input Monitoring
-- Accessibility
+- Accessibility, if paste insertion uses the direct paste path
+- Input Monitoring only for modifier-only triggers such as bare `Option` or `Fn`
 
 ## Optional Modes
 The codebase still supports a `codex-confirm-execute` mode, but that is no longer the packaged default. The packaged installer is optimized for local dictation first.

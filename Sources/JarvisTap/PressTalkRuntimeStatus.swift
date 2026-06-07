@@ -39,8 +39,14 @@ struct PressTalkRuntimeStatus {
         }
     }
 
+    var triggerUsesRegisteredHotKey: Bool {
+        triggerKey == "option_space"
+    }
+
     var inputListenerInstalled: Bool {
-        inputListenerStatus.contains(":default") || inputListenerStatus.contains(":listen_only")
+        inputListenerStatus.contains(":default") ||
+            inputListenerStatus.contains(":listen_only") ||
+            inputListenerStatus.contains("carbon:registered")
     }
 
     var writableEventTapInstalled: Bool {
@@ -54,6 +60,9 @@ struct PressTalkRuntimeStatus {
         if triggerRequiresWritableEventTap {
             return writableEventTapInstalled
         }
+        if triggerUsesRegisteredHotKey {
+            return inputListenerInstalled
+        }
         if triggerKey == "trackpad_hold" {
             return inputListenerInstalled && selectedTriggerObserved
         }
@@ -61,6 +70,9 @@ struct PressTalkRuntimeStatus {
     }
 
     var inputMonitoringStatus: String {
+        if triggerUsesRegisteredHotKey {
+            return inputMonitoringEffective ? "registered_hotkey_ready" : "registered_hotkey_unavailable"
+        }
         if inputMonitoringEffective {
             return inputMonitoringGranted ? "preflight_granted" : "listener_ready_preflight_unavailable"
         }
@@ -86,6 +98,10 @@ struct PressTalkRuntimeStatus {
             return "writable key tap unavailable"
         case "waiting_for_trackpad_event":
             return "listener installed; waiting for trackpad event"
+        case "registered_hotkey_ready":
+            return "registered hotkey ready"
+        case "registered_hotkey_unavailable":
+            return "registered hotkey unavailable"
         case "preflight_granted_listener_unavailable":
             return "preflight granted; listener unavailable"
         default:
@@ -129,6 +145,12 @@ struct PressTalkRuntimeStatus {
     }
 
     var inputMonitoringPermissionLabel: PressTalkPermissionLabel {
+        if triggerUsesRegisteredHotKey {
+            if inputMonitoringEffective {
+                return PressTalkPermissionLabel(text: "Registered hotkey ready", tone: .ready)
+            }
+            return PressTalkPermissionLabel(text: "Registered hotkey unavailable", tone: .warning)
+        }
         if inputMonitoringEffective && inputMonitoringGranted {
             return PressTalkPermissionLabel(text: "Granted", tone: .ready)
         }

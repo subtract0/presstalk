@@ -127,10 +127,9 @@ longer force-presents the Settings window. The setup window is only auto-shown
 for a real startup failure, so a machine with working microphone/listener
 runtime proof will not be sent back through the permission UI.
 
-For Fn, Option, and trackpad triggers, PressTalk now attempts listen-only HID
-and session event taps before falling back to writable taps. Runtime status
-records the selected input listener mode so cross-machine smoke tests can tell
-whether the lower-permission path armed successfully.
+The default Option + Space trigger uses a registered macOS hotkey. Modifier-only
+Fn/Option triggers remain available as advanced choices and still report whether
+the required writable event-tap path armed successfully.
 
 PressTalk also recognizes the actual WhisperKit local cache layout under
 ~/Library/Application Support/JarvisTap/Models/models/... and prefetches the
@@ -140,8 +139,8 @@ leave the app stuck at "Warming up".
 The app bundle includes presstalk-manual-fn-smoke.swift, a focused-window helper
 that records physical trigger dictation smoke results as JSON without opening
 macOS permission panes. It now reads the configured runtime trigger key, supports
-Fn/Option/F5/trackpad labels, and records readiness before and after the manual
-paste smoke. It also records traceFinalTranscript, traceInserted,
+Option + Space/Fn/Option/F5/trackpad labels, and records readiness before and
+after the manual paste smoke. It also records traceFinalTranscript, traceInserted,
 traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and
 targetCaptureFailureHint, so a physical trigger/STT success is visibly separate
 from an active-field insertion failure.
@@ -249,7 +248,7 @@ runs a local paste-event self-test first and records pasteSelfTest plus
 targetCaptureFailureHint, so failed target capture can be separated from STT or
 trigger failures. Results are marked physicalTriggerProof=false, and
 targetCaptureSuccess is tracked separately, so this does not replace physical
-Fn/Option smoke.
+Option + Space smoke.
 
 If automated F5 helper playback is routed somewhere the microphone cannot hear,
 the microphone may capture near silence. The helper reports this as

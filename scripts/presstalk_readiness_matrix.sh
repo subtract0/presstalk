@@ -2,7 +2,11 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-READINESS_HELPER="${PRESSTALK_READINESS_HELPER:-$SCRIPT_DIR/presstalk_machine_readiness.sh}"
+DEFAULT_READINESS_HELPER="$SCRIPT_DIR/presstalk_machine_readiness.sh"
+if [[ ! -f "$DEFAULT_READINESS_HELPER" && -f "$SCRIPT_DIR/presstalk-machine-readiness.sh" ]]; then
+  DEFAULT_READINESS_HELPER="$SCRIPT_DIR/presstalk-machine-readiness.sh"
+fi
+READINESS_HELPER="${PRESSTALK_READINESS_HELPER:-$DEFAULT_READINESS_HELPER}"
 OUTPUT_FORMAT="text"
 JSON_OUTPUT_PATH=""
 SSH_CONNECT_TIMEOUT="${PRESSTALK_SSH_CONNECT_TIMEOUT:-5}"

@@ -8,6 +8,7 @@ trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 local_json="$TEST_TMPDIR/local-matrix.json"
 blocked_json="$TEST_TMPDIR/blocked-matrix.json"
+bundle_json="$TEST_TMPDIR/bundle-matrix.json"
 
 "$MATRIX_HELPER" --local --json >"$local_json"
 
@@ -47,6 +48,19 @@ blocked_reachable="$(extract_required "$blocked_json" targets.0.reachable)"
 if [[ "$blocked_status" != "failed" || "$blocked_reachable" != "false" ]]; then
   echo "FAIL: expected blocked host to be recorded as failed/reachable=false"
   plutil -convert json -r -o - "$blocked_json"
+  exit 1
+fi
+
+bundle_dir="$TEST_TMPDIR/bundle-resources"
+mkdir -p "$bundle_dir"
+cp "$MATRIX_HELPER" "$bundle_dir/presstalk-readiness-matrix.sh"
+cp "$SCRIPT_DIR/presstalk_machine_readiness.sh" "$bundle_dir/presstalk-machine-readiness.sh"
+chmod +x "$bundle_dir/presstalk-readiness-matrix.sh" "$bundle_dir/presstalk-machine-readiness.sh"
+"$bundle_dir/presstalk-readiness-matrix.sh" --local --json >"$bundle_json"
+bundle_status="$(extract_required "$bundle_json" targets.0.status)"
+if [[ "$bundle_status" != "ready_reported" ]]; then
+  echo "FAIL: expected bundled-name helper layout to work"
+  plutil -convert json -r -o - "$bundle_json"
   exit 1
 fi
 

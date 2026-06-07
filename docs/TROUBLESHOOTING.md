@@ -204,6 +204,11 @@ The app bundle also includes a repair wrapper for that exact state:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
 ```
 
+In current builds, Settings also shows `Repair Signing` for the same ad-hoc
+`recognized_disabled` input-method state. Clicking it runs the bundled repair
+wrapper with permission panes disabled and then runs the production insertion
+probe.
+
 It keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
 restarts PressTalk with stable signing, signs the bundled

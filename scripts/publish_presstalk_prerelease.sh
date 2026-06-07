@@ -58,6 +58,12 @@ the bundled PressTalkInputMethod.app before the outer app, refreshes the copy in
 This is a signing/input-method repair path; it is not a reason to reopen
 Microphone, Input Monitoring, or Accessibility panes.
 
+Settings now shows a Repair Signing button only in the ad-hoc state where macOS
+recognizes the PressTalk input method but has not enabled it. The button runs
+the bundled repair helper with permission panes disabled and then runs the
+production insertion probe, so the desktop repair path no longer requires
+typing a shell command.
+
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before
 launching the app. Its summary reports both Bundled input method signing applied

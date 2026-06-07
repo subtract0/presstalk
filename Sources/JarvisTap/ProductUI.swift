@@ -852,6 +852,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     var onRunSetupCheck: (() -> Void)?
     var onExportDiagnostics: (() -> Void)?
     var onRestartApp: (() -> Void)?
+    var onRepairLocalSigning: (() -> Void)?
     var onOpenMicrophoneSettings: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenAccessibilitySettings: (() -> Void)?
@@ -886,6 +887,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let f5BridgeValueLabel = NSTextField(labelWithString: "")
     private let runSetupCheckButton = NSButton(title: "Run Setup Check", target: nil, action: nil)
     private let restartAppButton = NSButton(title: "Restart PressTalk", target: nil, action: nil)
+    private let repairLocalSigningButton = NSButton(title: "Repair Signing", target: nil, action: nil)
     private let exportDiagnosticsButton = NSButton(title: "Export Diagnostics", target: nil, action: nil)
     private let microphoneSettingsButton = NSButton(title: "Microphone", target: nil, action: nil)
     private let inputMonitoringSettingsButton = NSButton(title: "Input Monitoring", target: nil, action: nil)
@@ -1023,6 +1025,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         for button in [
             runSetupCheckButton,
             restartAppButton,
+            repairLocalSigningButton,
             exportDiagnosticsButton,
             microphoneSettingsButton,
             inputMonitoringSettingsButton,
@@ -1041,7 +1044,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         setupButtonsRow.alignment = .centerY
         setupButtonsRow.spacing = 8
 
-        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, exportDiagnosticsButton])
+        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, repairLocalSigningButton, exportDiagnosticsButton])
         diagnosticsButtonsRow.orientation = .horizontal
         diagnosticsButtonsRow.alignment = .centerY
         diagnosticsButtonsRow.spacing = 8
@@ -1184,6 +1187,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         restartAppButton.target = self
         restartAppButton.action = #selector(restartApp(_:))
 
+        repairLocalSigningButton.target = self
+        repairLocalSigningButton.action = #selector(repairLocalSigning(_:))
+
         exportDiagnosticsButton.target = self
         exportDiagnosticsButton.action = #selector(exportDiagnostics(_:))
 
@@ -1234,7 +1240,18 @@ final class PressTalkSettingsWindowController: NSWindowController {
         configureDetailLabel(speechModelValueLabel, text: runtimeStatus.speechModelStatus)
         configureDetailLabel(f5BridgeValueLabel, text: runtimeStatus.f5BridgeStatus)
         configurePermissionPaneButtons()
+        configureRepairLocalSigningButton()
         setupHintLabel.stringValue = permissionHintText()
+    }
+
+    private func configureRepairLocalSigningButton() {
+        let shouldShow = runtimeStatus.adHocSigned &&
+            runtimeStatus.inputMethodFallbackStatus == "recognized_disabled"
+        repairLocalSigningButton.isHidden = !shouldShow
+        repairLocalSigningButton.isEnabled = shouldShow
+        repairLocalSigningButton.toolTip = shouldShow
+            ? "Runs the bundled local signing repair helper with permission panes disabled, then runs the production insertion probe."
+            : nil
     }
 
     private func configurePermissionPaneButtons() {
@@ -1407,6 +1424,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func restartApp(_ sender: Any?) {
         onRestartApp?()
+    }
+
+    @objc private func repairLocalSigning(_ sender: Any?) {
+        onRepairLocalSigning?()
     }
 
     @objc private func exportDiagnostics(_ sender: Any?) {

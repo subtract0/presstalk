@@ -82,6 +82,10 @@ desktop session rather than reopening permission panes:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
 ```
 
+For the ad-hoc `recognized_disabled` input-method state, current Settings builds
+also show `Repair Signing`. That button runs the same no-pane repair wrapper and
+then runs the production insertion probe.
+
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
 restarts PressTalk with stable signing, signs the bundled

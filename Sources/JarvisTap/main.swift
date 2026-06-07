@@ -1469,6 +1469,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         settingsWindowController.onRestartApp = { [weak self] in
             self?.restartPressTalkFromSettings()
         }
+        settingsWindowController.onRepairLocalSigning = { [weak self] in
+            self?.repairLocalSigningFromSettings()
+        }
         settingsWindowController.onOpenMicrophoneSettings = { [weak self] in
             self?.openMicrophonePrivacyPane()
         }
@@ -2125,6 +2128,59 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         NSApp.terminate(nil)
+    }
+
+    private func repairLocalSigningFromSettings() {
+        let status = currentRuntimeStatus()
+        guard status.adHocSigned && status.inputMethodFallbackStatus == "recognized_disabled" else {
+            traceLogger.log("Local signing repair skipped reason=state_not_repairable ad_hoc=\(status.adHocSigned ? 1 : 0) input_method=\(status.inputMethodFallbackStatus)")
+            present(.error("Signing repair is only needed for the ad-hoc input-method-disabled state."))
+            return
+        }
+        guard let helperURL = Bundle.main.resourceURL?.appendingPathComponent("presstalk-repair-local-signing.sh"),
+              FileManager.default.isExecutableFile(atPath: helperURL.path) else {
+            traceLogger.log("Local signing repair helper missing path=\(Bundle.main.resourceURL?.path ?? "nil")")
+            present(.error("The signing repair helper is missing from this build."))
+            return
+        }
+
+        let diagnosticsDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap/Diagnostics", isDirectory: true)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let logURL = diagnosticsDirectory.appendingPathComponent("presstalk-signing-repair-\(timestamp).log")
+
+        do {
+            try FileManager.default.createDirectory(at: diagnosticsDirectory, withIntermediateDirectories: true)
+        } catch {
+            traceLogger.log("Local signing repair log directory failed error=\(error)")
+            present(.error("Could not create diagnostics directory for signing repair."))
+            return
+        }
+
+        let triggerKey = shellQuoted(settingsStore.triggerKey.rawValue)
+        let helperPath = shellQuoted(helperURL.path)
+        let logPath = shellQuoted(logURL.path)
+        let script = """
+        export PRESSTALK_OPEN_PERMISSION_PANES=0
+        export PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0
+        export PRESSTALK_TRIGGER_KEY=\(triggerKey)
+        /bin/bash \(helperPath) --probe >\(logPath) 2>&1 &
+        """
+
+        traceLogger.log("Local signing repair requested from settings log=\(logURL.path)")
+        present(.setupRequired("Signing repair started. Approve only the PressTalk local signing password prompt. PressTalk will restart and run an insertion probe."))
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-lc", script]
+        do {
+            try process.run()
+        } catch {
+            traceLogger.log("Local signing repair launch failed error=\(error)")
+            present(.error("Could not start signing repair: \(error.localizedDescription)"))
+        }
     }
 
     private func shellQuoted(_ value: String) -> String {

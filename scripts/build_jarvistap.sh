@@ -56,6 +56,8 @@ cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/pres
 chmod 755 "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
 cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+cp "$PKG_DIR/scripts/presstalk_verify_repair_result.sh" "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
 cp "$PKG_DIR/scripts/presstalk_accessibility_identity_probe.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
 cp "$PKG_DIR/scripts/presstalk_actual_accessibility_probe.sh" "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"

@@ -158,6 +158,12 @@ for the ad-hoc recognized_disabled state explicitly points to desktop Repair
 Signing instead of another Microphone/Input Monitoring/Accessibility permission
 loop.
 
+The app bundle also includes presstalk-verify-repair-result.sh. This is a
+read-only post-repair verifier for SSH checks: it reports the current runtime
+signing/input-method state plus the latest production insertion probe, exits 0
+only when insertion into the focused target is proven, and exits nonzero without
+opening permission panes or starting any signing trust flow.
+
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
 phrase through system audio, and records whether PressTalk transcribes, posts

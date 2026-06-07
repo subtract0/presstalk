@@ -280,6 +280,20 @@ and accepted the enable API call, but the enabled-source list still did not
 contain PressTalk. That is the current mbp1 ad-hoc SSH-install blocker; do not
 reopen privacy panes for it.
 
+To test the actual running PressTalk app process rather than only the standalone
+client probe, run the production insertion probe. It temporarily enables the app
+diagnostic notification, opens a focused local helper window, asks PressTalk to
+insert one payload through the same production insertion path used after
+dictation, writes JSON diagnostics, and restores normal no-probe startup:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-run-production-insertion-probe.sh" --json
+```
+
+For insertion proof, require `success=true`, `targetCaptureSuccess=true`, and a
+production trace such as `traceProductionMethod=input_method_notification` or an
+Accessibility insertion method.
+
 After macOS recognizes and you select `PressTalk Input Method`, focus an
 editable text field and run:
 

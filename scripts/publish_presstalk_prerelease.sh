@@ -76,6 +76,14 @@ traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and
 targetCaptureFailureHint, so a physical trigger/STT success is visibly separate
 from an active-field insertion failure.
 
+The bundle also includes presstalk-run-production-insertion-probe.sh and
+presstalk-production-insertion-probe.swift. The wrapper temporarily restarts
+PressTalk with PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1, opens a focused
+local text window, asks the running PressTalk app to insert a payload through
+the same production insertion path used after dictation, records whether the
+payload lands, then restores normal no-probe startup. This tests the app process
+itself rather than only the standalone input-method client probe.
+
 The bundle now also carries a separate PressTalkInputMethod.app plus
 presstalk-install-input-method.sh, presstalk-input-method-status.swift,
 presstalk-input-method-client-probe.swift, and

@@ -145,6 +145,28 @@ client probe"`, and the input-method log records `client updated context=init`,
 `controller initialized`, `insert requested`, and `insert notification handled
 inserted=1`.
 
+## Production Probe
+
+The standalone client probe proves whether a selected PressTalk input method can
+insert into its own focused helper window. The production insertion probe tests
+the running PressTalk app process instead. It temporarily restarts PressTalk with
+`PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1`, opens a focused helper window,
+posts a payload request to PressTalk, records whether the payload lands, and
+then restores normal no-probe startup:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-run-production-insertion-probe.sh" --json
+```
+
+On `studio1`, this probe succeeds with `success=true`,
+`targetCaptureSuccess=true`, and `traceProductionMethod=input_method_notification`.
+On the current ad-hoc `mbp1` install, it fails with
+`targetCaptureFailureHint=input_method_enable_no_effect` and trace evidence from
+the running PressTalk app: `Input method insertion enable had no visible effect`,
+`enabled_count=0`, and `Input method insertion unavailable
+reason=enable_no_effect status=-50`. That confirms the blocker is not just the
+standalone client probe context.
+
 The non-IMK event route is also ruled out on `studio1` while
 `AXIsProcessTrusted=false`. The bundled `presstalk-unicode-event-insert-probe`
 now tries Unicode CGEvents through HID, session, annotated-session, and

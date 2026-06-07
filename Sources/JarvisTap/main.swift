@@ -1099,6 +1099,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         static let release = "com.am.jarvistap.trigger.release"
     }
 
+    private enum ProductionInsertionProbeNotification {
+        static let insert = "com.am.presstalk.production-insertion-probe.insert"
+        static let payloadFileName = "production-insertion-probe.txt"
+    }
+
     private let config = JarvisTapConfig.load()
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
@@ -1158,6 +1163,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var lastPrintedPartial = ""
     private var lastInputDebugSignature = ""
     private var darwinNotificationObserverInstalled = false
+    private var productionInsertionProbeObserverInstalled = false
     private var whisperLoadState: WhisperLoadState = .idle
     private var whisperWarmupTask: Task<Void, Never>?
     private var amplitudeMonitorTask: Task<Void, Never>?
@@ -1241,6 +1247,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         speaker.configure(voiceIdentifier: config.sayVoice)
         installProductUI()
+        installProductionInsertionProbeNotificationIfEnabled()
         applyWhisperDecodingPreferences()
         refreshRuntimeStatusUI()
 
@@ -3131,6 +3138,67 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 handleRelease(.configuredKey, source: .darwinNotification)
             default:
                 break
+            }
+        }
+    }
+
+    private func productionInsertionProbePayloadURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent(ProductionInsertionProbeNotification.payloadFileName)
+    }
+
+    private func installProductionInsertionProbeNotificationIfEnabled() {
+        guard ProcessInfo.processInfo.environment["PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE"] == "1" else {
+            return
+        }
+        guard !productionInsertionProbeObserverInstalled else { return }
+
+        let callback: CFNotificationCallback = { _, observer, name, _, _ in
+            guard let observer, let rawName = name?.rawValue as String? else { return }
+            let app = Unmanaged<JarvisTapApp>.fromOpaque(observer).takeUnretainedValue()
+            app.handleProductionInsertionProbeNotification(named: rawName)
+        }
+
+        let observer = UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        CFNotificationCenterAddObserver(
+            CFNotificationCenterGetDarwinNotifyCenter(),
+            observer,
+            callback,
+            ProductionInsertionProbeNotification.insert as CFString,
+            nil,
+            .deliverImmediately
+        )
+
+        productionInsertionProbeObserverInstalled = true
+        traceLogger.log("Production insertion probe notification installed")
+    }
+
+    private func handleProductionInsertionProbeNotification(named name: String) {
+        guard name == ProductionInsertionProbeNotification.insert else { return }
+        traceLogger.log("Production insertion probe notification received")
+        DispatchQueue.main.async { [self] in
+            do {
+                let payload = try String(
+                    contentsOf: productionInsertionProbePayloadURL(),
+                    encoding: .utf8
+                ).trimmingCharacters(in: .newlines)
+                guard !payload.isEmpty else {
+                    traceLogger.log("Production insertion probe ignored reason=empty_payload")
+                    return
+                }
+
+                let result = try insertTranscriptIntoFocusedApp(payload)
+                switch result {
+                case .inserted(let method):
+                    traceLogger.log("Production insertion probe inserted method=\(method)")
+                case .pasteCommandPosted:
+                    traceLogger.log("Production insertion probe paste command posted")
+                case .copiedFallback(let reason):
+                    traceLogger.log("Production insertion probe copied fallback reason=\(reason)")
+                }
+            } catch {
+                traceLogger.log("Production insertion probe failed error=\(error)")
             }
         }
     }

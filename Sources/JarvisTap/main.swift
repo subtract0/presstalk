@@ -2199,9 +2199,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func runPhysicalSmokeFromSettings() {
-        guard let helperURL = Bundle.main.resourceURL?.appendingPathComponent("presstalk-manual-fn-smoke.swift"),
-              FileManager.default.isExecutableFile(atPath: helperURL.path) else {
+        guard let resourceURL = Bundle.main.resourceURL else {
             traceLogger.log("Manual physical smoke helper missing path=\(Bundle.main.resourceURL?.path ?? "nil")")
+            present(.error("The physical smoke helper is missing from this build."))
+            return
+        }
+        let compiledHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke")
+        let scriptHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke.swift")
+        let helperURL: URL
+        let helperCommand: String
+        if FileManager.default.isExecutableFile(atPath: compiledHelperURL.path) {
+            helperURL = compiledHelperURL
+            helperCommand = shellQuoted(compiledHelperURL.path)
+        } else if FileManager.default.isExecutableFile(atPath: scriptHelperURL.path) {
+            helperURL = scriptHelperURL
+            helperCommand = "/usr/bin/env swift \(shellQuoted(scriptHelperURL.path))"
+        } else {
+            traceLogger.log("Manual physical smoke helper missing path=\(resourceURL.path)")
             present(.error("The physical smoke helper is missing from this build."))
             return
         }
@@ -2222,7 +2236,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return
         }
 
-        let helperPath = shellQuoted(helperURL.path)
         let logPath = shellQuoted(logURL.path)
         let pidPath = shellQuoted(pidURL.path)
         let triggerKey = shellQuoted(settingsStore.triggerKey.rawValue)
@@ -2232,7 +2245,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         export PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0
         export PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY=\(triggerKey)
         export PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL=\(triggerLabel)
-        /usr/bin/nohup /usr/bin/env swift \(helperPath) >\(logPath) 2>&1 &
+        /usr/bin/nohup \(helperCommand) >\(logPath) 2>&1 &
         echo $! >\(pidPath)
         """
 

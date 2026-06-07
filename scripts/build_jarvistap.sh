@@ -72,6 +72,8 @@ cp "$PKG_DIR/scripts/presstalk_actual_accessibility_probe.sh" "$APP_RESOURCES_DI
 chmod 755 "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"
 cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
+swiftc "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" -o "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
 cp "$PKG_DIR/scripts/presstalk_automated_f5_smoke.swift" "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
 cp "$PKG_DIR/scripts/presstalk_production_insertion_probe.swift" "$APP_RESOURCES_DIR/presstalk-production-insertion-probe.swift"

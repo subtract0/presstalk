@@ -346,7 +346,7 @@ Expected readiness fields:
 Then run the bundled manual smoke helper:
 
 ```bash
-swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-manual-fn-smoke.swift"
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-manual-fn-smoke"
 ```
 
 The helper opens a focused text window and reads the configured PressTalk

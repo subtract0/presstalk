@@ -142,11 +142,12 @@ PressTalk also recognizes the actual WhisperKit local cache layout under
 small Whisper tokenizer files explicitly, so a populated model cache does not
 leave the app stuck at "Warming up".
 
-The app bundle includes presstalk-manual-fn-smoke.swift, a focused-window helper
-that records physical trigger dictation smoke results as JSON without opening
-macOS permission panes. It now reads the configured runtime trigger key, supports
-Option + Space/Fn/Option/F5/trackpad labels, and records readiness before and
-after the manual paste smoke. It also records expectedTriggerProof,
+The app bundle includes a compiled presstalk-manual-fn-smoke helper plus the
+source presstalk-manual-fn-smoke.swift. The compiled focused-window helper
+records physical trigger dictation smoke results as JSON without opening macOS
+permission panes. It reads the configured runtime trigger key, supports Option +
+Space/Fn/Option/F5/trackpad labels, and records readiness before and after the
+manual paste smoke. It also records expectedTriggerProof,
 traceExpectedTriggerPressed, traceExpectedTriggerReleased,
 traceRegisteredHotKeyObserved, traceFinalTranscript, traceInserted,
 traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and

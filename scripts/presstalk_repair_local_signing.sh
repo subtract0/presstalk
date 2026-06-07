@@ -132,12 +132,13 @@ existing_identity_status() {
 }
 
 print_preflight() {
-  local ad_hoc input_method active_status speech_model input_listener microphone_status input_monitoring_effective
+  local ad_hoc input_method active_status code_signature_authority speech_model input_listener microphone_status input_monitoring_effective
   local existing_status existing_state existing_detail repair_needed prompt_needed repair_allowed would_run next_action
 
   ad_hoc="$(status_value status.adHocSigned)"
   input_method="$(status_value permissions.inputMethodFallbackStatus)"
   active_status="$(status_value runtime.activeFieldInsertionStatus)"
+  code_signature_authority="$(status_value status.codeSignatureAuthority)"
   speech_model="$(status_value status.speechModel)"
   input_listener="$(status_value runtime.inputListener)"
   microphone_status="$(status_value permissions.microphoneAuthorizationStatus)"
@@ -147,7 +148,8 @@ print_preflight() {
   existing_detail="${existing_status#*:}"
 
   repair_needed=false
-  if [[ "$ad_hoc" == "true" && "$input_method" == "recognized_disabled" ]]; then
+  if [[ "$input_method" == "recognized_disabled" &&
+        ( "$ad_hoc" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ]]; then
     repair_needed=true
   elif [[ "$active_status" == "needs_signing_repair" ]]; then
     repair_needed=true
@@ -193,6 +195,7 @@ SigningTrustPromptNeeded: $prompt_needed
 ExistingSigningIdentity: $existing_state
 ExistingSigningIdentityDetail: $existing_detail
 AdHocSigned: ${ad_hoc:-unknown}
+CodeSignatureAuthority: ${code_signature_authority:-unknown}
 InputMethodFallbackStatus: ${input_method:-unknown}
 ActiveFieldInsertionStatus: ${active_status:-unknown}
 SpeechModel: ${speech_model:-unknown}

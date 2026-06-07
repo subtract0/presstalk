@@ -63,6 +63,7 @@ cat >"$status_dir/runtime-status.json" <<'JSON'
   },
   "status": {
     "adHocSigned": true,
+    "codeSignatureAuthority": "unknown",
     "speechModel": "Ready"
   }
 }
@@ -84,5 +85,31 @@ grep -Fq "WouldRunRepair: true" "$ready_output"
 grep -Fq "SigningTrustPromptNeeded: false" "$ready_output"
 grep -Fq "ExistingSigningIdentity: ready" "$ready_output"
 grep -Fq "ExistingSigningIdentityDetail: TESTHASH" "$ready_output"
+
+cat >"$status_dir/runtime-status.json" <<'JSON'
+{
+  "runtime": {
+    "activeFieldInsertionStatus": "blocked_recognized_disabled",
+    "inputListener": "hid:listen_only"
+  },
+  "permissions": {
+    "inputMethodFallbackStatus": "recognized_disabled",
+    "microphoneAuthorizationStatus": "authorized",
+    "inputMonitoringEffective": true
+  },
+  "status": {
+    "adHocSigned": false,
+    "codeSignatureAuthority": "PressTalk Local Development Code Signing",
+    "speechModel": "Ready"
+  }
+}
+JSON
+
+local_signing_output="$TEST_TMPDIR/local-signing.txt"
+SSH_CONNECTION="test" HOME="$home_dir" PRESSTALK_APP_BUNDLE="$app_bundle" "$HELPER" --preflight >"$local_signing_output"
+grep -Fq "RepairNeeded: true" "$local_signing_output"
+grep -Fq "RepairAllowedHere: false" "$local_signing_output"
+grep -Fq "SigningTrustPromptNeeded: true" "$local_signing_output"
+grep -Fq "CodeSignatureAuthority: PressTalk Local Development Code Signing" "$local_signing_output"
 
 echo "PASS signing_repair_preflight"

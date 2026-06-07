@@ -240,7 +240,9 @@ print_repair_and_probe_status() {
     local active_field_insertion_status
     local microphone_authorization
     local input_monitoring_effective
+    local code_signature_authority
     ad_hoc_signed="$(json_value status.adHocSigned)"
+    code_signature_authority="$(json_value status.codeSignatureAuthority)"
     input_method_fallback="$(json_value permissions.inputMethodFallbackStatus)"
     accessibility_status="$(json_value permissions.accessibilityStatus)"
     speech_model="$(json_value status.speechModel)"
@@ -251,6 +253,7 @@ print_repair_and_probe_status() {
     input_monitoring_effective="$(json_value permissions.inputMonitoringEffective)"
 
     echo "adHocSigned: ${ad_hoc_signed:-unknown}"
+    echo "codeSignatureAuthority: ${code_signature_authority:-unknown}"
     echo "inputMethodFallbackStatus: ${input_method_fallback:-unknown}"
     echo "accessibilityStatus: ${accessibility_status:-unknown}"
     echo "speechModel: ${speech_model:-unknown}"
@@ -260,7 +263,9 @@ print_repair_and_probe_status() {
     echo "microphoneAuthorizationStatus: ${microphone_authorization:-unknown}"
     echo "inputMonitoringEffective: ${input_monitoring_effective:-unknown}"
 
-    if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+    if [[ "$active_field_insertion_status" == "needs_signing_repair" ||
+          ( "$input_method_fallback" == "recognized_disabled" &&
+            ( "$ad_hoc_signed" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
       cat <<EOF
 Next action: from the logged-in desktop session, click Repair Signing in the PressTalk menu bar or Settings and approve only the PressTalk local signing password prompt.
 No Microphone, Input Monitoring, or Accessibility re-grant is needed for this state.

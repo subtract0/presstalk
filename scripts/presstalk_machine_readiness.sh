@@ -268,7 +268,9 @@ elif [[ "$runtime_status_available" != "true" ]]; then
 elif [[ "$input_pipeline_ready" != "true" || "$speech_model" != "Ready" ]]; then
   next_action="Speech pipeline is not ready; collect smoke status before running a physical dictation smoke."
 elif [[ "$active_field_ready" != "true" ]]; then
-  if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+  if [[ "$active_field_status" == "needs_signing_repair" ||
+        ( "$input_method_fallback" == "recognized_disabled" &&
+          ( "$ad_hoc_signed" == "true" || "$signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
     next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
   else
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."

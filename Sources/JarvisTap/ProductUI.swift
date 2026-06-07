@@ -1191,8 +1191,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func configureRepairLocalSigningButton() {
-        let shouldShow = runtimeStatus.adHocSigned &&
-            runtimeStatus.inputMethodFallbackStatus == "recognized_disabled"
+        let shouldShow = runtimeStatus.localSigningRepairNeeded
         repairLocalSigningButton.isHidden = !shouldShow
         repairLocalSigningButton.isEnabled = shouldShow
         repairLocalSigningButton.toolTip = shouldShow
@@ -1261,8 +1260,8 @@ final class PressTalkSettingsWindowController: NSWindowController {
             if runtimeStatus.inputMethodFallbackStatus == "ready" {
                 return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, but the input method fallback is currently enabled; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
-            if runtimeStatus.inputMethodFallbackStatus == "recognized_disabled" && runtimeStatus.adHocSigned {
-                return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but has not enabled it for this ad-hoc signed app. Run the logged-in desktop signing repair helper, then the production insertion probe; do not re-grant Microphone, Input Monitoring, or Accessibility repeatedly.\(noPaneSuffix)"
+            if runtimeStatus.localSigningRepairNeeded {
+                return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but has not enabled it for this PressTalk signing state. Run the logged-in desktop signing repair helper, then the production insertion probe; do not re-grant Microphone, Input Monitoring, or Accessibility repeatedly.\(noPaneSuffix)"
             }
             return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, and the input method fallback status is \(runtimeStatus.inputMethodFallbackStatus). PressTalk will copy if insertion is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }

@@ -125,9 +125,12 @@ API call, but the enabled-source requery still showed no PressTalk source. On
 visible as `com.am.presstalk.inputmethod.container` with
 `TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
 `selectCapable=true`, but `enabled=false` before and after enable, and direct
-`TISSelectInputSource` returned `-50`. In that state production dictation will
-fall back to copying unless Accessibility is trusted, the signing/trust state is
-repaired, or the input method can be selected by macOS.
+`TISSelectInputSource` returned `-50`. A no-prompt mbp1 experiment later showed
+that signing with an untrusted PressTalk local identity changes the app from
+ad-hoc to locally signed, but the input method can still remain
+`recognized_disabled`. In either state production dictation will fall back to
+copying unless Accessibility is trusted, the signing/trust state is repaired,
+or the input method can be selected by macOS.
 
 For that state, run the bundled signing repair wrapper from the logged-in
 desktop session:

@@ -52,6 +52,7 @@ if [[ ! -f "$STATUS_JSON" ]]; then
 fi
 
 ad_hoc_signed="$(status_value status.adHocSigned)"
+code_signature_authority="$(status_value status.codeSignatureAuthority)"
 input_method_fallback="$(status_value permissions.inputMethodFallbackStatus)"
 accessibility_status="$(status_value permissions.accessibilityStatus)"
 speech_model="$(status_value status.speechModel)"
@@ -62,6 +63,7 @@ microphone_authorization="$(status_value permissions.microphoneAuthorizationStat
 input_monitoring_effective="$(status_value permissions.inputMonitoringEffective)"
 
 print_field "adHocSigned" "$ad_hoc_signed"
+print_field "codeSignatureAuthority" "$code_signature_authority"
 print_field "inputMethodFallbackStatus" "$input_method_fallback"
 print_field "accessibilityStatus" "$accessibility_status"
 print_field "speechModel" "$speech_model"
@@ -122,7 +124,9 @@ print_field "probe.traceInputMethodEnableNoEffect" "$probe_enable_no_effect"
 
 if [[ "$active_field_insertion_ready" != "true" ]]; then
   echo "Result: not proven"
-  if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+  if [[ "$active_field_insertion_status" == "needs_signing_repair" ||
+        ( "$input_method_fallback" == "recognized_disabled" &&
+          ( "$ad_hoc_signed" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
     echo "Reason: active-field insertion needs signing repair"
   else
     echo "Reason: active-field insertion is not ready"

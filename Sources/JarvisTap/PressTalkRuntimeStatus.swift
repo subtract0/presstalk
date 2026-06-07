@@ -36,6 +36,11 @@ struct PressTalkRuntimeStatus {
         pasteAutomatically && (accessibilityGranted || inputMethodFallbackStatus == "ready")
     }
 
+    var localSigningRepairNeeded: Bool {
+        inputMethodFallbackStatus == "recognized_disabled" &&
+            (adHocSigned || codeSignatureAuthority == "PressTalk Local Development Code Signing")
+    }
+
     var activeFieldInsertionStatus: String {
         guard pasteAutomatically else {
             return "copy_only"
@@ -46,7 +51,7 @@ struct PressTalkRuntimeStatus {
         if inputMethodFallbackStatus == "ready" {
             return "ready_input_method"
         }
-        if adHocSigned && inputMethodFallbackStatus == "recognized_disabled" {
+        if localSigningRepairNeeded {
             return "needs_signing_repair"
         }
         return "blocked_\(inputMethodFallbackStatus)"
@@ -100,7 +105,7 @@ struct PressTalkRuntimeStatus {
             return PressTalkPermissionLabel(text: "Input method ready", tone: .ready)
         case "recognized_disabled":
             return PressTalkPermissionLabel(
-                text: adHocSigned ? "Needs signing repair" : "Input method disabled",
+                text: localSigningRepairNeeded ? "Needs signing repair" : "Input method disabled",
                 tone: .warning
             )
         case "recognized_not_selectable":

@@ -2180,8 +2180,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func repairLocalSigningFromSettings() {
         let status = currentRuntimeStatus()
         guard localSigningRepairNeeded(status) else {
-            traceLogger.log("Local signing repair skipped reason=state_not_repairable ad_hoc=\(status.adHocSigned ? 1 : 0) input_method=\(status.inputMethodFallbackStatus)")
-            present(.error("Signing repair is only needed for the ad-hoc input-method-disabled state."))
+            traceLogger.log("Local signing repair skipped reason=state_not_repairable ad_hoc=\(status.adHocSigned ? 1 : 0) input_method=\(status.inputMethodFallbackStatus) authority=\(status.codeSignatureAuthority)")
+            present(.error("Signing repair is only needed for the PressTalk input-method-disabled signing state."))
             return
         }
         guard let helperURL = Bundle.main.resourceURL?.appendingPathComponent("presstalk-repair-local-signing.sh"),
@@ -2234,7 +2234,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func localSigningRepairNeeded(_ status: PressTalkRuntimeStatus) -> Bool {
-        status.adHocSigned && status.inputMethodFallbackStatus == "recognized_disabled"
+        status.localSigningRepairNeeded
     }
 
     private func shellQuoted(_ value: String) -> String {

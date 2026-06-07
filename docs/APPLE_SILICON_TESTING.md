@@ -162,9 +162,10 @@ restarting, probing, or opening panes, run the no-prompt preflight first:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --preflight
 ```
 
-For the ad-hoc `recognized_disabled` input-method state, current builds show
-`Repair Signing` in the PressTalk menu bar and in Settings. That action runs the
-same no-pane repair wrapper and then runs the production insertion probe.
+For the `recognized_disabled` input-method state caused by either ad-hoc
+signing or an untrusted PressTalk local signing identity, current builds show
+`Repair Signing` in the PressTalk menu bar and in Settings. That action runs
+the same no-pane repair wrapper and then runs the production insertion probe.
 
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,

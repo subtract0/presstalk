@@ -77,10 +77,11 @@ whether the latest repair helper is still running. When the repair is run with
 same diagnostics log after the production insertion probe, while preserving the
 probe exit status.
 
-The status menu also shows Repair Signing... in that exact ad-hoc
-recognized-disabled input-method state. This gives a logged-in desktop user a
-direct repair action from the menu bar without reopening the full Settings
-window.
+The status menu also shows Repair Signing... in the PressTalk signing states
+where macOS recognizes the input method but leaves it disabled. This covers both
+ad-hoc release installs and local-signing identities that exist but still need
+desktop trust repair. It gives a logged-in desktop user a direct repair action
+from the menu bar without reopening the full Settings window.
 
 The menu-bar status no longer says plain "Ready" for that state. It now reports
 Paste Repair Needed while transcription is ready but active-field paste still
@@ -90,14 +91,19 @@ tries dictation.
 Runtime status now also records activeFieldInsertionReady and
 activeFieldInsertionStatus. These fields separate a ready speech pipeline from
 a proven active-field insertion path, and the bundled smoke collector and repair
-verifier print them for cross-machine evidence.
+verifier print them for cross-machine evidence. The repair preflight,
+machine-readiness helper, smoke collector, and verifier now route the
+non-ad-hoc PressTalk Local Development Code Signing plus recognized_disabled
+state to the same no-pane Repair Signing action instead of calling it a generic
+insertion blocker.
 
 The production insertion probe now records active-field insertion readiness in
 its start/finish snapshots, including activeFieldInsertionReady,
 activeFieldInsertionStatus, and inputMethodFallbackStatus. The read-only repair
 verifier accepts every proven active-field insertion path: InputMethodKit,
 direct Accessibility insertion, or Accessibility-backed paste command. It still
-fails the mbp1 ad-hoc recognized_disabled state as a signing repair blocker.
+fails mbp1 recognized_disabled states as signing repair blockers when they are
+ad-hoc or signed by the PressTalk local development identity.
 
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before

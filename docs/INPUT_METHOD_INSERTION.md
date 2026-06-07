@@ -121,7 +121,7 @@ the input method but refused to select it.
 If `reason=input_method_enable_no_effect`, `enableStatus=0`, and
 `enableNoEffect=true`, macOS recognized the input method and accepted the enable
 API call, but the enabled-source requery still showed no PressTalk source. On
-`mbp1`, this happened with the ad-hoc rc49 input-method bundle: the source was
+`mbp1`, this happened with the ad-hoc rc50 input-method bundle: the source was
 visible as `com.am.presstalk.inputmethod.container` with
 `TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
 `selectCapable=true`, but `enabled=false` before and after enable, and direct

@@ -50,6 +50,8 @@ cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/
 chmod 755 "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
 cp "$PKG_DIR/scripts/presstalk_karabiner_fallback.sh" "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
+cp "$PKG_DIR/scripts/presstalk_karabiner_trigger_bridge.sh" "$APP_RESOURCES_DIR/presstalk-karabiner-trigger-bridge.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-trigger-bridge.sh"
 cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"

@@ -48,6 +48,20 @@ armed and the Settings window should show Input Monitoring as listener-ready,
 not missing.
 Treat Accessibility false-preflight as a paste probe unless paste actually
 fails.
+
+If direct `Fn`/`Option` triggers report
+`permissions.inputMonitoringStatus=writable_key_tap_unavailable`, an already
+trusted Karabiner install can be used as a local press/release bridge without
+opening System Settings:
+
+```bash
+PRESSTALK_KARABINER_TRIGGER_KEY=right_option \
+  /Applications/PressTalk.app/Contents/Resources/presstalk-karabiner-trigger-bridge.sh --enable
+```
+
+Then launch PressTalk with `PRESSTALK_TRIGGER_KEY=right_option`. Disable that
+bridge with the same helper and `--disable`; it removes PressTalk notification
+bridge rules from the selected Karabiner profile.
 If Microphone is unavailable even though macOS already shows PressTalk enabled,
 check the app signature and TCC identity before re-granting. Ad-hoc builds can
 change CDHash between releases, leaving old TCC rows that no longer match the

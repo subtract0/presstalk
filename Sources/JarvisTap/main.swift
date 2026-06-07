@@ -1935,7 +1935,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         case .trackpadHold:
             return telemetry.trackpadHoldSeen
         case .fn, .option, .leftOption, .rightOption:
-            return telemetry.modifierKeySeen || telemetry.darwinNotificationSeen
+            return telemetry.modifierKeySeen
         case .f5:
             return telemetry.darwinNotificationSeen ||
                 telemetry.nativeSystemDefinedSeen ||
@@ -2338,9 +2338,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let telemetry = withStateLock { triggerBridgeTelemetry }
         if settingsStore.triggerKey == .trackpadHold && !telemetry.trackpadHoldSeen {
             return "Trackpad Hold waiting for pointer event"
-        }
-        if settingsStore.triggerKey != .f5 && telemetry.darwinNotificationSeen {
-            return "Karabiner bridge"
         }
         if telemetry.modifierKeySeen {
             var detail = "\(settingsStore.triggerKey.displayName) trigger"
@@ -3269,8 +3266,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func handleDarwinTriggerNotification(named name: String) {
         traceLogger.log("Darwin trigger notification received name=\(name)")
         DispatchQueue.main.async { [self] in
-            guard settingsStore.triggerKey != .trackpadHold else {
-                traceLogger.log("Darwin trigger notification ignored reason=trackpad_trigger selected=\(settingsStore.triggerKey.rawValue)")
+            guard settingsStore.triggerKey == .f5 else {
+                traceLogger.log("Darwin trigger notification ignored reason=trigger_key_not_f5 selected=\(settingsStore.triggerKey.rawValue)")
                 return
             }
             switch name {

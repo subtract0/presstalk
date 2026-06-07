@@ -68,11 +68,6 @@ enum PermissionStatusLabelTest {
         require(modifierWritable.inputMonitoringPermissionLabel.text == "Listener ready", "writable listener without preflight should be labelled ready")
         require(modifierWritable.inputMonitoringPermissionLabel.tone == .ready, "writable listener should use ready tone")
 
-        let modifierBridge = makeStatus(selectedTriggerObserved: true)
-        require(modifierBridge.inputMonitoringEffective, "modifier triggers should accept an observed trigger bridge")
-        require(modifierBridge.inputMonitoringStatus == "trigger_bridge_ready", "observed modifier bridge should report bridge readiness")
-        require(modifierBridge.inputMonitoringPermissionLabel.text == "Trigger bridge ready", "observed modifier bridge should be labelled ready")
-
         let trackpadListenOnly = makeStatus(triggerKey: "trackpad_hold")
         require(!trackpadListenOnly.inputMonitoringEffective, "trackpad hold should wait for observed pointer input")
         require(trackpadListenOnly.inputMonitoringStatus == "waiting_for_trackpad_event", "trackpad listen-only status should wait for observed pointer input")

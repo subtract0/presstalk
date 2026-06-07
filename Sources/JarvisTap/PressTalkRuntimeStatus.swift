@@ -52,7 +52,7 @@ struct PressTalkRuntimeStatus {
             return false
         }
         if triggerRequiresWritableEventTap {
-            return writableEventTapInstalled || selectedTriggerObserved
+            return writableEventTapInstalled
         }
         if triggerKey == "trackpad_hold" {
             return inputListenerInstalled && selectedTriggerObserved
@@ -61,9 +61,6 @@ struct PressTalkRuntimeStatus {
     }
 
     var inputMonitoringStatus: String {
-        if triggerRequiresWritableEventTap && selectedTriggerObserved && !writableEventTapInstalled {
-            return "trigger_bridge_ready"
-        }
         if inputMonitoringEffective {
             return inputMonitoringGranted ? "preflight_granted" : "listener_ready_preflight_unavailable"
         }
@@ -87,8 +84,6 @@ struct PressTalkRuntimeStatus {
             return "listener ready; preflight unavailable"
         case "writable_key_tap_unavailable":
             return "writable key tap unavailable"
-        case "trigger_bridge_ready":
-            return "trigger bridge ready"
         case "waiting_for_trackpad_event":
             return "listener installed; waiting for trackpad event"
         case "preflight_granted_listener_unavailable":
@@ -138,9 +133,6 @@ struct PressTalkRuntimeStatus {
             return PressTalkPermissionLabel(text: "Granted", tone: .ready)
         }
         if inputMonitoringEffective {
-            if inputMonitoringStatus == "trigger_bridge_ready" {
-                return PressTalkPermissionLabel(text: "Trigger bridge ready", tone: .ready)
-            }
             return PressTalkPermissionLabel(text: "Listener ready", tone: .ready)
         }
         if triggerRequiresWritableEventTap && inputListenerInstalled {

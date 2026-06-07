@@ -85,9 +85,9 @@ desktop session rather than reopening permission panes:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
 ```
 
-For the ad-hoc `recognized_disabled` input-method state, current Settings builds
-also show `Repair Signing`. That button runs the same no-pane repair wrapper and
-then runs the production insertion probe.
+For the ad-hoc `recognized_disabled` input-method state, current builds show
+`Repair Signing` in the PressTalk menu bar and in Settings. That action runs the
+same no-pane repair wrapper and then runs the production insertion probe.
 
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
@@ -132,8 +132,9 @@ bundled one, rerun bootstrap/repair before interpreting insertion probes.
 
 The `Repair And Probe Status` section should name the current repair state and
 latest production insertion probe. If it says `adHocSigned=true` and
-`inputMethodFallbackStatus=recognized_disabled`, use desktop `Repair Signing`;
-do not re-grant Microphone, Input Monitoring, or Accessibility for that state.
+`inputMethodFallbackStatus=recognized_disabled`, use desktop `Repair Signing`
+from the menu bar or Settings; do not re-grant Microphone, Input Monitoring, or
+Accessibility for that state.
 
 Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
 values:

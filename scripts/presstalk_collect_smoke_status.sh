@@ -256,7 +256,7 @@ print_repair_and_probe_status() {
 
     if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
       cat <<EOF
-Next action: from the logged-in desktop session, click Repair Signing in PressTalk Settings and approve only the PressTalk local signing password prompt.
+Next action: from the logged-in desktop session, click Repair Signing in the PressTalk menu bar or Settings and approve only the PressTalk local signing password prompt.
 No Microphone, Input Monitoring, or Accessibility re-grant is needed for this state.
 EOF
     elif [[ "$input_method_fallback" == "ready" ]]; then

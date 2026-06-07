@@ -1283,8 +1283,8 @@ Earlier prerelease notes retained for provenance:
   and installed app signature, so stale or mismatched diagnostics are visible.
 - `v0.1.5-rc20` and later improve `presstalk-manual-fn-smoke.swift`: the
   helper reads the configured runtime trigger key, labels Option + Space,
-  Fn/Option/F5, or trackpad smoke correctly, and records readiness before and
-  after the manual paste attempt.
+  Fn/Option/F5, or trackpad smoke correctly, and records exact expected-trigger
+  proof plus readiness before and after the manual paste attempt.
 - `v0.1.5-rc22` adds `presstalk-automated-f5-smoke.swift`, an explicit
   synthetic pipeline helper. It posts the F5 Darwin trigger bridge, speaks a
   local phrase through system audio, and records PressTalk trace evidence for

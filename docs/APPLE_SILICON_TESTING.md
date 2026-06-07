@@ -341,7 +341,7 @@ Expected readiness fields:
 - `runtime.inputPipelineReady=true`
 - `runtime.inputListener` is not `failed`
 - `status.speechModel=Ready`
-- `status.triggerPath=Either Option ready`
+- `status.triggerPath=Option + Space ready`
 
 Then run the bundled manual smoke helper:
 
@@ -355,13 +355,15 @@ sentence, then release. It writes a machine-readable result under
 `~/Library/Application Support/JarvisTap/Diagnostics/` with the captured text,
 expected trigger, runtime readiness before and after the attempt, runtime status,
 and trace lines since the helper started. Current helpers also record
-`traceFinalTranscript`, `traceInserted`, `traceCopyFallback`,
-`traceInputMethodSelectFailed`, `targetCaptureSuccess`, and
-`targetCaptureFailureHint`, so physical trigger/STT proof is separate from
-active-field insertion proof. On a machine like the current mbp1 ad-hoc SSH
-install, `targetCaptureFailureHint=input_method_select_failed` means the trigger
-and transcription path may have worked, but macOS refused to select the
-InputMethodKit fallback for active-field insertion.
+`expectedTriggerProof`, `traceExpectedTriggerPressed`,
+`traceExpectedTriggerReleased`, `traceExpectedTriggerSources`,
+`traceRegisteredHotKeyObserved`, `traceFinalTranscript`, `traceInserted`,
+`traceCopyFallback`, `traceInputMethodSelectFailed`, `targetCaptureSuccess`, and
+`targetCaptureFailureHint`, so the exact trigger path, STT proof, and
+active-field insertion proof are separate. On a machine like the current mbp1
+ad-hoc SSH install, `targetCaptureFailureHint=input_method_select_failed` means
+the trigger and transcription path may have worked, but macOS refused to select
+the InputMethodKit fallback for active-field insertion.
 
 Expected:
 
@@ -370,6 +372,7 @@ Expected:
 - listening light appears
 - transcript is inserted into the helper window
 - the helper result JSON has `"success": true`
+- the helper result JSON has `"expectedTriggerProof": true`
 - the helper result JSON has `"targetCaptureSuccess": true`
 - the helper result JSON has the expected `expectedTriggerKey` and readiness
   fields for the tested machine

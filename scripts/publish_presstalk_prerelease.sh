@@ -140,10 +140,12 @@ The app bundle includes presstalk-manual-fn-smoke.swift, a focused-window helper
 that records physical trigger dictation smoke results as JSON without opening
 macOS permission panes. It now reads the configured runtime trigger key, supports
 Option + Space/Fn/Option/F5/trackpad labels, and records readiness before and
-after the manual paste smoke. It also records traceFinalTranscript, traceInserted,
+after the manual paste smoke. It also records expectedTriggerProof,
+traceExpectedTriggerPressed, traceExpectedTriggerReleased,
+traceRegisteredHotKeyObserved, traceFinalTranscript, traceInserted,
 traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and
-targetCaptureFailureHint, so a physical trigger/STT success is visibly separate
-from an active-field insertion failure.
+targetCaptureFailureHint, so the exact physical trigger path, STT success, and
+active-field insertion result are visibly separate.
 
 The bundle also includes presstalk-run-production-insertion-probe.sh and
 presstalk-production-insertion-probe.swift. The wrapper temporarily restarts

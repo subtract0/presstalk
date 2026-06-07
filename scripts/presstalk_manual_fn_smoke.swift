@@ -25,6 +25,9 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private var traceCopyFallback = false
     private var traceTriggerPressed = false
     private var traceTriggerReleased = false
+    private var traceExpectedTriggerPressed = false
+    private var traceExpectedTriggerReleased = false
+    private var traceTriggerSources: Set<String> = []
     private var traceInputMethodSelectFailed = false
     private var traceInputMethodEnableNoEffect = false
     private var traceInputMethodFailure: String?
@@ -157,6 +160,16 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             if line.contains("released: recording ended") {
                 traceTriggerReleased = true
             }
+            if line.contains("\(triggerLabel) pressed: recording started") ||
+                line.contains("\(triggerLabel) armed: recording started") {
+                traceExpectedTriggerPressed = true
+            }
+            if line.contains("\(triggerLabel) released: recording ended") {
+                traceExpectedTriggerReleased = true
+            }
+            if let source = Self.traceTriggerSource(from: line) {
+                traceTriggerSources.insert(source)
+            }
             if let range = line.range(of: "Transkription abgeschlossen:") {
                 let transcript = line[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines)
                 if !transcript.isEmpty {
@@ -214,6 +227,10 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         refreshTracePipelineState()
         let trimmedCapturedText = capturedText.trimmingCharacters(in: .whitespacesAndNewlines)
         let targetCaptureSuccess = !trimmedCapturedText.isEmpty
+        let expectedTriggerSources = Self.expectedTraceSources(for: triggerKey)
+        let sortedTraceTriggerSources = Array(traceTriggerSources).sorted()
+        let traceExpectedTriggerSourceObserved = expectedTriggerSources.contains { traceTriggerSources.contains($0) }
+        let expectedTriggerProof = traceExpectedTriggerPressed || traceExpectedTriggerReleased || traceExpectedTriggerSourceObserved
         let targetCaptureFailureHint: Any
         if targetCaptureSuccess {
             targetCaptureFailureHint = NSNull()
@@ -234,9 +251,10 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         }
 
         let payload: [String: Any] = [
-            "smokeVersion": 3,
+            "smokeVersion": 4,
             "smokeKind": "manual_physical_trigger",
             "physicalTriggerProof": traceTriggerPressed || traceTriggerReleased,
+            "expectedTriggerProof": expectedTriggerProof,
             "generatedAt": formatter.string(from: Date()),
             "startedAt": formatter.string(from: startedAt),
             "success": success,
@@ -254,6 +272,12 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             "tracePipelineComplete": tracePipelineComplete,
             "traceTriggerPressed": traceTriggerPressed,
             "traceTriggerReleased": traceTriggerReleased,
+            "traceExpectedTriggerPressed": traceExpectedTriggerPressed,
+            "traceExpectedTriggerReleased": traceExpectedTriggerReleased,
+            "traceTriggerSources": sortedTraceTriggerSources,
+            "traceExpectedTriggerSources": expectedTriggerSources,
+            "traceExpectedTriggerSourceObserved": traceExpectedTriggerSourceObserved,
+            "traceRegisteredHotKeyObserved": traceTriggerSources.contains("registered_hotkey"),
             "elapsedSeconds": Date().timeIntervalSince(startedAt),
             "expectedTriggerKey": triggerKey,
             "expectedTriggerLabel": triggerLabel,
@@ -334,6 +358,28 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private static func expectedTraceSources(for triggerKey: String) -> [String] {
+        switch triggerKey {
+        case "option_space":
+            return ["registered_hotkey"]
+        case "trackpad_hold":
+            return ["trackpad_hold"]
+        case "fn", "option", "left_option", "right_option":
+            return ["modifier_key"]
+        case "f5":
+            return ["cg_function_key", "darwin_notification", "native_system_defined"]
+        default:
+            return []
+        }
+    }
+
+    private static func traceTriggerSource(from line: String) -> String? {
+        guard let range = line.range(of: "Trigger bridge observed source=") else { return nil }
+        let suffix = line[range.upperBound...]
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return suffix.split(separator: " ").first.map(String.init)
+    }
+
     private static func readinessSummary(from runtimeStatus: [String: Any]?) -> String {
         let pipeline = boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"]) == true
         let microphone = boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"]) == true
@@ -348,8 +394,12 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             "microphoneGranted": jsonValue(boolValue(runtimeStatus, path: ["permissions", "microphoneGranted"])),
             "microphoneAuthorizationStatus": stringValue(runtimeStatus, path: ["permissions", "microphoneAuthorizationStatus"]) ?? NSNull(),
             "inputMonitoringEffective": jsonValue(boolValue(runtimeStatus, path: ["permissions", "inputMonitoringEffective"])),
+            "inputMonitoringStatus": stringValue(runtimeStatus, path: ["permissions", "inputMonitoringStatus"]) ?? NSNull(),
             "inputPipelineReady": jsonValue(boolValue(runtimeStatus, path: ["runtime", "inputPipelineReady"])),
             "inputListener": stringValue(runtimeStatus, path: ["runtime", "inputListener"]) ?? NSNull(),
+            "activeFieldInsertionReady": jsonValue(boolValue(runtimeStatus, path: ["runtime", "activeFieldInsertionReady"])),
+            "activeFieldInsertionStatus": stringValue(runtimeStatus, path: ["runtime", "activeFieldInsertionStatus"]) ?? NSNull(),
+            "selectedTriggerObserved": jsonValue(boolValue(runtimeStatus, path: ["runtime", "selectedTriggerObserved"])),
             "speechModel": stringValue(runtimeStatus, path: ["status", "speechModel"]) ?? NSNull(),
             "triggerKey": stringValue(runtimeStatus, path: ["runtime", "triggerKey"]) ?? NSNull(),
             "triggerPath": stringValue(runtimeStatus, path: ["status", "triggerPath"]) ?? NSNull(),

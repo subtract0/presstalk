@@ -5,21 +5,21 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc45`
-- Commit: `daf4286d12322e6266fe0d095cfde086c93568ed`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc45`
-- Asset: `PressTalk-0.1.5-rc45-macos-arm64.zip`
-- SHA-256: `51b69983cd1cd76e685887fe8ec6c29174395f3b4516100968d0482a1fbdfeed`
+- Tag: `v0.1.5-rc46`
+- Commit: `42bc5c078a5055025222d48e88139e2eac33bcee`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc46`
+- Asset: `PressTalk-0.1.5-rc46-macos-arm64.zip`
+- SHA-256: `1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737`
 
-Verified on `studio1` on 2026-06-06:
+Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
 - `swift build -c release` succeeds.
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc45` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc46` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc45` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc46` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
@@ -682,7 +682,7 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc45` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc46` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
@@ -707,18 +707,16 @@ Known current proof gaps:
   Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
   only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or
   `studio2-tb`; `mbp1` is reachable via `mbp1-tb`.
-- `mbp1` rc45 was installed from the GitHub release artifact over SSH with
+- `mbp1` rc46 was installed from the GitHub release artifact over SSH with
   SHA-256 verified as
-  `51b69983cd1cd76e685887fe8ec6c29174395f3b4516100968d0482a1fbdfeed`.
+  `1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737`.
   Bootstrap used `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
-  After startup delay, `presstalk-collect-smoke-status.sh` reported matching
-  live process/status/app CDHash `e5a918437fad2ded14db5c5063c3edfbc438ebfe`,
+  After startup delay, runtime status reported app CDHash
+  `4400fa6adf6626632be8f163d3d6a513d2a4e067`,
   `bundleIdentifier=com.am.presstalk`,
   `permissions.microphoneAuthorizationStatus=authorized`,
-  `permissions.microphoneGranted=true`,
   `permissions.inputMonitoringEffective=true`,
-  `permissions.inputMonitoringStatus=listener_ready_preflight_unavailable`,
   `permissions.accessibilityStatus=ax_false_input_method_fallback`,
   `runtime.inputListener=hid:listen_only`, `runtime.inputPipelineReady=true`,
   `runtime.setupRetryActive=false`, `status.speechModel=Ready`, and
@@ -727,22 +725,19 @@ Known current proof gaps:
 - On `mbp1`, bootstrap over SSH could not create a trusted local development
   signing identity because macOS denied Keychain trust changes without user
   interaction. The app therefore ran ad-hoc for the SSH install
-  (`status.adHocSigned=true`), and the rc45 bootstrap summary correctly reported
+  (`status.adHocSigned=true`), and the rc46 bootstrap summary correctly reported
   `Stable local signing requested: 1` and `Stable local signing applied: 0`.
   Treat that as a signing/identity caveat for remote installs, not as a missing
   microphone/input permission.
-- `mbp1` rc45 input-method fallback is not yet a proven insertion path. After
-  installing the bundled `PressTalkInputMethod.app`, status reported
-  `registerStatus=0`, `recognizedSourceCount=1`,
-  `source.id=com.am.presstalk.inputmethod.container`,
-  `type=TISTypeKeyboardInputMethodWithoutModes`, and `selectCapable=true`, but
-  `recognizedEnabledSourceCount=0`. The bundled rc45 reversible client probe
-  reported `success=false`, `reason=input_method_select_failed`,
-  `enableStatus=0`, `selectStatus=-50`, `restoreStatus=0`, and
-  `disableStatus=0`. This means macOS recognizes the input method but refuses
+- `mbp1` rc46 input-method fallback is not yet a proven insertion path. After
+  installing the bundled `PressTalkInputMethod.app`, the bundled reversible
+  client probe reported `success=false`,
+  `reason=input_method_select_failed`, `registerStatus=0`, `enableStatus=0`,
+  `selectStatus=-50`, `restoreStatus=0`, `disableStatus=0`, and
+  `observedText=""`. This means macOS accepts registration/enabling but refuses
   selection on the ad-hoc mbp1 install; active-field insertion remains blocked
   there unless Accessibility is trusted or input-method selectability is fixed.
-- Rebootstrapping the same rc45 install on `mbp1` as the legacy
+- Rebootstrapping the earlier rc45 install on `mbp1` as the legacy
   `com.am.jarvistap` identity did not recover the old TCC grants, because stable
   local signing still could not be applied over SSH and bootstrap fell back to a
   new ad-hoc signature. Runtime status under that ad-hoc legacy id reported
@@ -759,7 +754,7 @@ Known current proof gaps:
   Microphone/Input Monitoring/Accessibility TCC rows. However,
   `security find-identity -v -p codesigning` reports `0 valid identities` in
   the login keychain, the PressTalk local-dev keychain, and the System keychain,
-  so the current rc45 app cannot be re-signed with that historical trusted
+  so the current rc46 app cannot be re-signed with that historical trusted
   identity from SSH.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to

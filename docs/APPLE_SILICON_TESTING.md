@@ -14,6 +14,34 @@ Verify that a fresh machine can install PressTalk with minimal thinking:
 3. hold `Fn / Globe`
 4. dictate
 
+## Machine Readiness Preflight
+
+Before installing or counting a machine in the release matrix, run the read-only
+machine readiness helper. From the repo:
+
+```bash
+/bin/bash scripts/presstalk_machine_readiness.sh
+```
+
+On a remote Mac with SSH already working:
+
+```bash
+ssh <host> 'bash -s' < scripts/presstalk_machine_readiness.sh
+```
+
+After installing the app, the same helper is bundled at:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-machine-readiness.sh"
+```
+
+It does not open System Settings or start signing repair. It reports Apple
+Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
+speech readiness, active-field insertion readiness, latest production insertion
+probe, and the next action. If it reports
+`MicrophoneHardwareDetected: false`, skip microphone/STT smoke for that machine
+until a microphone is attached.
+
 ## Install
 
 For the current prerelease smoke artifact:

@@ -180,6 +180,14 @@ for the ad-hoc recognized_disabled state explicitly points to desktop Repair
 Signing instead of another Microphone/Input Monitoring/Accessibility permission
 loop.
 
+The app bundle also includes presstalk-machine-readiness.sh. This read-only
+helper reports Apple Silicon eligibility, audio input hardware, installed
+PressTalk identity, runtime speech readiness, active-field insertion readiness,
+latest production insertion probe, and a concrete next action. It is intended to
+exclude machines without an attached microphone from physical STT smoke and to
+separate host/setup blockers from app regressions before cross-machine release
+claims.
+
 The app bundle also includes presstalk-verify-repair-result.sh. This is a
 read-only post-repair verifier for SSH checks: it reports the current runtime
 signing/input-method state plus the latest production insertion probe, exits 0

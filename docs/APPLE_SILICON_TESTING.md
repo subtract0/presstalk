@@ -102,10 +102,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc88-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc88/PressTalk-0.1.5-rc88-macos-arm64.zip
-echo "c0be5def05c88c6e86eaec124342f82b3161c765107b1aad3a60ff021b0b6705  $tmpdir/PressTalk-0.1.5-rc88-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc88-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc90-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc90/PressTalk-0.1.5-rc90-macos-arm64.zip
+echo "9376b93002fbd5b8637761afde36094bc9c91bcf2bb571c626c18117c3f54a8e  $tmpdir/PressTalk-0.1.5-rc90-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc90-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -117,7 +117,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-c0be5def05c88c6e86eaec124342f82b3161c765107b1aad3a60ff021b0b6705
+9376b93002fbd5b8637761afde36094bc9c91bcf2bb571c626c18117c3f54a8e
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -507,8 +507,8 @@ launchctl print gui/$(id -u)/com.am.jarvistap | sed -n '1,80p'
 
 - `WhisperKit ready`
 - `PressTalk armed`
-- `🎙️ Fn / Globe pressed: recording started`
-- `📝 Transkription abgeschlossen: ...`
+- `Option + Space` trigger observed in the trace
+- `Transkription abgeschlossen: ...`
 - `targetCaptureSuccess: true` in the manual or automated smoke JSON
 
 ## Machine Matrix
@@ -516,10 +516,10 @@ launchctl print gui/$(id -u)/com.am.jarvistap | sed -n '1,80p'
 Record each machine result before claiming release coverage:
 
 - `studio1`: M4 Max, local build/runtime smoke
-- `s1`: install + Fn smoke
+- `s1`: install + Option + Space smoke
 - `s2` / `studio2`: excluded from current microphone/STT coverage until a
   microphone is attached
-- `mbp1`: M1 Max install + Fn or Option smoke
+- `mbp1`: M1 Max install + Option + Space smoke after logged-in signing repair
 
 Attach or paste the output of `presstalk-collect-smoke-status.sh` for each
 machine. A successful smoke should show `inputPipelineReady: true`, the trigger

@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc50`
-- Commit: `25e1dad1b98341e65cbede22ddd1b555cf0faa87`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc50`
-- Asset: `PressTalk-0.1.5-rc50-macos-arm64.zip`
-- SHA-256: `b72b147689089395fc1b33cb5b9b76130ac25860f9dc2062ffb71c6b8c3f8aaa`
+- Tag: `v0.1.5-rc51`
+- Commit: `c39aa6ec532ef0a5d08452ea630808d5d740833c`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc51`
+- Asset: `PressTalk-0.1.5-rc51-macos-arm64.zip`
+- SHA-256: `42715a47f3d91e50ef608a31de3c9c43c1a67ccbfac2c24111758fe1e50343eb`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,15 +17,15 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc50` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc51` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc50` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc51` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
-  bundled local-signing helper, bundled smoke-status collector, bundled manual
-  Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
-  Accessibility probe, bundled production insertion probe helpers, and bundled
-  input-method app/helpers with `PkgInfo`.
-- Current local builds after rc50 add the bundled
+  bundled local-signing helper, bundled signing-repair helper, bundled
+  smoke-status collector, bundled manual Fn smoke helper, bundled automated F5
+  smoke helper, bundled actual-bundle Accessibility probe, bundled production
+  insertion probe helpers, and bundled input-method app/helpers with `PkgInfo`.
+- `v0.1.5-rc51` adds the bundled
   `presstalk-repair-local-signing.sh` helper. It runs with no-pane flags,
   prepares a local signing identity, restarts PressTalk with stable signing,
   signs the bundled `PressTalkInputMethod.app`, refreshes the installed copy in
@@ -703,7 +703,7 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- Current local work after `v0.1.5-rc50` adds a bundled no-pane signing repair
+- `v0.1.5-rc51` adds a bundled no-pane signing repair
   wrapper and updates bootstrap to sign/refresh `PressTalkInputMethod.app`
   alongside the outer app. This is intended for the mbp1
   `input_method_enable_no_effect` blocker after a skipped signing-trust password

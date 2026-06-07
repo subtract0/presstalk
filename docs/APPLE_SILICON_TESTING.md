@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc65-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc65/PressTalk-0.1.5-rc65-macos-arm64.zip
-echo "73ef9f26096cd80b234f2d63322ee766ce2c145ca700a4a55260779f25379593  $tmpdir/PressTalk-0.1.5-rc65-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc65-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc66-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc66/PressTalk-0.1.5-rc66-macos-arm64.zip
+echo "df52b2d5edebad4baec59e3626a289f389d209c8857647a536bcdc2444fe58bc  $tmpdir/PressTalk-0.1.5-rc66-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc66-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-73ef9f26096cd80b234f2d63322ee766ce2c145ca700a4a55260779f25379593
+df52b2d5edebad4baec59e3626a289f389d209c8857647a536bcdc2444fe58bc
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -106,6 +106,12 @@ The repair wrapper refuses to start the signing trust flow over SSH unless
 The normal bootstrap summary now also reports `Bundled input method signing
 applied` and `Installed input method refreshed`. On mbp1, those fields must be
 `1` before treating the repaired input-method path as tested.
+
+Runtime status now also reports `runtime.activeFieldInsertionReady` and
+`runtime.activeFieldInsertionStatus`. For the requested PressTalk behavior,
+`activeFieldInsertionReady=true` is the machine-readable distinction between a
+speech pipeline that is merely transcription-ready and one that is ready to
+insert into the active field.
 
 After repair or bootstrap, collect one read-only status report:
 

@@ -71,6 +71,11 @@ whether the latest repair helper is still running. When the repair is run with
 same diagnostics log after the production insertion probe, while preserving the
 probe exit status.
 
+The status menu also shows Repair Signing... in that exact ad-hoc
+recognized-disabled input-method state. This gives a logged-in desktop user a
+direct repair action from the menu bar without reopening the full Settings
+window.
+
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before
 launching the app. Its summary reports both Bundled input method signing applied

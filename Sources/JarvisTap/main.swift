@@ -1185,6 +1185,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var toggleHUDMenuItem: NSMenuItem?
     private var togglePasteMenuItem: NSMenuItem?
     private var toggleAbortPopupsMenuItem: NSMenuItem?
+    private var repairLocalSigningMenuItem: NSMenuItem?
     private var settingsWindowController: PressTalkSettingsWindowController?
     private var hudController: PressTalkHUDController?
     private var readyResetWorkItem: DispatchWorkItem?
@@ -1543,6 +1544,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         setupCheckItem.target = self
         menu.addItem(setupCheckItem)
 
+        let repairSigningItem = NSMenuItem(title: "Repair Signing…", action: #selector(repairLocalSigningFromMenu(_:)), keyEquivalent: "")
+        repairSigningItem.target = self
+        repairSigningItem.isHidden = true
+        repairSigningItem.toolTip = "Runs the bundled signing repair helper with permission panes disabled."
+        self.repairLocalSigningMenuItem = repairSigningItem
+        menu.addItem(repairSigningItem)
+
         let reloadItem = NSMenuItem(title: "Reload Speech Model", action: #selector(reloadSpeechModelFromMenu(_:)), keyEquivalent: "r")
         reloadItem.target = self
         menu.addItem(reloadItem)
@@ -1839,6 +1847,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
     }
 
+    @objc private func repairLocalSigningFromMenu(_ sender: Any?) {
+        repairLocalSigningFromSettings()
+    }
+
     @objc private func toggleHUDFromMenu(_ sender: Any?) {
         settingsStore.showHUD.toggle()
         settingsWindowController?.reloadFromStore()
@@ -1885,7 +1897,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         writeRuntimeStatusSnapshot(status)
         DispatchQueue.main.async { [weak self] in
             self?.settingsWindowController?.updateRuntimeStatus(status)
+            self?.updateRepairLocalSigningMenuItem(status)
         }
+    }
+
+    private func updateRepairLocalSigningMenuItem(_ status: PressTalkRuntimeStatus) {
+        let repairNeeded = localSigningRepairNeeded(status)
+        repairLocalSigningMenuItem?.isHidden = !repairNeeded
+        repairLocalSigningMenuItem?.isEnabled = repairNeeded
     }
 
     private func currentRuntimeStatus() -> PressTalkRuntimeStatus {
@@ -2137,7 +2156,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func repairLocalSigningFromSettings() {
         let status = currentRuntimeStatus()
-        guard status.adHocSigned && status.inputMethodFallbackStatus == "recognized_disabled" else {
+        guard localSigningRepairNeeded(status) else {
             traceLogger.log("Local signing repair skipped reason=state_not_repairable ad_hoc=\(status.adHocSigned ? 1 : 0) input_method=\(status.inputMethodFallbackStatus)")
             present(.error("Signing repair is only needed for the ad-hoc input-method-disabled state."))
             return
@@ -2189,6 +2208,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Local signing repair launch failed error=\(error)")
             present(.error("Could not start signing repair: \(error.localizedDescription)"))
         }
+    }
+
+    private func localSigningRepairNeeded(_ status: PressTalkRuntimeStatus) -> Bool {
+        status.adHocSigned && status.inputMethodFallbackStatus == "recognized_disabled"
     }
 
     private func shellQuoted(_ value: String) -> String {

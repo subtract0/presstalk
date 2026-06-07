@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc46-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc46/PressTalk-0.1.5-rc46-macos-arm64.zip
-echo "1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737  $tmpdir/PressTalk-0.1.5-rc46-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc46-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc49-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc49/PressTalk-0.1.5-rc49-macos-arm64.zip
+echo "5910d18e8de85b7c747871186185fabbcccf536ba71bed648d2796dce7883571  $tmpdir/PressTalk-0.1.5-rc49-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc49-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737
+5910d18e8de85b7c747871186185fabbcccf536ba71bed648d2796dce7883571
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -273,6 +273,12 @@ If the client probe reports `reason=input_method_select_failed` with
 That is an active-field insertion blocker: dictation may still transcribe, but
 without Accessibility trust the app will copy instead of inserting into the
 focused field.
+
+If the client probe reports `reason=input_method_enable_no_effect`,
+`enableStatus=0`, and `enableNoEffect=true`, macOS recognized the input method
+and accepted the enable API call, but the enabled-source list still did not
+contain PressTalk. That is the current mbp1 ad-hoc SSH-install blocker; do not
+reopen privacy panes for it.
 
 After macOS recognizes and you select `PressTalk Input Method`, focus an
 editable text field and run:

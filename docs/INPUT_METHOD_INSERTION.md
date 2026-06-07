@@ -60,7 +60,8 @@ The installed bundle path is:
 Current builds sign the prototype with the same local development identity as
 `PressTalk.app` unless `PRESSTALK_BUILD_STABLE_SIGNING=0` is set. The generated
 bundle uses a no-mode source id, `com.am.presstalk.inputmethod.container`, and
-carries the IMK metadata keys `CFBundleIconFile`, `LSUIElement`,
+carries the IMK metadata keys `CFBundleIconFile`, `LSBackgroundOnly`,
+`LSUIElement`,
 `InputMethodConnectionName`, `InputMethodServerControllerClass`,
 `InputMethodServerDelegateClass`, `TISInputSourceID`,
 `tsInputMethodIconFileKey`, and `tsInputMethodCharacterRepertoireKey`.
@@ -115,12 +116,18 @@ method as an enable/select-capable source. In that state, manual notification
 probes are not meaningful yet because no focused client can be attached.
 
 If `reason=input_method_select_failed` with `selectStatus=-50`, macOS recognized
-the input method but refused to select it. On `mbp1`, this happened with the
-ad-hoc rc44 input-method bundle: `TISRegisterInputSource` returned `0`,
-`recognizedSourceCount=1`, and `TISEnableInputSource` returned `0`, but the
-enabled-source requery stayed empty and direct `TISSelectInputSource` returned
-`-50`. In that state production dictation will fall back to copying unless
-Accessibility is trusted or the input method can be selected by macOS.
+the input method but refused to select it.
+
+If `reason=input_method_enable_no_effect`, `enableStatus=0`, and
+`enableNoEffect=true`, macOS recognized the input method and accepted the enable
+API call, but the enabled-source requery still showed no PressTalk source. On
+`mbp1`, this happened with the ad-hoc rc49 input-method bundle: the source was
+visible as `com.am.presstalk.inputmethod.container` with
+`TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
+`selectCapable=true`, but `enabled=false` before and after enable, and direct
+`TISSelectInputSource` returned `-50`. In that state production dictation will
+fall back to copying unless Accessibility is trusted, the signing/trust state is
+repaired, or the input method can be selected by macOS.
 
 Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with

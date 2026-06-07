@@ -190,3 +190,10 @@ panes repeatedly. First inspect `runtime-status.json` and the app signature
 fields (`codeSignatureIdentifier`, `codeSignatureCDHash`, and
 `codeSignatureAuthority`) to confirm whether the bundle id or signing identity
 changed.
+
+Current helpers retry trust for an existing untrusted PressTalk local signing
+identity instead of importing another duplicate certificate on every failed
+attempt. If the helper prints `Existing PressTalk local code-signing identity
+remains untrusted`, run it from the logged-in desktop session and approve the
+Mac login-password signing trust prompt. This is a signing/trust repair step,
+not a reason to reopen Microphone, Input Monitoring, or Accessibility panes.

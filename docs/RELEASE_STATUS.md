@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc46`
-- Commit: `42bc5c078a5055025222d48e88139e2eac33bcee`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc46`
-- Asset: `PressTalk-0.1.5-rc46-macos-arm64.zip`
-- SHA-256: `1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737`
+- Tag: `v0.1.5-rc49`
+- Commit: `9a6d4714ba5cc27831de0ff49f4bd9329e30bb40`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc49`
+- Asset: `PressTalk-0.1.5-rc49-macos-arm64.zip`
+- SHA-256: `5910d18e8de85b7c747871186185fabbcccf536ba71bed648d2796dce7883571`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,9 +17,9 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc46` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc49` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc46` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc49` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled smoke-status collector, bundled manual
   Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
@@ -682,7 +682,7 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
-- `v0.1.5-rc46` includes the listen-only event-tap fallback, WhisperKit cache
+- `v0.1.5-rc49` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1
   launchd disabled-label/provenance fix, the `com.am.presstalk` bundle
@@ -697,7 +697,12 @@ Known current proof gaps:
   also report `input_method_select_failed` when source recognition succeeds but
   `TISSelectInputSource` fails, and manual physical-trigger smoke records
   `traceInputMethodSelectFailed` / `traceInputMethodFailure` so STT success can
-  be separated from active-field insertion failure. It also includes
+  be separated from active-field insertion failure. It also includes the
+  `input_method_enable_no_effect` classifier for the mbp1 shape where
+  `TISEnableInputSource` returns `0` but the source remains disabled, the
+  `LSBackgroundOnly=true` input-method metadata fix, and a local signing helper
+  fix that retries trust on existing untrusted PressTalk identities instead of
+  importing another duplicate certificate. It also includes
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON, plus the rc29
   success-path setup-window fix, the rc30 manual-smoke insertion evidence
@@ -707,36 +712,44 @@ Known current proof gaps:
   Direct SSH to `s1` / `s2` does not resolve from this host, and mDNS/DNS lookup
   only resolves `studio1` and `studio2`. `studio2` is reachable as `studio2` or
   `studio2-tb`; `mbp1` is reachable via `mbp1-tb`.
-- `mbp1` rc46 was installed from the GitHub release artifact over SSH with
+- `mbp1` rc49 was installed from the GitHub release artifact over SSH with
   SHA-256 verified as
-  `1df42c4928e4913ad59582afa964a9eec8ef902f3e49f93dbb7cd3b70e26f737`.
+  `5910d18e8de85b7c747871186185fabbcccf536ba71bed648d2796dce7883571`.
   Bootstrap used `PRESSTALK_OPEN_PERMISSION_PANES=0`,
   `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn`.
-  After startup delay, runtime status reported app CDHash
-  `4400fa6adf6626632be8f163d3d6a513d2a4e067`,
+  After warmup, runtime status reported app CDHash
+  `ee77d9e950f1c471bde4aa1760782254b2ed90f0`,
   `bundleIdentifier=com.am.presstalk`,
   `permissions.microphoneAuthorizationStatus=authorized`,
   `permissions.inputMonitoringEffective=true`,
-  `permissions.accessibilityStatus=ax_false_input_method_fallback`,
-  `runtime.inputListener=hid:listen_only`, `runtime.inputPipelineReady=true`,
-  `runtime.setupRetryActive=false`, `status.speechModel=Ready`, and
-  `status.triggerPath=Fn / Globe ready`. This is runtime-readiness evidence,
-  not physical Fn dictation/paste proof.
+  `runtime.inputPipelineReady=true`, `runtime.setupRetryActive=false`,
+  `status.speechModel=Ready`, and `status.triggerPath=Fn / Globe ready`. This
+  is runtime-readiness evidence, not physical Fn dictation/paste proof.
 - On `mbp1`, bootstrap over SSH could not create a trusted local development
   signing identity because macOS denied Keychain trust changes without user
   interaction. The app therefore ran ad-hoc for the SSH install
-  (`status.adHocSigned=true`), and the rc46 bootstrap summary correctly reported
+  (`status.adHocSigned=true`), and the rc49 bootstrap summary correctly reported
   `Stable local signing requested: 1` and `Stable local signing applied: 0`.
-  Treat that as a signing/identity caveat for remote installs, not as a missing
+  The fixed rc49 helper found the existing untrusted PressTalk local signing
+  identity and retried trust instead of importing another duplicate; the mbp1
+  local-signing identity count stayed at `13` before and after bootstrap. Treat
+  this as a signing/identity caveat for remote installs, not as a missing
   microphone/input permission.
-- `mbp1` rc46 input-method fallback is not yet a proven insertion path. After
+- `mbp1` rc49 input-method fallback is not yet a proven insertion path. After
   installing the bundled `PressTalkInputMethod.app`, the bundled reversible
   client probe reported `success=false`,
-  `reason=input_method_select_failed`, `registerStatus=0`, `enableStatus=0`,
-  `selectStatus=-50`, `restoreStatus=0`, `disableStatus=0`, and
-  `observedText=""`. This means macOS accepts registration/enabling but refuses
-  selection on the ad-hoc mbp1 install; active-field insertion remains blocked
-  there unless Accessibility is trusted or input-method selectability is fixed.
+  `reason=input_method_enable_no_effect`, `registerStatus=0`,
+  `enableStatus=0`, `enableNoEffect=true`, `selectStatus=-50`,
+  `restoreStatus=0`, `disableStatus=0`,
+  `pressTalkWasEnabledBeforeProbe=false`, and `observedText=""`. The source was
+  visible in the all-installed list as
+  `com.am.presstalk.inputmethod.container` with
+  `TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
+  `selectCapable=true`, but `enabled=false` before and after enable. This means
+  macOS recognizes the input method and accepts the enable API call but does not
+  actually enable it on the ad-hoc mbp1 install; active-field insertion remains
+  blocked there unless Accessibility is trusted, the signing/trust state is
+  repaired interactively, or another insertion mechanism is implemented.
 - Rebootstrapping the earlier rc45 install on `mbp1` as the legacy
   `com.am.jarvistap` identity did not recover the old TCC grants, because stable
   local signing still could not be applied over SSH and bootstrap fell back to a
@@ -754,7 +767,7 @@ Known current proof gaps:
   Microphone/Input Monitoring/Accessibility TCC rows. However,
   `security find-identity -v -p codesigning` reports `0 valid identities` in
   the login keychain, the PressTalk local-dev keychain, and the System keychain,
-  so the current rc46 app cannot be re-signed with that historical trusted
+  so the current rc49 app cannot be re-signed with that historical trusted
   identity from SSH.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to

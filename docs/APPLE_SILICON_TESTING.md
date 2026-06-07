@@ -45,6 +45,15 @@ plutil -extract eligibility.physicalSTTSmokeReady raw -o - "$HOME/Desktop/presst
 plutil -extract eligibility.activeFieldSmokeReady raw -o - "$HOME/Desktop/presstalk-readiness.json"
 ```
 
+To collect host and alias evidence before the release matrix, run:
+
+```bash
+/bin/bash scripts/presstalk_host_discovery.sh \
+  --targets local,s1,s1.local,mbp1,mbp1-tb,studio1.local,mba1.local \
+  --probe-ssh --timeout 3 \
+  --json-output "$HOME/Desktop/presstalk-host-discovery.json"
+```
+
 To collect a matrix that includes local readiness plus SSH host blockers, run:
 
 ```bash

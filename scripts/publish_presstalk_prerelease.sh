@@ -201,6 +201,13 @@ with strict host-key checking and a short connect timeout. Failed host
 resolution, host-key verification, and SSH timeouts are recorded as failed
 targets instead of being confused with app regressions.
 
+The bundle also includes presstalk-host-discovery.sh. It collects read-only
+host/alias evidence before matrix runs: local SSH config aliases, Bonjour SSH
+advertisements, target ssh -G resolution, and optional strict BatchMode SSH
+probes. This makes missing aliases such as s1, strict host-key blockers, and
+the reachable mbp1-tb path visible in JSON without installing or repairing
+PressTalk.
+
 The bundle also includes presstalk-release-proof-gate.sh. It consumes the
 readiness matrix and exits 0 only when every required target is reachable,
 reports readiness, has physical STT smoke ready, and has active-field smoke

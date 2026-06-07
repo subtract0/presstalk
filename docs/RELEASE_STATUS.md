@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc69`
-- Commit: `52ee02481d175b19c82a3e5fbb090cb2708a2172`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc69`
-- Asset: `PressTalk-0.1.5-rc69-macos-arm64.zip`
-- SHA-256: `09bd78f93e1a68d476d2d0bb0589e94b96b3d5d3e07dde6f0871cadda7ab2f8f`
+- Tag: `v0.1.5-rc71`
+- Commit: `96c9c08fde4f0b9a819195407a6f5181b5dd1ffe`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc71`
+- Asset: `PressTalk-0.1.5-rc71-macos-arm64.zip`
+- SHA-256: `377412a2fe341e29760694b9abdaeea11536e9adb6ebea51eff73448e000bbf4`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,23 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc71` fixes the bundled `presstalk-readiness-matrix.sh` helper path.
+  The source-tree helper uses underscore naming, but bundled resources use
+  hyphen naming. A regression test now simulates the bundled resource layout.
+- The `v0.1.5-rc71` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:377412a2fe341e29760694b9abdaeea11536e9adb6ebea51eff73448e000bbf4`,
+  matching the local `dist/PressTalk-0.1.5-rc71-macos-arm64.zip`. The
+  `v0.1.5-rc71` tag points at
+  `96c9c08fde4f0b9a819195407a6f5181b5dd1ffe`, and the inspected asset's bundled
+  matrix helper reports local target status `ready_reported`.
+- After rc71 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
+  matrix helper reports local `activeFieldSmokeReady=true`; the bundled
+  verifier exits `0`.
+
+Earlier prerelease notes retained for provenance:
+
 - `v0.1.5-rc69` makes the machine-readiness helper produce parseable JSON
   with `--json` and `--json-output PATH`, and adds a fixture test for the JSON
   contract. The JSON schema includes `eligibility.physicalSTTSmokeReady`,
@@ -34,7 +51,9 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   readiness helper JSON reports `eligibility.physicalSTTSmokeReady=true` and
   `eligibility.activeFieldSmokeReady=true`; the bundled verifier exits `0`.
 
-Earlier prerelease notes retained for provenance:
+- `v0.1.5-rc70` added bundled `presstalk-readiness-matrix.sh` for local and SSH
+  readiness matrix JSON, but artifact inspection found the bundled helper path
+  bug fixed in rc71.
 
 - `v0.1.5-rc68` adds bundled `presstalk-machine-readiness.sh`, a read-only
   machine eligibility helper. It reports Apple Silicon eligibility, detected

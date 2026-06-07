@@ -50,6 +50,15 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
+- Bonjour SSH discovery advertises `mba1`, `studio1`, `studio2`, and `mbp1`,
+  but no `s1`. `mba1` resolves through Bonjour as `mba1.local:22`, but strict
+  SSH remains blocked because the host key is not trusted locally. Observed
+  `mba1.local` key fingerprints from read-only `ssh-keyscan`, not trusted or
+  added: RSA
+  `SHA256:uA9g7l4TV0EVDgTn1d1X3g/aDQ5vBJmVaTe7gwj7lnI`, ED25519
+  `SHA256:3d9YHlo6UXSwPW8JCg9GoVIuSGAU38SVhm4a9Ow1Mg4`, ECDSA
+  `SHA256:BhdJk5PV1aV/VhYi8FCJu5oR0DTzA8K+bdIN+rVzS+Q`. Do not bypass or add
+  host keys without out-of-band verification.
 
 Earlier prerelease notes retained for provenance:
 

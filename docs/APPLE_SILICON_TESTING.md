@@ -50,6 +50,7 @@ To collect a matrix that includes local readiness plus SSH host blockers, run:
 ```bash
 /bin/bash scripts/presstalk_readiness_matrix.sh \
   --local --host s1 --host s1.local --host mbp1 --host mbp1-tb \
+  --host studio1.local --host mba1.local --timeout 3 \
   --json-output "$HOME/Desktop/presstalk-readiness-matrix.json"
 plutil -extract targets raw -o - "$HOME/Desktop/presstalk-readiness-matrix.json"
 ```
@@ -59,7 +60,8 @@ Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
 speech readiness, active-field insertion readiness, latest production insertion
 probe, and the next action. If it reports
 `MicrophoneHardwareDetected: false`, skip microphone/STT smoke for that machine
-until a microphone is attached.
+until a microphone is attached. Do not include `studio2` / `s2` in the current
+STT smoke matrix while it has no attached microphone.
 
 ## Install
 

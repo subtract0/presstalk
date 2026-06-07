@@ -247,4 +247,6 @@ appears, the client accepted the request path but insertion is still not proven.
 The focused editable-field probe has succeeded on `studio1`, so production
 dictation may use the same pending-insert file plus Darwin notification path
 before falling back to copy when Accessibility is untrusted. It still needs
-cross-machine smoke on `s1`, `s2`, and `mbp1` before the full app goal is proven.
+cross-machine smoke on `s1` and `mbp1` before the full app goal is proven.
+`s2` / `studio2` is intentionally out of the current microphone/STT smoke matrix
+until a microphone is attached.

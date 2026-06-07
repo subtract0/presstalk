@@ -5,6 +5,7 @@ SSH_CONFIG="${PRESSTALK_SSH_CONFIG_PATH:-$HOME/.ssh/config}"
 OUTPUT_FORMAT="text"
 JSON_OUTPUT_PATH=""
 BONJOUR_ENABLED=1
+TAILSCALE_ENABLED=1
 BONJOUR_TIMEOUT="${PRESSTALK_BONJOUR_TIMEOUT:-3}"
 SSH_CONNECT_TIMEOUT="${PRESSTALK_SSH_CONNECT_TIMEOUT:-3}"
 PROBE_SSH=0
@@ -24,6 +25,7 @@ Options:
   --probe-ssh         Also run a strict BatchMode SSH probe for each target.
   --timeout SECONDS   SSH ConnectTimeout and Bonjour browse timeout. Default: 3.
   --no-bonjour        Skip Bonjour browsing.
+  --no-tailscale      Skip Tailscale status collection.
   --json              Write only machine-readable JSON to stdout.
   --json-output PATH  Also write machine-readable JSON to PATH.
   -h, --help          Show this help.
@@ -69,6 +71,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-bonjour)
       BONJOUR_ENABLED=0
+      shift
+      ;;
+    --no-tailscale)
+      TAILSCALE_ENABLED=0
       shift
       ;;
     --json)
@@ -153,6 +159,7 @@ plist_insert_bool "sshConfig.exists" "$([[ -f "$SSH_CONFIG" ]] && echo true || e
 plist_insert_int "sshConnectTimeoutSeconds" "$SSH_CONNECT_TIMEOUT"
 plist_insert_int "bonjourTimeoutSeconds" "$BONJOUR_TIMEOUT"
 plist_insert_bool "sshProbeEnabled" "$([[ "$PROBE_SSH" == "1" ]] && echo true || echo false)"
+plist_insert_bool "tailscaleEnabled" "$([[ "$TAILSCALE_ENABLED" == "1" ]] && echo true || echo false)"
 plutil -insert sshConfig.hosts -array "$RESULT_PLIST" >/dev/null
 
 if [[ -f "$SSH_CONFIG" ]]; then
@@ -165,7 +172,65 @@ if [[ -f "$SSH_CONFIG" ]]; then
   )
 fi
 
+plutil -insert tailscale -dictionary "$RESULT_PLIST" >/dev/null
+plist_insert_bool "tailscale.enabled" "$([[ "$TAILSCALE_ENABLED" == "1" ]] && echo true || echo false)"
+plutil -insert tailscale.rawLines -array "$RESULT_PLIST" >/dev/null
+plutil -insert tailscale.nodes -array "$RESULT_PLIST" >/dev/null
+if [[ "$TAILSCALE_ENABLED" == "1" ]]; then
+  tailscale_bin="${PRESSTALK_TAILSCALE_PATH:-$(command -v tailscale 2>/dev/null || true)}"
+  plist_insert_string "tailscale.path" "${tailscale_bin:-missing}"
+  if [[ -n "$tailscale_bin" && -x "$tailscale_bin" ]]; then
+    tailscale_output="$RUN_TMPDIR/tailscale-status.out"
+    tailscale_error="$RUN_TMPDIR/tailscale-status.err"
+    tailscale_status=0
+    set +e
+    "$tailscale_bin" status >"$tailscale_output" 2>"$tailscale_error"
+    tailscale_status=$?
+    set -e
+    plist_insert_int "tailscale.exitStatus" "$tailscale_status"
+    tailscale_error_summary="$(single_line_file "$tailscale_error")"
+    tailscale_output_summary="$(single_line_file "$tailscale_output")"
+    if [[ "$tailscale_status" -eq 0 ]] &&
+       ! printf '%s\n' "$tailscale_output_summary" | grep -Eiq 'failed to start|clierror|error'; then
+      plist_insert_bool "tailscale.statusAvailable" true
+      plist_insert_string "tailscale.error" "$tailscale_error_summary"
+    else
+      plist_insert_bool "tailscale.statusAvailable" false
+      if [[ -n "$tailscale_error_summary" ]]; then
+        plist_insert_string "tailscale.error" "$tailscale_error_summary"
+      else
+        plist_insert_string "tailscale.error" "$tailscale_output_summary"
+      fi
+    fi
+
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      plutil -insert tailscale.rawLines -string "$line" -append "$RESULT_PLIST" >/dev/null
+      ip="$(printf '%s\n' "$line" | awk '{ print $1 }')"
+      name="$(printf '%s\n' "$line" | awk '{ print $2 }')"
+      if [[ "$ip" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ || "$ip" == *":"* ]]; then
+        node_plist="$RUN_TMPDIR/tailscale-node-$RANDOM.plist"
+        plutil -create xml1 "$node_plist" >/dev/null
+        plutil -insert ip -string "$ip" "$node_plist" >/dev/null
+        plutil -insert name -string "${name:-unknown}" "$node_plist" >/dev/null
+        plutil -insert statusLine -string "$line" "$node_plist" >/dev/null
+        node_json="$(plutil -convert json -r -o - "$node_plist")"
+        plutil -insert tailscale.nodes -json "$node_json" -append "$RESULT_PLIST" >/dev/null
+      fi
+    done <"$tailscale_output"
+  else
+    plist_insert_int "tailscale.exitStatus" 0
+    plist_insert_bool "tailscale.statusAvailable" false
+    plist_insert_string "tailscale.error" "tailscale unavailable"
+  fi
+else
+  plist_insert_int "tailscale.exitStatus" 0
+  plist_insert_bool "tailscale.statusAvailable" false
+  plist_insert_string "tailscale.error" "disabled"
+fi
+
 plutil -insert targets -array "$RESULT_PLIST" >/dev/null
+if [[ "${#TARGETS[@]}" -gt 0 ]]; then
 for target in "${TARGETS[@]}"; do
   target_plist="$RUN_TMPDIR/target-$RANDOM.plist"
   plutil -create xml1 "$target_plist" >/dev/null
@@ -225,6 +290,7 @@ for target in "${TARGETS[@]}"; do
   target_json="$(plutil -convert json -r -o - "$target_plist")"
   plutil -insert targets -json "$target_json" -append "$RESULT_PLIST" >/dev/null
 done
+fi
 
 plutil -insert bonjour -dictionary "$RESULT_PLIST" >/dev/null
 plist_insert_bool "bonjour.enabled" "$([[ "$BONJOUR_ENABLED" == "1" ]] && echo true || echo false)"
@@ -268,10 +334,15 @@ write_json() {
 if [[ "$OUTPUT_FORMAT" == "json" ]]; then
   write_json "-"
 else
+  targets_text="(none)"
+  if [[ "${#TARGETS[@]}" -gt 0 ]]; then
+    targets_text="${TARGETS[*]}"
+  fi
   echo "PressTalk host discovery"
   echo "SSH config: $SSH_CONFIG"
-  echo "Targets: ${TARGETS[*]:-(none)}"
+  echo "Targets: $targets_text"
   echo "Bonjour: $([[ "$BONJOUR_ENABLED" == "1" ]] && echo enabled || echo disabled)"
+  echo "Tailscale: $([[ "$TAILSCALE_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "SSH probe: $([[ "$PROBE_SSH" == "1" ]] && echo enabled || echo disabled)"
   if [[ -n "$JSON_OUTPUT_PATH" ]]; then
     echo "HostDiscoveryJSON: $JSON_OUTPUT_PATH"

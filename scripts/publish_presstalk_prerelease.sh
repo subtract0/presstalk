@@ -213,9 +213,12 @@ targets instead of being confused with app regressions.
 
 The bundle also includes presstalk-host-discovery.sh. It collects read-only
 host/alias evidence before matrix runs: local SSH config aliases, Bonjour SSH
-advertisements, target ssh -G resolution, and optional strict BatchMode SSH
-probes. This makes missing aliases such as s1, strict host-key blockers, and
-the reachable mbp1-tb path visible in JSON without installing or repairing
+advertisements, Tailscale status by default, target ssh -G resolution, and
+optional strict BatchMode SSH probes. Tailscale collection can be skipped with
+--no-tailscale, and Tailscale CLI failures are recorded as unavailable status
+with the failure text in JSON instead of being confused with missing hosts.
+This makes missing aliases such as s1, strict host-key blockers, Tailscale
+status, and the reachable mbp1-tb path visible without installing or repairing
 PressTalk.
 
 The bundle also includes presstalk-release-proof-gate.sh. It consumes the

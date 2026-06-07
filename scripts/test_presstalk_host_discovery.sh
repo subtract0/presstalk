@@ -10,6 +10,8 @@ ssh_config="$TEST_TMPDIR/ssh_config"
 json_report="$TEST_TMPDIR/host-discovery.json"
 text_report="$TEST_TMPDIR/host-discovery.txt"
 probe_json_report="$TEST_TMPDIR/host-discovery-probe.json"
+tailscale_failure_json_report="$TEST_TMPDIR/host-discovery-tailscale-failure.json"
+fake_tailscale="$TEST_TMPDIR/tailscale"
 
 cat >"$ssh_config" <<'SSHCONFIG'
 Host mbp1-tb
@@ -27,7 +29,24 @@ Host invalid-host
   User am
 SSHCONFIG
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" "$HELPER" \
+cat >"$fake_tailscale" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" != "status" ]]; then
+  echo "unexpected tailscale arg: $*" >&2
+  exit 2
+fi
+if [[ "${PRESSTALK_FAKE_TAILSCALE_FAIL_STDOUT:-0}" == "1" ]]; then
+  echo "The Tailscale CLI failed to start: Tailscale.CLIError error 1."
+  exit 0
+fi
+cat <<'STATUS'
+100.64.0.10 s1 alex@ macOS active
+100.64.0.20 mbp1 alex@ macOS active
+STATUS
+SH
+chmod +x "$fake_tailscale"
+
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" "$HELPER" \
   --no-bonjour \
   --target mbp1-tb \
   --target s1 \
@@ -39,6 +58,10 @@ if [[ ! -s "$json_report" ]]; then
 fi
 if ! grep -Fq "HostDiscoveryJSON: $json_report" "$text_report"; then
   echo "FAIL: host discovery text did not report JSON path"
+  exit 1
+fi
+if ! grep -Fq "Tailscale: enabled" "$text_report"; then
+  echo "FAIL: host discovery text did not report Tailscale status"
   exit 1
 fi
 
@@ -62,6 +85,48 @@ if [[ "$target_count" != "2" ]]; then
   exit 1
 fi
 
+tailscale_available="$(plutil -extract tailscale.statusAvailable raw -o - "$json_report")"
+if [[ "$tailscale_available" != "true" ]]; then
+  echo "FAIL: expected Tailscale status available, got $tailscale_available"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+tailscale_node_count="$(plutil -extract tailscale.nodes raw -o - "$json_report")"
+if [[ "$tailscale_node_count" != "2" ]]; then
+  echo "FAIL: expected 2 Tailscale nodes, got $tailscale_node_count"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+tailscale_first_node="$(plutil -extract tailscale.nodes.0.name raw -o - "$json_report")"
+if [[ "$tailscale_first_node" != "s1" ]]; then
+  echo "FAIL: unexpected first Tailscale node $tailscale_first_node"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
+  PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
+  PRESSTALK_FAKE_TAILSCALE_FAIL_STDOUT=1 \
+  "$HELPER" \
+  --no-bonjour \
+  --json-output "$tailscale_failure_json_report" >/dev/null
+
+tailscale_failure_available="$(plutil -extract tailscale.statusAvailable raw -o - "$tailscale_failure_json_report")"
+if [[ "$tailscale_failure_available" != "false" ]]; then
+  echo "FAIL: expected failed Tailscale status to be unavailable"
+  plutil -p "$tailscale_failure_json_report"
+  exit 1
+fi
+
+tailscale_failure_error="$(plutil -extract tailscale.error raw -o - "$tailscale_failure_json_report")"
+if [[ "$tailscale_failure_error" != "The Tailscale CLI failed to start: Tailscale.CLIError error 1." ]]; then
+  echo "FAIL: expected stdout Tailscale failure to be recorded, got $tailscale_failure_error"
+  plutil -p "$tailscale_failure_json_report"
+  exit 1
+fi
+
 mbp_host="$(plutil -extract targets.0.hostName raw -o - "$json_report")"
 if [[ "$mbp_host" != "10.77.77.3" ]]; then
   echo "FAIL: unexpected mbp1-tb HostName $mbp_host"
@@ -76,7 +141,7 @@ if [[ "$invalid_probe" != "false" ]]; then
   exit 1
 fi
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" "$HELPER" \
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" "$HELPER" \
   --no-bonjour \
   --timeout 1 \
   --probe-ssh \

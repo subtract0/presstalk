@@ -45,7 +45,10 @@ plutil -extract eligibility.physicalSTTSmokeReady raw -o - "$HOME/Desktop/presst
 plutil -extract eligibility.activeFieldSmokeReady raw -o - "$HOME/Desktop/presstalk-readiness.json"
 ```
 
-To collect host and alias evidence before the release matrix, run:
+To collect host and alias evidence before the release matrix, run. This is
+read-only: it records SSH config aliases, Bonjour SSH advertisements, Tailscale
+status, target `ssh -G` resolution, and strict SSH probe results without
+installing, repairing, or opening permission panes.
 
 ```bash
 /bin/bash scripts/presstalk_host_discovery.sh \

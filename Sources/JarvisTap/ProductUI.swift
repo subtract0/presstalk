@@ -1253,6 +1253,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         if !runtimeStatus.inputMonitoringEffective {
+            if runtimeStatus.triggerRequiresWritableEventTap && runtimeStatus.inputListenerInstalled {
+                return "\(runtimeStatus.inputMonitoringPermissionLabel.text) for \(identity). Option/Fn triggers need a writable event tap; this run only has \(runtimeStatus.inputListenerStatus). Export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            }
             return "Input listener is not ready for \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 

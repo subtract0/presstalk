@@ -18,6 +18,8 @@ enum PermissionStatusLabelTest {
         microphoneAuthorizationStatus: String = "authorized",
         accessibilityGranted: Bool = false,
         inputPipelineReady: Bool = true,
+        inputListenerStatus: String = "hid:listen_only",
+        triggerKey: String = "option",
         pasteAutomatically: Bool = true,
         inputMethodFallbackStatus: String = "ready",
         adHocSigned: Bool = false,
@@ -30,7 +32,8 @@ enum PermissionStatusLabelTest {
             microphoneAuthorizationStatus: microphoneAuthorizationStatus,
             accessibilityGranted: accessibilityGranted,
             inputPipelineReady: inputPipelineReady,
-            inputListenerStatus: "hid:listen_only",
+            inputListenerStatus: inputListenerStatus,
+            triggerKey: triggerKey,
             pasteAutomatically: pasteAutomatically,
             inputMethodFallbackStatus: inputMethodFallbackStatus,
             systemDictationHotkeyDisabled: true,
@@ -52,9 +55,22 @@ enum PermissionStatusLabelTest {
     }
 
     static func main() {
-        let readyNoPane = makeStatus()
-        require(readyNoPane.inputMonitoringPermissionLabel.text == "Listener ready", "effective input listener must not be labelled missing")
-        require(readyNoPane.inputMonitoringPermissionLabel.tone == .ready, "effective input listener must use ready tone")
+        let modifierListenOnly = makeStatus()
+        require(!modifierListenOnly.inputMonitoringEffective, "modifier triggers must not treat a listen-only event tap as effective")
+        require(modifierListenOnly.inputMonitoringStatus == "writable_key_tap_unavailable", "modifier listen-only status should identify writable tap failure")
+        require(modifierListenOnly.inputMonitoringPermissionLabel.text == "Writable key tap unavailable", "modifier listen-only label should not say listener ready")
+        require(modifierListenOnly.inputMonitoringPermissionLabel.tone == .warning, "modifier listen-only label should use warning tone")
+
+        let modifierWritable = makeStatus(inputListenerStatus: "hid:default")
+        require(modifierWritable.inputMonitoringEffective, "modifier triggers should accept a writable event tap")
+        require(modifierWritable.inputMonitoringPermissionLabel.text == "Listener ready", "writable listener without preflight should be labelled ready")
+        require(modifierWritable.inputMonitoringPermissionLabel.tone == .ready, "writable listener should use ready tone")
+
+        let trackpadListenOnly = makeStatus(triggerKey: "trackpad_hold")
+        require(trackpadListenOnly.inputMonitoringEffective, "trackpad hold should accept a listen-only event tap")
+        require(trackpadListenOnly.inputMonitoringPermissionLabel.text == "Listener ready", "trackpad listen-only listener should be labelled ready")
+
+        let readyNoPane = trackpadListenOnly
         require(readyNoPane.microphonePermissionLabel.text == "Granted", "authorized microphone must be labelled granted")
         require(readyNoPane.microphonePermissionLabel.tone == .ready, "authorized microphone must use ready tone")
         require(readyNoPane.accessibilityPermissionLabel.text == "Input method ready", "enabled input method fallback must not be labelled missing Accessibility")

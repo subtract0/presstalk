@@ -1958,6 +1958,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             accessibilityGranted: AXIsProcessTrusted(),
             inputPipelineReady: inputPipelineReady,
             inputListenerStatus: eventTapInstallSummary,
+            triggerKey: settingsStore.triggerKey.rawValue,
             pasteAutomatically: settingsStore.pasteAutomatically,
             inputMethodFallbackStatus: inputMethodFallbackStatus,
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
@@ -2001,7 +2002,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "permissions": [
                 "inputMonitoringGranted": status.inputMonitoringGranted,
                 "inputMonitoringEffective": status.inputMonitoringEffective,
-                "inputMonitoringStatus": status.inputMonitoringGranted ? "preflight_granted" : (status.inputMonitoringEffective ? "listener_ready_preflight_unavailable" : "preflight_unavailable"),
+                "inputMonitoringStatus": status.inputMonitoringStatus,
                 "microphoneGranted": status.microphoneGranted,
                 "microphoneAuthorizationStatus": status.microphoneAuthorizationStatus,
                 "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_\(status.microphoneAuthorizationStatus)",
@@ -2104,7 +2105,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Permissions
             - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
-            - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
+            - Input Monitoring status: \(runtimeStatus.inputMonitoringStatusDescription)
             - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : runtimeStatus.microphoneAuthorizationStatus)
             - Accessibility status: \(accessibilityStatusDescription(runtimeStatus))
             - Input method fallback: \(runtimeStatus.inputMethodFallbackStatus)
@@ -2311,6 +2312,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func currentTriggerBridgeStatus() -> String {
         guard inputPipelineReady else {
             return "Waiting for setup"
+        }
+
+        if isModifierTriggerKey(settingsStore.triggerKey) && !eventTapInstallSummary.contains(":default") {
+            return "\(settingsStore.triggerKey.displayName) blocked: writable key tap unavailable"
         }
 
         let telemetry = withStateLock { triggerBridgeTelemetry }
@@ -3351,7 +3356,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let listenOnly = (CGEventTapOptions.listenOnly, "listen_only")
             let writable = (CGEventTapOptions.defaultTap, "default")
 
-            if settingsStore.triggerKey == .f5 {
+            if settingsStore.triggerKey != .trackpadHold {
                 return [writable, listenOnly]
             }
             return [listenOnly, writable]

@@ -17,6 +17,7 @@ struct PressTalkRuntimeStatus {
     let accessibilityGranted: Bool
     let inputPipelineReady: Bool
     let inputListenerStatus: String
+    let triggerKey: String
     let pasteAutomatically: Bool
     let inputMethodFallbackStatus: String
     let systemDictationHotkeyDisabled: Bool
@@ -28,8 +29,59 @@ struct PressTalkRuntimeStatus {
     let codeSignatureCDHash: String
     let codeSignatureAuthority: String
 
+    var triggerRequiresWritableEventTap: Bool {
+        switch triggerKey {
+        case "fn", "option", "left_option", "right_option":
+            return true
+        default:
+            return false
+        }
+    }
+
+    var inputListenerInstalled: Bool {
+        inputListenerStatus.contains(":default") || inputListenerStatus.contains(":listen_only")
+    }
+
+    var writableEventTapInstalled: Bool {
+        inputListenerStatus.contains(":default")
+    }
+
     var inputMonitoringEffective: Bool {
-        inputMonitoringGranted || inputPipelineReady
+        guard inputPipelineReady else {
+            return false
+        }
+        if triggerRequiresWritableEventTap {
+            return writableEventTapInstalled
+        }
+        return inputListenerInstalled
+    }
+
+    var inputMonitoringStatus: String {
+        if inputMonitoringEffective {
+            return inputMonitoringGranted ? "preflight_granted" : "listener_ready_preflight_unavailable"
+        }
+        if triggerRequiresWritableEventTap && inputListenerInstalled {
+            return "writable_key_tap_unavailable"
+        }
+        if inputMonitoringGranted {
+            return "preflight_granted_listener_unavailable"
+        }
+        return "preflight_unavailable"
+    }
+
+    var inputMonitoringStatusDescription: String {
+        switch inputMonitoringStatus {
+        case "preflight_granted":
+            return "preflight granted"
+        case "listener_ready_preflight_unavailable":
+            return "listener ready; preflight unavailable"
+        case "writable_key_tap_unavailable":
+            return "writable key tap unavailable"
+        case "preflight_granted_listener_unavailable":
+            return "preflight granted; listener unavailable"
+        default:
+            return "preflight unavailable"
+        }
     }
 
     var activeFieldInsertionReady: Bool {
@@ -68,11 +120,17 @@ struct PressTalkRuntimeStatus {
     }
 
     var inputMonitoringPermissionLabel: PressTalkPermissionLabel {
-        if inputMonitoringGranted {
+        if inputMonitoringEffective && inputMonitoringGranted {
             return PressTalkPermissionLabel(text: "Granted", tone: .ready)
         }
-        if inputPipelineReady {
+        if inputMonitoringEffective {
             return PressTalkPermissionLabel(text: "Listener ready", tone: .ready)
+        }
+        if triggerRequiresWritableEventTap && inputListenerInstalled {
+            return PressTalkPermissionLabel(text: "Writable key tap unavailable", tone: .warning)
+        }
+        if inputMonitoringGranted {
+            return PressTalkPermissionLabel(text: "Granted, listener unavailable", tone: .warning)
         }
         return PressTalkPermissionLabel(text: "Preflight unavailable", tone: .warning)
     }
@@ -123,6 +181,7 @@ struct PressTalkRuntimeStatus {
         accessibilityGranted: false,
         inputPipelineReady: false,
         inputListenerStatus: "Checking...",
+        triggerKey: "unknown",
         pasteAutomatically: true,
         inputMethodFallbackStatus: "unknown",
         systemDictationHotkeyDisabled: true,

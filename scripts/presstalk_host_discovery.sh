@@ -2,6 +2,8 @@
 set -euo pipefail
 
 SSH_CONFIG="${PRESSTALK_SSH_CONFIG_PATH:-$HOME/.ssh/config}"
+KNOWN_HOSTS="${PRESSTALK_KNOWN_HOSTS_PATH:-$HOME/.ssh/known_hosts}"
+SSH_KEYGEN_BIN="${PRESSTALK_SSH_KEYGEN_PATH:-$(command -v ssh-keygen 2>/dev/null || true)}"
 OUTPUT_FORMAT="text"
 JSON_OUTPUT_PATH=""
 BONJOUR_ENABLED=1
@@ -176,6 +178,51 @@ plist_insert_bool "arpEnabled" "$([[ "$ARP_ENABLED" == "1" ]] && echo true || ec
 plist_insert_bool "arpSSHKeyscanEnabled" "$([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo true || echo false)"
 plutil -insert sshConfig.hosts -array "$RESULT_PLIST" >/dev/null
 
+plutil -insert knownHosts -dictionary "$RESULT_PLIST" >/dev/null
+plist_insert_string "knownHosts.path" "$KNOWN_HOSTS"
+plist_insert_bool "knownHosts.exists" "$([[ -f "$KNOWN_HOSTS" ]] && echo true || echo false)"
+plist_insert_string "knownHosts.sshKeygenPath" "${SSH_KEYGEN_BIN:-missing}"
+plutil -insert knownHosts.fingerprints -array "$RESULT_PLIST" >/dev/null
+KNOWN_HOST_FINGERPRINTS_TSV="$RUN_TMPDIR/known-host-fingerprints.tsv"
+
+if [[ -f "$KNOWN_HOSTS" && -n "$SSH_KEYGEN_BIN" && -x "$SSH_KEYGEN_BIN" ]]; then
+  known_hosts_output="$RUN_TMPDIR/known-hosts-fingerprints.out"
+  known_hosts_error="$RUN_TMPDIR/known-hosts-fingerprints.err"
+  set +e
+  "$SSH_KEYGEN_BIN" -lf "$KNOWN_HOSTS" >"$known_hosts_output" 2>"$known_hosts_error"
+  known_hosts_status=$?
+  set -e
+  plist_insert_string "knownHosts.error" "$(single_line_file "$known_hosts_error")"
+  if [[ "$known_hosts_status" -eq 0 ]]; then
+    while IFS= read -r known_fingerprint_line; do
+      [[ -z "$known_fingerprint_line" ]] && continue
+      known_bits="$(printf '%s\n' "$known_fingerprint_line" | awk '{ print $1 }')"
+      known_sha256="$(printf '%s\n' "$known_fingerprint_line" | awk '{ print $2 }')"
+      known_host="$(printf '%s\n' "$known_fingerprint_line" | awk '{ print $3 }')"
+      known_key_type="$(printf '%s\n' "$known_fingerprint_line" | awk '{ print $4 }' | tr -d '()')"
+      known_plist="$RUN_TMPDIR/known-host-fingerprint-$RANDOM.plist"
+      plutil -create xml1 "$known_plist" >/dev/null
+      plutil -insert rawLine -string "$known_fingerprint_line" "$known_plist" >/dev/null
+      plutil -insert bits -string "${known_bits:-unknown}" "$known_plist" >/dev/null
+      plutil -insert sha256 -string "${known_sha256:-unknown}" "$known_plist" >/dev/null
+      plutil -insert host -string "${known_host:-unknown}" "$known_plist" >/dev/null
+      plutil -insert keyType -string "${known_key_type:-unknown}" "$known_plist" >/dev/null
+      known_json="$(plutil -convert json -r -o - "$known_plist")"
+      plutil -insert knownHosts.fingerprints -json "$known_json" -append "$RESULT_PLIST" >/dev/null
+      printf '%s\t%s\t%s\t%s\t%s\n' \
+        "${known_sha256:-unknown}" \
+        "${known_key_type:-unknown}" \
+        "${known_bits:-unknown}" \
+        "${known_host:-unknown}" \
+        "$known_fingerprint_line" >>"$KNOWN_HOST_FINGERPRINTS_TSV"
+    done <"$known_hosts_output"
+  fi
+elif [[ ! -f "$KNOWN_HOSTS" ]]; then
+  plist_insert_string "knownHosts.error" "known_hosts unavailable"
+else
+  plist_insert_string "knownHosts.error" "ssh-keygen unavailable"
+fi
+
 if [[ -f "$SSH_CONFIG" ]]; then
   while IFS= read -r host; do
     [[ -z "$host" ]] && continue
@@ -251,7 +298,7 @@ plutil -insert arp.entries -array "$RESULT_PLIST" >/dev/null
 if [[ "$ARP_ENABLED" == "1" ]]; then
   arp_bin="${PRESSTALK_ARP_PATH:-$(command -v arp 2>/dev/null || true)}"
   ssh_keyscan_bin="${PRESSTALK_SSH_KEYSCAN_PATH:-$(command -v ssh-keyscan 2>/dev/null || true)}"
-  ssh_keygen_bin="${PRESSTALK_SSH_KEYGEN_PATH:-$(command -v ssh-keygen 2>/dev/null || true)}"
+  ssh_keygen_bin="$SSH_KEYGEN_BIN"
   plist_insert_string "arp.path" "${arp_bin:-missing}"
   plist_insert_string "arp.sshKeyscanPath" "${ssh_keyscan_bin:-missing}"
   plist_insert_string "arp.sshKeygenPath" "${ssh_keygen_bin:-missing}"
@@ -318,12 +365,28 @@ if [[ "$ARP_ENABLED" == "1" ]]; then
               [[ -z "$fingerprint_line" ]] && continue
               fingerprint_plist="$RUN_TMPDIR/fingerprint-$RANDOM.plist"
               plutil -create xml1 "$fingerprint_plist" >/dev/null
+              fingerprint_sha256="$(printf '%s\n' "$fingerprint_line" | awk '{ print $2 }')"
               plutil -insert rawLine -string "$fingerprint_line" "$fingerprint_plist" >/dev/null
               plutil -insert bits -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $1 }')" "$fingerprint_plist" >/dev/null
-              plutil -insert sha256 -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $2 }')" "$fingerprint_plist" >/dev/null
+              plutil -insert sha256 -string "$fingerprint_sha256" "$fingerprint_plist" >/dev/null
               plutil -insert host -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $3 }')" "$fingerprint_plist" >/dev/null
               key_type="$(printf '%s\n' "$fingerprint_line" | awk '{ print $4 }' | tr -d '()')"
               plutil -insert keyType -string "${key_type:-unknown}" "$fingerprint_plist" >/dev/null
+              plutil -insert knownHostMatches -array "$fingerprint_plist" >/dev/null
+              if [[ -s "$KNOWN_HOST_FINGERPRINTS_TSV" ]]; then
+                while IFS=$'\t' read -r known_sha256 known_key_type known_bits known_host known_raw_line; do
+                  [[ "$known_sha256" == "$fingerprint_sha256" ]] || continue
+                  known_match_plist="$RUN_TMPDIR/known-host-match-$RANDOM.plist"
+                  plutil -create xml1 "$known_match_plist" >/dev/null
+                  plutil -insert rawLine -string "$known_raw_line" "$known_match_plist" >/dev/null
+                  plutil -insert bits -string "${known_bits:-unknown}" "$known_match_plist" >/dev/null
+                  plutil -insert sha256 -string "${known_sha256:-unknown}" "$known_match_plist" >/dev/null
+                  plutil -insert host -string "${known_host:-unknown}" "$known_match_plist" >/dev/null
+                  plutil -insert keyType -string "${known_key_type:-unknown}" "$known_match_plist" >/dev/null
+                  known_match_json="$(plutil -convert json -r -o - "$known_match_plist")"
+                  plutil -insert knownHostMatches -json "$known_match_json" -append "$fingerprint_plist" >/dev/null
+                done <"$KNOWN_HOST_FINGERPRINTS_TSV"
+              fi
               fingerprint_json="$(plutil -convert json -r -o - "$fingerprint_plist")"
               plutil -insert sshKeyscan.fingerprints -json "$fingerprint_json" -append "$entry_plist" >/dev/null
             done <"$fingerprints_output"

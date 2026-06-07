@@ -15,6 +15,7 @@ fake_tailscale="$TEST_TMPDIR/tailscale"
 fake_arp="$TEST_TMPDIR/arp"
 fake_ssh_keyscan="$TEST_TMPDIR/ssh-keyscan"
 test_host_key="$TEST_TMPDIR/test_host_key"
+known_hosts="$TEST_TMPDIR/known_hosts"
 
 cat >"$ssh_config" <<'SSHCONFIG'
 Host mbp1-tb
@@ -64,6 +65,7 @@ chmod +x "$fake_arp"
 
 ssh-keygen -q -t ed25519 -N '' -f "$test_host_key" >/dev/null
 test_host_public_key="$(awk '{ print $2 }' "$test_host_key.pub")"
+printf 's1.local ssh-ed25519 %s\n' "$test_host_public_key" >"$known_hosts"
 
 cat >"$fake_ssh_keyscan" <<SH
 #!/usr/bin/env bash
@@ -77,6 +79,7 @@ SH
 chmod +x "$fake_ssh_keyscan"
 
 PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
+  PRESSTALK_KNOWN_HOSTS_PATH="$known_hosts" \
   PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
   PRESSTALK_ARP_PATH="$fake_arp" \
   PRESSTALK_SSH_KEYSCAN_PATH="$fake_ssh_keyscan" \
@@ -117,6 +120,27 @@ fi
 host_count="$(plutil -extract sshConfig.hosts raw -o - "$json_report")"
 if [[ "$host_count" != "4" ]]; then
   echo "FAIL: expected 4 ssh config hosts, got $host_count"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+known_hosts_exists="$(plutil -extract knownHosts.exists raw -o - "$json_report")"
+if [[ "$known_hosts_exists" != "true" ]]; then
+  echo "FAIL: expected known_hosts to exist, got $known_hosts_exists"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+known_host_fingerprints="$(plutil -extract knownHosts.fingerprints raw -o - "$json_report")"
+if [[ "$known_host_fingerprints" != "1" ]]; then
+  echo "FAIL: expected one known_hosts fingerprint, got $known_host_fingerprints"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+known_host_first_host="$(plutil -extract knownHosts.fingerprints.0.host raw -o - "$json_report")"
+if [[ "$known_host_first_host" != "s1.local" ]]; then
+  echo "FAIL: expected known_hosts fingerprint host s1.local, got $known_host_first_host"
   plutil -p "$json_report"
   exit 1
 fi
@@ -191,6 +215,20 @@ if [[ "$arp_first_key_type" != "ED25519" ]]; then
   exit 1
 fi
 
+arp_first_known_matches="$(plutil -extract arp.entries.0.sshKeyscan.fingerprints.0.knownHostMatches raw -o - "$json_report")"
+if [[ "$arp_first_known_matches" != "1" ]]; then
+  echo "FAIL: expected one known_hosts match for first ARP fingerprint, got $arp_first_known_matches"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_first_known_match_host="$(plutil -extract arp.entries.0.sshKeyscan.fingerprints.0.knownHostMatches.0.host raw -o - "$json_report")"
+if [[ "$arp_first_known_match_host" != "s1.local" ]]; then
+  echo "FAIL: expected first ARP known_hosts match host s1.local, got $arp_first_known_match_host"
+  plutil -p "$json_report"
+  exit 1
+fi
+
 arp_second_keyscan="$(plutil -extract arp.entries.1.sshKeyscan.success raw -o - "$json_report")"
 if [[ "$arp_second_keyscan" != "false" ]]; then
   echo "FAIL: expected second ARP keyscan to fail"
@@ -199,6 +237,7 @@ if [[ "$arp_second_keyscan" != "false" ]]; then
 fi
 
 PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
+  PRESSTALK_KNOWN_HOSTS_PATH="$known_hosts" \
   PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
   PRESSTALK_ARP_PATH="$fake_arp" \
   PRESSTALK_SSH_KEYSCAN_PATH="$fake_ssh_keyscan" \
@@ -235,7 +274,7 @@ if [[ "$invalid_probe" != "false" ]]; then
   exit 1
 fi
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" PRESSTALK_ARP_PATH="$fake_arp" "$HELPER" \
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_KNOWN_HOSTS_PATH="$known_hosts" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" PRESSTALK_ARP_PATH="$fake_arp" "$HELPER" \
   --no-bonjour \
   --timeout 1 \
   --probe-ssh \

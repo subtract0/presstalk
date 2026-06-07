@@ -61,6 +61,10 @@ permission panes.
 When chasing an unresolved host such as `s1`, add `--probe-arp-ssh` to run
 read-only `ssh-keyscan` against ARP candidate IPs. This records public SSH host
 key fingerprints without editing `known_hosts` and is candidate evidence only.
+The JSON also includes fingerprints from the local `known_hosts` file and
+attaches `knownHostMatches` to any ARP keyscan fingerprint that already matches
+a known host key. A match can identify an existing known machine, but it still
+does not promote ARP evidence into release proof.
 
 To collect a matrix that includes local readiness plus SSH host blockers, run:
 

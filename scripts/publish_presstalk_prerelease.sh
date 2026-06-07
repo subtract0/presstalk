@@ -221,9 +221,11 @@ with the failure text in JSON instead of being confused with missing hosts. ARP
 entries are candidate-discovery evidence only, not proof of a machine identity.
 When --probe-arp-ssh is passed, it also runs read-only ssh-keyscan against ARP
 candidate IPs and records public host-key fingerprints without editing
-known_hosts. This makes missing aliases such as s1, strict host-key blockers,
-Tailscale status, local network candidates, and the reachable mbp1-tb path
-visible without installing or repairing PressTalk.
+known_hosts. The JSON now also indexes local known_hosts fingerprints and adds
+knownHostMatches to scanned ARP fingerprints that match an already-known host
+key. This makes missing aliases such as s1, strict host-key blockers, Tailscale
+status, local network candidates, known-machine matches, and the reachable
+mbp1-tb path visible without installing or repairing PressTalk.
 
 The bundle also includes presstalk-release-proof-gate.sh. It consumes the
 readiness matrix and exits 0 only when every required target is reachable,
@@ -387,7 +389,10 @@ macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via
 the Neural Engine path. Set PRESSTALK_WHISPER_COMPUTE=default only when you
 explicitly want the upstream WhisperKit compute defaults.
 
-This prerelease is for machine verification on studio1, s1, s2 when a microphone is attached, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on the machines currently eligible for microphone coverage.
+This prerelease is for machine verification on studio1, s1, studio2/s2 only
+when a microphone is attached, and mbp1. Do not treat it as fully verified
+until docs/RELEASE_STATUS.md records successful dictation smoke tests on the
+machines currently eligible for microphone coverage.
 
 SHA-256:
 

@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc68`
-- Commit: `f8c1fc90fafeaa9a92f9441149b6a5b5654636a6`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc68`
-- Asset: `PressTalk-0.1.5-rc68-macos-arm64.zip`
-- SHA-256: `d97390a372669496e739811573b82c8a1ecd656cad698baa669fe1e818b85e85`
+- Tag: `v0.1.5-rc69`
+- Commit: `52ee02481d175b19c82a3e5fbb090cb2708a2172`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc69`
+- Asset: `PressTalk-0.1.5-rc69-macos-arm64.zip`
+- SHA-256: `09bd78f93e1a68d476d2d0bb0589e94b96b3d5d3e07dde6f0871cadda7ab2f8f`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,25 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc69` makes the machine-readiness helper produce parseable JSON
+  with `--json` and `--json-output PATH`, and adds a fixture test for the JSON
+  contract. The JSON schema includes `eligibility.physicalSTTSmokeReady`,
+  `eligibility.activeFieldSmokeReady`, `audio.microphoneHardwareDetected`, and
+  `nextAction` for release evidence.
+- The `v0.1.5-rc69` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:09bd78f93e1a68d476d2d0bb0589e94b96b3d5d3e07dde6f0871cadda7ab2f8f`,
+  matching the local `dist/PressTalk-0.1.5-rc69-macos-arm64.zip`. The
+  `v0.1.5-rc69` tag points at
+  `52ee02481d175b19c82a3e5fbb090cb2708a2172`, and the inspected asset contains
+  a bundled readiness helper whose `--json` output exposes `schemaVersion=1`.
+- After rc69 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
+  readiness helper JSON reports `eligibility.physicalSTTSmokeReady=true` and
+  `eligibility.activeFieldSmokeReady=true`; the bundled verifier exits `0`.
+
+Earlier prerelease notes retained for provenance:
+
 - `v0.1.5-rc68` adds bundled `presstalk-machine-readiness.sh`, a read-only
   machine eligibility helper. It reports Apple Silicon eligibility, detected
   audio input hardware, installed PressTalk identity, runtime speech readiness,
@@ -39,8 +58,6 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `studio1.local` and `mba1.local` fail SSH host-key verification, and `mbp1`
   SSH to port 22 times out. Do not bypass host-key checks silently. `studio2`
   remains excluded from microphone/STT smoke until a microphone is attached.
-
-Earlier prerelease notes retained for provenance:
 
 - `v0.1.5-rc67` fixes the read-only repair verifier so it accepts every proven
   active-field insertion path: InputMethodKit, direct Accessibility insertion,

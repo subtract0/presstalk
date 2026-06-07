@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc67`
-- Commit: `2bad7440cc23140084162966bb7f0bc1e7167049`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc67`
-- Asset: `PressTalk-0.1.5-rc67-macos-arm64.zip`
-- SHA-256: `15b54c839c4a4d26c177dea9118614ede8e3ccdf02cd47ff14fdca33a865345a`
+- Tag: `v0.1.5-rc68`
+- Commit: `f8c1fc90fafeaa9a92f9441149b6a5b5654636a6`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc68`
+- Asset: `PressTalk-0.1.5-rc68-macos-arm64.zip`
+- SHA-256: `d97390a372669496e739811573b82c8a1ecd656cad698baa669fe1e818b85e85`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,31 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc68` adds bundled `presstalk-machine-readiness.sh`, a read-only
+  machine eligibility helper. It reports Apple Silicon eligibility, detected
+  audio input hardware, installed PressTalk identity, runtime speech readiness,
+  active-field insertion readiness, latest production insertion probe, and the
+  next action. This is now the first cross-machine preflight before counting a
+  Mac in physical STT smoke coverage.
+- The `v0.1.5-rc68` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:d97390a372669496e739811573b82c8a1ecd656cad698baa669fe1e818b85e85`,
+  matching the local `dist/PressTalk-0.1.5-rc68-macos-arm64.zip`. The
+  `v0.1.5-rc68` tag points at
+  `f8c1fc90fafeaa9a92f9441149b6a5b5654636a6`, and the inspected asset contains
+  executable `presstalk-machine-readiness.sh`.
+- After rc68 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
+  readiness helper reports `MicrophoneHardwareDetected=true`,
+  `PhysicalSTTSmokeReady=true`, and `ActiveFieldSmokeReady=true`; the bundled
+  verifier exits `0` using the latest successful production insertion probe.
+- Current host/machine blockers: `s1` and `s1.local` do not resolve,
+  `studio1.local` and `mba1.local` fail SSH host-key verification, and `mbp1`
+  SSH to port 22 times out. Do not bypass host-key checks silently. `studio2`
+  remains excluded from microphone/STT smoke until a microphone is attached.
+
+Earlier prerelease notes retained for provenance:
+
 - `v0.1.5-rc67` fixes the read-only repair verifier so it accepts every proven
   active-field insertion path: InputMethodKit, direct Accessibility insertion,
   or Accessibility-backed paste command. It still reports the mbp1 ad-hoc
@@ -40,8 +65,6 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   22 timed out before the checksum or bootstrap step. Do not treat `mbp1` as
   rc67-refreshed; latest verified `mbp1` app state remains the rc66
   `needs_signing_repair` blocker below.
-
-Earlier prerelease notes retained for provenance:
 
 - `v0.1.5-rc66` adds machine-readable active-field insertion readiness.
   Runtime status now records `runtime.activeFieldInsertionReady` and

@@ -1770,7 +1770,28 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         case .warming:
             uiState = ("PressTalk 0.1.5", "Warming up the local speech model…", "hourglass.circle.fill", .warming, nil)
         case .ready:
-            uiState = ("PressTalk 0.1.5", "Ready. Hold \(settingsStore.triggerKey.displayName) to dictate.", "waveform.badge.mic", .ready, 1.1)
+            let status = currentRuntimeStatus()
+            if localSigningRepairNeeded(status) {
+                uiState = (
+                    "Paste Repair Needed",
+                    "Transcription ready. Click Repair Signing in the menu bar to restore active-field paste.",
+                    "wrench.and.screwdriver.fill",
+                    .warming,
+                    nil
+                )
+            } else if settingsStore.pasteAutomatically &&
+                !status.accessibilityGranted &&
+                status.inputMethodFallbackStatus != "ready" {
+                uiState = (
+                    "Paste Fallback Blocked",
+                    "Transcription ready. Input method status: \(status.inputMethodFallbackStatus).",
+                    "exclamationmark.triangle.fill",
+                    .warming,
+                    nil
+                )
+            } else {
+                uiState = ("PressTalk 0.1.5", "Ready. Hold \(settingsStore.triggerKey.displayName) to dictate.", "waveform.badge.mic", .ready, 1.1)
+            }
         case .listening(let partial):
             uiState = ("Listening", partial?.nonEmpty ?? "Speak now. Release when finished.", "mic.fill", .listening, nil)
         case .processing:

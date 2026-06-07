@@ -76,6 +76,11 @@ recognized-disabled input-method state. This gives a logged-in desktop user a
 direct repair action from the menu bar without reopening the full Settings
 window.
 
+The menu-bar status no longer says plain "Ready" for that state. It now reports
+Paste Repair Needed while transcription is ready but active-field paste still
+needs the local signing repair, so the blocked state is visible before a user
+tries dictation.
+
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before
 launching the app. Its summary reports both Bundled input method signing applied

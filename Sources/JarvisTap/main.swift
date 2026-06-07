@@ -1199,6 +1199,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var repairLocalSigningMenuItem: NSMenuItem?
     private var settingsWindowController: PressTalkSettingsWindowController?
     private var hudController: PressTalkHUDController?
+    private var manualSmokeProcess: Process?
     private var readyResetWorkItem: DispatchWorkItem?
     private var setupRetryTimer: Timer?
     private var singletonLockFileDescriptor: Int32 = -1
@@ -2207,13 +2208,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let compiledHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke")
         let scriptHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke.swift")
         let helperURL: URL
-        let helperCommand: String
+        let executableURL: URL
+        let arguments: [String]
         if FileManager.default.isExecutableFile(atPath: compiledHelperURL.path) {
             helperURL = compiledHelperURL
-            helperCommand = shellQuoted(compiledHelperURL.path)
+            executableURL = compiledHelperURL
+            arguments = []
         } else if FileManager.default.isExecutableFile(atPath: scriptHelperURL.path) {
             helperURL = scriptHelperURL
-            helperCommand = "/usr/bin/env swift \(shellQuoted(scriptHelperURL.path))"
+            executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            arguments = ["swift", scriptHelperURL.path]
         } else {
             traceLogger.log("Manual physical smoke helper missing path=\(resourceURL.path)")
             present(.error("The physical smoke helper is missing from this build."))
@@ -2236,28 +2240,48 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return
         }
 
-        let logPath = shellQuoted(logURL.path)
-        let pidPath = shellQuoted(pidURL.path)
-        let triggerKey = shellQuoted(settingsStore.triggerKey.rawValue)
-        let triggerLabel = shellQuoted(settingsStore.triggerKey.displayName)
-        let script = """
-        export PRESSTALK_OPEN_PERMISSION_PANES=0
-        export PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0
-        export PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY=\(triggerKey)
-        export PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL=\(triggerLabel)
-        /usr/bin/nohup \(helperCommand) >\(logPath) 2>&1 &
-        echo $! >\(pidPath)
-        """
-
         traceLogger.log("Manual physical smoke requested from UI helper=\(helperURL.path) log=\(logURL.path) pid_file=\(pidURL.path)")
         present(.diagnosticStarted("Physical smoke window opening for \(settingsStore.triggerKey.displayName)."))
 
         let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-lc", script]
+        process.executableURL = executableURL
+        process.arguments = arguments
+        var environment = ProcessInfo.processInfo.environment
+        environment["PRESSTALK_OPEN_PERMISSION_PANES"] = "0"
+        environment["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] = "0"
+        environment["PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY"] = settingsStore.triggerKey.rawValue
+        environment["PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL"] = settingsStore.triggerKey.displayName
+        process.environment = environment
+
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
+        let logHandle: FileHandle
         do {
-            try process.run()
+            logHandle = try FileHandle(forWritingTo: logURL)
         } catch {
+            traceLogger.log("Manual physical smoke log open failed error=\(error)")
+            present(.error("Could not open physical smoke log."))
+            return
+        }
+
+        process.standardOutput = logHandle
+        process.standardError = logHandle
+        process.terminationHandler = { [weak self] terminatedProcess in
+            logHandle.closeFile()
+            DispatchQueue.main.async {
+                self?.traceLogger.log("Manual physical smoke helper exited status=\(terminatedProcess.terminationStatus)")
+                if self?.manualSmokeProcess === terminatedProcess {
+                    self?.manualSmokeProcess = nil
+                }
+            }
+        }
+
+        do {
+            manualSmokeProcess = process
+            try process.run()
+            try "\(process.processIdentifier)\n".write(to: pidURL, atomically: true, encoding: .utf8)
+        } catch {
+            logHandle.closeFile()
+            manualSmokeProcess = nil
             traceLogger.log("Manual physical smoke launch failed error=\(error)")
             present(.error("Could not start physical smoke: \(error.localizedDescription)"))
         }

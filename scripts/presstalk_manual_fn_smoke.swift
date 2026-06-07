@@ -174,9 +174,15 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate, NSWindowDele
             if line.contains("\(triggerLabel) pressed: recording started") ||
                 line.contains("\(triggerLabel) armed: recording started") {
                 traceExpectedTriggerPressed = true
+                if triggerKey == "option_space" {
+                    traceTriggerSources.insert("registered_hotkey")
+                }
             }
             if line.contains("\(triggerLabel) released: recording ended") {
                 traceExpectedTriggerReleased = true
+                if triggerKey == "option_space" {
+                    traceTriggerSources.insert("registered_hotkey")
+                }
             }
             if let source = Self.traceTriggerSource(from: line) {
                 traceTriggerSources.insert(source)

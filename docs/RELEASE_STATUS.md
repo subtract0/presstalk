@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc80`
-- Commit: `7a5f8c5510bd0d4cea4dedfbd57f5057eff80c91`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc80`
-- Asset: `PressTalk-0.1.5-rc80-macos-arm64.zip`
-- SHA-256: `1978179eb683e5443b7625b3b1087bd9c7e8de6b565782bf04eda40e6e9fbc22`
+- Tag: `v0.1.5-rc81`
+- Commit: `9a9d2121625ae7407c04fdcadc393d3adeed92e7`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc81`
+- Asset: `PressTalk-0.1.5-rc81-macos-arm64.zip`
+- SHA-256: `4e840296917987777316d743d57b521c2b7df7c4997f873599cc39f0700ca6b4`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,23 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc81` adds optional read-only ARP SSH keyscan evidence to the bundled
+  host-discovery helper. It only runs when `--probe-arp-ssh` is passed, records
+  public host-key fingerprints for ARP candidate IPs, and does not edit
+  `known_hosts`.
+- The `v0.1.5-rc81` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:4e840296917987777316d743d57b521c2b7df7c4997f873599cc39f0700ca6b4`,
+  matching the local `dist/PressTalk-0.1.5-rc81-macos-arm64.zip`. The
+  `v0.1.5-rc81` tag points at
+  `9a9d2121625ae7407c04fdcadc393d3adeed92e7`.
+- After rc81 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `b5aa21d404a94156cc98cd5ecb8b3cb928b54036`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`.
 - `v0.1.5-rc80` adds read-only ARP table collection to the bundled
   host-discovery helper. ARP collection is enabled by default, can be skipped
   with `--no-arp`, and records local host/IP candidates as discovery evidence
@@ -203,7 +220,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc80 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc81 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap detected the
@@ -240,7 +257,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
   The next action is logged-in desktop `Repair Signing`; do not reopen privacy
   panes for this state.
-- Current rc80 readiness matrix command:
+- Current rc81 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -250,15 +267,16 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- The rc80 proof gate run against required `local`, `s1`, and `mbp1-tb`,
+- The rc81 proof gate run against required `local`, `s1`, and `mbp1-tb`,
   excluding `studio2=no attached microphone`, exits nonzero with `proven=false`
   and `failureCount=5`. It passes `local`, fails `s1` for not reachable /
   missing physical STT / missing active-field readiness, and fails `mbp1-tb`
   only for `active_field_not_ready`.
-- The rc80 host discovery probe targeted `local`, `s1`, `s1.local`, `mbp1`,
-  `mbp1-tb`, `studio1.local`, and `mba1.local`. Only `mbp1-tb` answered the
-  strict SSH probe. `s1` and `s1.local` do not resolve, plain `mbp1` times out
-  at `100.106.125.111:22`, and `studio1.local` / `mba1.local` remain strict
+- The rc81 host discovery probe targeted `local`, `s1`, `s1.local`, `mbp1`,
+  `mbp1-tb`, `studio1.local`, and `mba1.local`, with opt-in
+  `--probe-arp-ssh` evidence. Only `mbp1-tb` answered the strict SSH probe.
+  `s1` and `s1.local` do not resolve, plain `mbp1` times out at
+  `100.106.125.111:22`, and `studio1.local` / `mba1.local` remain strict
   host-key blockers. Bonjour passively advertises `studio1`, `studio2`,
   `mbp1`, and `mba1`, but no `s1`; `studio2` was not an SSH or STT target in
   this probe. Tailscale was present at `/usr/local/bin/tailscale` but reported
@@ -268,7 +286,12 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   include `mac` at `192.168.0.19`, `macbookpro` at `192.168.0.41`, and unknown
   hosts at `192.168.0.13`, `192.168.0.42`, `192.168.0.72`,
   `192.168.0.210`, and `192.168.0.243`; these are local-network candidates,
-  not confirmed `s1` identity proof. Earlier read-only
+  not confirmed `s1` identity proof. The opt-in keyscan shows
+  `192.168.0.41` shares mbp1 fingerprints
+  `SHA256:zm/r7lgK7/obIbpd1Ye7km5BdWHbhcUh80d+lqWBR9s` (ED25519),
+  `SHA256:vgMu0L/qG82ZP2DAoad498TEUo0wc62gYzcsi1To0+E` (RSA), and
+  `SHA256:em2WKtB8v3u/DW0N0M+YqDEJn0PJ9b9EayxVzQM01jI` (ECDSA), while
+  `192.168.0.42` shares the earlier mba1 fingerprints. Earlier read-only
   `ssh-keyscan` observed `mba1.local` key
   fingerprints, not trusted or added: RSA
   `SHA256:uA9g7l4TV0EVDgTn1d1X3g/aDQ5vBJmVaTe7gwj7lnI`, ED25519

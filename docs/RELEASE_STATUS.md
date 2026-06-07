@@ -843,6 +843,18 @@ Known current proof gaps:
   enable no-effect on the ad-hoc install. The rc51 desktop-session signing
   repair or a proper trusted release-signing identity remains required before
   production insertion probes can pass there.
+- A reversible mbp1 HIToolbox history test after rc53 also did not fix the
+  blocker. The current `com.apple.HIToolbox` domain had only the German keyboard
+  layout in `AppleInputSourceHistory`, while studio1 history contains the
+  PressTalk input method after successful IMK selection. A backup was written to
+  `~/Library/Application Support/JarvisTap/Diagnostics/hitoolbox-before-presstalk-history-test-20260607T013922Z.plist`,
+  then `{ "Bundle ID" = "com.am.presstalk.inputmethod.container";
+  InputSourceKind = "Keyboard Input Method"; }` was appended to
+  `AppleInputSourceHistory` and `cfprefsd` was flushed. Read-only status still
+  reported `recognizedEnabledSourceCount=0`, and `--enable --json` still
+  returned `enableStatus=0` plus `enableNoEffect=true`. The HIToolbox backup was
+  restored and the history returned to the German keyboard-only state. Do not
+  add a history-repair helper; it is not sufficient for mbp1.
 - Rebootstrapping the earlier rc45 install on `mbp1` as the legacy
   `com.am.jarvistap` identity did not recover the old TCC grants, because stable
   local signing still could not be applied over SSH and bootstrap fell back to a

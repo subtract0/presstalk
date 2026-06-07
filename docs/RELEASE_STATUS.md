@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc71`
-- Commit: `96c9c08fde4f0b9a819195407a6f5181b5dd1ffe`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc71`
-- Asset: `PressTalk-0.1.5-rc71-macos-arm64.zip`
-- SHA-256: `377412a2fe341e29760694b9abdaeea11536e9adb6ebea51eff73448e000bbf4`
+- Tag: `v0.1.5-rc72`
+- Commit: `5d8fe79760eee87ff1047e827f708839c4779518`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc72`
+- Asset: `PressTalk-0.1.5-rc72-macos-arm64.zip`
+- SHA-256: `c94495eda5de6f8adc99c5b52f0264075cf23f0ffde4c1bd59d7fa55b91de60f`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,29 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc72` factors the Settings permission row decisions into a pure
+  runtime-status model and adds
+  `scripts/test_presstalk_permission_status_labels.sh`. The regression fixture
+  proves that a no-pane ready state with `inputMonitoringGranted=false`,
+  `inputPipelineReady=true`, `microphoneAuthorizationStatus=authorized`,
+  `AXIsProcessTrusted=false`, and `inputMethodFallbackStatus=ready` displays as
+  `Listener ready`, `Granted`, and `Input method ready` rather than a missing
+  permission loop. It also proves the current mbp1 ad-hoc
+  `recognized_disabled` state points to `Needs signing repair`.
+- The `v0.1.5-rc72` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:c94495eda5de6f8adc99c5b52f0264075cf23f0ffde4c1bd59d7fa55b91de60f`,
+  matching the local `dist/PressTalk-0.1.5-rc72-macos-arm64.zip`. The
+  `v0.1.5-rc72` tag points at
+  `5d8fe79760eee87ff1047e827f708839c4779518`.
+- After rc72 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `d747ab96d9551d472e9a9c4f8e2f6f2981552a7e`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`; the bundled repair verifier
+  exits `0` with `Result: proven`.
 - `v0.1.5-rc71` fixes the bundled `presstalk-readiness-matrix.sh` helper path.
   The source-tree helper uses underscore naming, but bundled resources use
   hyphen naming. A regression test now simulates the bundled resource layout.

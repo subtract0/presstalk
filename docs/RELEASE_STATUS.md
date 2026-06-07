@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc56`
-- Commit: `1f88adbfc0d0a4eb48362998cfd663c2ea09a6b3`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc56`
-- Asset: `PressTalk-0.1.5-rc56-macos-arm64.zip`
-- SHA-256: `31a784c7d8933b5245e9dc9f2f537980aa0879d74f92cdb36fcd720cd57ada73`
+- Tag: `v0.1.5-rc57`
+- Commit: `86886c610ff0071d4ab4f331c25372f284bc14f9`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc57`
+- Asset: `PressTalk-0.1.5-rc57-macos-arm64.zip`
+- SHA-256: `c1a9cc4ad63738e3f5a060f2bfdd2c6221b6153a9f2ba013afd41dd2f7d0c208`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -138,6 +138,39 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `adHocSigned=true`, `inputMethodFallbackStatus=recognized_disabled`, and the
   rc56 collector reports the correct next action, desktop `Repair Signing`, plus
   the prior failed insertion probe with `targetCaptureFailureHint=input_method_enable_no_effect`.
+- `v0.1.5-rc57` fixes remote-update behavior after a future desktop signing
+  repair. When bootstrap is launched over SSH and
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` was not explicitly set, it now requests
+  `existing`: reuse an already-valid PressTalk local signing identity without a
+  trust prompt, otherwise skip stable signing. This preserves the no-surprise
+  prompt rule while avoiding a future regression where a successfully repaired
+  Mac would be downgraded to ad-hoc on the next remote install.
+- The `v0.1.5-rc57` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:c1a9cc4ad63738e3f5a060f2bfdd2c6221b6153a9f2ba013afd41dd2f7d0c208`,
+  matching the local `dist/PressTalk-0.1.5-rc57-macos-arm64.zip`. The inspected
+  asset contains `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing` in
+  `presstalk-bootstrap.sh` and `PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY` in the
+  local signing helper.
+- After rc57 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `Authority=PressTalk Local Development Code Signing`,
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputMethodFallbackStatus=ready`, and
+  `accessibilityStatus=ax_false_input_method_fallback_ready`.
+- On `mbp1`, rc57 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped without explicitly setting
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The new bootstrap correctly reported
+  `Stable local signing requested: existing`, then
+  `No existing valid PressTalk local code-signing identity is available` and
+  skipped stable signing without a trust prompt. No `add-trusted-cert` or helper
+  process remained after install. Runtime remains transcription-ready:
+  `speechModel=Ready`, `triggerPath=Fn / Globe ready`,
+  `inputListener=hid:listen_only`, `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, and `inputPipelineReady=true`. Active-field
+  insertion remains unproven until the logged-in desktop signing repair:
+  `adHocSigned=true` and `inputMethodFallbackStatus=recognized_disabled`.
 - On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
   installed with no-pane flags, and bootstrapped without explicitly setting
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported

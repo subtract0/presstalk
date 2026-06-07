@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc86`
-- Commit: `2e32c92d0b063529731f5de1e96a21543a64c7f5`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc86`
-- Asset: `PressTalk-0.1.5-rc86-macos-arm64.zip`
-- SHA-256: `eb92d4de449f81fdbcad6c9342c190f16c91c202243ef37c68b3a98cd266bafb`
+- Tag: `v0.1.5-rc87`
+- Commit: `5fc4831316bc599ad41046a0455214dd09994d19`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc87`
+- Asset: `PressTalk-0.1.5-rc87-macos-arm64.zip`
+- SHA-256: `646456f11afd8886cce7bb18d3b68385c19db703bef23e6c81b54f5f571f08b3`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -24,7 +24,55 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc86` is the current public prerelease smoke artifact. It includes the
+- `v0.1.5-rc87` is the current public prerelease smoke artifact. It includes the
+  rc86 input-method insertion hardening and replaces the fragile background
+  `swift presstalk-manual-fn-smoke.swift` launcher with a compiled
+  `presstalk-manual-fn-smoke` helper in the app bundle. Settings and the menu
+  bar now prefer the compiled helper and keep the Swift source only as a
+  fallback. The compiled helper was verified in detached `nohup` mode with a
+  short timeout: it wrote the expected manual-smoke JSON instead of silently
+  exiting.
+- The `v0.1.5-rc87` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:646456f11afd8886cce7bb18d3b68385c19db703bef23e6c81b54f5f571f08b3`,
+  matching the local `dist/PressTalk-0.1.5-rc87-macos-arm64.zip`. The
+  `v0.1.5-rc87` tag points at
+  `5fc4831316bc599ad41046a0455214dd09994d19`.
+- After rc87 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and
+  `PRESSTALK_TRIGGER_KEY=option_space`. The final restored readiness report
+  shows `CodeSignatureCDHash=c9bf7264ab344b1022cda0d077fd70d9c21b83f3`,
+  `inputListener=carbon:registered`, `speechModel=Ready`,
+  `activeFieldInsertionStatus=ready_input_method`, and trigger path
+  `Option + Space ready`.
+- The latest rc87 current-signed-app production insertion probe on `studio1`
+  reported `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification` at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T22-36-23-689Z.json`.
+  Its trace includes
+  `Input method insertion acknowledgement inserted=1 attempt=1` before
+  `Production insertion probe inserted`; the same final readiness report still
+  shows `latestManualPhysicalTriggerSmoke.path=none`, so physical
+  `Option + Space` STT/paste proof remains the studio1 blocker.
+- `mbp1` was updated from the public rc87 artifact over `mbp1-tb` with the
+  expected SHA and no-pane bootstrap flags. It reports
+  `triggerPath=Option + Space ready`, `inputListener=carbon:registered`,
+  `speechModel=Ready`, and `microphoneAuthorizationStatus=authorized`.
+  Active-field insertion is still blocked by signing repair:
+  `activeFieldInsertionStatus=needs_signing_repair`,
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
+  The rc87 bootstrap reused only existing signing state, skipped stable signing
+  because the existing PressTalk local identity is still untrusted, did not open
+  System Settings, and did not start a signing trust prompt.
+- The latest rc87 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc87-mbp1-updated-20260607T223718Z.json`
+  required `local` and `mbp1-tb`. It reports `local` as ready for physical
+  dictation smoke and `mbp1-tb` as reachable with speech ready but
+  `activeFieldSmokeReady=false`. The matching rc87 proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc87-mbp1-updated-20260607T223718Z.json`
+  is still `proven=false` with `failureCount=1`, failing only `mbp1-tb` for
+  `active_field_not_ready`.
+- `v0.1.5-rc86` was the previous public prerelease smoke artifact. It includes the
   rc85 `Run Physical Smoke` launcher in Settings and the menu bar, the
   acknowledgement-gated input-method insertion path, and the rc86 hardening for
   app updates: bootstrap restarts the per-user InputMethodKit launch agent after

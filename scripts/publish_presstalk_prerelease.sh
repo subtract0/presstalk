@@ -39,6 +39,12 @@ and whether it was actually applied. This is intended to avoid repeated ad-hoc
 TCC identity drift without repeatedly prompting for already approved permissions
 during smoke testing and updates.
 
+The local signing helper now retries trust on an existing untrusted PressTalk
+identity instead of importing another duplicate certificate on every failed
+attempt. It prints a clear signing-trust message before macOS may ask for the
+user's Mac login password, keeps a short timeout over SSH, and uses a longer
+timeout in the logged-in desktop session.
+
 While blocked on macOS privacy approvals, PressTalk keeps a quiet setup retry
 timer running. Startup/setup checks use read-only preflights and real listener
 capability probes by default; the setup window is not auto-shown unless

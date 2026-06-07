@@ -6,7 +6,13 @@ KEYCHAIN="${PRESSTALK_LOCAL_CODESIGN_KEYCHAIN:-$HOME/Library/Keychains/presstalk
 STATE_DIR="$HOME/Library/Application Support/PressTalk"
 PASSWORD_FILE="$STATE_DIR/local-codesign-keychain-password"
 DAYS="${PRESSTALK_LOCAL_CODESIGN_DAYS:-3650}"
-TRUST_TIMEOUT_SECONDS="${PRESSTALK_LOCAL_CODESIGN_TRUST_TIMEOUT_SECONDS:-10}"
+if [[ -n "${PRESSTALK_LOCAL_CODESIGN_TRUST_TIMEOUT_SECONDS:-}" ]]; then
+  TRUST_TIMEOUT_SECONDS="$PRESSTALK_LOCAL_CODESIGN_TRUST_TIMEOUT_SECONDS"
+elif [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
+  TRUST_TIMEOUT_SECONDS=10
+else
+  TRUST_TIMEOUT_SECONDS=90
+fi
 
 if ! command -v openssl >/dev/null 2>&1; then
   echo "Missing required command: openssl" >&2
@@ -50,7 +56,20 @@ find_identity_hash() {
     awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
 }
 
+find_any_identity_hash() {
+  security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null |
+    awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
+}
+
+export_existing_certificate() {
+  local output_path="$1"
+  security find-certificate -p -c "$IDENTITY" "$KEYCHAIN" >"$output_path" 2>/dev/null || true
+  [[ -s "$output_path" ]]
+}
+
 trust_certificate_for_codesigning() {
+  echo "macOS may ask for your Mac login password to trust the PressTalk local signing certificate." >&2
+  echo "Approve this signing trust prompt if you want PressTalk to keep a stable privacy identity." >&2
   security add-trusted-cert -k "$KEYCHAIN" -p codeSign "$1" >/dev/null 2>&1 &
   local trust_pid=$!
   local waited=0
@@ -76,13 +95,39 @@ if [[ -z "$IDENTITY_HASH" ]]; then
   }
   trap cleanup EXIT
 
-  P12_PASSWORD="$(openssl rand -hex 24)"
-  OPENSSL_CONFIG="$TMP_DIR/openssl.cnf"
-  CERT_PEM="$TMP_DIR/cert.pem"
-  KEY_PEM="$TMP_DIR/key.pem"
-  P12="$TMP_DIR/identity.p12"
+  EXISTING_IDENTITY_HASH="$(find_any_identity_hash)"
+  if [[ -n "$EXISTING_IDENTITY_HASH" ]]; then
+    EXISTING_CERT_PEM="$TMP_DIR/existing-cert.pem"
+    if export_existing_certificate "$EXISTING_CERT_PEM"; then
+      echo "Found an existing untrusted PressTalk local code-signing identity; retrying trust instead of creating a duplicate." >&2
+      if ! trust_certificate_for_codesigning "$EXISTING_CERT_PEM"; then
+        echo "Warning: timed out while adding code-signing trust for $IDENTITY." >&2
+        echo "If prompted, enter your Mac login password for the signing trust prompt. Do not reopen privacy permission panes for this state." >&2
+      fi
+      security set-key-partition-list \
+        -S apple-tool:,apple:,codesign: \
+        -s \
+        -k "$KEYCHAIN_PASSWORD" \
+        "$KEYCHAIN" >/dev/null 2>&1 || true
 
-  cat >"$OPENSSL_CONFIG" <<EOF
+      IDENTITY_HASH="$(find_identity_hash)"
+    fi
+
+    if [[ -z "$IDENTITY_HASH" ]]; then
+      echo "Existing PressTalk local code-signing identity remains untrusted in $KEYCHAIN" >&2
+      echo "Run this helper in the logged-in desktop session and approve the signing trust password prompt." >&2
+      exit 1
+    fi
+  fi
+
+  if [[ -z "$IDENTITY_HASH" ]]; then
+    P12_PASSWORD="$(openssl rand -hex 24)"
+    OPENSSL_CONFIG="$TMP_DIR/openssl.cnf"
+    CERT_PEM="$TMP_DIR/cert.pem"
+    KEY_PEM="$TMP_DIR/key.pem"
+    P12="$TMP_DIR/identity.p12"
+
+    cat >"$OPENSSL_CONFIG" <<EOF
 [ req ]
 distinguished_name = req_distinguished_name
 x509_extensions = v3_codesign
@@ -98,46 +143,47 @@ extendedKeyUsage = critical, codeSigning
 subjectKeyIdentifier = hash
 EOF
 
-  openssl req \
-    -new \
-    -newkey rsa:2048 \
-    -nodes \
-    -keyout "$KEY_PEM" \
-    -x509 \
-    -days "$DAYS" \
-    -out "$CERT_PEM" \
-    -config "$OPENSSL_CONFIG" >/dev/null 2>&1
+    openssl req \
+      -new \
+      -newkey rsa:2048 \
+      -nodes \
+      -keyout "$KEY_PEM" \
+      -x509 \
+      -days "$DAYS" \
+      -out "$CERT_PEM" \
+      -config "$OPENSSL_CONFIG" >/dev/null 2>&1
 
-  # macOS security(1) can reject OpenSSL 3's newer PKCS#12 defaults.
-  openssl pkcs12 \
-    -export \
-    -inkey "$KEY_PEM" \
-    -in "$CERT_PEM" \
-    -out "$P12" \
-    -name "$IDENTITY" \
-    -keypbe PBE-SHA1-3DES \
-    -certpbe PBE-SHA1-3DES \
-    -macalg sha1 \
-    -passout "pass:$P12_PASSWORD" >/dev/null 2>&1
+    # macOS security(1) can reject OpenSSL 3's newer PKCS#12 defaults.
+    openssl pkcs12 \
+      -export \
+      -inkey "$KEY_PEM" \
+      -in "$CERT_PEM" \
+      -out "$P12" \
+      -name "$IDENTITY" \
+      -keypbe PBE-SHA1-3DES \
+      -certpbe PBE-SHA1-3DES \
+      -macalg sha1 \
+      -passout "pass:$P12_PASSWORD" >/dev/null 2>&1
 
-  security import "$P12" \
-    -f pkcs12 \
-    -k "$KEYCHAIN" \
-    -P "$P12_PASSWORD" \
-    -T /usr/bin/codesign \
-    -T /usr/bin/security >/dev/null
+    security import "$P12" \
+      -f pkcs12 \
+      -k "$KEYCHAIN" \
+      -P "$P12_PASSWORD" \
+      -T /usr/bin/codesign \
+      -T /usr/bin/security >/dev/null
 
-  if ! trust_certificate_for_codesigning "$CERT_PEM"; then
-    echo "Warning: timed out while adding code-signing trust for $IDENTITY." >&2
-    echo "If the identity is not valid below, open Keychain Access and trust the certificate for code signing." >&2
+    if ! trust_certificate_for_codesigning "$CERT_PEM"; then
+      echo "Warning: timed out while adding code-signing trust for $IDENTITY." >&2
+      echo "If the identity is not valid below, open Keychain Access and trust the certificate for code signing." >&2
+    fi
+    security set-key-partition-list \
+      -S apple-tool:,apple:,codesign: \
+      -s \
+      -k "$KEYCHAIN_PASSWORD" \
+      "$KEYCHAIN" >/dev/null 2>&1 || true
+
+    IDENTITY_HASH="$(find_identity_hash)"
   fi
-  security set-key-partition-list \
-    -S apple-tool:,apple:,codesign: \
-    -s \
-    -k "$KEYCHAIN_PASSWORD" \
-    "$KEYCHAIN" >/dev/null 2>&1 || true
-
-  IDENTITY_HASH="$(find_identity_hash)"
 fi
 
 if [[ -z "$IDENTITY_HASH" ]]; then

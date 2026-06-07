@@ -122,6 +122,14 @@ delivery. On studio1 these paths posted events but observed no inserted text
 while Accessibility was untrusted, which rules out these CGEvent routes as
 reliable no-Accessibility insertion fallbacks on that machine.
 
+The bundle also carries presstalk-virtual-hid-paste-probe.swift. It opens a
+local text view, places a payload on the pasteboard, and tries Cmd-V through an
+IOHIDUserDevice virtual keyboard. Apple's SDK requires the
+com.apple.developer.hid.virtual.device entitlement to create that virtual HID
+device; on studio1 the probe reports reason=device_create_failed before sending
+any report, so this is diagnostic evidence rather than a public unsigned
+fallback.
+
 The bundled smoke-status collector now includes an Input Method section. It
 prints the bundled and installed PressTalkInputMethod.app signatures, warns if
 their CDHashes differ, and embeds the read-only TIS status JSON from

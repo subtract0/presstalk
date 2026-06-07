@@ -210,6 +210,16 @@ PID-targeted posting. Local evidence from
 shows all four methods reported `postResult=posted` but `success=false` and
 `observedText=""`.
 
+The virtual keyboard route is also not a public unsigned fallback. The bundled
+`presstalk-virtual-hid-paste-probe.swift` creates a focused local text window,
+places a payload on the pasteboard, then tries to send Cmd-V through
+`IOHIDUserDevice`. Apple's SDK header for `IOHIDUserDeviceCreateWithProperties`
+states that creating a virtual HID device requires the
+`com.apple.developer.hid.virtual.device` entitlement. On `studio1`, the probe
+failed before sending any report:
+`Diagnostics/virtual-hid-paste-probe-2026-06-07T02-00-59-948Z.json` reported
+`success=false`, `reason=device_create_failed`, and `deviceCreated=false`.
+
 After the input method is installed, selected, and focused in an editable text
 field, post a probe insert:
 

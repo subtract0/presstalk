@@ -76,6 +76,8 @@ cp "$PKG_DIR/scripts/presstalk_input_method_client_probe.swift" "$APP_RESOURCES_
 chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
 cp "$PKG_DIR/scripts/presstalk_unicode_event_insert_probe.swift" "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
+cp "$PKG_DIR/scripts/presstalk_virtual_hid_paste_probe.swift" "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
 cp "$PKG_DIR/scripts/presstalk_install_input_method.sh" "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 bash "$PKG_DIR/scripts/build_presstalk_input_method.sh" \

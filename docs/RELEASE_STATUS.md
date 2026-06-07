@@ -56,6 +56,13 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   reported `success=true`, `targetCaptureSuccess=true`,
   `traceProductionMethod=input_method_notification`,
   `traceCopyFallback=false`, and `traceInputMethodEnableNoEffect=false`.
+- A post-rc54 virtual-HID paste probe was added for diagnostics. It opens a
+  focused local text view, sets a pasteboard payload, and attempts Cmd-V through
+  `IOHIDUserDevice`. Apple's local SDK header says virtual HID device creation
+  requires the `com.apple.developer.hid.virtual.device` entitlement, and
+  `studio1` confirmed the route is blocked for this unsigned/public fallback:
+  `Diagnostics/virtual-hid-paste-probe-2026-06-07T02-00-59-948Z.json` reported
+  `success=false`, `reason=device_create_failed`, and `deviceCreated=false`.
 - On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
   installed with no-pane flags, and bootstrapped without explicitly setting
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported

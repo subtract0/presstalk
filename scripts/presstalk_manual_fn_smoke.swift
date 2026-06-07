@@ -2,7 +2,7 @@
 import AppKit
 import Foundation
 
-final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
+final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     private let startedAt = Date()
     private let timeoutSeconds: TimeInterval
     private let traceLogURL: URL
@@ -78,6 +78,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         )
         window.title = "PressTalk Manual Trigger Smoke"
         window.center()
+        window.delegate = self
 
         let contentView = NSView()
         contentView.translatesAutoresizingMaskIntoConstraints = false
@@ -121,6 +122,11 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 220),
             scrollView.widthAnchor.constraint(equalTo: stack.widthAnchor),
         ])
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        guard !completed else { return }
+        finish(success: false, reason: "window_closed", capturedText: textView?.string ?? "")
     }
 
     private func tick() {

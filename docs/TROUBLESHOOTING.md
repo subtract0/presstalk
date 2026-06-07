@@ -33,13 +33,17 @@ Microphone, Input Monitoring, and Accessibility buttons are hidden too. This
 keeps a no-pane diagnostic run from reopening System Settings or suggesting
 another approval pass after the user has already confirmed the toggles.
 
-For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID and
-session event taps before falling back to writable taps. Check
-`runtime.inputListener` in the collected status to see which path armed, for
-example `hid:listen_only`, `session:listen_only`, `hid:default`, or `failed`.
-If `permissions.inputMonitoringGranted=false` but
-`permissions.inputMonitoringEffective=true`, the listener is armed and the
-Settings window should show Input Monitoring as listener-ready, not missing.
+For `Fn` and `Option`, current builds try writable HID/session event taps first.
+A listen-only fallback can prove that some event tap is installed, but it is not
+effective for modifier-key triggers; runtime status reports
+`permissions.inputMonitoringStatus=writable_key_tap_unavailable` in that state.
+`trackpad_hold` can use a listen-only tap. Check `runtime.inputListener` in the
+collected status to see which path armed, for example `hid:listen_only`,
+`session:listen_only`, `hid:default`, or `failed`. If
+`permissions.inputMonitoringGranted=false` but
+`permissions.inputMonitoringEffective=true`, the selected trigger's listener is
+armed and the Settings window should show Input Monitoring as listener-ready,
+not missing.
 Treat Accessibility false-preflight as a paste probe unless paste actually
 fails.
 If Microphone is unavailable even though macOS already shows PressTalk enabled,

@@ -857,10 +857,12 @@ Earlier prerelease notes retained for provenance:
 - Current startup/setup checks no longer call macOS permission-request APIs
   automatically. They only preflight and attempt the real listener capability,
   so repeated restarts do not keep prompting for already-approved permissions.
-- For `Fn`, `Option`, and `trackpad_hold`, current builds try listen-only HID
-  and session event taps before falling back to writable taps. Runtime status
-  records `runtime.inputListener` so smoke tests can distinguish
-  `hid:listen_only`, `session:listen_only`, `hid:default`, and `failed`.
+- For `Fn` and `Option`, current builds try writable HID/session event taps
+  first. A listen-only fallback is not effective for modifier-key triggers and
+  now records `permissions.inputMonitoringStatus=writable_key_tap_unavailable`.
+  `trackpad_hold` can use a listen-only tap. Runtime status records
+  `runtime.inputListener` so smoke tests can distinguish `hid:listen_only`,
+  `session:listen_only`, `hid:default`, and `failed`.
 - Settings now distinguish read-only permission preflights from effective
   runtime capability. If the real listener is armed, Input Monitoring renders as
   listener-ready and `runtime-status.json` records

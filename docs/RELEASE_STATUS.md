@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc64`
-- Commit: `53c37d59223c42b834ca5c10d866dc330e5dab79`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc64`
-- Asset: `PressTalk-0.1.5-rc64-macos-arm64.zip`
-- SHA-256: `90fcaa56566cd40ebbedddae9d88e6c4099b1c6ae891f65b590c4ed11b4b2534`
+- Tag: `v0.1.5-rc65`
+- Commit: `8589091746b98f3455b6b6affcea14b07b8a3647`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc65`
+- Asset: `PressTalk-0.1.5-rc65-macos-arm64.zip`
+- SHA-256: `73ef9f26096cd80b234f2d63322ee766ce2c145ca700a4a55260779f25379593`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,29 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc65` makes the known mbp1 blocker visible in the menu-bar status.
+  When transcription is ready but ad-hoc input-method signing still blocks
+  active-field paste, the menu summary says `Paste Repair Needed` instead of
+  plain `Ready` and the detail points to `Repair Signing` in the menu bar. A
+  generic non-ready fallback status reports `Paste Fallback Blocked`.
+- The `v0.1.5-rc65` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:73ef9f26096cd80b234f2d63322ee766ce2c145ca700a4a55260779f25379593`,
+  matching the local `dist/PressTalk-0.1.5-rc65-macos-arm64.zip`. The
+  `v0.1.5-rc65` tag points at
+  `8589091746b98f3455b6b6affcea14b07b8a3647`, and the inspected asset contains
+  the `Paste Repair Needed` and `Paste Fallback Blocked` status strings.
+- After rc65 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The installed
+  binary contains the new paste repair status strings, and the bundled verifier
+  still exits `0` using the latest successful production insertion probe.
+- On `mbp1`, rc65 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. The installed binary contains the new paste
+  repair status strings. Runtime remains transcription-ready, but active-field
+  insertion is still unproven: `adHocSigned=true`,
+  `inputMethodFallbackStatus=recognized_disabled`, and the no-window TIS enable
+  diagnostic still reports `enableStatus=0` with `enableNoEffect=true`.
 - `v0.1.5-rc64` publishes the direct menu-bar repair path and matching
   collector wording. In the ad-hoc `recognized_disabled` state, the status menu
   shows `Repair Signing...` so a logged-in desktop user can start the no-pane

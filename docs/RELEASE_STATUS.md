@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc60`
-- Commit: `387de8c2bf1219bd984fc21867a0cb6b12a403b1`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc60`
-- Asset: `PressTalk-0.1.5-rc60-macos-arm64.zip`
-- SHA-256: `e7328bfdb2fda714f2a991acaaaa2a752b43f2873c5e72a920867ab1870e0953`
+- Tag: `v0.1.5-rc61`
+- Commit: `06be461f87b8cbf255340f65d559888701346430`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc61`
+- Asset: `PressTalk-0.1.5-rc61-macos-arm64.zip`
+- SHA-256: `b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,42 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc61` adds a bundled read-only
+  `presstalk-verify-repair-result.sh` helper. It reports the current runtime
+  signing/input-method state plus the latest production insertion probe and
+  exits `0` only when active-field insertion has been proven in the focused
+  target. It does not open permission panes and does not start any signing trust
+  flow.
+- The `v0.1.5-rc61` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d`,
+  matching the local `dist/PressTalk-0.1.5-rc61-macos-arm64.zip`. The remote
+  `main` branch and `v0.1.5-rc61` tag both point at
+  `06be461f87b8cbf255340f65d559888701346430`, and the inspected asset contains
+  `presstalk-verify-repair-result.sh`.
+- After rc61 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `Authority=PressTalk Local Development Code Signing`,
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputMethodFallbackStatus=ready`, and
+  `accessibilityStatus=ax_false_input_method_fallback_ready`. The bundled
+  verifier exits `0` on `studio1` using the latest successful production
+  insertion probe:
+  `Diagnostics/production-insertion-probe-2026-06-07T02-10-16-571Z.json`.
+- On `mbp1`, rc61 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. Runtime remains transcription-ready:
+  `speechModel=Ready`, `triggerPath=Fn / Globe ready`,
+  `inputListener=hid:listen_only`, `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, and `inputPipelineReady=true`. The bundled
+  verifier is present and exits nonzero with `Result: not proven` because the
+  app is still ad-hoc signed and
+  `inputMethodFallbackStatus=recognized_disabled`. The correct next action is
+  still the logged-in desktop `Repair Signing` path, not another Microphone,
+  Input Monitoring, or Accessibility permission pass.
+- `studio2` / `s2` is intentionally excluded from current microphone/STT smoke
+  coverage because it has no attached microphone.
 - `v0.1.5-rc53` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
 - The `v0.1.5-rc53` zip was inspected locally and contains the expected arm64

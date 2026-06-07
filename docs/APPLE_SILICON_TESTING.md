@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc60-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc60/PressTalk-0.1.5-rc60-macos-arm64.zip
-echo "e7328bfdb2fda714f2a991acaaaa2a752b43f2873c5e72a920867ab1870e0953  $tmpdir/PressTalk-0.1.5-rc60-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc60-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc61/PressTalk-0.1.5-rc61-macos-arm64.zip
+echo "b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d  $tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-e7328bfdb2fda714f2a991acaaaa2a752b43f2873c5e72a920867ab1870e0953
+b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -110,6 +110,17 @@ After repair or bootstrap, collect one read-only status report:
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
 ```
+
+For a compact SSH-safe pass/fail check after desktop repair, run:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-verify-repair-result.sh"
+```
+
+That verifier is read-only. It exits `0` only when the runtime insertion path is
+ready and the latest production insertion probe captured text in the focused
+target. It exits nonzero without opening permission panes or starting any
+signing trust flow.
 
 The `Input Method` section should show matching bundled and installed
 `PressTalkInputMethod.app` CDHashes plus TIS status with
@@ -395,7 +406,8 @@ Record each machine result before claiming release coverage:
 
 - `studio1`: M4 Max, local build/runtime smoke
 - `s1`: install + Fn smoke
-- `s2`: install + Fn smoke when a microphone is attached
+- `s2` / `studio2`: excluded from current microphone/STT coverage until a
+  microphone is attached
 - `mbp1`: M1 Max install + Fn or Option smoke
 
 Attach or paste the output of `presstalk-collect-smoke-status.sh` for each

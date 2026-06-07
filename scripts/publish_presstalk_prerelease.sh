@@ -175,8 +175,12 @@ PressTalk with PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1, opens a focused
 local text window, asks the running PressTalk app to insert a payload through
 the same production insertion path used after dictation, records whether the
 payload lands, then restores normal no-probe startup. It reads the current
-trigger key through macOS plutil rather than a Python dependency. This tests the
-app process itself rather than only the standalone input-method client probe.
+trigger key through macOS plutil rather than a Python dependency. The wrapper
+now waits until the restarted app logs that the production insertion probe
+notification is installed before opening the probe window, avoiding false
+production_probe_not_enabled artifacts after immediate app rebuilds or repairs.
+This tests the app process itself rather than only the standalone input-method
+client probe.
 
 The bundle now also carries a separate PressTalkInputMethod.app plus
 presstalk-install-input-method.sh, presstalk-input-method-status.swift,

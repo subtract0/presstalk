@@ -1089,6 +1089,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         case aborted(String)
         case error(String)
         case setupRequired(String)
+        case diagnosticStarted(String)
     }
 
     private struct PermissionCheckResult {
@@ -1474,6 +1475,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         settingsWindowController.onRunSetupCheck = { [weak self] in
             self?.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
         }
+        settingsWindowController.onRunPhysicalSmoke = { [weak self] in
+            self?.runPhysicalSmokeFromSettings()
+        }
         settingsWindowController.onExportDiagnostics = { [weak self] in
             self?.exportDiagnostics()
         }
@@ -1553,6 +1557,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let setupCheckItem = NSMenuItem(title: "Run Setup Check", action: #selector(runSetupCheckFromMenu(_:)), keyEquivalent: "")
         setupCheckItem.target = self
         menu.addItem(setupCheckItem)
+
+        let physicalSmokeItem = NSMenuItem(title: "Run Physical Smoke…", action: #selector(runPhysicalSmokeFromMenu(_:)), keyEquivalent: "")
+        physicalSmokeItem.target = self
+        physicalSmokeItem.toolTip = "Opens the bundled physical trigger smoke helper without opening privacy panes."
+        menu.addItem(physicalSmokeItem)
 
         let repairSigningItem = NSMenuItem(title: "Repair Signing…", action: #selector(repairLocalSigningFromMenu(_:)), keyEquivalent: "")
         repairSigningItem.target = self
@@ -1816,6 +1825,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             uiState = ("Couldn’t Hear That", message, "exclamationmark.triangle.fill", .error, 1.7)
         case .setupRequired(let message):
             uiState = ("Setup Required", message, "slider.horizontal.3", .warming, nil)
+        case .diagnosticStarted(let message):
+            uiState = ("Diagnostic Started", message, "waveform.path.badge.plus", .ready, 2.0)
         }
 
         if case .inserted = state {
@@ -1826,6 +1837,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             scheduleReturnToReady(after: 4.0)
         } else if case .error = state {
             scheduleReturnToReady()
+        } else if case .diagnosticStarted = state {
+            scheduleReturnToReady(after: 2.0)
         } else if case .setupRequired = state {
             cancelReadyReset()
         } else {
@@ -1857,7 +1870,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             )
         case .setupRequired:
             hudController?.hide()
-        case .aborted, .error:
+        case .aborted, .error, .diagnosticStarted:
             hudController?.show(
                 title: uiState.summary,
                 detail: uiState.detail,
@@ -1880,6 +1893,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     @objc private func repairLocalSigningFromMenu(_ sender: Any?) {
         repairLocalSigningFromSettings()
+    }
+
+    @objc private func runPhysicalSmokeFromMenu(_ sender: Any?) {
+        runPhysicalSmokeFromSettings()
     }
 
     @objc private func toggleHUDFromMenu(_ sender: Any?) {
@@ -2178,6 +2195,58 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         } catch {
             traceLogger.log("Diagnostics export failed error=\(error)")
             present(.error("Diagnostics export failed."))
+        }
+    }
+
+    private func runPhysicalSmokeFromSettings() {
+        guard let helperURL = Bundle.main.resourceURL?.appendingPathComponent("presstalk-manual-fn-smoke.swift"),
+              FileManager.default.isExecutableFile(atPath: helperURL.path) else {
+            traceLogger.log("Manual physical smoke helper missing path=\(Bundle.main.resourceURL?.path ?? "nil")")
+            present(.error("The physical smoke helper is missing from this build."))
+            return
+        }
+
+        let diagnosticsDirectory = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap/Diagnostics", isDirectory: true)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
+        let logURL = diagnosticsDirectory.appendingPathComponent("manual-physical-smoke-launch-\(timestamp).log")
+        let pidURL = diagnosticsDirectory.appendingPathComponent("manual-physical-smoke-launch-\(timestamp).pid")
+
+        do {
+            try FileManager.default.createDirectory(at: diagnosticsDirectory, withIntermediateDirectories: true)
+        } catch {
+            traceLogger.log("Manual physical smoke log directory failed error=\(error)")
+            present(.error("Could not create diagnostics directory for physical smoke."))
+            return
+        }
+
+        let helperPath = shellQuoted(helperURL.path)
+        let logPath = shellQuoted(logURL.path)
+        let pidPath = shellQuoted(pidURL.path)
+        let triggerKey = shellQuoted(settingsStore.triggerKey.rawValue)
+        let triggerLabel = shellQuoted(settingsStore.triggerKey.displayName)
+        let script = """
+        export PRESSTALK_OPEN_PERMISSION_PANES=0
+        export PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0
+        export PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY=\(triggerKey)
+        export PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL=\(triggerLabel)
+        /usr/bin/nohup /usr/bin/env swift \(helperPath) >\(logPath) 2>&1 &
+        echo $! >\(pidPath)
+        """
+
+        traceLogger.log("Manual physical smoke requested from UI helper=\(helperURL.path) log=\(logURL.path) pid_file=\(pidURL.path)")
+        present(.diagnosticStarted("Physical smoke window opening for \(settingsStore.triggerKey.displayName)."))
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/bash")
+        process.arguments = ["-lc", script]
+        do {
+            try process.run()
+        } catch {
+            traceLogger.log("Manual physical smoke launch failed error=\(error)")
+            present(.error("Could not start physical smoke: \(error.localizedDescription)"))
         }
     }
 

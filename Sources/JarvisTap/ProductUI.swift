@@ -799,6 +799,7 @@ final class PressTalkHUDController {
 final class PressTalkSettingsWindowController: NSWindowController {
     var onSettingsChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
+    var onRunPhysicalSmoke: (() -> Void)?
     var onExportDiagnostics: (() -> Void)?
     var onRestartApp: (() -> Void)?
     var onRepairLocalSigning: (() -> Void)?
@@ -835,6 +836,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let speechModelValueLabel = NSTextField(labelWithString: "")
     private let f5BridgeValueLabel = NSTextField(labelWithString: "")
     private let runSetupCheckButton = NSButton(title: "Run Setup Check", target: nil, action: nil)
+    private let runPhysicalSmokeButton = NSButton(title: "Run Physical Smoke", target: nil, action: nil)
     private let restartAppButton = NSButton(title: "Restart PressTalk", target: nil, action: nil)
     private let repairLocalSigningButton = NSButton(title: "Repair Signing", target: nil, action: nil)
     private let exportDiagnosticsButton = NSButton(title: "Export Diagnostics", target: nil, action: nil)
@@ -973,6 +975,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         for button in [
             runSetupCheckButton,
+            runPhysicalSmokeButton,
             restartAppButton,
             repairLocalSigningButton,
             exportDiagnosticsButton,
@@ -997,6 +1000,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
         diagnosticsButtonsRow.orientation = .horizontal
         diagnosticsButtonsRow.alignment = .centerY
         diagnosticsButtonsRow.spacing = 8
+
+        let physicalSmokeButtonsRow = NSStackView(views: [runPhysicalSmokeButton])
+        physicalSmokeButtonsRow.orientation = .horizontal
+        physicalSmokeButtonsRow.alignment = .centerY
+        physicalSmokeButtonsRow.spacing = 8
 
         let dictationButtonsRow = NSStackView(views: [disableSystemDictationButton])
         dictationButtonsRow.orientation = .horizontal
@@ -1056,6 +1064,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
             f5BridgeRow,
             setupButtonsRow,
             diagnosticsButtonsRow,
+            physicalSmokeButtonsRow,
             dictationButtonsRow,
             nativeButtonsRow,
             fallbackButtonsRow,
@@ -1132,6 +1141,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         runSetupCheckButton.target = self
         runSetupCheckButton.action = #selector(runSetupCheck(_:))
+
+        runPhysicalSmokeButton.target = self
+        runPhysicalSmokeButton.action = #selector(runPhysicalSmoke(_:))
 
         restartAppButton.target = self
         restartAppButton.action = #selector(restartApp(_:))
@@ -1377,6 +1389,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func runSetupCheck(_ sender: Any?) {
         onRunSetupCheck?()
+    }
+
+    @objc private func runPhysicalSmoke(_ sender: Any?) {
+        onRunPhysicalSmoke?()
     }
 
     @objc private func restartApp(_ sender: Any?) {

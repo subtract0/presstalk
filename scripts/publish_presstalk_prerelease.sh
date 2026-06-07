@@ -153,6 +153,13 @@ traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and
 targetCaptureFailureHint, so the exact physical trigger path, STT success, and
 active-field insertion result are visibly separate.
 
+PressTalk Settings and the menu-bar menu now include Run Physical Smoke. That
+action launches the bundled manual physical-trigger smoke helper in a separate
+window, keeps permission panes disabled, and writes launcher log/pid files next
+to the resulting manual-trigger-smoke JSON diagnostics. This removes the need
+to type a terminal command for the required studio1 physical Option + Space
+proof.
+
 The bundle also includes presstalk-run-production-insertion-probe.sh and
 presstalk-production-insertion-probe.swift. The wrapper temporarily restarts
 PressTalk with PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1, opens a focused

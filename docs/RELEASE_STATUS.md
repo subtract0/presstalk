@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc52`
-- Commit: `a229854b092888fdc466feed8a290be85ae939e2`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc52`
-- Asset: `PressTalk-0.1.5-rc52-macos-arm64.zip`
-- SHA-256: `6e359be871ed408f871f98357e59e9c32544b977b92976e6e62990b6c2df694e`
+- Tag: `v0.1.5-rc53`
+- Commit: `20a91f77863440a05f1419ac7f23a5eb89083284`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc53`
+- Asset: `PressTalk-0.1.5-rc53-macos-arm64.zip`
+- SHA-256: `8d82b9e2042f32bfd564c1136d2d82b27244d3cc6be39d1fe8a26a4774e2f3a5`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,14 +17,24 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
-- `v0.1.5-rc52` is published as a public prerelease smoke artifact, and GitHub
+- `v0.1.5-rc53` is published as a public prerelease smoke artifact, and GitHub
   reports the expected asset SHA-256 digest.
-- The `v0.1.5-rc52` zip was inspected locally and contains the expected arm64
+- The `v0.1.5-rc53` zip was inspected locally and contains the expected arm64
   `PressTalk.app`, permission usage descriptions, bundled bootstrap helper,
   bundled local-signing helper, bundled signing-repair helper, bundled
   smoke-status collector, bundled manual Fn smoke helper, bundled automated F5
   smoke helper, bundled actual-bundle Accessibility probe, bundled production
   insertion probe helpers, and bundled input-method app/helpers with `PkgInfo`.
+- `v0.1.5-rc53` adds `permissions.inputMethodFallbackStatus` to runtime status
+  and Settings. On `studio1`, local restore reports
+  `inputMethodFallbackStatus=ready`,
+  `accessibilityStatus=ax_false_input_method_fallback_ready`, and the production
+  insertion probe succeeded with `success=true`, `targetCaptureSuccess=true`,
+  and `traceProductionMethod=input_method_notification`. On `mbp1`, rc53
+  no-pane/ad-hoc install reports
+  `inputMethodFallbackStatus=recognized_disabled` and
+  `accessibilityStatus=ax_false_input_method_recognized_disabled`, matching the
+  collector evidence that TIS recognizes the source but has not enabled it.
 - `v0.1.5-rc52` extends the bundled smoke-status collector with an `Input
   Method` section. It prints bundled and installed `PressTalkInputMethod.app`
   signatures, warns if their CDHashes differ, and embeds the read-only TIS JSON
@@ -714,6 +724,9 @@ Known current proof gaps:
 - `v0.1.5-rc52` adds the input-method state to the smoke collector so post-repair
   mbp1 evidence can prove matching input-method signatures and TIS enablement
   before interpreting insertion probes.
+- `v0.1.5-rc53` makes that blocker visible in app runtime status and Settings:
+  mbp1 reports `inputMethodFallbackStatus=recognized_disabled`, not a ready
+  fallback. This is diagnostic progress, not active-field insertion proof.
 - `v0.1.5-rc51` adds a bundled no-pane signing repair
   wrapper and updates bootstrap to sign/refresh `PressTalkInputMethod.app`
   alongside the outer app. This is intended for the mbp1

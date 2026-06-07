@@ -22,7 +22,7 @@ PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING+x}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 if [[ -z "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT" && -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
-  PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0
+  PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing
 fi
 PRESSTALK_OPEN_PERMISSION_PANES="${PRESSTALK_OPEN_PERMISSION_PANES:-0}"
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-0}"
@@ -161,7 +161,7 @@ adhoc_resign_if_needed() {
 }
 
 resign_with_local_identity_if_possible() {
-  if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" != "1" ]]; then
+  if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" != "1" && "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" != "existing" ]]; then
     echo "Stable local signing skipped: PRESSTALK_BOOTSTRAP_STABLE_SIGNING=$PRESSTALK_BOOTSTRAP_STABLE_SIGNING"
     adhoc_resign_if_needed
     return 0
@@ -176,11 +176,20 @@ resign_with_local_identity_if_possible() {
   if [[ -n "$PRESSTALK_CODESIGN_IDENTITY" ]]; then
     identity_hash="$PRESSTALK_CODESIGN_IDENTITY"
   else
-    if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
-      echo "$output"
-      echo "Stable local signing skipped: could not prepare local code-signing identity."
-      adhoc_resign_if_needed
-      return 0
+    if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" == "existing" ]]; then
+      if ! output="$(PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY=1 "$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+        echo "$output"
+        echo "Stable local signing skipped: no existing valid local code-signing identity is available without a trust prompt."
+        adhoc_resign_if_needed
+        return 0
+      fi
+    else
+      if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+        echo "$output"
+        echo "Stable local signing skipped: could not prepare local code-signing identity."
+        adhoc_resign_if_needed
+        return 0
+      fi
     fi
     identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
   fi

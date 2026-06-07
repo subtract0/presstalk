@@ -69,11 +69,12 @@ The cask should:
   macOS privacy panes during no-pane smoke runs
 
 When bootstrap is run over SSH and `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` was not
-set explicitly, it skips local signing so it cannot create a surprise
-Mac-password trust prompt on the remote user's desktop. In that case the app
-still starts, but `status.adHocSigned=true` and the bootstrap summary reports
-stable signing skipped. That is a signing/identity blocker, not a reason to
-open privacy panes repeatedly.
+set explicitly, it only reuses an already-valid PressTalk local signing identity.
+If no valid identity exists, it skips local signing so it cannot create a
+surprise Mac-password trust prompt on the remote user's desktop. In that case
+the app still starts, but `status.adHocSigned=true` and the bootstrap summary
+reports stable signing skipped. That is a signing/identity blocker, not a reason
+to open privacy panes repeatedly.
 
 If a Mac skipped the signing trust password prompt, repair it from the logged-in
 desktop session rather than reopening permission panes:

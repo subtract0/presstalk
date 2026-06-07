@@ -6,6 +6,7 @@ KEYCHAIN="${PRESSTALK_LOCAL_CODESIGN_KEYCHAIN:-$HOME/Library/Keychains/presstalk
 STATE_DIR="$HOME/Library/Application Support/PressTalk"
 PASSWORD_FILE="$STATE_DIR/local-codesign-keychain-password"
 DAYS="${PRESSTALK_LOCAL_CODESIGN_DAYS:-3650}"
+EXISTING_ONLY="${PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY:-0}"
 if [[ -n "${PRESSTALK_LOCAL_CODESIGN_TRUST_TIMEOUT_SECONDS:-}" ]]; then
   TRUST_TIMEOUT_SECONDS="$PRESSTALK_LOCAL_CODESIGN_TRUST_TIMEOUT_SECONDS"
 elif [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
@@ -17,6 +18,64 @@ fi
 if ! command -v openssl >/dev/null 2>&1; then
   echo "Missing required command: openssl" >&2
   exit 1
+fi
+
+find_identity_hash() {
+  security find-identity -v -p codesigning "$KEYCHAIN" 2>/dev/null |
+    awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
+}
+
+add_keychain_to_search_list() {
+  local existing
+  local keychains=("$KEYCHAIN")
+  existing="$(security list-keychains -d user | sed 's/^[[:space:]]*"//;s/"$//')"
+  if printf '%s\n' "$existing" | grep -Fx "$KEYCHAIN" >/dev/null; then
+    return 0
+  fi
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    keychains+=("$line")
+  done <<<"$existing"
+  security list-keychains -d user -s "${keychains[@]}" >/dev/null
+}
+
+print_ready_identity() {
+  local identity_hash="$1"
+  security set-key-partition-list \
+    -S apple-tool:,apple:,codesign: \
+    -s \
+    -k "$KEYCHAIN_PASSWORD" \
+    "$KEYCHAIN" >/dev/null 2>&1 || true
+
+  add_keychain_to_search_list
+
+  echo "PressTalk local code-signing identity is ready."
+  echo "Identity: $IDENTITY"
+  echo "Hash: $identity_hash"
+  echo "Keychain: $KEYCHAIN"
+  echo
+  echo "Build with:"
+  echo "  PRESSTALK_CODESIGN_IDENTITY=$identity_hash bash scripts/build_jarvistap.sh"
+}
+
+if [[ "$EXISTING_ONLY" == "1" ]]; then
+  if [[ ! -f "$KEYCHAIN" || ! -f "$PASSWORD_FILE" ]]; then
+    echo "No existing PressTalk local code-signing keychain is available." >&2
+    exit 1
+  fi
+
+  KEYCHAIN_PASSWORD="$(cat "$PASSWORD_FILE")"
+  security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+  security set-keychain-settings -lut 21600 "$KEYCHAIN" >/dev/null
+
+  IDENTITY_HASH="$(find_identity_hash)"
+  if [[ -z "$IDENTITY_HASH" ]]; then
+    echo "No existing valid PressTalk local code-signing identity is available." >&2
+    exit 1
+  fi
+
+  print_ready_identity "$IDENTITY_HASH"
+  exit 0
 fi
 
 mkdir -p "$(dirname "$KEYCHAIN")" "$STATE_DIR"
@@ -36,25 +95,6 @@ fi
 
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
 security set-keychain-settings -lut 21600 "$KEYCHAIN" >/dev/null
-
-add_keychain_to_search_list() {
-  local existing
-  local keychains=("$KEYCHAIN")
-  existing="$(security list-keychains -d user | sed 's/^[[:space:]]*"//;s/"$//')"
-  if printf '%s\n' "$existing" | grep -Fx "$KEYCHAIN" >/dev/null; then
-    return 0
-  fi
-  while IFS= read -r line; do
-    [[ -z "$line" ]] && continue
-    keychains+=("$line")
-  done <<<"$existing"
-  security list-keychains -d user -s "${keychains[@]}" >/dev/null
-}
-
-find_identity_hash() {
-  security find-identity -v -p codesigning "$KEYCHAIN" 2>/dev/null |
-    awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
-}
 
 find_any_identity_hash() {
   security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null |
@@ -191,18 +231,4 @@ if [[ -z "$IDENTITY_HASH" ]]; then
   exit 1
 fi
 
-security set-key-partition-list \
-  -S apple-tool:,apple:,codesign: \
-  -s \
-  -k "$KEYCHAIN_PASSWORD" \
-  "$KEYCHAIN" >/dev/null 2>&1 || true
-
-add_keychain_to_search_list
-
-echo "PressTalk local code-signing identity is ready."
-echo "Identity: $IDENTITY"
-echo "Hash: $IDENTITY_HASH"
-echo "Keychain: $KEYCHAIN"
-echo
-echo "Build with:"
-echo "  PRESSTALK_CODESIGN_IDENTITY=$IDENTITY_HASH bash scripts/build_jarvistap.sh"
+print_ready_identity "$IDENTITY_HASH"

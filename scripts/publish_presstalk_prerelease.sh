@@ -34,9 +34,10 @@ The bundled bootstrap creates or reuses a local development code-signing
 identity on the target Mac, re-signs PressTalk.app before launchd starts it
 when macOS allows the noninteractive Keychain trust update, and leaves macOS
 permission panes closed. When bootstrap is launched over SSH and stable signing
-was not requested explicitly, it skips the local signing trust flow so a remote
-install cannot create a surprise Mac-password prompt on the desktop. Bootstrap
-never opens System Settings; the
+was not requested explicitly, it reuses an already-valid PressTalk local signing
+identity if one exists. If no valid identity exists, it skips the local signing
+trust flow so a remote install cannot create a surprise Mac-password prompt on
+the desktop. Bootstrap never opens System Settings; the
 permission-pane flag only controls whether the app manual Settings buttons are
 enabled. The bootstrap summary reports both whether stable signing was requested
 and whether it was actually applied. This is intended to avoid repeated ad-hoc

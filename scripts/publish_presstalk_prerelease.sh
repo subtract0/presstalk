@@ -33,7 +33,10 @@ Default trigger: Fn / Globe.
 The bundled bootstrap creates or reuses a local development code-signing
 identity on the target Mac, re-signs PressTalk.app before launchd starts it
 when macOS allows the noninteractive Keychain trust update, and leaves macOS
-permission panes closed. Bootstrap never opens System Settings; the
+permission panes closed. When bootstrap is launched over SSH and stable signing
+was not requested explicitly, it skips the local signing trust flow so a remote
+install cannot create a surprise Mac-password prompt on the desktop. Bootstrap
+never opens System Settings; the
 permission-pane flag only controls whether the app manual Settings buttons are
 enabled. The bootstrap summary reports both whether stable signing was requested
 and whether it was actually applied. This is intended to avoid repeated ad-hoc
@@ -43,8 +46,8 @@ during smoke testing and updates.
 The local signing helper now retries trust on an existing untrusted PressTalk
 identity instead of importing another duplicate certificate on every failed
 attempt. It prints a clear signing-trust message before macOS may ask for the
-user's Mac login password, keeps a short timeout over SSH, and uses a longer
-timeout in the logged-in desktop session.
+user's Mac login password. The repair wrapper refuses to start that trust flow
+over SSH unless --allow-ssh is passed deliberately.
 
 The app bundle now includes presstalk-repair-local-signing.sh. Run it from the
 logged-in desktop session when a Mac skipped the signing trust password prompt:

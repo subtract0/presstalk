@@ -68,11 +68,11 @@ The cask should:
 - pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
   macOS privacy panes during no-pane smoke runs
 
-When bootstrap is run over SSH on a Mac that has not already trusted the local
-PressTalk signing certificate, macOS may deny the Keychain trust update because
-no user interaction is possible. In that case the app still starts, but
-`status.adHocSigned=true` and the bootstrap summary reports stable signing
-requested but not applied. That is a signing/identity blocker, not a reason to
+When bootstrap is run over SSH and `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` was not
+set explicitly, it skips local signing so it cannot create a surprise
+Mac-password trust prompt on the remote user's desktop. In that case the app
+still starts, but `status.adHocSigned=true` and the bootstrap summary reports
+stable signing skipped. That is a signing/identity blocker, not a reason to
 open privacy panes repeatedly.
 
 If a Mac skipped the signing trust password prompt, repair it from the logged-in
@@ -92,6 +92,9 @@ running app insertion path immediately after repair:
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --probe
 ```
+
+The repair wrapper refuses to start the signing trust flow over SSH unless
+`--allow-ssh` is passed deliberately.
 
 The normal bootstrap summary now also reports `Bundled input method signing
 applied` and `Installed input method refreshed`. On mbp1, those fields must be

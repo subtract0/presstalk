@@ -7,6 +7,7 @@ STATUS_JSON="$HOME/Library/Application Support/JarvisTap/runtime-status.json"
 RUN_PROBE=0
 APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-}"
 TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-}"
+ALLOW_SSH="${PRESSTALK_REPAIR_ALLOW_SSH:-0}"
 
 usage() {
   cat <<EOF
@@ -23,6 +24,7 @@ Options:
   --trigger-key KEY   Trigger to preserve while restarting. Default: current
                       runtime status, then fn.
   --probe             Run the production insertion probe after repair.
+  --allow-ssh         Permit running the signing trust flow from SSH.
   -h, --help          Show this help.
 EOF
 }
@@ -47,6 +49,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --probe)
       RUN_PROBE=1
+      shift
+      ;;
+    --allow-ssh)
+      ALLOW_SSH=1
       shift
       ;;
     -h|--help)
@@ -104,13 +110,16 @@ your Mac login password, approve it only for the PressTalk local signing
 certificate trust prompt.
 EOF
 
-if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
-  cat <<EOF
+if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" && "$ALLOW_SSH" != "1" ]]; then
+  cat >&2 <<EOF
 
-Warning: this appears to be running over SSH. macOS often cannot show the
-signing trust prompt in an SSH session. If this fails, run the same helper from
-the logged-in desktop session and approve the Mac login-password prompt.
+This appears to be running over SSH, so PressTalk will not start the signing
+trust flow here. Run the same helper from the logged-in desktop session and
+approve only the Mac login-password prompt for PressTalk local signing trust.
+
+If you are deliberately testing SSH behavior, rerun with --allow-ssh.
 EOF
+  exit 2
 fi
 
 identity_output="$(

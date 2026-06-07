@@ -215,9 +215,9 @@ after repair:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --probe
 ```
 
-If this is run over SSH and fails, run the same command in the logged-in desktop
-session. macOS often cannot show the signing trust prompt to an SSH-only
-session.
+The repair wrapper refuses to start the signing trust flow over SSH unless
+`--allow-ssh` is passed deliberately. Run the command in the logged-in desktop
+session so the Mac login-password trust prompt is visible and intentional.
 
 After repair, use the smoke-status collector before rerunning insertion tests:
 

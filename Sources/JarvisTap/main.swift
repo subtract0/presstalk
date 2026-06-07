@@ -2331,16 +2331,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return "Waiting for setup"
         }
 
-        let telemetry = withStateLock { triggerBridgeTelemetry }
-        if settingsStore.triggerKey != .f5 && telemetry.darwinNotificationSeen {
-            return "Karabiner bridge"
-        }
         if isModifierTriggerKey(settingsStore.triggerKey) && !eventTapInstallSummary.contains(":default") {
             return "\(settingsStore.triggerKey.displayName) blocked: writable key tap unavailable"
         }
 
+        let telemetry = withStateLock { triggerBridgeTelemetry }
         if settingsStore.triggerKey == .trackpadHold && !telemetry.trackpadHoldSeen {
             return "Trackpad Hold waiting for pointer event"
+        }
+        if settingsStore.triggerKey != .f5 && telemetry.darwinNotificationSeen {
+            return "Karabiner bridge"
         }
         if telemetry.modifierKeySeen {
             var detail = "\(settingsStore.triggerKey.displayName) trigger"

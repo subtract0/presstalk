@@ -106,6 +106,7 @@ probe_reason="$(json_file_value "$latest_probe_json" reason)"
 probe_target_capture_success="$(json_file_value "$latest_probe_json" targetCaptureSuccess)"
 probe_failure_hint="$(json_file_value "$latest_probe_json" targetCaptureFailureHint)"
 probe_trace_method="$(json_file_value "$latest_probe_json" traceProductionMethod)"
+probe_paste_command_posted="$(json_file_value "$latest_probe_json" tracePasteCommandPosted)"
 probe_trace_copy_fallback="$(json_file_value "$latest_probe_json" traceCopyFallback)"
 probe_enable_no_effect="$(json_file_value "$latest_probe_json" traceInputMethodEnableNoEffect)"
 
@@ -115,18 +116,17 @@ print_field "probe.reason" "$probe_reason"
 print_field "probe.targetCaptureSuccess" "$probe_target_capture_success"
 print_field "probe.targetCaptureFailureHint" "$probe_failure_hint"
 print_field "probe.traceProductionMethod" "$probe_trace_method"
+print_field "probe.tracePasteCommandPosted" "$probe_paste_command_posted"
 print_field "probe.traceCopyFallback" "$probe_trace_copy_fallback"
 print_field "probe.traceInputMethodEnableNoEffect" "$probe_enable_no_effect"
 
-if [[ "$input_method_fallback" != "ready" ]]; then
+if [[ "$active_field_insertion_ready" != "true" ]]; then
   echo "Result: not proven"
-  echo "Reason: input method fallback is not ready"
-  exit 1
-fi
-
-if [[ "$active_field_insertion_ready" == "false" ]]; then
-  echo "Result: not proven"
-  echo "Reason: active-field insertion is not ready"
+  if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+    echo "Reason: active-field insertion needs signing repair"
+  else
+    echo "Reason: active-field insertion is not ready"
+  fi
   exit 1
 fi
 
@@ -136,17 +136,37 @@ if [[ "$probe_success" != "true" || "$probe_target_capture_success" != "true" ]]
   exit 1
 fi
 
-if [[ "$probe_trace_method" != "input_method_notification" && "$accessibility_status" != "ax_trusted" ]]; then
-  echo "Result: not proven"
-  echo "Reason: latest probe did not prove the input-method insertion path"
-  exit 1
-fi
-
 if [[ "$probe_trace_copy_fallback" == "true" || "$probe_enable_no_effect" == "true" ]]; then
   echo "Result: not proven"
   echo "Reason: latest probe used fallback or still saw input-method enable no-effect"
   exit 1
 fi
+
+case "$probe_trace_method" in
+  input_method_notification)
+    if [[ "$input_method_fallback" != "ready" ]]; then
+      echo "Result: not proven"
+      echo "Reason: latest probe used input method, but current input method fallback is not ready"
+      exit 1
+    fi
+    ;;
+  ax_selected_text|ax_value_range)
+    if [[ "$accessibility_status" != "ax_trusted" ]]; then
+      echo "Result: not proven"
+      echo "Reason: latest probe used Accessibility, but current Accessibility status is not trusted"
+      exit 1
+    fi
+    ;;
+  *)
+    if [[ "$probe_paste_command_posted" == "true" && "$accessibility_status" == "ax_trusted" ]]; then
+      :
+    else
+      echo "Result: not proven"
+      echo "Reason: latest probe did not prove a current active-field insertion path"
+      exit 1
+    fi
+    ;;
+esac
 
 echo "Result: proven"
 echo "Reason: runtime insertion path is ready and latest production insertion probe inserted into the focused target"

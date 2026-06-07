@@ -86,6 +86,13 @@ activeFieldInsertionStatus. These fields separate a ready speech pipeline from
 a proven active-field insertion path, and the bundled smoke collector and repair
 verifier print them for cross-machine evidence.
 
+The production insertion probe now records active-field insertion readiness in
+its start/finish snapshots, including activeFieldInsertionReady,
+activeFieldInsertionStatus, and inputMethodFallbackStatus. The read-only repair
+verifier accepts every proven active-field insertion path: InputMethodKit,
+direct Accessibility insertion, or Accessibility-backed paste command. It still
+fails the mbp1 ad-hoc recognized_disabled state as a signing repair blocker.
+
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before
 launching the app. Its summary reports both Bundled input method signing applied

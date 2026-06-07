@@ -5,6 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk.app"
 STATUS_JSON="$HOME/Library/Application Support/JarvisTap/runtime-status.json"
 RUN_PROBE=0
+PREFLIGHT=0
 APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-}"
 TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-}"
 ALLOW_SSH="${PRESSTALK_REPAIR_ALLOW_SSH:-0}"
@@ -23,6 +24,9 @@ Options:
                       $DEFAULT_APP_BUNDLE.
   --trigger-key KEY   Trigger to preserve while restarting. Default: current
                       runtime status, then fn.
+  --preflight         Report whether repair is needed and whether a signing
+                      trust password prompt would be required. Does not repair,
+                      create, sign, bootstrap, probe, or open any panes.
   --probe             Run the production insertion probe after repair.
   --allow-ssh         Permit running the signing trust flow from SSH.
   -h, --help          Show this help.
@@ -49,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --probe)
       RUN_PROBE=1
+      shift
+      ;;
+    --preflight)
+      PREFLIGHT=1
       shift
       ;;
     --allow-ssh)
@@ -100,6 +108,109 @@ if [[ -z "$TRIGGER_KEY" && -f "$STATUS_JSON" ]]; then
 fi
 TRIGGER_KEY="${TRIGGER_KEY:-fn}"
 
+status_value() {
+  local key_path="$1"
+  if [[ -f "$STATUS_JSON" ]]; then
+    plutil -extract "$key_path" raw -o - "$STATUS_JSON" 2>/dev/null || true
+  fi
+}
+
+running_over_ssh() {
+  [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]
+}
+
+existing_identity_status() {
+  local existing_output existing_hash
+  if existing_output="$(
+    PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY=1 "$LOCAL_CODESIGN_HELPER" 2>&1
+  )"; then
+    existing_hash="$(printf '%s\n' "$existing_output" | awk '/^Hash: / { print $2; exit }')"
+    printf 'ready:%s\n' "${existing_hash:-unknown}"
+  else
+    printf 'missing:%s\n' "$(printf '%s\n' "$existing_output" | tail -1)"
+  fi
+}
+
+print_preflight() {
+  local ad_hoc input_method active_status speech_model input_listener microphone_status input_monitoring_effective
+  local existing_status existing_state existing_detail repair_needed prompt_needed repair_allowed would_run next_action
+
+  ad_hoc="$(status_value status.adHocSigned)"
+  input_method="$(status_value permissions.inputMethodFallbackStatus)"
+  active_status="$(status_value runtime.activeFieldInsertionStatus)"
+  speech_model="$(status_value status.speechModel)"
+  input_listener="$(status_value runtime.inputListener)"
+  microphone_status="$(status_value permissions.microphoneAuthorizationStatus)"
+  input_monitoring_effective="$(status_value permissions.inputMonitoringEffective)"
+  existing_status="$(existing_identity_status)"
+  existing_state="${existing_status%%:*}"
+  existing_detail="${existing_status#*:}"
+
+  repair_needed=false
+  if [[ "$ad_hoc" == "true" && "$input_method" == "recognized_disabled" ]]; then
+    repair_needed=true
+  elif [[ "$active_status" == "needs_signing_repair" ]]; then
+    repair_needed=true
+  fi
+
+  prompt_needed=false
+  if [[ "$repair_needed" == "true" && "$existing_state" != "ready" ]]; then
+    prompt_needed=true
+  fi
+
+  repair_allowed=true
+  if running_over_ssh && [[ "$ALLOW_SSH" != "1" ]]; then
+    repair_allowed=false
+  fi
+
+  would_run=false
+  if [[ "$repair_needed" == "true" && "$repair_allowed" == "true" ]]; then
+    would_run=true
+  fi
+
+  if [[ "$repair_needed" != "true" ]]; then
+    next_action="No signing repair needed for the current runtime status."
+  elif [[ "$repair_allowed" != "true" ]]; then
+    next_action="Run Repair Signing from the logged-in desktop session; SSH repair is refused unless --allow-ssh is passed deliberately."
+  elif [[ "$prompt_needed" == "true" ]]; then
+    next_action="Run Repair Signing from the logged-in desktop session and approve only the PressTalk local signing trust password prompt."
+  else
+    next_action="Run Repair Signing; an existing trusted PressTalk local signing identity can be reused."
+  fi
+
+  cat <<EOF
+PressTalk local signing repair preflight
+
+App: $APP_BUNDLE
+Trigger: $TRIGGER_KEY
+RuntimeStatus: ${STATUS_JSON}
+RunningOverSSH: $(running_over_ssh && echo true || echo false)
+AllowSSH: $([[ "$ALLOW_SSH" == "1" ]] && echo true || echo false)
+RepairNeeded: $repair_needed
+RepairAllowedHere: $repair_allowed
+WouldRunRepair: $would_run
+SigningTrustPromptNeeded: $prompt_needed
+ExistingSigningIdentity: $existing_state
+ExistingSigningIdentityDetail: $existing_detail
+AdHocSigned: ${ad_hoc:-unknown}
+InputMethodFallbackStatus: ${input_method:-unknown}
+ActiveFieldInsertionStatus: ${active_status:-unknown}
+SpeechModel: ${speech_model:-unknown}
+InputListener: ${input_listener:-unknown}
+MicrophoneAuthorizationStatus: ${microphone_status:-unknown}
+InputMonitoringEffective: ${input_monitoring_effective:-unknown}
+NextAction: $next_action
+
+This preflight did not create or trust a certificate, did not sign or restart
+PressTalk, did not run an insertion probe, and did not open System Settings.
+EOF
+}
+
+if [[ "$PREFLIGHT" == "1" ]]; then
+  print_preflight
+  exit 0
+fi
+
 cat <<EOF
 PressTalk local signing repair
 
@@ -110,6 +221,9 @@ This repair will not open System Settings or privacy panes. If macOS asks for
 your Mac login password, approve it only for the PressTalk local signing
 certificate trust prompt.
 EOF
+
+echo
+print_preflight
 
 if [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" && "$ALLOW_SSH" != "1" ]]; then
   cat >&2 <<EOF

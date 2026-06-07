@@ -59,6 +59,12 @@ the bundled PressTalkInputMethod.app before the outer app, refreshes the copy in
 This is a signing/input-method repair path; it is not a reason to reopen
 Microphone, Input Monitoring, or Accessibility panes.
 
+The repair helper now supports --preflight. That mode reports whether repair is
+needed, whether repair would be refused over SSH, whether an existing trusted
+local signing identity can be reused, and whether a Mac login-password signing
+trust prompt would be required. It does not create or trust a certificate, sign
+or restart PressTalk, run an insertion probe, or open System Settings.
+
 Settings now shows a Repair Signing button only in the ad-hoc state where macOS
 recognizes the PressTalk input method but has not enabled it. The button runs
 the bundled repair helper with permission panes disabled and then runs the

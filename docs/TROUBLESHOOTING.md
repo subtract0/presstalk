@@ -204,6 +204,15 @@ The app bundle also includes a repair wrapper for that exact state:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
 ```
 
+Run `--preflight` first if you only want the no-prompt repair plan. It reports
+whether repair is needed, whether an existing trusted local signing identity can
+be reused, whether a signing trust password prompt would be required, and
+whether the helper would refuse because it is running over SSH:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --preflight
+```
+
 In current builds, the PressTalk menu bar and Settings both show
 `Repair Signing` for the same ad-hoc `recognized_disabled` input-method state.
 Clicking it runs the bundled repair wrapper with permission panes disabled and

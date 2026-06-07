@@ -134,6 +134,13 @@ desktop session rather than reopening permission panes:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
 ```
 
+To inspect that state without creating or trusting a certificate, signing,
+restarting, probing, or opening panes, run the no-prompt preflight first:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --preflight
+```
+
 For the ad-hoc `recognized_disabled` input-method state, current builds show
 `Repair Signing` in the PressTalk menu bar and in Settings. That action runs the
 same no-pane repair wrapper and then runs the production insertion probe.

@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc55-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc55/PressTalk-0.1.5-rc55-macos-arm64.zip
-echo "6ce317c8cbb26fb6f82d5961b789d5784261dfc2f1e57502d15c2a930a0a2e19  $tmpdir/PressTalk-0.1.5-rc55-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc55-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc56-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc56/PressTalk-0.1.5-rc56-macos-arm64.zip
+echo "31a784c7d8933b5245e9dc9f2f537980aa0879d74f92cdb36fcd720cd57ada73  $tmpdir/PressTalk-0.1.5-rc56-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc56-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-6ce317c8cbb26fb6f82d5961b789d5784261dfc2f1e57502d15c2a930a0a2e19
+31a784c7d8933b5245e9dc9f2f537980aa0879d74f92cdb36fcd720cd57ada73
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -115,6 +115,11 @@ The `Input Method` section should show matching bundled and installed
 `recognizedSourceCount=1`, `recognizedEnabledSourceCount=1`, and
 `selectCapable=true`. If the installed input-method CDHash differs from the
 bundled one, rerun bootstrap/repair before interpreting insertion probes.
+
+The `Repair And Probe Status` section should name the current repair state and
+latest production insertion probe. If it says `adHocSigned=true` and
+`inputMethodFallbackStatus=recognized_disabled`, use desktop `Repair Signing`;
+do not re-grant Microphone, Input Monitoring, or Accessibility for that state.
 
 Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
 values:

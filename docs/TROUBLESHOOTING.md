@@ -37,10 +37,12 @@ For `Fn` and `Option`, current builds try writable HID/session event taps first.
 A listen-only fallback can prove that some event tap is installed, but it is not
 effective for modifier-key triggers; runtime status reports
 `permissions.inputMonitoringStatus=writable_key_tap_unavailable` in that state.
-`trackpad_hold` can use a listen-only tap. Check `runtime.inputListener` in the
-collected status to see which path armed, for example `hid:listen_only`,
-`session:listen_only`, `hid:default`, or `failed`. If
-`permissions.inputMonitoringGranted=false` but
+`trackpad_hold` can use a listen-only tap, but it is only effective after the
+app observes a real pointer trigger; before that, status reports
+`permissions.inputMonitoringStatus=waiting_for_trackpad_event`. Check
+`runtime.inputListener` in the collected status to see which path armed, for
+example `hid:listen_only`, `session:listen_only`, `hid:default`, or `failed`.
+If `permissions.inputMonitoringGranted=false` but
 `permissions.inputMonitoringEffective=true`, the selected trigger's listener is
 armed and the Settings window should show Input Monitoring as listener-ready,
 not missing.

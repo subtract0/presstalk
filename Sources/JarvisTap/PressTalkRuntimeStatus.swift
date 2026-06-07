@@ -18,6 +18,7 @@ struct PressTalkRuntimeStatus {
     let inputPipelineReady: Bool
     let inputListenerStatus: String
     let triggerKey: String
+    let selectedTriggerObserved: Bool
     let pasteAutomatically: Bool
     let inputMethodFallbackStatus: String
     let systemDictationHotkeyDisabled: Bool
@@ -53,6 +54,9 @@ struct PressTalkRuntimeStatus {
         if triggerRequiresWritableEventTap {
             return writableEventTapInstalled
         }
+        if triggerKey == "trackpad_hold" {
+            return inputListenerInstalled && selectedTriggerObserved
+        }
         return inputListenerInstalled
     }
 
@@ -62,6 +66,9 @@ struct PressTalkRuntimeStatus {
         }
         if triggerRequiresWritableEventTap && inputListenerInstalled {
             return "writable_key_tap_unavailable"
+        }
+        if triggerKey == "trackpad_hold" && inputListenerInstalled && !selectedTriggerObserved {
+            return "waiting_for_trackpad_event"
         }
         if inputMonitoringGranted {
             return "preflight_granted_listener_unavailable"
@@ -77,6 +84,8 @@ struct PressTalkRuntimeStatus {
             return "listener ready; preflight unavailable"
         case "writable_key_tap_unavailable":
             return "writable key tap unavailable"
+        case "waiting_for_trackpad_event":
+            return "listener installed; waiting for trackpad event"
         case "preflight_granted_listener_unavailable":
             return "preflight granted; listener unavailable"
         default:
@@ -128,6 +137,9 @@ struct PressTalkRuntimeStatus {
         }
         if triggerRequiresWritableEventTap && inputListenerInstalled {
             return PressTalkPermissionLabel(text: "Writable key tap unavailable", tone: .warning)
+        }
+        if triggerKey == "trackpad_hold" && inputListenerInstalled && !selectedTriggerObserved {
+            return PressTalkPermissionLabel(text: "Waiting for trackpad event", tone: .warning)
         }
         if inputMonitoringGranted {
             return PressTalkPermissionLabel(text: "Granted, listener unavailable", tone: .warning)
@@ -182,6 +194,7 @@ struct PressTalkRuntimeStatus {
         inputPipelineReady: false,
         inputListenerStatus: "Checking...",
         triggerKey: "unknown",
+        selectedTriggerObserved: false,
         pasteAutomatically: true,
         inputMethodFallbackStatus: "unknown",
         systemDictationHotkeyDisabled: true,

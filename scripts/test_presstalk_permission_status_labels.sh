@@ -20,6 +20,7 @@ enum PermissionStatusLabelTest {
         inputPipelineReady: Bool = true,
         inputListenerStatus: String = "hid:listen_only",
         triggerKey: String = "option",
+        selectedTriggerObserved: Bool = false,
         pasteAutomatically: Bool = true,
         inputMethodFallbackStatus: String = "ready",
         adHocSigned: Bool = false,
@@ -34,6 +35,7 @@ enum PermissionStatusLabelTest {
             inputPipelineReady: inputPipelineReady,
             inputListenerStatus: inputListenerStatus,
             triggerKey: triggerKey,
+            selectedTriggerObserved: selectedTriggerObserved,
             pasteAutomatically: pasteAutomatically,
             inputMethodFallbackStatus: inputMethodFallbackStatus,
             systemDictationHotkeyDisabled: true,
@@ -67,10 +69,15 @@ enum PermissionStatusLabelTest {
         require(modifierWritable.inputMonitoringPermissionLabel.tone == .ready, "writable listener should use ready tone")
 
         let trackpadListenOnly = makeStatus(triggerKey: "trackpad_hold")
-        require(trackpadListenOnly.inputMonitoringEffective, "trackpad hold should accept a listen-only event tap")
-        require(trackpadListenOnly.inputMonitoringPermissionLabel.text == "Listener ready", "trackpad listen-only listener should be labelled ready")
+        require(!trackpadListenOnly.inputMonitoringEffective, "trackpad hold should wait for observed pointer input")
+        require(trackpadListenOnly.inputMonitoringStatus == "waiting_for_trackpad_event", "trackpad listen-only status should wait for observed pointer input")
+        require(trackpadListenOnly.inputMonitoringPermissionLabel.text == "Waiting for trackpad event", "trackpad listen-only listener should not be labelled ready before input arrives")
 
-        let readyNoPane = trackpadListenOnly
+        let trackpadObserved = makeStatus(triggerKey: "trackpad_hold", selectedTriggerObserved: true)
+        require(trackpadObserved.inputMonitoringEffective, "trackpad hold should accept a listen-only tap after pointer input is observed")
+        require(trackpadObserved.inputMonitoringPermissionLabel.text == "Listener ready", "observed trackpad listener should be labelled ready")
+
+        let readyNoPane = trackpadObserved
         require(readyNoPane.microphonePermissionLabel.text == "Granted", "authorized microphone must be labelled granted")
         require(readyNoPane.microphonePermissionLabel.tone == .ready, "authorized microphone must use ready tone")
         require(readyNoPane.accessibilityPermissionLabel.text == "Input method ready", "enabled input method fallback must not be labelled missing Accessibility")

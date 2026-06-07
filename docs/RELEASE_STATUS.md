@@ -860,9 +860,11 @@ Earlier prerelease notes retained for provenance:
 - For `Fn` and `Option`, current builds try writable HID/session event taps
   first. A listen-only fallback is not effective for modifier-key triggers and
   now records `permissions.inputMonitoringStatus=writable_key_tap_unavailable`.
-  `trackpad_hold` can use a listen-only tap. Runtime status records
-  `runtime.inputListener` so smoke tests can distinguish `hid:listen_only`,
-  `session:listen_only`, `hid:default`, and `failed`.
+  `trackpad_hold` can use a listen-only tap after it observes a real pointer
+  trigger; until then it records
+  `permissions.inputMonitoringStatus=waiting_for_trackpad_event`. Runtime
+  status records `runtime.inputListener` so smoke tests can distinguish
+  `hid:listen_only`, `session:listen_only`, `hid:default`, and `failed`.
 - Settings now distinguish read-only permission preflights from effective
   runtime capability. If the real listener is armed, Input Monitoring renders as
   listener-ready and `runtime-status.json` records

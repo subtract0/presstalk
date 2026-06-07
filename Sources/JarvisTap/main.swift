@@ -1176,6 +1176,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var nativeCalibrationTimeoutWorkItem: DispatchWorkItem?
     private var nativeAutoCalibrationObservations = NativeCalibrationSession()
     private var lastPointerEventAt: Date?
+    private var firstPointerEventLogged = false
     private var trackpadHoldState: TrackpadHoldState?
     private var trackpadArmWorkItem: DispatchWorkItem?
 
@@ -1928,6 +1929,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         repairLocalSigningMenuItem?.isEnabled = repairNeeded
     }
 
+    private func selectedTriggerObservedForRuntimeStatus() -> Bool {
+        let telemetry = withStateLock { triggerBridgeTelemetry }
+        switch settingsStore.triggerKey {
+        case .trackpadHold:
+            return telemetry.trackpadHoldSeen
+        case .fn, .option, .leftOption, .rightOption:
+            return telemetry.modifierKeySeen
+        case .f5:
+            return telemetry.darwinNotificationSeen ||
+                telemetry.nativeSystemDefinedSeen ||
+                telemetry.cgFunctionKeySeen
+        }
+    }
+
     private func currentRuntimeStatus() -> PressTalkRuntimeStatus {
         let microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         let whisperStatus: String = withStateLock {
@@ -1959,6 +1974,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             inputPipelineReady: inputPipelineReady,
             inputListenerStatus: eventTapInstallSummary,
             triggerKey: settingsStore.triggerKey.rawValue,
+            selectedTriggerObserved: selectedTriggerObservedForRuntimeStatus(),
             pasteAutomatically: settingsStore.pasteAutomatically,
             inputMethodFallbackStatus: inputMethodFallbackStatus,
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
@@ -1995,6 +2011,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "activeFieldInsertionStatus": status.activeFieldInsertionStatus,
                 "agentMode": config.agentMode,
                 "triggerKey": settingsStore.triggerKey.rawValue,
+                "selectedTriggerObserved": status.selectedTriggerObserved,
                 "whisperModel": config.whisperModel,
                 "whisperLanguage": config.whisperLanguage ?? "auto",
                 "traceLogPath": config.traceLogPath,
@@ -2319,6 +2336,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         let telemetry = withStateLock { triggerBridgeTelemetry }
+        if settingsStore.triggerKey == .trackpadHold && !telemetry.trackpadHoldSeen {
+            return "Trackpad Hold waiting for pointer event"
+        }
         if telemetry.modifierKeySeen {
             var detail = "\(settingsStore.triggerKey.displayName) trigger"
             var alternates: [String] = []
@@ -3417,25 +3437,25 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         switch eventType {
         case .leftMouseDown:
-            recordPointerActivity()
+            recordPointerActivity(eventType: eventType)
             if settingsStore.triggerKey == .trackpadHold {
                 handleTrackpadPointerDown(event)
             }
             return Unmanaged.passUnretained(event)
         case .leftMouseDragged:
-            recordPointerActivity()
+            recordPointerActivity(eventType: eventType)
             if settingsStore.triggerKey == .trackpadHold {
                 handleTrackpadPointerDragged(event)
             }
             return Unmanaged.passUnretained(event)
         case .leftMouseUp:
-            recordPointerActivity()
+            recordPointerActivity(eventType: eventType)
             if settingsStore.triggerKey == .trackpadHold {
                 handleTrackpadPointerUp(event)
             }
             return Unmanaged.passUnretained(event)
         case .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp:
-            recordPointerActivity()
+            recordPointerActivity(eventType: eventType)
             return Unmanaged.passUnretained(event)
         case .keyDown:
             if isConfiguredFunctionTriggerKeyCode(keyCode) {
@@ -3555,15 +3575,27 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func recordPointerActivity() {
+    private func recordPointerActivity(eventType: CGEventType) {
+        var shouldLog = false
         withStateLock {
             lastPointerEventAt = Date()
+            if !firstPointerEventLogged {
+                firstPointerEventLogged = true
+                shouldLog = true
+            }
+        }
+        if shouldLog {
+            traceLogger.log("Pointer event observed type=\(eventType.rawValue)")
+            refreshRuntimeStatusUI()
         }
     }
 
     private func handleTrackpadPointerDown(_ event: CGEvent) {
         let location = pointerLocation()
         let pressure = pointerPressure(from: event)
+        traceLogger.log(
+            "Trackpad pointer down observed location=\(formattedPoint(location)) pressure=\(String(format: "%.2f", pressure))"
+        )
 
         let workItem: DispatchWorkItem? = withStateLock {
             guard !isRecording, !isProcessing else { return nil }

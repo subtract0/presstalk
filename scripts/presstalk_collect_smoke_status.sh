@@ -273,6 +273,19 @@ EOF
   if [[ -n "$latest_repair_log" ]]; then
     echo
     echo "Latest signing repair log: $latest_repair_log"
+    local latest_repair_pid_file="${latest_repair_log%.log}.pid"
+    if [[ -f "$latest_repair_pid_file" ]]; then
+      local latest_repair_pid
+      latest_repair_pid="$(tr -dc '0-9' <"$latest_repair_pid_file" 2>/dev/null || true)"
+      echo "Latest signing repair PID file: $latest_repair_pid_file"
+      if [[ -n "$latest_repair_pid" ]] && kill -0 "$latest_repair_pid" >/dev/null 2>&1; then
+        echo "Latest signing repair process: running pid=$latest_repair_pid"
+      elif [[ -n "$latest_repair_pid" ]]; then
+        echo "Latest signing repair process: not running pid=$latest_repair_pid"
+      else
+        echo "Latest signing repair process: PID file empty"
+      fi
+    fi
     tail -40 "$latest_repair_log" 2>/dev/null || true
   else
     echo

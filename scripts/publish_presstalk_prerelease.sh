@@ -63,7 +63,10 @@ Settings now shows a Repair Signing button only in the ad-hoc state where macOS
 recognizes the PressTalk input method but has not enabled it. The button runs
 the bundled repair helper with permission panes disabled and then runs the
 production insertion probe, so the desktop repair path no longer requires
-typing a shell command.
+typing a shell command. The settings action launches the helper through nohup
+and writes a diagnostics .pid file next to the signing repair log, so the repair
+can survive the app restart it initiates and the smoke collector can report
+whether the latest repair helper is still running.
 
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before

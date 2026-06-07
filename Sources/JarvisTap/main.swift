@@ -2150,6 +2150,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
         let logURL = diagnosticsDirectory.appendingPathComponent("presstalk-signing-repair-\(timestamp).log")
+        let pidURL = diagnosticsDirectory.appendingPathComponent("presstalk-signing-repair-\(timestamp).pid")
 
         do {
             try FileManager.default.createDirectory(at: diagnosticsDirectory, withIntermediateDirectories: true)
@@ -2162,14 +2163,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let triggerKey = shellQuoted(settingsStore.triggerKey.rawValue)
         let helperPath = shellQuoted(helperURL.path)
         let logPath = shellQuoted(logURL.path)
+        let pidPath = shellQuoted(pidURL.path)
         let script = """
         export PRESSTALK_OPEN_PERMISSION_PANES=0
         export PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0
         export PRESSTALK_TRIGGER_KEY=\(triggerKey)
-        /bin/bash \(helperPath) --probe >\(logPath) 2>&1 &
+        /usr/bin/nohup /bin/bash \(helperPath) --probe >\(logPath) 2>&1 &
+        echo $! >\(pidPath)
         """
 
-        traceLogger.log("Local signing repair requested from settings log=\(logURL.path)")
+        traceLogger.log("Local signing repair requested from settings log=\(logURL.path) pid_file=\(pidURL.path)")
         present(.setupRequired("Signing repair started. Approve only the PressTalk local signing password prompt. PressTalk will restart and run an insertion probe."))
 
         let process = Process()

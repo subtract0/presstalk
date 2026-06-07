@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc58`
-- Commit: `e465ff09270840ff286cfbe39f057bb3eb0c5356`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc58`
-- Asset: `PressTalk-0.1.5-rc58-macos-arm64.zip`
-- SHA-256: `9b17ad8c824ee10bba2ef47fcb99c5147c93306f290b97d5016f78cd39d58149`
+- Tag: `v0.1.5-rc59`
+- Commit: `fd39e0d3ec80d15048373413154b695cfd2ff7d5`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc59`
+- Asset: `PressTalk-0.1.5-rc59-macos-arm64.zip`
+- SHA-256: `23e0495559d8c875400ba3df7d8ad64504dbbed89a2feb95a504ee0f5b5ae1dd`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -197,6 +197,35 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMonitoringEffective=true`, and `inputPipelineReady=true`. Active-field
   insertion remains unproven until the logged-in desktop signing repair:
   `adHocSigned=true` and `inputMethodFallbackStatus=recognized_disabled`.
+- `v0.1.5-rc59` hardens the Settings `Repair Signing` action. The app now
+  launches the bundled repair helper through `nohup`, writes a sibling
+  `presstalk-signing-repair-*.pid` file next to the diagnostics log, and traces
+  that pid file. This lets the repair survive the app restart it initiates. The
+  smoke-status collector now reports the latest signing repair pid file and
+  whether that helper process is still running.
+- The `v0.1.5-rc59` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:23e0495559d8c875400ba3df7d8ad64504dbbed89a2feb95a504ee0f5b5ae1dd`,
+  matching the local `dist/PressTalk-0.1.5-rc59-macos-arm64.zip`. The inspected
+  asset contains `/usr/bin/nohup /bin/bash` in the app binary and the new
+  signing repair pid reporting lines in `presstalk-collect-smoke-status.sh`.
+- After rc59 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `Authority=PressTalk Local Development Code Signing`,
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputMethodFallbackStatus=ready`, and
+  `accessibilityStatus=ax_false_input_method_fallback_ready`.
+- On `mbp1`, rc59 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. The installed app contains the `nohup` repair
+  launch and the installed collector contains the signing repair pid reporting
+  lines. Runtime remains transcription-ready: `speechModel=Ready`,
+  `triggerPath=Fn / Globe ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  and `inputPipelineReady=true`. Active-field insertion remains unproven until
+  the logged-in desktop signing repair: `adHocSigned=true` and
+  `inputMethodFallbackStatus=recognized_disabled`.
 - On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
   installed with no-pane flags, and bootstrapped without explicitly setting
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported

@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc72`
-- Commit: `5d8fe79760eee87ff1047e827f708839c4779518`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc72`
-- Asset: `PressTalk-0.1.5-rc72-macos-arm64.zip`
-- SHA-256: `c94495eda5de6f8adc99c5b52f0264075cf23f0ffde4c1bd59d7fa55b91de60f`
+- Tag: `v0.1.5-rc73`
+- Commit: `ed5f36e1f96ad15689b279115a0164516b1057e3`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc73`
+- Asset: `PressTalk-0.1.5-rc73-macos-arm64.zip`
+- SHA-256: `2455a1b5bf38f15f03d150a53af2e790616f55ab7fd70e7be92c69aff12c254a`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,28 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc73` adds a no-prompt
+  `presstalk-repair-local-signing.sh --preflight` mode. It reports whether
+  signing repair is needed, whether repair is refused over SSH, whether an
+  existing trusted local signing identity can be reused, whether a Mac login
+  signing trust prompt would be required, and the current runtime fields. It
+  does not create or trust a certificate, sign or restart PressTalk, run an
+  insertion probe, or open System Settings.
+- The `v0.1.5-rc73` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:2455a1b5bf38f15f03d150a53af2e790616f55ab7fd70e7be92c69aff12c254a`,
+  matching the local `dist/PressTalk-0.1.5-rc73-macos-arm64.zip`. The
+  `v0.1.5-rc73` tag points at
+  `ed5f36e1f96ad15689b279115a0164516b1057e3`.
+- After rc73 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `cced9ee3335b38deef774b9bda1d721e41685277`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`. The installed
+  `--preflight` helper reports `RepairNeeded=false`,
+  `SigningTrustPromptNeeded=false`, and `ExistingSigningIdentity=ready`.
 - `v0.1.5-rc72` factors the Settings permission row decisions into a pure
   runtime-status model and adds
   `scripts/test_presstalk_permission_status_labels.sh`. The regression fixture
@@ -54,7 +76,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc72 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc73 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
@@ -67,7 +89,16 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled`, and
   `targetCaptureFailureHint=input_method_enable_no_effect`; the next action is
   logged-in desktop `Repair Signing`, not another permission grant.
-- Current rc72 readiness matrix command:
+- The installed rc73 repair preflight on `mbp1` reports
+  `RunningOverSSH=true`, `RepairNeeded=true`, `RepairAllowedHere=false`,
+  `WouldRunRepair=false`, `SigningTrustPromptNeeded=true`,
+  `ExistingSigningIdentity=missing`, `AdHocSigned=true`,
+  `InputMethodFallbackStatus=recognized_disabled`,
+  `ActiveFieldInsertionStatus=needs_signing_repair`,
+  `MicrophoneAuthorizationStatus=authorized`, and
+  `InputMonitoringEffective=true`. It did not create or trust a certificate,
+  sign or restart PressTalk, run an insertion probe, or open System Settings.
+- Current rc73 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -77,7 +108,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- A focused rc72 `--local --host mbp1-tb` matrix reports `local` with
+- A focused rc73 `--local --host mbp1-tb` matrix reports `local` with
   `physicalSTTSmokeReady=true` and `activeFieldSmokeReady=true`, and `mbp1-tb`
   with `physicalSTTSmokeReady=true` but `activeFieldSmokeReady=false` pending
   the same logged-in desktop signing repair.

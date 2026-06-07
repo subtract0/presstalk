@@ -127,6 +127,12 @@ longer force-presents the Settings window. The setup window is only auto-shown
 for a real startup failure, so a machine with working microphone/listener
 runtime proof will not be sent back through the permission UI.
 
+The Settings window now presents the default ready path as capabilities instead
+of missing permissions: "Trigger listener" and "Insertion" replace the old
+Input Monitoring/Accessibility row labels, the ready hint says no permission
+pane changes are needed, and permission-pane buttons are hidden once the
+selected trigger, microphone, and insertion path are already working.
+
 The default Option + Space trigger uses a registered macOS hotkey. Modifier-only
 Fn/Option triggers remain available as advanced choices and still report whether
 the required writable event-tap path armed successfully.
@@ -167,6 +173,12 @@ System Settings. The status helper is read-only by default; registration,
 enabling, and selection require explicit flags. The client probe temporarily
 enables/selects the source, focuses a local text view, posts a payload, records
 whether text lands, and restores the original input source.
+
+The production input-method insertion path now requires an acknowledgement from
+the PressTalkInputMethod helper before PressTalk reports
+input_method_notification as inserted. If the helper never handles the
+notification, PressTalk logs input_method_ack_timeout and falls back instead of
+treating a posted Darwin notification as proof that text landed.
 
 The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
 local text view and posts per-character Unicode CGEvents without opening System

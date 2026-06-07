@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc83`
-- Commit: `94ed53823fcceb4e55d6e035f50df2b5b3e3607c`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc83`
-- Asset: `PressTalk-0.1.5-rc83-macos-arm64.zip`
-- SHA-256: `2605a87a945e2811b61a242fe35b0394466f8599eec0f84f42b6ed8772d4ddad`
+- Tag: `v0.1.5-rc84`
+- Commit: `2f53f1a93cdbda025c85c3c635aae79402e7c053`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc84`
+- Asset: `PressTalk-0.1.5-rc84-macos-arm64.zip`
+- SHA-256: `f296e054d6362026adab3bf4dd10ab339cebce35494fc8933db53119b40ebdc0`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -24,7 +24,42 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc83` is the current public prerelease smoke artifact. It includes the
+- `v0.1.5-rc84` is the current public prerelease smoke artifact. It includes the
+  `Option + Space` registered-hotkey default, the rc83 manual physical-trigger
+  smoke proof fields, Settings copy that presents ready trigger/insertion paths
+  as capabilities instead of missing permissions, and input-method insertion
+  acknowledgement before PressTalk reports production insertion success.
+- The `v0.1.5-rc84` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:f296e054d6362026adab3bf4dd10ab339cebce35494fc8933db53119b40ebdc0`,
+  matching the local `dist/PressTalk-0.1.5-rc84-macos-arm64.zip`. The
+  `v0.1.5-rc84` tag points at
+  `2f53f1a93cdbda025c85c3c635aae79402e7c053`.
+- After rc84 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and
+  `PRESSTALK_TRIGGER_KEY=option_space`. The restored runtime reports
+  `inputListener=carbon:registered`,
+  `inputMonitoringStatus=registered_hotkey_ready`, `speechModel=Ready`,
+  `activeFieldInsertionStatus=ready_input_method`, and trigger path
+  `Option + Space ready`.
+- The latest rc84 current-signed-app production insertion probe on `studio1`
+  reported `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification` at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T21-52-46-956Z.json`.
+  Its trace includes `Input method insertion acknowledgement inserted=1` before
+  `Production insertion probe inserted`, so this proof is stronger than a
+  notification-post trace alone. The same readiness report still shows
+  `latestManualPhysicalTriggerSmoke.path=none`; physical `Option + Space`
+  STT/paste proof remains the studio1 blocker.
+- The latest rc84 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc84-20260607T215335Z.json`
+  required `local` and `mbp1-tb`. It reports `local` as ready for physical
+  dictation smoke and `mbp1-tb` as reachable with speech ready but
+  `activeFieldSmokeReady=false`. The matching rc84 proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc84-20260607T215335Z.json`
+  is still `proven=false` with `failureCount=1`, failing only `mbp1-tb` for
+  `active_field_not_ready`.
+- `v0.1.5-rc83` added the
   `Option + Space` registered-hotkey default, manual physical-trigger smoke
   `smokeVersion=4` with `expectedTriggerProof`, and readiness/smoke collectors
   that surface the latest manual physical-trigger JSON separately from production
@@ -42,14 +77,14 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMonitoringStatus=registered_hotkey_ready`, `speechModel=Ready`,
   `activeFieldInsertionStatus=ready_input_method`, and trigger path
   `Option + Space ready`.
-- The latest current-signed-app production insertion probe on `studio1` reported
+- The rc83 current-signed-app production insertion probe on `studio1` reported
   `success=true`, `targetCaptureSuccess=true`, and
   `traceProductionMethod=input_method_notification` at
   `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T21-31-27-808Z.json`.
   The same readiness report still shows
   `latestManualPhysicalTriggerSmoke.path=none`; physical `Option + Space`
   STT/paste proof remains the studio1 blocker.
-- The latest rc83 readiness matrix at
+- The rc83 readiness matrix at
   `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc83-20260607T213316Z.json`
   required `local` and `mbp1-tb`. It reports `local` as ready for physical
   dictation smoke and `mbp1-tb` as reachable with speech ready but

@@ -64,18 +64,22 @@ needed, whether repair would be refused over SSH, whether an existing trusted
 local signing identity can be reused, and whether a Mac login-password signing
 trust prompt would be required. It does not create or trust a certificate, sign
 or restart PressTalk, run an insertion probe, or open System Settings.
+Preflight now also distinguishes a truly missing local signing identity from an
+existing but untrusted PressTalk local signing identity, reporting the latter as
+ExistingSigningIdentity=untrusted with its hash. That keeps mbp1-style repair
+diagnostics honest without starting the signing trust prompt remotely.
 
-Settings now shows a Repair Signing button only in the ad-hoc state where macOS
-recognizes the PressTalk input method but has not enabled it. The button runs
-the bundled repair helper with permission panes disabled and then runs the
-production insertion probe, so the desktop repair path no longer requires
-typing a shell command. The settings action launches the helper through nohup
-and writes a diagnostics .pid file next to the signing repair log, so the repair
-can survive the app restart it initiates and the smoke collector can report
-whether the latest repair helper is still running. When the repair is run with
---probe, the helper now appends a full post-repair smoke-status snapshot to the
-same diagnostics log after the production insertion probe, while preserving the
-probe exit status.
+Settings now shows a Repair Signing button for PressTalk signing states where
+macOS recognizes the PressTalk input method but has not enabled it. The button
+runs the bundled repair helper with permission panes disabled and then runs the
+production insertion probe, so the desktop repair path no longer requires typing
+a shell command. The settings action launches the helper through nohup and
+writes a diagnostics .pid file next to the signing repair log, so the repair can
+survive the app restart it initiates and the smoke collector can report whether
+the latest repair helper is still running. When the repair is run with --probe,
+the helper now appends a full post-repair smoke-status snapshot to the same
+diagnostics log after the production insertion probe, while preserving the probe
+exit status.
 
 The status menu also shows Repair Signing... in the PressTalk signing states
 where macOS recognizes the input method but leaves it disabled. This covers both

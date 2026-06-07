@@ -25,6 +25,11 @@ find_identity_hash() {
     awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
 }
 
+find_any_identity_hash() {
+  security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null |
+    awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
+}
+
 add_keychain_to_search_list() {
   local existing
   local keychains=("$KEYCHAIN")
@@ -70,6 +75,13 @@ if [[ "$EXISTING_ONLY" == "1" ]]; then
 
   IDENTITY_HASH="$(find_identity_hash)"
   if [[ -z "$IDENTITY_HASH" ]]; then
+    UNTRUSTED_IDENTITY_HASH="$(find_any_identity_hash)"
+    if [[ -n "$UNTRUSTED_IDENTITY_HASH" ]]; then
+      echo "Existing PressTalk local code-signing identity is present but not trusted for code signing." >&2
+      echo "Hash: $UNTRUSTED_IDENTITY_HASH" >&2
+      echo "Keychain: $KEYCHAIN" >&2
+      exit 1
+    fi
     echo "No existing valid PressTalk local code-signing identity is available." >&2
     exit 1
   fi
@@ -95,11 +107,6 @@ fi
 
 security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
 security set-keychain-settings -lut 21600 "$KEYCHAIN" >/dev/null
-
-find_any_identity_hash() {
-  security find-identity -p codesigning "$KEYCHAIN" 2>/dev/null |
-    awk -v name="$IDENTITY" '$0 ~ name { print $2; exit }'
-}
 
 export_existing_certificate() {
   local output_path="$1"

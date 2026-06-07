@@ -179,7 +179,7 @@ resign_with_local_identity_if_possible() {
     if [[ "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING" == "existing" ]]; then
       if ! output="$(PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY=1 "$LOCAL_CODESIGN_HELPER" 2>&1)"; then
         echo "$output"
-        echo "Stable local signing skipped: no existing valid local code-signing identity is available without a trust prompt."
+        echo "Stable local signing skipped: no existing trusted local code-signing identity is available without a trust prompt."
         adhoc_resign_if_needed
         return 0
       fi

@@ -127,6 +127,12 @@ existing_identity_status() {
     existing_hash="$(printf '%s\n' "$existing_output" | awk '/^Hash: / { print $2; exit }')"
     printf 'ready:%s\n' "${existing_hash:-unknown}"
   else
+    existing_hash="$(printf '%s\n' "$existing_output" | awk '/^Hash: / { print $2; exit }')"
+    if [[ -n "$existing_hash" ]] &&
+       printf '%s\n' "$existing_output" | grep -Eiq 'present but not trusted|remains untrusted'; then
+      printf 'untrusted:%s\n' "$existing_hash"
+      return 0
+    fi
     printf 'missing:%s\n' "$(printf '%s\n' "$existing_output" | tail -1)"
   fi
 }

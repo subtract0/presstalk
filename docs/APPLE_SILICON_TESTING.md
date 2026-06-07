@@ -162,6 +162,11 @@ restarting, probing, or opening panes, run the no-prompt preflight first:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --preflight
 ```
 
+`ExistingSigningIdentity=ready` means repair can reuse a trusted identity.
+`ExistingSigningIdentity=untrusted` means the local identity exists but still
+needs the logged-in desktop signing trust prompt. `missing` means the repair
+will create and trust a new local identity from the logged-in desktop session.
+
 For the `recognized_disabled` input-method state caused by either ad-hoc
 signing or an untrusted PressTalk local signing identity, current builds show
 `Repair Signing` in the PressTalk menu bar and in Settings. That action runs

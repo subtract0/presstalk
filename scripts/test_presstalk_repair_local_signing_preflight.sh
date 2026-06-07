@@ -42,6 +42,12 @@ case "${PRESSTALK_TEST_EXISTING_IDENTITY:-missing}" in
     echo "PressTalk local code-signing identity is ready."
     echo "Hash: TESTHASH"
     ;;
+  untrusted)
+    echo "Existing PressTalk local code-signing identity is present but not trusted for code signing." >&2
+    echo "Hash: UNTRUSTEDHASH" >&2
+    echo "Keychain: /tmp/presstalk-test.keychain-db" >&2
+    exit 1
+    ;;
   *)
     echo "No existing valid PressTalk local code-signing identity is available." >&2
     exit 1
@@ -111,5 +117,13 @@ grep -Fq "RepairNeeded: true" "$local_signing_output"
 grep -Fq "RepairAllowedHere: false" "$local_signing_output"
 grep -Fq "SigningTrustPromptNeeded: true" "$local_signing_output"
 grep -Fq "CodeSignatureAuthority: PressTalk Local Development Code Signing" "$local_signing_output"
+
+untrusted_output="$TEST_TMPDIR/untrusted.txt"
+SSH_CONNECTION="test" HOME="$home_dir" PRESSTALK_APP_BUNDLE="$app_bundle" PRESSTALK_TEST_EXISTING_IDENTITY=untrusted "$HELPER" --preflight >"$untrusted_output"
+grep -Fq "RepairNeeded: true" "$untrusted_output"
+grep -Fq "RepairAllowedHere: false" "$untrusted_output"
+grep -Fq "SigningTrustPromptNeeded: true" "$untrusted_output"
+grep -Fq "ExistingSigningIdentity: untrusted" "$untrusted_output"
+grep -Fq "ExistingSigningIdentityDetail: UNTRUSTEDHASH" "$untrusted_output"
 
 echo "PASS signing_repair_preflight"

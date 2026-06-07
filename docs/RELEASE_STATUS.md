@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc66`
-- Commit: `f8466deb685b729bf765c7b1db41a5fe938f2724`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc66`
-- Asset: `PressTalk-0.1.5-rc66-macos-arm64.zip`
-- SHA-256: `df52b2d5edebad4baec59e3626a289f389d209c8857647a536bcdc2444fe58bc`
+- Tag: `v0.1.5-rc67`
+- Commit: `2bad7440cc23140084162966bb7f0bc1e7167049`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc67`
+- Asset: `PressTalk-0.1.5-rc67-macos-arm64.zip`
+- SHA-256: `15b54c839c4a4d26c177dea9118614ede8e3ccdf02cd47ff14fdca33a865345a`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,32 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc67` fixes the read-only repair verifier so it accepts every proven
+  active-field insertion path: InputMethodKit, direct Accessibility insertion,
+  or Accessibility-backed paste command. It still reports the mbp1 ad-hoc
+  `recognized_disabled` state as a signing repair blocker. The production
+  insertion probe now records `activeFieldInsertionReady`,
+  `activeFieldInsertionStatus`, and `inputMethodFallbackStatus` in its
+  readiness snapshots.
+- The `v0.1.5-rc67` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:15b54c839c4a4d26c177dea9118614ede8e3ccdf02cd47ff14fdca33a865345a`,
+  matching the local `dist/PressTalk-0.1.5-rc67-macos-arm64.zip`. The
+  `v0.1.5-rc67` tag points at
+  `2bad7440cc23140084162966bb7f0bc1e7167049`, and the inspected asset contains
+  the updated verifier reason plus production-probe readiness fields.
+- After rc67 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `activeFieldInsertionReady=true` and
+  `activeFieldInsertionStatus=ready_input_method`; the bundled verifier exits
+  `0` using the latest successful production insertion probe.
+- An rc67 install attempt on `mbp1` did not reach the host because SSH to port
+  22 timed out before the checksum or bootstrap step. Do not treat `mbp1` as
+  rc67-refreshed; latest verified `mbp1` app state remains the rc66
+  `needs_signing_repair` blocker below.
+
+Earlier prerelease notes retained for provenance:
+
 - `v0.1.5-rc66` adds machine-readable active-field insertion readiness.
   Runtime status now records `runtime.activeFieldInsertionReady` and
   `runtime.activeFieldInsertionStatus`, and the smoke collector plus repair
@@ -41,8 +67,6 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `activeFieldInsertionStatus=needs_signing_repair`, while `speechModel=Ready`
   and `inputListener=hid:listen_only`. Active-field insertion remains unproven
   until logged-in desktop `Repair Signing`.
-
-Earlier prerelease notes retained for provenance:
 
 - `v0.1.5-rc65` makes the known mbp1 blocker visible in the menu-bar status.
   When transcription is ready but ad-hoc input-method signing still blocks

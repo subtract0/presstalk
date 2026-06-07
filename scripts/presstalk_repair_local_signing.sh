@@ -80,6 +80,7 @@ APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 BOOTSTRAP="$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 LOCAL_CODESIGN_HELPER="$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 PROBE_RUNNER="$APP_RESOURCES_DIR/presstalk-run-production-insertion-probe.sh"
+SMOKE_COLLECTOR="$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 
 if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Missing PressTalk app bundle: $APP_BUNDLE" >&2
@@ -163,7 +164,18 @@ if [[ "$RUN_PROBE" == "1" ]]; then
   fi
   echo
   echo "Running production insertion probe..."
-  PRESSTALK_TRIGGER_KEY="$TRIGGER_KEY" /bin/bash "$PROBE_RUNNER" --json --timeout 14
+  probe_status=0
+  PRESSTALK_TRIGGER_KEY="$TRIGGER_KEY" /bin/bash "$PROBE_RUNNER" --json --timeout 14 || probe_status=$?
+
+  if [[ -x "$SMOKE_COLLECTOR" ]]; then
+    echo
+    echo "Collecting post-repair smoke status..."
+    /bin/bash "$SMOKE_COLLECTOR" || true
+  else
+    echo
+    echo "Post-repair smoke collector missing: $SMOKE_COLLECTOR"
+  fi
+  exit "$probe_status"
 else
   cat <<EOF
 

@@ -66,7 +66,10 @@ production insertion probe, so the desktop repair path no longer requires
 typing a shell command. The settings action launches the helper through nohup
 and writes a diagnostics .pid file next to the signing repair log, so the repair
 can survive the app restart it initiates and the smoke collector can report
-whether the latest repair helper is still running.
+whether the latest repair helper is still running. When the repair is run with
+--probe, the helper now appends a full post-repair smoke-status snapshot to the
+same diagnostics log after the production insertion probe, while preserving the
+probe exit status.
 
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before

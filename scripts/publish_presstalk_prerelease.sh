@@ -269,7 +269,7 @@ macOS 26.5 can hang while Core ML loads the large-v3 turbo decoder/encoder via
 the Neural Engine path. Set PRESSTALK_WHISPER_COMPUTE=default only when you
 explicitly want the upstream WhisperKit compute defaults.
 
-This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on those machines.
+This prerelease is for machine verification on studio1, s1, s2 when a microphone is attached, and mbp1. Do not treat it as fully verified until docs/RELEASE_STATUS.md records successful dictation smoke tests on the machines currently eligible for microphone coverage.
 
 SHA-256:
 

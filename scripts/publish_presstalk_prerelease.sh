@@ -193,10 +193,11 @@ treating a posted Darwin notification as proof that text landed.
 When bootstrap refreshes the installed PressTalkInputMethod.app, it also
 restarts the per-user InputMethodKit launch agent so macOS cannot keep a stale
 input-method server path after an app update. The production insertion path now
-also retries once after the first acknowledgement timeout by restoring and
-reselecting the user's original input source and PressTalk's input source before
-posting the insert notification again. This keeps update-time IMK launch races
-from turning a ready input-method fallback into copy-only behavior.
+also makes up to three notification attempts after acknowledgement timeouts,
+restoring and reselecting the user's original input source and PressTalk's input
+source before retrying. This keeps update-time IMK launch races from turning a
+ready input-method fallback into copy-only behavior when the input-method app
+launches just after an earlier notification.
 
 The bundle also carries presstalk-unicode-event-insert-probe.swift. This opens a
 local text view and posts per-character Unicode CGEvents without opening System

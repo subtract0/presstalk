@@ -5027,7 +5027,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        for attempt in 1...2 {
+        for attempt in 1...3 {
             Thread.sleep(forTimeInterval: attempt == 1 ? 0.75 : 0.35)
             postInsertionNotification(attempt: attempt)
             Thread.sleep(forTimeInterval: 0.25)
@@ -5041,8 +5041,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 return nil
             }
 
-            guard attempt == 1 else { break }
-            traceLogger.log("Input method insertion acknowledgement retrying reason=input_method_ack_timeout attempt=1")
+            guard attempt < 3 else { break }
+            traceLogger.log("Input method insertion acknowledgement retrying reason=input_method_ack_timeout attempt=\(attempt)")
             let restoreStatus = TISSelectInputSource(originalSource)
             if restoreStatus != 0 {
                 traceLogger.log("Input method insertion retry restore failed status=\(restoreStatus)")

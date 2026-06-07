@@ -147,9 +147,9 @@ source presstalk-manual-fn-smoke.swift. The compiled focused-window helper
 records physical trigger dictation smoke results as JSON without opening macOS
 permission panes. It reads the configured runtime trigger key, supports Option +
 Space/Fn/Option/F5/trackpad labels, and records readiness before and after the
-manual paste smoke. Closing the helper before completion writes an explicit
-window_closed result instead of leaving no artifact. It also records
-expectedTriggerProof,
+manual paste smoke. Closing or terminating the helper before completion writes
+an explicit window_closed or app_terminated result instead of leaving no
+artifact. It also records expectedTriggerProof,
 traceExpectedTriggerPressed, traceExpectedTriggerReleased,
 traceRegisteredHotKeyObserved, traceFinalTranscript, traceInserted,
 traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and

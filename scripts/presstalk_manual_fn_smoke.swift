@@ -129,6 +129,11 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate, NSWindowDele
         finish(success: false, reason: "window_closed", capturedText: textView?.string ?? "")
     }
 
+    func applicationWillTerminate(_ notification: Notification) {
+        guard !completed else { return }
+        finish(success: false, reason: "app_terminated", capturedText: textView?.string ?? "", terminateAfter: false)
+    }
+
     private func tick() {
         guard !completed else { return }
 
@@ -221,7 +226,7 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate, NSWindowDele
         return "trace_pipeline_incomplete"
     }
 
-    private func finish(success: Bool, reason: String, capturedText: String) {
+    private func finish(success: Bool, reason: String, capturedText: String, terminateAfter: Bool = true) {
         completed = true
         timer?.invalidate()
 
@@ -310,8 +315,10 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate, NSWindowDele
             fputs("Failed to write result: \(error)\n", stderr)
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + (success ? 2.5 : 4.0)) {
-            NSApp.terminate(nil)
+        if terminateAfter {
+            DispatchQueue.main.asyncAfter(deadline: .now() + (success ? 2.5 : 4.0)) {
+                NSApp.terminate(nil)
+            }
         }
     }
 

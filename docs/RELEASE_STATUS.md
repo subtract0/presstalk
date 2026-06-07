@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc78`
-- Commit: `faa00bebcdaad399b1011ae2d3a353c694cff0b0`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc78`
-- Asset: `PressTalk-0.1.5-rc78-macos-arm64.zip`
-- SHA-256: `c8fda32c78611b58d3d1a48d3d8d133fea1c56d4dad217d28c67a89a5bcdfc8b`
+- Tag: `v0.1.5-rc79`
+- Commit: `89f8a7f6d510d53987b3a69abfae48de7c0b3855`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc79`
+- Asset: `PressTalk-0.1.5-rc79-macos-arm64.zip`
+- SHA-256: `5bdbbd4c0bc35e2ab03d877d91c38821b63dfc1c948fffcb302b2393a7626cee`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,23 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc79` adds read-only Tailscale status collection to the bundled
+  host-discovery helper. Tailscale collection is enabled by default, can be
+  skipped with `--no-tailscale`, and records CLI startup failures as
+  `tailscale.statusAvailable=false` with the failure text in JSON.
+- The `v0.1.5-rc79` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:5bdbbd4c0bc35e2ab03d877d91c38821b63dfc1c948fffcb302b2393a7626cee`,
+  matching the local `dist/PressTalk-0.1.5-rc79-macos-arm64.zip`. The
+  `v0.1.5-rc79` tag points at
+  `89f8a7f6d510d53987b3a69abfae48de7c0b3855`.
+- After rc79 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `c487a0ae39f419bb9030b02013e483933e5613a8`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`.
 - `v0.1.5-rc78` makes no-prompt signing preflight distinguish a missing local
   identity from an existing but untrusted PressTalk local identity. The
   preflight reports the latter as `ExistingSigningIdentity=untrusted` with the
@@ -169,7 +186,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc78 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc79 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap detected the
@@ -178,7 +195,11 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   no existing trusted identity was available without a prompt, and did not open
   panes or start a signing-trust prompt. Readiness reports
   `speechModel=Ready`, `inputPipelineReady=true`,
+  `InputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`,
   `microphoneHardwareDetected=true`, `physicalSTTSmokeReady=true`,
+  `activeFieldInsertionReady=false`,
   `activeFieldInsertionStatus=needs_signing_repair`,
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
   The bundled preflight reports `ExistingSigningIdentity=untrusted`,
@@ -202,7 +223,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
   The next action is logged-in desktop `Repair Signing`; do not reopen privacy
   panes for this state.
-- Current rc78 readiness matrix command:
+- Current rc79 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -212,18 +233,22 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- The rc78 proof gate run against required `local`, `s1`, and `mbp1-tb`,
+- The rc79 proof gate run against required `local`, `s1`, and `mbp1-tb`,
   excluding `studio2=no attached microphone`, exits nonzero with `proven=false`
   and `failureCount=5`. It passes `local`, fails `s1` for not reachable /
   missing physical STT / missing active-field readiness, and fails `mbp1-tb`
   only for `active_field_not_ready`.
-- The rc76 host discovery probe targeted `local`, `s1`, `s1.local`, `mbp1`,
+- The rc79 host discovery probe targeted `local`, `s1`, `s1.local`, `mbp1`,
   `mbp1-tb`, `studio1.local`, and `mba1.local`. Only `mbp1-tb` answered the
   strict SSH probe. `s1` and `s1.local` do not resolve, plain `mbp1` times out
   at `100.106.125.111:22`, and `studio1.local` / `mba1.local` remain strict
   host-key blockers. Bonjour passively advertises `studio1`, `studio2`,
   `mbp1`, and `mba1`, but no `s1`; `studio2` was not an SSH or STT target in
-  this probe. Earlier read-only `ssh-keyscan` observed `mba1.local` key
+  this probe. Tailscale was present at `/usr/local/bin/tailscale` but reported
+  `The Tailscale CLI failed to start: The operation couldn’t be completed.
+  (Tailscale.CLIError error 1.)`, so `tailscale.statusAvailable=false` and no
+  Tailscale nodes were available as `s1` evidence. Earlier read-only
+  `ssh-keyscan` observed `mba1.local` key
   fingerprints, not trusted or added: RSA
   `SHA256:uA9g7l4TV0EVDgTn1d1X3g/aDQ5vBJmVaTe7gwj7lnI`, ED25519
   `SHA256:3d9YHlo6UXSwPW8JCg9GoVIuSGAU38SVhm4a9Ow1Mg4`, ECDSA

@@ -230,3 +230,9 @@ Its `Input Method` section is read-only. It reports the bundled and installed
 prints the TIS source state. For the repaired path to be worth probing, the
 installed input method should match the bundled CDHash and show a recognized,
 enabled, select-capable `com.am.presstalk.inputmethod.container` source.
+
+The app also writes `permissions.inputMethodFallbackStatus` into
+`runtime-status.json`. `ready` means the InputMethodKit fallback is enabled.
+`recognized_disabled` means macOS recognizes PressTalk but has not enabled it,
+which is the mbp1 ad-hoc signing/TIS blocker. Do not treat that state as a
+missing Microphone or Input Monitoring grant.

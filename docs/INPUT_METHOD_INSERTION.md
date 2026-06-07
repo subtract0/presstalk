@@ -155,6 +155,15 @@ Require the `Input Method` section to show matching bundled/installed
 installed copy is stale. If `recognizedEnabledSourceCount=0` after repair, the
 machine is still in the TIS enable no-effect state.
 
+The app-level runtime status mirrors this check through
+`permissions.inputMethodFallbackStatus`:
+
+- `ready` means the fallback source is enabled.
+- `recognized_disabled` means TIS sees the source but the enabled-source list is
+  empty.
+- `recognized_not_selectable`, `source_not_recognized`, and `not_installed`
+  mean the fallback should not be treated as an active insertion path.
+
 Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the

@@ -26,6 +26,7 @@ struct PressTalkRuntimeStatus {
     let inputPipelineReady: Bool
     let inputListenerStatus: String
     let pasteAutomatically: Bool
+    let inputMethodFallbackStatus: String
     let systemDictationHotkeyDisabled: Bool
     let adHocSigned: Bool
     let permissionPaneOpeningAllowed: Bool
@@ -58,6 +59,7 @@ struct PressTalkRuntimeStatus {
         inputPipelineReady: false,
         inputListenerStatus: "Checking...",
         pasteAutomatically: true,
+        inputMethodFallbackStatus: "unknown",
         systemDictationHotkeyDisabled: true,
         adHocSigned: false,
         permissionPaneOpeningAllowed: false,
@@ -1262,12 +1264,21 @@ final class PressTalkSettingsWindowController: NSWindowController {
         if runtimeStatus.accessibilityGranted {
             label.stringValue = "Granted"
             label.textColor = .systemGreen
-        } else if runtimeStatus.pasteAutomatically {
-            label.stringValue = "Input method fallback"
-            label.textColor = .systemGreen
-        } else {
+        } else if !runtimeStatus.pasteAutomatically {
             label.stringValue = "Optional; copy only"
             label.textColor = .secondaryLabelColor
+        } else if runtimeStatus.inputMethodFallbackStatus == "ready" {
+            label.stringValue = "Input method ready"
+            label.textColor = .systemGreen
+        } else if runtimeStatus.inputMethodFallbackStatus == "recognized_disabled" {
+            label.stringValue = "Input method disabled"
+            label.textColor = .systemOrange
+        } else if runtimeStatus.inputMethodFallbackStatus == "recognized_not_selectable" {
+            label.stringValue = "Input method blocked"
+            label.textColor = .systemOrange
+        } else {
+            label.stringValue = "Input method unavailable"
+            label.textColor = .systemOrange
         }
     }
 
@@ -1314,7 +1325,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
         }
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, even if macOS Settings shows a toggle. Dictation will use the input method fallback, then copy only if that is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            if runtimeStatus.inputMethodFallbackStatus == "ready" {
+                return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, but the input method fallback is currently enabled; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            }
+            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, and the input method fallback status is \(runtimeStatus.inputMethodFallbackStatus). PressTalk will copy if insertion is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 
         if !runtimeStatus.accessibilityGranted {

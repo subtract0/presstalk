@@ -109,6 +109,15 @@ The `Input Method` section should show matching bundled and installed
 `selectCapable=true`. If the installed input-method CDHash differs from the
 bundled one, rerun bootstrap/repair before interpreting insertion probes.
 
+Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
+values:
+
+- `ready`: the fallback is enabled and worth probing.
+- `recognized_disabled`: macOS sees a select-capable PressTalk source but has
+  not enabled it; this is the current mbp1 ad-hoc blocker.
+- `recognized_not_selectable`, `source_not_recognized`, or `not_installed`:
+  collect diagnostics before treating insertion as a runtime/STT failure.
+
 ## Runtime Checks
 
 Approve only fresh macOS prompts that are not already granted for the current

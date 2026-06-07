@@ -1905,6 +1905,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let codeSignatureIdentifier = codeSignatureValue(prefix: "Identifier=")
         let codeSignatureCDHash = codeSignatureValue(prefix: "CDHash=")
         let codeSignatureAuthority = codeSignatureValue(prefix: "Authority=")
+        let inputMethodFallbackStatus = currentInputMethodFallbackStatus()
 
         return PressTalkRuntimeStatus(
             bundleIdentifier: bundleIdentifier,
@@ -1915,6 +1916,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             inputPipelineReady: inputPipelineReady,
             inputListenerStatus: eventTapInstallSummary,
             pasteAutomatically: settingsStore.pasteAutomatically,
+            inputMethodFallbackStatus: inputMethodFallbackStatus,
             systemDictationHotkeyDisabled: !currentSystemDictationHotkeyEnabled(),
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
@@ -1959,7 +1961,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "microphoneAuthorizationStatus": status.microphoneAuthorizationStatus,
                 "microphoneStatus": status.microphoneGranted ? "preflight_granted" : "preflight_\(status.microphoneAuthorizationStatus)",
                 "accessibilityGranted": status.accessibilityGranted,
-                "accessibilityStatus": status.accessibilityGranted ? "ax_trusted" : (status.pasteAutomatically ? "ax_false_input_method_fallback" : "ax_false_copy_only"),
+                "accessibilityStatus": accessibilityStatusDescription(status),
+                "inputMethodFallbackStatus": status.inputMethodFallbackStatus,
                 "systemDictationHotkeyDisabled": status.systemDictationHotkeyDisabled,
                 "permissionPaneOpeningAllowed": status.permissionPaneOpeningAllowed,
             ],
@@ -2058,7 +2061,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Input listener effective: \(runtimeStatus.inputMonitoringEffective ? "yes" : "no")
             - Input Monitoring status: \(runtimeStatus.inputMonitoringGranted ? "preflight granted" : (runtimeStatus.inputMonitoringEffective ? "listener ready; preflight unavailable" : "preflight unavailable"))
             - Microphone preflight: \(runtimeStatus.microphoneGranted ? "granted" : runtimeStatus.microphoneAuthorizationStatus)
-            - Accessibility status: \(runtimeStatus.accessibilityGranted ? "AXIsProcessTrusted=true" : (runtimeStatus.pasteAutomatically ? "AXIsProcessTrusted=false; input method fallback active" : "AXIsProcessTrusted=false; copy-only mode"))
+            - Accessibility status: \(accessibilityStatusDescription(runtimeStatus))
+            - Input method fallback: \(runtimeStatus.inputMethodFallbackStatus)
             - Apple Dictation key: \(runtimeStatus.systemDictationHotkeyDisabled ? "disabled" : "active")
 
             Code signature
@@ -4501,6 +4505,57 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         } ?? sources.first {
             inputSourceBoolProperty($0, kTISPropertyInputSourceIsSelectCapable) ?? false
         } ?? sources.first
+    }
+
+    private func currentInputMethodFallbackStatus() -> String {
+        guard settingsStore.pasteAutomatically else {
+            return "not_used"
+        }
+
+        let installedURL = installedInputMethodBundleURL()
+        let executableURL = installedURL.appendingPathComponent("Contents/MacOS/presstalk-input-method")
+        guard FileManager.default.isExecutableFile(atPath: executableURL.path),
+              inputMethodBundleHasCurrentSourceID(installedURL)
+        else {
+            return "not_installed"
+        }
+
+        let enabledSources = pressTalkInputMethodSources(includeAllInstalled: false)
+        if preferredPressTalkInputMethodSource(from: enabledSources) != nil {
+            return "ready"
+        }
+
+        let allSources = pressTalkInputMethodSources(includeAllInstalled: true)
+        guard !allSources.isEmpty else {
+            return "source_not_recognized"
+        }
+        if preferredPressTalkInputMethodSource(from: allSources) != nil {
+            return "recognized_disabled"
+        }
+        return "recognized_not_selectable"
+    }
+
+    private func accessibilityStatusDescription(_ status: PressTalkRuntimeStatus) -> String {
+        if status.accessibilityGranted {
+            return "ax_trusted"
+        }
+        if !status.pasteAutomatically {
+            return "ax_false_copy_only"
+        }
+        switch status.inputMethodFallbackStatus {
+        case "ready":
+            return "ax_false_input_method_fallback_ready"
+        case "recognized_disabled":
+            return "ax_false_input_method_recognized_disabled"
+        case "recognized_not_selectable":
+            return "ax_false_input_method_recognized_not_selectable"
+        case "source_not_recognized":
+            return "ax_false_input_method_source_not_recognized"
+        case "not_installed":
+            return "ax_false_input_method_not_installed"
+        default:
+            return "ax_false_input_method_\(status.inputMethodFallbackStatus)"
+        }
     }
 
     private func insertPreparedTranscriptUsingInputMethod(_ preparedTranscript: String) -> String? {

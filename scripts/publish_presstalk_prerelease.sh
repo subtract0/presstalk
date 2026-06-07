@@ -149,9 +149,15 @@ fails. Runtime status also records inputMonitoringStatus, microphoneStatus, and
 accessibilityStatus so raw macOS preflight misses are visibly separate from
 effective readiness.
 
+Runtime status and Settings now also expose inputMethodFallbackStatus. When
+Accessibility is false and auto-paste is enabled, PressTalk reports whether the
+InputMethodKit fallback is ready, recognized but disabled, not selectable, not
+installed, or not recognized. This prevents mbp1's ad-hoc TIS state from being
+presented as a working fallback merely because auto-paste is on.
+
 When Accessibility is not trusted but dictation can use the InputMethodKit
-fallback, Settings now labels the Accessibility row as input method fallback and
-runtime status records accessibilityStatus=ax_false_input_method_fallback
+fallback, Settings labels the Accessibility row as input method ready and
+runtime status records accessibilityStatus=ax_false_input_method_fallback_ready
 instead of naming it as a missing permission or copy-only path.
 
 The Settings window is now resizable and scrollable, and the Accessibility row

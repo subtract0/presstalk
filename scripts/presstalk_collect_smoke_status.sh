@@ -236,6 +236,8 @@ print_repair_and_probe_status() {
     local accessibility_status
     local speech_model
     local input_listener
+    local active_field_insertion_ready
+    local active_field_insertion_status
     local microphone_authorization
     local input_monitoring_effective
     ad_hoc_signed="$(json_value status.adHocSigned)"
@@ -243,6 +245,8 @@ print_repair_and_probe_status() {
     accessibility_status="$(json_value permissions.accessibilityStatus)"
     speech_model="$(json_value status.speechModel)"
     input_listener="$(json_value runtime.inputListener)"
+    active_field_insertion_ready="$(json_value runtime.activeFieldInsertionReady)"
+    active_field_insertion_status="$(json_value runtime.activeFieldInsertionStatus)"
     microphone_authorization="$(json_value permissions.microphoneAuthorizationStatus)"
     input_monitoring_effective="$(json_value permissions.inputMonitoringEffective)"
 
@@ -251,6 +255,8 @@ print_repair_and_probe_status() {
     echo "accessibilityStatus: ${accessibility_status:-unknown}"
     echo "speechModel: ${speech_model:-unknown}"
     echo "inputListener: ${input_listener:-unknown}"
+    echo "activeFieldInsertionReady: ${active_field_insertion_ready:-unknown}"
+    echo "activeFieldInsertionStatus: ${active_field_insertion_status:-unknown}"
     echo "microphoneAuthorizationStatus: ${microphone_authorization:-unknown}"
     echo "inputMonitoringEffective: ${input_monitoring_effective:-unknown}"
 

@@ -1990,6 +1990,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "inputPipelineReady": inputPipelineReady,
                 "inputListener": eventTapInstallSummary,
                 "setupRetryActive": setupRetryTimer != nil,
+                "activeFieldInsertionReady": status.activeFieldInsertionReady,
+                "activeFieldInsertionStatus": status.activeFieldInsertionStatus,
                 "agentMode": config.agentMode,
                 "triggerKey": settingsStore.triggerKey.rawValue,
                 "whisperModel": config.whisperModel,

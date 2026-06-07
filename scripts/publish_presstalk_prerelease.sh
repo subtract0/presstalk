@@ -81,6 +81,11 @@ Paste Repair Needed while transcription is ready but active-field paste still
 needs the local signing repair, so the blocked state is visible before a user
 tries dictation.
 
+Runtime status now also records activeFieldInsertionReady and
+activeFieldInsertionStatus. These fields separate a ready speech pipeline from
+a proven active-field insertion path, and the bundled smoke collector and repair
+verifier print them for cross-machine evidence.
+
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before
 launching the app. Its summary reports both Bundled input method signing applied

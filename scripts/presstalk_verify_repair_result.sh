@@ -56,6 +56,8 @@ input_method_fallback="$(status_value permissions.inputMethodFallbackStatus)"
 accessibility_status="$(status_value permissions.accessibilityStatus)"
 speech_model="$(status_value status.speechModel)"
 input_listener="$(status_value runtime.inputListener)"
+active_field_insertion_ready="$(status_value runtime.activeFieldInsertionReady)"
+active_field_insertion_status="$(status_value runtime.activeFieldInsertionStatus)"
 microphone_authorization="$(status_value permissions.microphoneAuthorizationStatus)"
 input_monitoring_effective="$(status_value permissions.inputMonitoringEffective)"
 
@@ -64,6 +66,8 @@ print_field "inputMethodFallbackStatus" "$input_method_fallback"
 print_field "accessibilityStatus" "$accessibility_status"
 print_field "speechModel" "$speech_model"
 print_field "inputListener" "$input_listener"
+print_field "activeFieldInsertionReady" "$active_field_insertion_ready"
+print_field "activeFieldInsertionStatus" "$active_field_insertion_status"
 print_field "microphoneAuthorizationStatus" "$microphone_authorization"
 print_field "inputMonitoringEffective" "$input_monitoring_effective"
 
@@ -117,6 +121,12 @@ print_field "probe.traceInputMethodEnableNoEffect" "$probe_enable_no_effect"
 if [[ "$input_method_fallback" != "ready" ]]; then
   echo "Result: not proven"
   echo "Reason: input method fallback is not ready"
+  exit 1
+fi
+
+if [[ "$active_field_insertion_ready" == "false" ]]; then
+  echo "Result: not proven"
+  echo "Reason: active-field insertion is not ready"
   exit 1
 fi
 

@@ -40,6 +40,26 @@ struct PressTalkRuntimeStatus {
         inputMonitoringGranted || inputPipelineReady
     }
 
+    var activeFieldInsertionReady: Bool {
+        pasteAutomatically && (accessibilityGranted || inputMethodFallbackStatus == "ready")
+    }
+
+    var activeFieldInsertionStatus: String {
+        guard pasteAutomatically else {
+            return "copy_only"
+        }
+        if accessibilityGranted {
+            return "ready_accessibility"
+        }
+        if inputMethodFallbackStatus == "ready" {
+            return "ready_input_method"
+        }
+        if adHocSigned && inputMethodFallbackStatus == "recognized_disabled" {
+            return "needs_signing_repair"
+        }
+        return "blocked_\(inputMethodFallbackStatus)"
+    }
+
     var codeSignatureSummary: String {
         if codeSignatureCDHash != "unknown" {
             return "CDHash \(codeSignatureCDHash)"

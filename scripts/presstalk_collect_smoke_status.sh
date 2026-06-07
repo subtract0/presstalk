@@ -24,6 +24,31 @@ app_signature_value() {
   fi
 }
 
+print_bundle_signature() {
+  local label="$1"
+  local path="$2"
+
+  echo "$label: $path"
+  if [[ ! -d "$path" ]]; then
+    echo "Bundle missing"
+    return
+  fi
+
+  codesign -dv --verbose=4 "$path" 2>&1 |
+    awk '/^Identifier=|^CDHash=|^Signature=|^Authority=|^TeamIdentifier=/ { print }'
+  codesign -dr - "$path" 2>&1 |
+    awk '/designated =>/ { sub(/^.*designated => /, "DesignatedRequirement="); print }'
+}
+
+bundle_signature_value() {
+  local path="$1"
+  local key="$2"
+  if [[ -d "$path" ]]; then
+    codesign -dv --verbose=4 "$path" 2>&1 |
+      awk -F= -v key="$key" '$1 == key { value = $2 } END { if (value != "") print value }'
+  fi
+}
+
 status_signature_value() {
   local key="$1"
   json_value codeSignatureSummary |
@@ -217,12 +242,30 @@ echo "App bundle: $APP_BUNDLE"
 if [[ -d "$APP_BUNDLE" ]]; then
   /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
   /usr/libexec/PlistBuddy -c 'Print CFBundleShortVersionString' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
-  codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 |
-    awk '/^Identifier=|^CDHash=|^Signature=|^Authority=|^TeamIdentifier=/ { print }'
-  codesign -dr - "$APP_BUNDLE" 2>&1 |
-    awk '/designated =>/ { sub(/^.*designated => /, "DesignatedRequirement="); print }'
+  print_bundle_signature "App signature" "$APP_BUNDLE"
 else
   echo "PressTalk.app not found"
+fi
+
+section "Input Method"
+BUNDLED_INPUT_METHOD="$APP_BUNDLE/Contents/Resources/PressTalkInputMethod.app"
+INSTALLED_INPUT_METHOD="$HOME/Library/Input Methods/PressTalkInputMethod.app"
+INPUT_METHOD_STATUS_HELPER="$APP_BUNDLE/Contents/Resources/presstalk-input-method-status.swift"
+print_bundle_signature "Bundled input method" "$BUNDLED_INPUT_METHOD"
+print_bundle_signature "Installed input method" "$INSTALLED_INPUT_METHOD"
+BUNDLED_INPUT_METHOD_CDHASH="$(bundle_signature_value "$BUNDLED_INPUT_METHOD" CDHash)"
+INSTALLED_INPUT_METHOD_CDHASH="$(bundle_signature_value "$INSTALLED_INPUT_METHOD" CDHash)"
+echo "Bundled input method CDHash: ${BUNDLED_INPUT_METHOD_CDHASH:-unknown}"
+echo "Installed input method CDHash: ${INSTALLED_INPUT_METHOD_CDHASH:-unknown}"
+if [[ -n "$BUNDLED_INPUT_METHOD_CDHASH" && -n "$INSTALLED_INPUT_METHOD_CDHASH" &&
+      "$BUNDLED_INPUT_METHOD_CDHASH" != "$INSTALLED_INPUT_METHOD_CDHASH" ]]; then
+  echo "Warning: installed input method signature differs from the bundled input method."
+fi
+if [[ -f "$INPUT_METHOD_STATUS_HELPER" ]]; then
+  echo "Read-only TIS status:"
+  swift "$INPUT_METHOD_STATUS_HELPER" --json 2>&1 || true
+else
+  echo "Input method status helper missing: $INPUT_METHOD_STATUS_HELPER"
 fi
 
 section "LaunchAgent"

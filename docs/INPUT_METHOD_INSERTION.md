@@ -142,6 +142,19 @@ the installed input-method copy, then restarts PressTalk with no-pane flags. Add
 `--probe` when a focused-window production insertion check should run
 immediately after repair.
 
+The smoke-status collector now includes the read-only input-method checks needed
+before interpreting probes:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
+```
+
+Require the `Input Method` section to show matching bundled/installed
+`PressTalkInputMethod.app` CDHashes and a recognized, enabled, select-capable
+`com.am.presstalk.inputmethod.container` source. If the CDHashes differ, the
+installed copy is stale. If `recognizedEnabledSourceCount=0` after repair, the
+machine is still in the TIS enable no-effect state.
+
 Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the

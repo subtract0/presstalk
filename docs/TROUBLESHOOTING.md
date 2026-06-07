@@ -218,3 +218,15 @@ after repair:
 If this is run over SSH and fails, run the same command in the logged-in desktop
 session. macOS often cannot show the signing trust prompt to an SSH-only
 session.
+
+After repair, use the smoke-status collector before rerunning insertion tests:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
+```
+
+Its `Input Method` section is read-only. It reports the bundled and installed
+`PressTalkInputMethod.app` signatures, warns when their CDHashes differ, and
+prints the TIS source state. For the repaired path to be worth probing, the
+installed input method should match the bundled CDHash and show a recognized,
+enabled, select-capable `com.am.presstalk.inputmethod.container` source.

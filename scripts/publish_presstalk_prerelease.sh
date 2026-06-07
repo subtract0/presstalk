@@ -119,6 +119,13 @@ delivery. On studio1 these paths posted events but observed no inserted text
 while Accessibility was untrusted, which rules out these CGEvent routes as
 reliable no-Accessibility insertion fallbacks on that machine.
 
+The bundled smoke-status collector now includes an Input Method section. It
+prints the bundled and installed PressTalkInputMethod.app signatures, warns if
+their CDHashes differ, and embeds the read-only TIS status JSON from
+presstalk-input-method-status.swift. This makes the mbp1 post-repair checklist
+visible in one command: stable app signing, matching input-method signing, and
+recognized/enabled/select-capable PressTalk input source.
+
 The app bundle also includes presstalk-automated-f5-smoke.swift for explicit
 synthetic pipeline checks. It posts the F5 Darwin trigger bridge, speaks a local
 phrase through system audio, and records whether PressTalk transcribes, posts

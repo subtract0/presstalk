@@ -97,6 +97,18 @@ The normal bootstrap summary now also reports `Bundled input method signing
 applied` and `Installed input method refreshed`. On mbp1, those fields must be
 `1` before treating the repaired input-method path as tested.
 
+After repair or bootstrap, collect one read-only status report:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
+```
+
+The `Input Method` section should show matching bundled and installed
+`PressTalkInputMethod.app` CDHashes plus TIS status with
+`recognizedSourceCount=1`, `recognizedEnabledSourceCount=1`, and
+`selectCapable=true`. If the installed input-method CDHash differs from the
+bundled one, rerun bootstrap/repair before interpreting insertion probes.
+
 ## Runtime Checks
 
 Approve only fresh macOS prompts that are not already granted for the current

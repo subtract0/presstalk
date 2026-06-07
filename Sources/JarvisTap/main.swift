@@ -4480,6 +4480,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         if allSources.isEmpty {
             traceLogger.log("Input method insertion selecting recognized source because enabled-source requery is empty")
         }
+        let selectableSourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
+        let allInstalledCountAfterEnable = pressTalkInputMethodSources(includeAllInstalled: true).count
+        traceLogger.log(
+            "Input method insertion source state enabled_count=\(allSources.count) all_installed_count=\(allInstalledCountAfterEnable) selected_candidate=\(selectableSourceID)"
+        )
 
         let selectStatus = TISSelectInputSource(enabledSource)
         guard selectStatus == 0 else {

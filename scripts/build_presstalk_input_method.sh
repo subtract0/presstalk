@@ -123,6 +123,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>PressTalkIMController</string>
   <key>LSMinimumSystemVersion</key>
   <string>14.0</string>
+  <key>LSBackgroundOnly</key>
+  <true/>
   <key>LSUIElement</key>
   <true/>
   <key>NSPrincipalClass</key>

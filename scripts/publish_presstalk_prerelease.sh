@@ -176,12 +176,20 @@ view, and restores the original input source. Production dictation now attempts
 this input-method insertion route before copy fallback when Accessibility is
 untrusted.
 
+The generated input-method bundle now includes the documented
+LSBackgroundOnly=true metadata for InputMethodKit servers. The client probe also
+records enabled/all-installed PressTalk source snapshots before the probe, after
+enable, and after select, plus the current input source after select. This makes
+mbp1-style failures visible when TISEnableInputSource reports success but
+TISSelectInputSource still returns -50.
+
 InputMethodKit diagnostics now distinguish source recognition from selection
 failure. If macOS recognizes the input method but refuses
 TISSelectInputSource, the client probe reports reason=input_method_select_failed
 and the numeric selectStatus instead of the older generic not-selectable label.
 Production insertion also attempts direct selection from the recognized source
-when the enabled-source requery is stale or empty.
+when the enabled-source requery is stale or empty, and logs the enabled/all
+installed source counts before selection.
 
 The bundle also includes presstalk-actual-accessibility-probe.sh. It launches
 the installed PressTalk.app itself in a diagnostic mode with the Accessibility

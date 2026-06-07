@@ -227,6 +227,13 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
     private var disableStatus: Any = "not_requested"
     private var wasEnabledBeforeProbe = false
     private var pressTalkSourceBeforeProbe: [String: Any] = [:]
+    private var enabledSourcesBeforeProbe: [[String: Any]] = []
+    private var allSourcesBeforeProbe: [[String: Any]] = []
+    private var enabledSourcesAfterEnable: [[String: Any]] = []
+    private var allSourcesAfterEnable: [[String: Any]] = []
+    private var allSourcesAfterSelect: [[String: Any]] = []
+    private var currentInputSourceAfterSelect: [String: Any] = [:]
+    private var selectedPressTalkSourceAfterSelect: [String: Any] = [:]
     private var prepareFailureReason = "input_method_not_selectable"
 
     init(options: Options) {
@@ -266,9 +273,11 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         registerStatus = Int(TISRegisterInputSource(bundleURL as CFURL))
 
         let enabledBefore = findPressTalkSources(includeAllInstalled: false)
+        enabledSourcesBeforeProbe = enabledBefore.map(sourceSummary)
         wasEnabledBeforeProbe = !enabledBefore.isEmpty
 
         var allSources = findPressTalkSources(includeAllInstalled: true)
+        allSourcesBeforeProbe = allSources.map(sourceSummary)
         guard let allSource = preferredSelectableSource(from: allSources) ?? allSources.first else {
             prepareFailureReason = "input_method_source_not_recognized"
             return false
@@ -286,14 +295,22 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         }
 
         let enabledSources = findPressTalkSources(includeAllInstalled: false)
+        enabledSourcesAfterEnable = enabledSources.map(sourceSummary)
+        allSourcesAfterEnable = findPressTalkSources(includeAllInstalled: true).map(sourceSummary)
         let enabledSource = preferredSelectableSource(from: enabledSources) ?? enabledSources.first ?? allSource
         selectStatus = Int(TISSelectInputSource(enabledSource))
+        let currentAfterSelect = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        currentInputSourceAfterSelect = sourceSummary(currentAfterSelect)
+        allSources = findPressTalkSources(includeAllInstalled: true)
+        allSourcesAfterSelect = allSources.map(sourceSummary)
+        if let selected = allSources.first(where: { boolProperty($0, kTISPropertyInputSourceIsSelected) == true }) {
+            selectedPressTalkSourceAfterSelect = sourceSummary(selected)
+        }
         if "\(selectStatus)" != "0" {
             prepareFailureReason = "input_method_select_failed"
             return false
         }
 
-        allSources = findPressTalkSources(includeAllInstalled: true)
         if let selected = allSources.first(where: { boolProperty($0, kTISPropertyInputSourceIsSelected) == true }),
            sourceIDs.contains(stringProperty(selected, kTISPropertyInputSourceID) ?? "") {
             return true
@@ -437,6 +454,13 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
             "installedBundlePath": installedBundleURL().path,
             "pressTalkSourceBeforeProbe": pressTalkSourceBeforeProbe,
             "pressTalkWasEnabledBeforeProbe": wasEnabledBeforeProbe,
+            "enabledSourcesBeforeProbe": enabledSourcesBeforeProbe,
+            "allSourcesBeforeProbe": allSourcesBeforeProbe,
+            "enabledSourcesAfterEnable": enabledSourcesAfterEnable,
+            "allSourcesAfterEnable": allSourcesAfterEnable,
+            "allSourcesAfterSelect": allSourcesAfterSelect,
+            "currentInputSourceAfterSelect": currentInputSourceAfterSelect,
+            "selectedPressTalkSourceAfterSelect": selectedPressTalkSourceAfterSelect,
             "registerStatus": registerStatus,
             "enableStatus": enableStatus,
             "selectStatus": selectStatus,

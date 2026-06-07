@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc62`
-- Commit: `bf063347999933277483d40e0adff29f2fea6ec4`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc62`
-- Asset: `PressTalk-0.1.5-rc62-macos-arm64.zip`
-- SHA-256: `dd70d4f4f801b3a41aba2b6add6ed87547c3d09f4838dee4c4adcc80d235dcc4`
+- Tag: `v0.1.5-rc64`
+- Commit: `53c37d59223c42b834ca5c10d866dc330e5dab79`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc64`
+- Asset: `PressTalk-0.1.5-rc64-macos-arm64.zip`
+- SHA-256: `90fcaa56566cd40ebbedddae9d88e6c4099b1c6ae891f65b590c4ed11b4b2534`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,35 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc64` publishes the direct menu-bar repair path and matching
+  collector wording. In the ad-hoc `recognized_disabled` state, the status menu
+  shows `Repair Signing...` so a logged-in desktop user can start the no-pane
+  repair helper without reopening the full Settings window. The smoke-status
+  collector now says to use `Repair Signing` from the PressTalk menu bar or
+  Settings.
+- The `v0.1.5-rc64` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:90fcaa56566cd40ebbedddae9d88e6c4099b1c6ae891f65b590c4ed11b4b2534`,
+  matching the local `dist/PressTalk-0.1.5-rc64-macos-arm64.zip`. The
+  `v0.1.5-rc64` tag points at
+  `53c37d59223c42b834ca5c10d866dc330e5dab79`, and the inspected asset contains
+  the corrected collector text.
+- After rc64 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The installed
+  collector contains the menu-bar-or-Settings repair text, and the bundled
+  verifier still exits `0` using the latest successful production insertion
+  probe.
+- On `mbp1`, rc64 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. The installed collector reports the corrected
+  menu-bar-or-Settings repair action. A no-window TIS enable diagnostic returned
+  `enableStatus=0` with `enableNoEffect=true`, leaving
+  `recognizedEnabledSourceCount=0`. Runtime remains transcription-ready, but
+  active-field insertion is still unproven until logged-in desktop
+  `Repair Signing`.
+- `v0.1.5-rc63` adds the status-menu `Repair Signing...` item for the exact
+  ad-hoc `recognized_disabled` input-method state. The item is hidden otherwise
+  and runs the same no-pane repair helper as the Settings button.
 - `v0.1.5-rc62` suppresses Finder reveal on diagnostics export during no-pane
   runs. When `PRESSTALK_OPEN_PERMISSION_PANES=0`, Export Diagnostics writes the
   diagnostics file, logs its path, and shows a short HUD message without

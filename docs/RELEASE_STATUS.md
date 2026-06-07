@@ -31,14 +31,25 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc71 was
+  downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
+  no-pane flags, and bootstrapped with
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
+  signing skipped because no existing valid local signing identity was available
+  without a trust prompt, so there was no signing-trust prompt. After warm-up,
+  readiness reports `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneHardwareDetected=true`, and
+  `activeFieldInsertionStatus=needs_signing_repair`.
 - Current rc71 readiness matrix command:
-  `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host studio1.local --host mba1.local --timeout 2 --json-output <path>`.
+  `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
-  fails with SSH timeout to `100.106.125.111:22`; `studio1.local` and
-  `mba1.local` fail strict SSH host-key verification. These are current
-  host/matrix blockers, not app regressions. `studio2` remains excluded from
-  microphone/STT smoke until a microphone is attached.
+  fails with SSH timeout to `100.106.125.111:22`; `mbp1-tb` is
+  `ready_reported` with `activeFieldSmokeReady=false` and next action
+  `Repair Signing`; `studio1.local` and `mba1.local` fail strict SSH host-key
+  verification. These are current host/matrix blockers, not app regressions.
+  `studio2` remains excluded from microphone/STT smoke until a microphone is
+  attached.
 
 Earlier prerelease notes retained for provenance:
 

@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc54`
-- Commit: `16cc009b3b89127a7c0478c631845f36d294de31`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc54`
-- Asset: `PressTalk-0.1.5-rc54-macos-arm64.zip`
-- SHA-256: `8d7c2bbf1e260fb0cf3141faf2c461a7486b946c1901a602e922e376c7aaad11`
+- Tag: `v0.1.5-rc55`
+- Commit: `08e5f8e59bfc4c5e65256a649fb2ed9bfad24c9d`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc55`
+- Asset: `PressTalk-0.1.5-rc55-macos-arm64.zip`
+- SHA-256: `6ce317c8cbb26fb6f82d5961b789d5784261dfc2f1e57502d15c2a930a0a2e19`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -68,6 +68,44 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   hint explicitly says to run the logged-in desktop signing repair helper plus
   production insertion probe instead of re-granting Microphone, Input
   Monitoring, or Accessibility.
+- `v0.1.5-rc55` publishes the Settings signing repair action. For the exact
+  ad-hoc `recognized_disabled` input-method state, Settings now shows
+  `Repair Signing`; clicking it runs the bundled no-pane
+  `presstalk-repair-local-signing.sh --probe` helper from the desktop session,
+  writes a diagnostics log, restarts PressTalk, and runs the production
+  insertion probe. This makes the mbp1 repair path intentional and GUI-driven
+  instead of requiring a shell command.
+- The `v0.1.5-rc55` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:6ce317c8cbb26fb6f82d5961b789d5784261dfc2f1e57502d15c2a930a0a2e19`,
+  matching the local `dist/PressTalk-0.1.5-rc55-macos-arm64.zip`. The inspected
+  asset contains the `Repair Signing` action strings and the virtual-HID paste
+  diagnostic helper.
+- After rc55 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. One
+  production insertion probe run traced successful input-method insertion but
+  missed target-window capture; a serial rerun succeeded:
+  `Diagnostics/production-insertion-probe-2026-06-07T02-10-16-571Z.json`
+  reported `success=true`, `targetCaptureSuccess=true`,
+  `traceProductionMethod=input_method_notification`, and
+  `traceCopyFallback=false`.
+- On `mbp1`, rc55 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped without explicitly setting
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. Bootstrap again skipped stable signing
+  without opening panes or starting a trust prompt. Runtime remains
+  transcription-ready: `speechModel=Ready`, `triggerPath=Fn / Globe ready`,
+  `inputListener=hid:listen_only`, `microphoneAuthorizationStatus=authorized`,
+  and `inputMonitoringEffective=true`.
+- The `mbp1` rc55 app is still ad-hoc, so active-field insertion is not yet
+  proven there: runtime status remains
+  `inputMethodFallbackStatus=recognized_disabled`. Smoke-status reports matching
+  bundled/installed input-method CDHash
+  `ab9ad270622a8fa409dcd9c2cad7e3bc17cf7979`, and TIS recognizes one
+  select-capable PressTalk source but `recognizedEnabledSourceCount=0`. The
+  installed rc55 binary contains `Needs signing repair` and the Settings repair
+  action strings, so the next required proof is clicking `Repair Signing` in the
+  logged-in mbp1 desktop session and checking the resulting production insertion
+  probe.
 - On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
   installed with no-pane flags, and bootstrapped without explicitly setting
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported

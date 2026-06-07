@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc59`
-- Commit: `fd39e0d3ec80d15048373413154b695cfd2ff7d5`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc59`
-- Asset: `PressTalk-0.1.5-rc59-macos-arm64.zip`
-- SHA-256: `23e0495559d8c875400ba3df7d8ad64504dbbed89a2feb95a504ee0f5b5ae1dd`
+- Tag: `v0.1.5-rc60`
+- Commit: `387de8c2bf1219bd984fc21867a0cb6b12a403b1`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc60`
+- Asset: `PressTalk-0.1.5-rc60-macos-arm64.zip`
+- SHA-256: `e7328bfdb2fda714f2a991acaaaa2a752b43f2873c5e72a920867ab1870e0953`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -226,6 +226,34 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   and `inputPipelineReady=true`. Active-field insertion remains unproven until
   the logged-in desktop signing repair: `adHocSigned=true` and
   `inputMethodFallbackStatus=recognized_disabled`.
+- `v0.1.5-rc60` improves post-click repair evidence. When the repair helper is
+  run with `--probe`, it now runs the production insertion probe, preserves the
+  probe exit status, then appends a full post-repair
+  `presstalk-collect-smoke-status.sh` snapshot to the same diagnostics log. That
+  means the `Repair Signing` log should contain the probe result plus the final
+  runtime/input-method status needed for SSH-side verification.
+- The `v0.1.5-rc60` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:e7328bfdb2fda714f2a991acaaaa2a752b43f2873c5e72a920867ab1870e0953`,
+  matching the local `dist/PressTalk-0.1.5-rc60-macos-arm64.zip`. The inspected
+  asset contains `SMOKE_COLLECTOR`, `Collecting post-repair smoke status`, and
+  `exit "$probe_status"` in `presstalk-repair-local-signing.sh`.
+- After rc60 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `Authority=PressTalk Local Development Code Signing`,
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputMethodFallbackStatus=ready`, and
+  `accessibilityStatus=ax_false_input_method_fallback_ready`.
+- On `mbp1`, rc60 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. The installed repair helper contains the
+  post-repair smoke collector snapshot path. Runtime remains transcription-ready:
+  `speechModel=Ready`, `triggerPath=Fn / Globe ready`,
+  `inputListener=hid:listen_only`, `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, and `inputPipelineReady=true`. Active-field
+  insertion remains unproven until the logged-in desktop signing repair:
+  `adHocSigned=true` and `inputMethodFallbackStatus=recognized_disabled`.
 - On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
   installed with no-pane flags, and bootstrapped without explicitly setting
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported

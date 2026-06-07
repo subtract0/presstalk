@@ -808,6 +808,28 @@ Known current proof gaps:
   all_installed_count=1`, and `Input method insertion unavailable
   reason=enable_no_effect status=-50`. The wrapper restored normal no-probe
   startup afterward; final runtime remained ready.
+- `mbp1` rc52 was installed from the GitHub release artifact over SSH with
+  SHA-256 verified as
+  `6e359be871ed408f871f98357e59e9c32544b977b92976e6e62990b6c2df694e`, then
+  bootstrapped with `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`,
+  `PRESSTALK_OPEN_PERMISSION_PANES=0`,
+  `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, and `PRESSTALK_TRIGGER_KEY=fn` to avoid
+  desktop signing-trust prompts and privacy panes. Runtime remains ready:
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputListener=hid:listen_only`,
+  `inputPipelineReady=true`, `setupRetryActive=false`, `speechModel=Ready`, and
+  `triggerPath=Fn / Globe ready`.
+- The rc52 mbp1 smoke collector proves the installed input method is no longer a
+  stale-copy mismatch: bundled and installed `PressTalkInputMethod.app` both
+  report CDHash `1429cebdf7da334efcd61d3add208c4f63c21daf` and
+  `Signature=adhoc`. TIS recognizes exactly one PressTalk source with
+  `type=TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
+  `selectCapable=true`, but `recognizedEnabledSourceCount=0` and
+  `enabled=false`. Running the status helper with `--enable --json` returns
+  `enableStatus=0` and `enableNoEffect=true`, so the mbp1 blocker is still TIS
+  enable no-effect on the ad-hoc install. The rc51 desktop-session signing
+  repair or a proper trusted release-signing identity remains required before
+  production insertion probes can pass there.
 - Rebootstrapping the earlier rc45 install on `mbp1` as the legacy
   `com.am.jarvistap` identity did not recover the old TCC grants, because stable
   local signing still could not be applied over SSH and bootstrap fell back to a

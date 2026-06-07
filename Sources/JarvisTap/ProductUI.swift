@@ -17,80 +17,6 @@ struct PressTalkCommerceConfig {
     }
 }
 
-struct PressTalkRuntimeStatus {
-    let bundleIdentifier: String
-    let inputMonitoringGranted: Bool
-    let microphoneGranted: Bool
-    let microphoneAuthorizationStatus: String
-    let accessibilityGranted: Bool
-    let inputPipelineReady: Bool
-    let inputListenerStatus: String
-    let pasteAutomatically: Bool
-    let inputMethodFallbackStatus: String
-    let systemDictationHotkeyDisabled: Bool
-    let adHocSigned: Bool
-    let permissionPaneOpeningAllowed: Bool
-    let speechModelStatus: String
-    let f5BridgeStatus: String
-    let codeSignatureIdentifier: String
-    let codeSignatureCDHash: String
-    let codeSignatureAuthority: String
-
-    var inputMonitoringEffective: Bool {
-        inputMonitoringGranted || inputPipelineReady
-    }
-
-    var activeFieldInsertionReady: Bool {
-        pasteAutomatically && (accessibilityGranted || inputMethodFallbackStatus == "ready")
-    }
-
-    var activeFieldInsertionStatus: String {
-        guard pasteAutomatically else {
-            return "copy_only"
-        }
-        if accessibilityGranted {
-            return "ready_accessibility"
-        }
-        if inputMethodFallbackStatus == "ready" {
-            return "ready_input_method"
-        }
-        if adHocSigned && inputMethodFallbackStatus == "recognized_disabled" {
-            return "needs_signing_repair"
-        }
-        return "blocked_\(inputMethodFallbackStatus)"
-    }
-
-    var codeSignatureSummary: String {
-        if codeSignatureCDHash != "unknown" {
-            return "CDHash \(codeSignatureCDHash)"
-        }
-        if codeSignatureAuthority != "unknown" {
-            return codeSignatureAuthority
-        }
-        return "signature unknown"
-    }
-
-    static let placeholder = PressTalkRuntimeStatus(
-        bundleIdentifier: "unknown",
-        inputMonitoringGranted: false,
-        microphoneGranted: false,
-        microphoneAuthorizationStatus: "unknown",
-        accessibilityGranted: false,
-        inputPipelineReady: false,
-        inputListenerStatus: "Checking...",
-        pasteAutomatically: true,
-        inputMethodFallbackStatus: "unknown",
-        systemDictationHotkeyDisabled: true,
-        adHocSigned: false,
-        permissionPaneOpeningAllowed: false,
-        speechModelStatus: "Checking...",
-        f5BridgeStatus: "Checking...",
-        codeSignatureIdentifier: "unknown",
-        codeSignatureCDHash: "unknown",
-        codeSignatureAuthority: "unknown"
-    )
-}
-
 struct PressTalkNativeTriggerSignature: Codable, Hashable {
     let subtype: Int
     let data1: Int
@@ -1285,56 +1211,26 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func configureInputMonitoringLabel(_ label: NSTextField) {
-        if runtimeStatus.inputMonitoringGranted {
-            label.stringValue = "Granted"
-            label.textColor = .systemGreen
-        } else if runtimeStatus.inputPipelineReady {
-            label.stringValue = "Listener ready"
-            label.textColor = .systemGreen
-        } else {
-            label.stringValue = "Preflight unavailable"
-            label.textColor = .systemOrange
-        }
+        applyPermissionLabel(runtimeStatus.inputMonitoringPermissionLabel, to: label)
     }
 
     private func configureAccessibilityLabel(_ label: NSTextField) {
-        if runtimeStatus.accessibilityGranted {
-            label.stringValue = "Granted"
-            label.textColor = .systemGreen
-        } else if !runtimeStatus.pasteAutomatically {
-            label.stringValue = "Optional; copy only"
-            label.textColor = .secondaryLabelColor
-        } else if runtimeStatus.inputMethodFallbackStatus == "ready" {
-            label.stringValue = "Input method ready"
-            label.textColor = .systemGreen
-        } else if runtimeStatus.inputMethodFallbackStatus == "recognized_disabled" {
-            label.stringValue = runtimeStatus.adHocSigned ? "Needs signing repair" : "Input method disabled"
-            label.textColor = .systemOrange
-        } else if runtimeStatus.inputMethodFallbackStatus == "recognized_not_selectable" {
-            label.stringValue = "Input method blocked"
-            label.textColor = .systemOrange
-        } else {
-            label.stringValue = "Input method unavailable"
-            label.textColor = .systemOrange
-        }
+        applyPermissionLabel(runtimeStatus.accessibilityPermissionLabel, to: label)
     }
 
     private func configureMicrophoneLabel(_ label: NSTextField) {
-        if runtimeStatus.microphoneGranted {
-            label.stringValue = "Granted"
+        applyPermissionLabel(runtimeStatus.microphonePermissionLabel, to: label)
+    }
+
+    private func applyPermissionLabel(_ permissionLabel: PressTalkPermissionLabel, to label: NSTextField) {
+        label.stringValue = permissionLabel.text
+        switch permissionLabel.tone {
+        case .ready:
             label.textColor = .systemGreen
-        } else if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
-            label.stringValue = "Not determined"
+        case .warning:
             label.textColor = .systemOrange
-        } else if runtimeStatus.microphoneAuthorizationStatus == "denied" {
-            label.stringValue = "Preflight denied"
-            label.textColor = .systemOrange
-        } else if runtimeStatus.microphoneAuthorizationStatus == "restricted" {
-            label.stringValue = "Restricted"
-            label.textColor = .systemOrange
-        } else {
-            label.stringValue = "Preflight unavailable"
-            label.textColor = .systemOrange
+        case .secondary:
+            label.textColor = .secondaryLabelColor
         }
     }
 

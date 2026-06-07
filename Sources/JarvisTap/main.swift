@@ -2097,8 +2097,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             """
             try report.write(to: diagnosticsURL, atomically: true, encoding: .utf8)
             traceLogger.log("Diagnostics exported path=\(diagnosticsURL.path)")
-            NSWorkspace.shared.activateFileViewerSelecting([diagnosticsURL])
-            present(.copied("Diagnostics exported to \(diagnosticsURL.lastPathComponent)"))
+            if config.allowPermissionPaneOpen {
+                NSWorkspace.shared.activateFileViewerSelecting([diagnosticsURL])
+                present(.copied("Diagnostics exported to \(diagnosticsURL.lastPathComponent)"))
+            } else {
+                traceLogger.log("Diagnostics file reveal suppressed because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+                present(.copied("Diagnostics exported quietly: \(diagnosticsURL.lastPathComponent)"))
+            }
         } catch {
             traceLogger.log("Diagnostics export failed error=\(error)")
             present(.error("Diagnostics export failed."))

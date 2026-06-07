@@ -222,6 +222,11 @@ privacy pane opens, and does not auto-present setup windows from setup checks or
 successful startup. This keeps no-pane smoke tests from accidentally reopening
 System Settings or suggesting another approval pass.
 
+Diagnostics export now also respects no-pane smoke runs. When
+PRESSTALK_OPEN_PERMISSION_PANES=0, Export Diagnostics writes the diagnostics file
+and logs its path without activating Finder, so troubleshooting does not create
+another surprise window.
+
 Bootstrap now clears both quarantine and provenance metadata from the installed
 app bundle and explicitly re-enables the com.am.jarvistap launchd label before
 bootstrapping. This fixes the mbp1 failure mode where launchd had the label

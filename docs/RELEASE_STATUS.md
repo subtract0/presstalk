@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc53`
-- Commit: `20a91f77863440a05f1419ac7f23a5eb89083284`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc53`
-- Asset: `PressTalk-0.1.5-rc53-macos-arm64.zip`
-- SHA-256: `8d82b9e2042f32bfd564c1136d2d82b27244d3cc6be39d1fe8a26a4774e2f3a5`
+- Tag: `v0.1.5-rc54`
+- Commit: `16cc009b3b89127a7c0478c631845f36d294de31`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc54`
+- Asset: `PressTalk-0.1.5-rc54-macos-arm64.zip`
+- SHA-256: `8d7c2bbf1e260fb0cf3141faf2c461a7486b946c1901a602e922e376c7aaad11`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -35,6 +35,46 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled` and
   `accessibilityStatus=ax_false_input_method_recognized_disabled`, matching the
   collector evidence that TIS recognizes the source but has not enabled it.
+- `v0.1.5-rc54` adds remote-signing guardrails. Bootstrap skips stable local
+  signing by default when launched over SSH unless
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` is set explicitly, and the repair helper
+  refuses the signing trust flow over SSH unless `--allow-ssh` is passed. This
+  prevents surprise Mac-password signing prompts while keeping the explicit
+  logged-in desktop repair path available.
+- The `v0.1.5-rc54` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:8d7c2bbf1e260fb0cf3141faf2c461a7486b946c1901a602e922e376c7aaad11`,
+  matching the local `dist/PressTalk-0.1.5-rc54-macos-arm64.zip`.
+- After rc54 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. Runtime status
+  reports `Authority=PressTalk Local Development Code Signing`,
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `inputMethodFallbackStatus=ready`, and
+  `accessibilityStatus=ax_false_input_method_fallback_ready`.
+- The `studio1` rc54 production insertion probe succeeded without audio:
+  `Diagnostics/production-insertion-probe-2026-06-07T01-54-34-727Z.json`
+  reported `success=true`, `targetCaptureSuccess=true`,
+  `traceProductionMethod=input_method_notification`,
+  `traceCopyFallback=false`, and `traceInputMethodEnableNoEffect=false`.
+- On `mbp1`, rc54 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped without explicitly setting
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING`. The rc54 bootstrap correctly reported
+  `Stable local signing skipped: PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0`, proving
+  the SSH default does not start the signing trust prompt. Runtime status after
+  install reports `speechModel=Ready`, `triggerPath=Fn / Globe ready`,
+  `inputListener=hid:listen_only`, `microphoneAuthorizationStatus=authorized`,
+  and `inputMonitoringEffective=true`.
+- The bundled rc54 repair helper was also checked over SSH on `mbp1`; it exited
+  with code `2` before starting the signing trust flow and printed the
+  desktop-session repair instruction. This is the intended no-surprise-prompt
+  behavior.
+- `mbp1` active-field insertion is still not proven on the ad-hoc rc54 install:
+  smoke-status reports matching bundled/installed input-method CDHash
+  `3e05dd4d24434d204631282139592215e7bebe3d`, TIS recognizes one
+  select-capable source `com.am.presstalk.inputmethod.container`, but
+  `recognizedEnabledSourceCount=0` and runtime status remains
+  `inputMethodFallbackStatus=recognized_disabled`. This still needs the
+  logged-in desktop signing repair plus production insertion probe proof.
 - `v0.1.5-rc52` extends the bundled smoke-status collector with an `Input
   Method` section. It prints bundled and installed `PressTalkInputMethod.app`
   signatures, warns if their CDHashes differ, and embeds the read-only TIS JSON
@@ -873,7 +913,11 @@ Known current proof gaps:
   `security find-identity -v -p codesigning` reports `0 valid identities` in
   the login keychain, the PressTalk local-dev keychain, and the System keychain,
   so the current rc50 app cannot be re-signed with that historical trusted
-  identity from SSH.
+  identity from SSH. A quiet launch of that old binary showed
+  `Input Monitoring permission OK` and `Microphone permission OK`, but it stalled
+  during WhisperKit load in the old Neural Engine/CoreML path even after the
+  local model-cache compatibility symlink was present. It is therefore useful as
+  TCC/signing evidence, not as a viable mbp1 runtime fallback.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to
   emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility

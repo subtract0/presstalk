@@ -13,6 +13,8 @@ probe_json_report="$TEST_TMPDIR/host-discovery-probe.json"
 tailscale_failure_json_report="$TEST_TMPDIR/host-discovery-tailscale-failure.json"
 fake_tailscale="$TEST_TMPDIR/tailscale"
 fake_arp="$TEST_TMPDIR/arp"
+fake_ssh_keyscan="$TEST_TMPDIR/ssh-keyscan"
+test_host_key="$TEST_TMPDIR/test_host_key"
 
 cat >"$ssh_config" <<'SSHCONFIG'
 Host mbp1-tb
@@ -60,8 +62,27 @@ ARP
 SH
 chmod +x "$fake_arp"
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" PRESSTALK_ARP_PATH="$fake_arp" "$HELPER" \
+ssh-keygen -q -t ed25519 -N '' -f "$test_host_key" >/dev/null
+test_host_public_key="$(awk '{ print $2 }' "$test_host_key.pub")"
+
+cat >"$fake_ssh_keyscan" <<SH
+#!/usr/bin/env bash
+ip="\${@: -1}"
+if [[ "\$ip" == "192.168.0.23" ]]; then
+  echo "\$ip ssh-ed25519 $test_host_public_key"
+  exit 0
+fi
+exit 1
+SH
+chmod +x "$fake_ssh_keyscan"
+
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
+  PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
+  PRESSTALK_ARP_PATH="$fake_arp" \
+  PRESSTALK_SSH_KEYSCAN_PATH="$fake_ssh_keyscan" \
+  "$HELPER" \
   --no-bonjour \
+  --probe-arp-ssh \
   --target mbp1-tb \
   --target s1 \
   --json-output "$json_report" >"$text_report"
@@ -80,6 +101,10 @@ if ! grep -Fq "Tailscale: enabled" "$text_report"; then
 fi
 if ! grep -Fq "ARP: enabled" "$text_report"; then
   echo "FAIL: host discovery text did not report ARP status"
+  exit 1
+fi
+if ! grep -Fq "ARP SSH keyscan: enabled" "$text_report"; then
+  echo "FAIL: host discovery text did not report ARP SSH keyscan status"
   exit 1
 fi
 
@@ -145,9 +170,38 @@ if [[ "$arp_second_ip" != "192.168.0.41" ]]; then
   exit 1
 fi
 
+arp_first_keyscan="$(plutil -extract arp.entries.0.sshKeyscan.success raw -o - "$json_report")"
+if [[ "$arp_first_keyscan" != "true" ]]; then
+  echo "FAIL: expected first ARP keyscan to succeed"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_first_fingerprints="$(plutil -extract arp.entries.0.sshKeyscan.fingerprints raw -o - "$json_report")"
+if [[ "$arp_first_fingerprints" != "1" ]]; then
+  echo "FAIL: expected one first ARP keyscan fingerprint, got $arp_first_fingerprints"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_first_key_type="$(plutil -extract arp.entries.0.sshKeyscan.fingerprints.0.keyType raw -o - "$json_report")"
+if [[ "$arp_first_key_type" != "ED25519" ]]; then
+  echo "FAIL: expected ED25519 first ARP key type, got $arp_first_key_type"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_second_keyscan="$(plutil -extract arp.entries.1.sshKeyscan.success raw -o - "$json_report")"
+if [[ "$arp_second_keyscan" != "false" ]]; then
+  echo "FAIL: expected second ARP keyscan to fail"
+  plutil -p "$json_report"
+  exit 1
+fi
+
 PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
   PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
   PRESSTALK_ARP_PATH="$fake_arp" \
+  PRESSTALK_SSH_KEYSCAN_PATH="$fake_ssh_keyscan" \
   PRESSTALK_FAKE_TAILSCALE_FAIL_STDOUT=1 \
   "$HELPER" \
   --no-bonjour \

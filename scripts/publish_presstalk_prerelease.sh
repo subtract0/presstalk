@@ -219,9 +219,11 @@ collection can be skipped with --no-tailscale, ARP collection can be skipped
 with --no-arp, and Tailscale CLI failures are recorded as unavailable status
 with the failure text in JSON instead of being confused with missing hosts. ARP
 entries are candidate-discovery evidence only, not proof of a machine identity.
-This makes missing aliases such as s1, strict host-key blockers, Tailscale
-status, local network candidates, and the reachable mbp1-tb path visible
-without installing or repairing PressTalk.
+When --probe-arp-ssh is passed, it also runs read-only ssh-keyscan against ARP
+candidate IPs and records public host-key fingerprints without editing
+known_hosts. This makes missing aliases such as s1, strict host-key blockers,
+Tailscale status, local network candidates, and the reachable mbp1-tb path
+visible without installing or repairing PressTalk.
 
 The bundle also includes presstalk-release-proof-gate.sh. It consumes the
 readiness matrix and exits 0 only when every required target is reachable,

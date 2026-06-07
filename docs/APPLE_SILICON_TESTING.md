@@ -48,7 +48,8 @@ plutil -extract eligibility.activeFieldSmokeReady raw -o - "$HOME/Desktop/presst
 To collect host and alias evidence before the release matrix, run. This is
 read-only: it records SSH config aliases, Bonjour SSH advertisements, Tailscale
 status, ARP table host/IP candidates, target `ssh -G` resolution, and strict
-SSH probe results without installing, repairing, or opening permission panes.
+SSH probe results without installing, repairing, trusting host keys, or opening
+permission panes.
 
 ```bash
 /bin/bash scripts/presstalk_host_discovery.sh \
@@ -56,6 +57,10 @@ SSH probe results without installing, repairing, or opening permission panes.
   --probe-ssh --timeout 3 \
   --json-output "$HOME/Desktop/presstalk-host-discovery.json"
 ```
+
+When chasing an unresolved host such as `s1`, add `--probe-arp-ssh` to run
+read-only `ssh-keyscan` against ARP candidate IPs. This records public SSH host
+key fingerprints without editing `known_hosts` and is candidate evidence only.
 
 To collect a matrix that includes local readiness plus SSH host blockers, run:
 

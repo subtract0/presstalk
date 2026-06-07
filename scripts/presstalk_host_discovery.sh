@@ -7,6 +7,7 @@ JSON_OUTPUT_PATH=""
 BONJOUR_ENABLED=1
 TAILSCALE_ENABLED=1
 ARP_ENABLED=1
+ARP_SSH_KEYSCAN_ENABLED=0
 BONJOUR_TIMEOUT="${PRESSTALK_BONJOUR_TIMEOUT:-3}"
 SSH_CONNECT_TIMEOUT="${PRESSTALK_SSH_CONNECT_TIMEOUT:-3}"
 PROBE_SSH=0
@@ -28,6 +29,7 @@ Options:
   --no-bonjour        Skip Bonjour browsing.
   --no-tailscale      Skip Tailscale status collection.
   --no-arp            Skip ARP table collection.
+  --probe-arp-ssh     Run read-only ssh-keyscan against ARP candidate IPs.
   --json              Write only machine-readable JSON to stdout.
   --json-output PATH  Also write machine-readable JSON to PATH.
   -h, --help          Show this help.
@@ -81,6 +83,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-arp)
       ARP_ENABLED=0
+      shift
+      ;;
+    --probe-arp-ssh)
+      ARP_SSH_KEYSCAN_ENABLED=1
       shift
       ;;
     --json)
@@ -167,6 +173,7 @@ plist_insert_int "bonjourTimeoutSeconds" "$BONJOUR_TIMEOUT"
 plist_insert_bool "sshProbeEnabled" "$([[ "$PROBE_SSH" == "1" ]] && echo true || echo false)"
 plist_insert_bool "tailscaleEnabled" "$([[ "$TAILSCALE_ENABLED" == "1" ]] && echo true || echo false)"
 plist_insert_bool "arpEnabled" "$([[ "$ARP_ENABLED" == "1" ]] && echo true || echo false)"
+plist_insert_bool "arpSSHKeyscanEnabled" "$([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo true || echo false)"
 plutil -insert sshConfig.hosts -array "$RESULT_PLIST" >/dev/null
 
 if [[ -f "$SSH_CONFIG" ]]; then
@@ -238,11 +245,16 @@ fi
 
 plutil -insert arp -dictionary "$RESULT_PLIST" >/dev/null
 plist_insert_bool "arp.enabled" "$([[ "$ARP_ENABLED" == "1" ]] && echo true || echo false)"
+plist_insert_bool "arp.sshKeyscanEnabled" "$([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo true || echo false)"
 plutil -insert arp.rawLines -array "$RESULT_PLIST" >/dev/null
 plutil -insert arp.entries -array "$RESULT_PLIST" >/dev/null
 if [[ "$ARP_ENABLED" == "1" ]]; then
   arp_bin="${PRESSTALK_ARP_PATH:-$(command -v arp 2>/dev/null || true)}"
+  ssh_keyscan_bin="${PRESSTALK_SSH_KEYSCAN_PATH:-$(command -v ssh-keyscan 2>/dev/null || true)}"
+  ssh_keygen_bin="${PRESSTALK_SSH_KEYGEN_PATH:-$(command -v ssh-keygen 2>/dev/null || true)}"
   plist_insert_string "arp.path" "${arp_bin:-missing}"
+  plist_insert_string "arp.sshKeyscanPath" "${ssh_keyscan_bin:-missing}"
+  plist_insert_string "arp.sshKeygenPath" "${ssh_keygen_bin:-missing}"
   if [[ -n "$arp_bin" && -x "$arp_bin" ]]; then
     arp_output="$RUN_TMPDIR/arp.out"
     arp_error="$RUN_TMPDIR/arp.err"
@@ -274,6 +286,53 @@ if [[ "$ARP_ENABLED" == "1" ]]; then
         plutil -insert mac -string "${mac:-unknown}" "$entry_plist" >/dev/null
         plutil -insert interface -string "${interface:-unknown}" "$entry_plist" >/dev/null
         plutil -insert rawLine -string "$line" "$entry_plist" >/dev/null
+        plutil -insert sshKeyscan -dictionary "$entry_plist" >/dev/null
+        plutil -insert sshKeyscan.enabled -bool "$([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo true || echo false)" "$entry_plist" >/dev/null
+        plutil -insert sshKeyscan.rawLines -array "$entry_plist" >/dev/null
+        plutil -insert sshKeyscan.fingerprints -array "$entry_plist" >/dev/null
+        if [[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" && -n "$ssh_keyscan_bin" && -x "$ssh_keyscan_bin" ]]; then
+          keyscan_output="$RUN_TMPDIR/keyscan-$RANDOM.out"
+          keyscan_error="$RUN_TMPDIR/keyscan-$RANDOM.err"
+          keyscan_status=0
+          set +e
+          "$ssh_keyscan_bin" -T "$SSH_CONNECT_TIMEOUT" -t ed25519,ecdsa,rsa "$ip" >"$keyscan_output" 2>"$keyscan_error"
+          keyscan_status=$?
+          set -e
+          plutil -insert sshKeyscan.exitStatus -integer "$keyscan_status" "$entry_plist" >/dev/null
+          plutil -insert sshKeyscan.error -string "$(single_line_file "$keyscan_error")" "$entry_plist" >/dev/null
+          if [[ -s "$keyscan_output" ]]; then
+            plutil -insert sshKeyscan.success -bool true "$entry_plist" >/dev/null
+          else
+            plutil -insert sshKeyscan.success -bool false "$entry_plist" >/dev/null
+          fi
+          while IFS= read -r keyscan_line; do
+            [[ -z "$keyscan_line" ]] && continue
+            plutil -insert sshKeyscan.rawLines -string "$keyscan_line" -append "$entry_plist" >/dev/null
+          done <"$keyscan_output"
+          if [[ -s "$keyscan_output" && -n "$ssh_keygen_bin" && -x "$ssh_keygen_bin" ]]; then
+            fingerprints_output="$RUN_TMPDIR/fingerprints-$RANDOM.out"
+            set +e
+            "$ssh_keygen_bin" -lf "$keyscan_output" >"$fingerprints_output" 2>/dev/null
+            set -e
+            while IFS= read -r fingerprint_line; do
+              [[ -z "$fingerprint_line" ]] && continue
+              fingerprint_plist="$RUN_TMPDIR/fingerprint-$RANDOM.plist"
+              plutil -create xml1 "$fingerprint_plist" >/dev/null
+              plutil -insert rawLine -string "$fingerprint_line" "$fingerprint_plist" >/dev/null
+              plutil -insert bits -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $1 }')" "$fingerprint_plist" >/dev/null
+              plutil -insert sha256 -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $2 }')" "$fingerprint_plist" >/dev/null
+              plutil -insert host -string "$(printf '%s\n' "$fingerprint_line" | awk '{ print $3 }')" "$fingerprint_plist" >/dev/null
+              key_type="$(printf '%s\n' "$fingerprint_line" | awk '{ print $4 }' | tr -d '()')"
+              plutil -insert keyType -string "${key_type:-unknown}" "$fingerprint_plist" >/dev/null
+              fingerprint_json="$(plutil -convert json -r -o - "$fingerprint_plist")"
+              plutil -insert sshKeyscan.fingerprints -json "$fingerprint_json" -append "$entry_plist" >/dev/null
+            done <"$fingerprints_output"
+          fi
+        else
+          plutil -insert sshKeyscan.exitStatus -integer 0 "$entry_plist" >/dev/null
+          plutil -insert sshKeyscan.success -bool false "$entry_plist" >/dev/null
+          plutil -insert sshKeyscan.error -string "$([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo "ssh-keyscan unavailable" || echo "disabled")" "$entry_plist" >/dev/null
+        fi
         entry_json="$(plutil -convert json -r -o - "$entry_plist")"
         plutil -insert arp.entries -json "$entry_json" -append "$RESULT_PLIST" >/dev/null
       fi
@@ -402,6 +461,7 @@ else
   echo "Bonjour: $([[ "$BONJOUR_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "Tailscale: $([[ "$TAILSCALE_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "ARP: $([[ "$ARP_ENABLED" == "1" ]] && echo enabled || echo disabled)"
+  echo "ARP SSH keyscan: $([[ "$ARP_SSH_KEYSCAN_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "SSH probe: $([[ "$PROBE_SSH" == "1" ]] && echo enabled || echo disabled)"
   if [[ -n "$JSON_OUTPUT_PATH" ]]; then
     echo "HostDiscoveryJSON: $JSON_OUTPUT_PATH"

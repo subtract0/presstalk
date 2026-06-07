@@ -129,6 +129,19 @@ visible as `com.am.presstalk.inputmethod.container` with
 fall back to copying unless Accessibility is trusted, the signing/trust state is
 repaired, or the input method can be selected by macOS.
 
+For that state, run the bundled signing repair wrapper from the logged-in
+desktop session:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
+```
+
+It does not open System Settings. It prepares/trusts the local signing identity,
+re-signs the bundled `PressTalkInputMethod.app` before the outer app, refreshes
+the installed input-method copy, then restarts PressTalk with no-pane flags. Add
+`--probe` when a focused-window production insertion check should run
+immediately after repair.
+
 Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the

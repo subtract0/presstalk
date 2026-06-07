@@ -25,6 +25,26 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   Fn smoke helper, bundled automated F5 smoke helper, bundled actual-bundle
   Accessibility probe, bundled production insertion probe helpers, and bundled
   input-method app/helpers with `PkgInfo`.
+- Current local builds after rc50 add the bundled
+  `presstalk-repair-local-signing.sh` helper. It runs with no-pane flags,
+  prepares a local signing identity, restarts PressTalk with stable signing,
+  signs the bundled `PressTalkInputMethod.app`, refreshes the installed copy in
+  `~/Library/Input Methods`, and can optionally run the production insertion
+  probe. This is the next repair path for mbp1 after the skipped signing trust
+  password prompt; it is not a reason to reopen privacy panes.
+- Current bootstrap signs the bundled input method before signing the outer app
+  and refreshes the installed input method before launch. On `studio1`, local
+  bootstrap reported `Stable local signing applied: 1`,
+  `Bundled input method signing applied: 1`, and
+  `Installed input method refreshed: 1`. The bundled and installed input method
+  then shared CDHash `a55ba84210b2dfbf2d82839807dabf8448801527` and
+  `Authority=PressTalk Local Development Code Signing`.
+- After that bootstrap change, the `studio1` production insertion probe still
+  succeeds from the running app process:
+  `Diagnostics/production-insertion-probe-2026-06-07T01-13-01-575Z.json`
+  reported `success=true`, `targetCaptureSuccess=true`,
+  `traceProductionMethod=input_method_notification`,
+  `traceInputMethodEnableNoEffect=false`, and `traceCopyFallback=false`.
 - A local development code-signing identity was created on `studio1`, and a
   local build now signs as `Authority=PressTalk Local Development Code Signing`
   instead of ad-hoc. The LaunchAgent was restarted against that stable-signed
@@ -683,6 +703,12 @@ Known current proof gaps:
   `targetCaptureFailureHint=accessibility_untrusted_copy_fallback`. Final
   restored status was `triggerKey=fn`, `triggerPath=Fn / Globe ready`, and
   `speechModel=Ready`.
+- Current local work after `v0.1.5-rc50` adds a bundled no-pane signing repair
+  wrapper and updates bootstrap to sign/refresh `PressTalkInputMethod.app`
+  alongside the outer app. This is intended for the mbp1
+  `input_method_enable_no_effect` blocker after a skipped signing-trust password
+  prompt. It has studio1 production-probe proof but still needs mbp1 desktop
+  repair plus production insertion probe proof before the goal is complete.
 - `v0.1.5-rc50` includes the listen-only event-tap fallback, WhisperKit cache
   layout/tokenizer prefetch fixes, no-automatic-prompt/no-auto-settings window
   fixes, settings status fixes for already-granted permission toggles, the mbp1

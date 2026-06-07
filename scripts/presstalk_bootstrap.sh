@@ -9,6 +9,9 @@ APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
 LOCAL_CODESIGN_HELPER="$APP_CONTENTS_DIR/Resources/create-presstalk-local-codesign-identity.sh"
 KARABINER_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-karabiner-fallback.sh"
 DISABLE_DICTATION_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-disable-system-dictation.sh"
+INPUT_METHOD_BUNDLE="$APP_CONTENTS_DIR/Resources/PressTalkInputMethod.app"
+INPUT_METHOD_BINARY="$INPUT_METHOD_BUNDLE/Contents/MacOS/presstalk-input-method"
+INSTALLED_INPUT_METHOD_BUNDLE="$HOME/Library/Input Methods/PressTalkInputMethod.app"
 PLIST="$HOME/Library/LaunchAgents/com.am.jarvistap.plist"
 WORKDIR="$HOME/Library/Application Support/JarvisTap"
 LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
@@ -22,6 +25,10 @@ PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-0}"
 PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE="${PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE:-0}"
 PRESSTALK_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-}}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED=0
+PRESSTALK_BOOTSTRAP_INPUT_METHOD_SIGNING_APPLIED=0
+PRESSTALK_BOOTSTRAP_INPUT_METHOD_REFRESHED=0
+PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD="${PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD:-1}"
+PRESSTALK_CODESIGN_IDENTITY="${PRESSTALK_CODESIGN_IDENTITY:-${CODESIGN_IDENTITY:-}}"
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
@@ -30,6 +37,39 @@ terminate_existing_presstalk() {
   local pids=""
   pids="$(ps -axo pid=,command= | awk '
     index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap") {
+      print $1
+    }
+  ')"
+  if [[ -z "$pids" ]]; then
+    return 0
+  fi
+
+  for pid in $pids; do
+    kill "$pid" >/dev/null 2>&1 || true
+  done
+
+  for _ in {1..20}; do
+    local remaining=""
+    for pid in $pids; do
+      if kill -0 "$pid" >/dev/null 2>&1; then
+        remaining="$remaining $pid"
+      fi
+    done
+    if [[ -z "$remaining" ]]; then
+      return 0
+    fi
+    sleep 0.2
+  done
+
+  for pid in $pids; do
+    kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
+terminate_existing_input_method() {
+  local pids=""
+  pids="$(ps -axo pid=,command= | awk '
+    index($0, "/PressTalkInputMethod.app/Contents/MacOS/presstalk-input-method") {
       print $1
     }
   ')"
@@ -92,6 +132,15 @@ fi
 
 sign_app() {
   local identity="$1"
+  if [[ -d "$INPUT_METHOD_BUNDLE" ]]; then
+    if [[ ! -x "$INPUT_METHOD_BINARY" ]]; then
+      echo "Bundled input method signing skipped: executable missing at $INPUT_METHOD_BINARY" >&2
+      return 1
+    fi
+    codesign --force --sign "$identity" --timestamp=none "$INPUT_METHOD_BINARY" || return 1
+    codesign --force --sign "$identity" --timestamp=none "$INPUT_METHOD_BUNDLE" || return 1
+    PRESSTALK_BOOTSTRAP_INPUT_METHOD_SIGNING_APPLIED=1
+  fi
   codesign --force --sign "$identity" --timestamp=none --identifier "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" "$APP_BINARY" &&
     codesign --force --sign "$identity" --timestamp=none "$APP_BUNDLE"
 }
@@ -120,13 +169,17 @@ resign_with_local_identity_if_possible() {
   fi
 
   local output identity_hash
-  if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
-    echo "$output"
-    echo "Stable local signing skipped: could not prepare local code-signing identity."
-    adhoc_resign_if_needed
-    return 0
+  if [[ -n "$PRESSTALK_CODESIGN_IDENTITY" ]]; then
+    identity_hash="$PRESSTALK_CODESIGN_IDENTITY"
+  else
+    if ! output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+      echo "$output"
+      echo "Stable local signing skipped: could not prepare local code-signing identity."
+      adhoc_resign_if_needed
+      return 0
+    fi
+    identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
   fi
-  identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
   if [[ -z "$identity_hash" ]]; then
     echo "$output"
     echo "Stable local signing skipped: helper did not report an identity hash."
@@ -145,6 +198,28 @@ resign_with_local_identity_if_possible() {
 }
 
 resign_with_local_identity_if_possible
+
+refresh_installed_input_method_if_possible() {
+  if [[ "$PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD" != "1" ]]; then
+    echo "Input method refresh skipped: PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD=$PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD"
+    return 0
+  fi
+  if [[ ! -d "$INPUT_METHOD_BUNDLE" ]]; then
+    echo "Input method refresh skipped: bundled input method missing."
+    return 0
+  fi
+
+  terminate_existing_input_method
+  mkdir -p "$(dirname "$INSTALLED_INPUT_METHOD_BUNDLE")"
+  rm -rf "$INSTALLED_INPUT_METHOD_BUNDLE"
+  ditto "$INPUT_METHOD_BUNDLE" "$INSTALLED_INPUT_METHOD_BUNDLE"
+  /usr/bin/xattr -dr com.apple.quarantine "$INSTALLED_INPUT_METHOD_BUNDLE" >/dev/null 2>&1 || true
+  /usr/bin/xattr -dr com.apple.provenance "$INSTALLED_INPUT_METHOD_BUNDLE" >/dev/null 2>&1 || true
+  PRESSTALK_BOOTSTRAP_INPUT_METHOD_REFRESHED=1
+  echo "Installed PressTalk input method refreshed."
+}
+
+refresh_installed_input_method_if_possible
 
 if [[ -x "$KARABINER_HELPER" ]]; then
   /bin/bash "$KARABINER_HELPER" --disable >/dev/null 2>&1 || true
@@ -281,6 +356,8 @@ Installed:
 - Bundle identifier: $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER
 - Stable local signing requested: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
 - Stable local signing applied: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED
+- Bundled input method signing applied: $PRESSTALK_BOOTSTRAP_INPUT_METHOD_SIGNING_APPLIED
+- Installed input method refreshed: $PRESSTALK_BOOTSTRAP_INPUT_METHOD_REFRESHED
 - Open permission panes: $PRESSTALK_OPEN_PERMISSION_PANES
 - Auto-show setup window: $PRESSTALK_AUTO_SHOW_SETUP_WINDOW
 - Production insertion probe: $PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE

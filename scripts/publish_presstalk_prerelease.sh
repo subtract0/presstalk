@@ -46,6 +46,22 @@ attempt. It prints a clear signing-trust message before macOS may ask for the
 user's Mac login password, keeps a short timeout over SSH, and uses a longer
 timeout in the logged-in desktop session.
 
+The app bundle now includes presstalk-repair-local-signing.sh. Run it from the
+logged-in desktop session when a Mac skipped the signing trust password prompt:
+it prepares the local signing identity, restarts PressTalk with
+PRESSTALK_OPEN_PERMISSION_PANES=0 and PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0, signs
+the bundled PressTalkInputMethod.app before the outer app, refreshes the copy in
+~/Library/Input Methods, and can optionally run the production insertion probe.
+This is a signing/input-method repair path; it is not a reason to reopen
+Microphone, Input Monitoring, or Accessibility panes.
+
+Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
+re-signs PressTalk.app, then refreshes the installed input-method bundle before
+launching the app. Its summary reports both Bundled input method signing applied
+and Installed input method refreshed. This targets the mbp1 rc50 shape where the
+running app received the production insertion notification but TIS enable had no
+visible effect on the ad-hoc input-method install.
+
 While blocked on macOS privacy approvals, PressTalk keeps a quiet setup retry
 timer running. Startup/setup checks use read-only preflights and real listener
 capability probes by default; the setup window is not auto-shown unless

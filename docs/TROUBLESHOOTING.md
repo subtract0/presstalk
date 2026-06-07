@@ -197,3 +197,24 @@ attempt. If the helper prints `Existing PressTalk local code-signing identity
 remains untrusted`, run it from the logged-in desktop session and approve the
 Mac login-password signing trust prompt. This is a signing/trust repair step,
 not a reason to reopen Microphone, Input Monitoring, or Accessibility panes.
+
+The app bundle also includes a repair wrapper for that exact state:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
+```
+
+It keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
+`PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
+restarts PressTalk with stable signing, signs the bundled
+`PressTalkInputMethod.app`, and refreshes the installed copy in
+`~/Library/Input Methods`. Add `--probe` to run the production insertion probe
+after repair:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --probe
+```
+
+If this is run over SSH and fails, run the same command in the logged-in desktop
+session. macOS often cannot show the signing trust prompt to an SSH-only
+session.

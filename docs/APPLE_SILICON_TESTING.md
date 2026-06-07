@@ -75,6 +75,28 @@ no user interaction is possible. In that case the app still starts, but
 requested but not applied. That is a signing/identity blocker, not a reason to
 open privacy panes repeatedly.
 
+If a Mac skipped the signing trust password prompt, repair it from the logged-in
+desktop session rather than reopening permission panes:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
+```
+
+The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
+`PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
+restarts PressTalk with stable signing, signs the bundled
+`PressTalkInputMethod.app`, refreshes the installed copy in
+`~/Library/Input Methods`, and preserves the current trigger key. To verify the
+running app insertion path immediately after repair:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --probe
+```
+
+The normal bootstrap summary now also reports `Bundled input method signing
+applied` and `Installed input method refreshed`. On mbp1, those fields must be
+`1` before treating the repaired input-method path as tested.
+
 ## Runtime Checks
 
 Approve only fresh macOS prompts that are not already granted for the current

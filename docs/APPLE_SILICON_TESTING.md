@@ -63,7 +63,8 @@ ready:
 /bin/bash scripts/presstalk_release_proof_gate.sh \
   --matrix "$HOME/Desktop/presstalk-readiness-matrix.json" \
   --require local --require s1 --require mbp1-tb \
-  --exclude "studio2=no attached microphone"
+  --exclude "studio2=no attached microphone" \
+  --json-output "$HOME/Desktop/presstalk-proof-gate.json"
 ```
 
 It does not open System Settings or start signing repair. It reports Apple

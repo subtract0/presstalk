@@ -205,7 +205,9 @@ The bundle also includes presstalk-release-proof-gate.sh. It consumes the
 readiness matrix and exits 0 only when every required target is reachable,
 reports readiness, has physical STT smoke ready, and has active-field smoke
 ready. This makes the current cross-machine proof gaps fail mechanically instead
-of relying on release-status prose.
+of relying on release-status prose. It also supports --json-output PATH to save
+a parseable proof result with required targets, excluded targets, per-target
+failures, failureCount, and proven=true/false.
 
 The app bundle also includes presstalk-verify-repair-result.sh. This is a
 read-only post-repair verifier for SSH checks: it reports the current runtime

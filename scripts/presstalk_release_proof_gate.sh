@@ -2,6 +2,7 @@
 set -euo pipefail
 
 MATRIX_JSON=""
+JSON_OUTPUT_PATH=""
 REQUIRED_TARGETS=()
 EXCLUDED_TARGETS=()
 
@@ -18,6 +19,7 @@ Options:
   --require TARGET     Required target alias or machine host. Repeatable.
   --exclude TARGET=WHY Record an intentionally excluded target and reason.
                        This is informational and does not make release proof.
+  --json-output PATH   Also write a machine-readable proof-gate result.
   -h, --help           Show this help.
 EOF
 }
@@ -46,6 +48,14 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       EXCLUDED_TARGETS+=("$2")
+      shift 2
+      ;;
+    --json-output)
+      JSON_OUTPUT_PATH="${2:-}"
+      if [[ -z "$JSON_OUTPUT_PATH" ]]; then
+        echo "Missing value for --json-output" >&2
+        exit 2
+      fi
       shift 2
       ;;
     -h|--help)
@@ -87,6 +97,42 @@ bool_ready() {
   esac
 }
 
+plist_insert_string() {
+  local plist="$1"
+  local key="$2"
+  local value="$3"
+  /usr/libexec/PlistBuddy -c "Add :$key string $value" "$plist" >/dev/null
+}
+
+plist_insert_integer() {
+  local plist="$1"
+  local key="$2"
+  local value="$3"
+  /usr/libexec/PlistBuddy -c "Add :$key integer $value" "$plist" >/dev/null
+}
+
+plist_insert_bool() {
+  local plist="$1"
+  local key="$2"
+  local value="$3"
+  if bool_ready "$value"; then
+    /usr/libexec/PlistBuddy -c "Add :$key bool true" "$plist" >/dev/null
+  else
+    /usr/libexec/PlistBuddy -c "Add :$key bool false" "$plist" >/dev/null
+  fi
+}
+
+new_plist() {
+  local plist="$1"
+  rm -f "$plist"
+  /usr/libexec/PlistBuddy -c "Clear dict" "$plist" >/dev/null
+}
+
+RUN_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-proof-gate.XXXXXX")"
+RESULT_PLIST="$RUN_TMPDIR/result.plist"
+trap 'rm -rf "$RUN_TMPDIR"' EXIT
+new_plist "$RESULT_PLIST"
+
 target_count="$(json_value targets)"
 if [[ -z "$target_count" || ! "$target_count" =~ ^[0-9]+$ ]]; then
   echo "Result: not proven"
@@ -112,6 +158,20 @@ echo "PressTalk release proof gate"
 echo "Matrix: $MATRIX_JSON"
 echo
 
+plist_insert_integer "$RESULT_PLIST" "schemaVersion" "1"
+plist_insert_string "$RESULT_PLIST" "matrix" "$MATRIX_JSON"
+/usr/libexec/PlistBuddy -c "Add :requiredTargets array" "$RESULT_PLIST" >/dev/null
+for required in "${REQUIRED_TARGETS[@]}"; do
+  /usr/libexec/PlistBuddy -c "Add :requiredTargets: string $required" "$RESULT_PLIST" >/dev/null
+done
+/usr/libexec/PlistBuddy -c "Add :excludedTargets array" "$RESULT_PLIST" >/dev/null
+if [[ "${#EXCLUDED_TARGETS[@]}" -gt 0 ]]; then
+  for excluded in "${EXCLUDED_TARGETS[@]}"; do
+    /usr/libexec/PlistBuddy -c "Add :excludedTargets: string $excluded" "$RESULT_PLIST" >/dev/null
+  done
+fi
+/usr/libexec/PlistBuddy -c "Add :targets array" "$RESULT_PLIST" >/dev/null
+
 if [[ "${#EXCLUDED_TARGETS[@]}" -gt 0 ]]; then
   echo "Excluded targets"
   for excluded in "${EXCLUDED_TARGETS[@]}"; do
@@ -121,10 +181,20 @@ if [[ "${#EXCLUDED_TARGETS[@]}" -gt 0 ]]; then
 fi
 
 failures=0
+result_index=0
 for required in "${REQUIRED_TARGETS[@]}"; do
+  /usr/libexec/PlistBuddy -c "Add :targets:$result_index dict" "$RESULT_PLIST" >/dev/null
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:required" "$required"
+  /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures array" "$RESULT_PLIST" >/dev/null
+
   if ! index="$(find_target_index "$required")"; then
     echo "FAIL $required: missing from matrix"
+    plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "false"
+    plist_insert_string "$RESULT_PLIST" "targets:$result_index:target" "missing"
+    plist_insert_string "$RESULT_PLIST" "targets:$result_index:machineHost" "missing"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string missing_from_matrix" "$RESULT_PLIST" >/dev/null
     failures=$((failures + 1))
+    result_index=$((result_index + 1))
     continue
   fi
 
@@ -139,14 +209,17 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   target_failures=0
   if [[ "$status" != "ready_reported" ]]; then
     echo "FAIL $required: status=$status target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string status_not_ready_reported" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
   if ! bool_ready "$reachable"; then
     echo "FAIL $required: reachable=${reachable:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string not_reachable" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
   if ! bool_ready "$physical"; then
     echo "FAIL $required: physicalSTTSmokeReady=${physical:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string physical_stt_not_ready" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
   if ! bool_ready "$active"; then
@@ -154,22 +227,46 @@ for required in "${REQUIRED_TARGETS[@]}"; do
     if [[ -n "$next_action" ]]; then
       echo "  nextAction: $next_action"
     fi
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string active_field_not_ready" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
 
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:target" "${target:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:machineHost" "${machine_host:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:status" "${status:-unknown}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:reachable" "${reachable:-false}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:physicalSTTSmokeReady" "${physical:-false}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:activeFieldSmokeReady" "${active:-false}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:nextAction" "${next_action:-unknown}"
+
   if [[ "$target_failures" -eq 0 ]]; then
     echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown}"
+    plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "true"
   else
+    plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "false"
     failures=$((failures + target_failures))
   fi
+  result_index=$((result_index + 1))
 done
 
 echo
 if [[ "$failures" -eq 0 ]]; then
+  plist_insert_bool "$RESULT_PLIST" "proven" "true"
+  plist_insert_integer "$RESULT_PLIST" "failureCount" "$failures"
+  if [[ -n "$JSON_OUTPUT_PATH" ]]; then
+    plutil -convert json -o "$JSON_OUTPUT_PATH" "$RESULT_PLIST"
+    echo "ProofGateJSON: $JSON_OUTPUT_PATH"
+  fi
   echo "Result: proven"
   exit 0
 fi
 
+plist_insert_bool "$RESULT_PLIST" "proven" "false"
+plist_insert_integer "$RESULT_PLIST" "failureCount" "$failures"
+if [[ -n "$JSON_OUTPUT_PATH" ]]; then
+  plutil -convert json -o "$JSON_OUTPUT_PATH" "$RESULT_PLIST"
+  echo "ProofGateJSON: $JSON_OUTPUT_PATH"
+fi
 echo "Result: not proven"
 echo "Failures: $failures"
 exit 1

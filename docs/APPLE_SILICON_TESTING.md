@@ -20,10 +20,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc61/PressTalk-0.1.5-rc61-macos-arm64.zip
-echo "b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d  $tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc61-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc62-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc62/PressTalk-0.1.5-rc62-macos-arm64.zip
+echo "dd70d4f4f801b3a41aba2b6add6ed87547c3d09f4838dee4c4adcc80d235dcc4  $tmpdir/PressTalk-0.1.5-rc62-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc62-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -35,7 +35,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d
+dd70d4f4f801b3a41aba2b6add6ed87547c3d09f4838dee4c4adcc80d235dcc4
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -67,6 +67,8 @@ The cask should:
 - leave macOS permission panes closed during bootstrap
 - pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
   macOS privacy panes during no-pane smoke runs
+- write diagnostics quietly when `PRESSTALK_OPEN_PERMISSION_PANES=0`, without
+  activating Finder
 
 When bootstrap is run over SSH and `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` was not
 set explicitly, it only reuses an already-valid PressTalk local signing identity.

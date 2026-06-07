@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc61`
-- Commit: `06be461f87b8cbf255340f65d559888701346430`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc61`
-- Asset: `PressTalk-0.1.5-rc61-macos-arm64.zip`
-- SHA-256: `b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d`
+- Tag: `v0.1.5-rc62`
+- Commit: `bf063347999933277483d40e0adff29f2fea6ec4`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc62`
+- Asset: `PressTalk-0.1.5-rc62-macos-arm64.zip`
+- SHA-256: `dd70d4f4f801b3a41aba2b6add6ed87547c3d09f4838dee4c4adcc80d235dcc4`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,31 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc62` suppresses Finder reveal on diagnostics export during no-pane
+  runs. When `PRESSTALK_OPEN_PERMISSION_PANES=0`, Export Diagnostics writes the
+  diagnostics file, logs its path, and shows a short HUD message without
+  activating another window. Normal interactive runs can still reveal the file.
+- The `v0.1.5-rc62` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:dd70d4f4f801b3a41aba2b6add6ed87547c3d09f4838dee4c4adcc80d235dcc4`,
+  matching the local `dist/PressTalk-0.1.5-rc62-macos-arm64.zip`. The
+  `v0.1.5-rc62` tag points at
+  `bf063347999933277483d40e0adff29f2fea6ec4`.
+- After rc62 packaging, `studio1` was restored to the stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The installed
+  binary contains the quiet diagnostics strings, runtime status is still
+  `speechModel=Ready`, `inputListener=hid:listen_only`,
+  `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `inputMethodFallbackStatus=ready`, and the
+  bundled verifier exits `0` using the latest successful production insertion
+  probe.
+- On `mbp1`, rc62 was downloaded from GitHub over SSH with the expected SHA,
+  installed with no-pane flags, and bootstrapped through the `existing` signing
+  path without a trust prompt. The quiet diagnostics strings are present and
+  runtime remains transcription-ready, but active-field insertion is still
+  unproven because `adHocSigned=true` and
+  `inputMethodFallbackStatus=recognized_disabled`. The correct next action is
+  still logged-in desktop `Repair Signing`, not another permission pass.
 - `v0.1.5-rc61` adds a bundled read-only
   `presstalk-verify-repair-result.sh` helper. It reports the current runtime
   signing/input-method state plus the latest production insertion probe and

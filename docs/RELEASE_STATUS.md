@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc82`
-- Commit: `f6f327048bc32888d230d18863f4b71baa8cf5f2`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc82`
-- Asset: `PressTalk-0.1.5-rc82-macos-arm64.zip`
-- SHA-256: `5351a14a91bef8ed370f9f23a5a2000ac0f4c2876e9cc9d0428226dd433bd727`
+- Tag: `v0.1.5-rc83`
+- Commit: `94ed53823fcceb4e55d6e035f50df2b5b3e3607c`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc83`
+- Asset: `PressTalk-0.1.5-rc83-macos-arm64.zip`
+- SHA-256: `2605a87a945e2811b61a242fe35b0394466f8599eec0f84f42b6ed8772d4ddad`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -24,6 +24,39 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
+- `v0.1.5-rc83` is the current public prerelease smoke artifact. It includes the
+  `Option + Space` registered-hotkey default, manual physical-trigger smoke
+  `smokeVersion=4` with `expectedTriggerProof`, and readiness/smoke collectors
+  that surface the latest manual physical-trigger JSON separately from production
+  insertion proof.
+- The `v0.1.5-rc83` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:2605a87a945e2811b61a242fe35b0394466f8599eec0f84f42b6ed8772d4ddad`,
+  matching the local `dist/PressTalk-0.1.5-rc83-macos-arm64.zip`. The
+  `v0.1.5-rc83` tag points at
+  `94ed53823fcceb4e55d6e035f50df2b5b3e3607c`.
+- After rc83 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and
+  `PRESSTALK_TRIGGER_KEY=option_space`. The restored runtime reports
+  `inputListener=carbon:registered`,
+  `inputMonitoringStatus=registered_hotkey_ready`, `speechModel=Ready`,
+  `activeFieldInsertionStatus=ready_input_method`, and trigger path
+  `Option + Space ready`.
+- The latest current-signed-app production insertion probe on `studio1` reported
+  `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification` at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T21-31-27-808Z.json`.
+  The same readiness report still shows
+  `latestManualPhysicalTriggerSmoke.path=none`; physical `Option + Space`
+  STT/paste proof remains the studio1 blocker.
+- The latest rc83 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc83-20260607T213316Z.json`
+  required `local` and `mbp1-tb`. It reports `local` as ready for physical
+  dictation smoke and `mbp1-tb` as reachable with speech ready but
+  `activeFieldSmokeReady=false`. The matching rc83 proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc83-20260607T213327Z.json`
+  is still `proven=false` with `failureCount=1`, failing only `mbp1-tb` for
+  `active_field_not_ready`.
 - `v0.1.5-rc82` adds read-only `known_hosts` fingerprint matching to the
   bundled host-discovery helper. The helper now records local known-host
   fingerprints and adds `knownHostMatches` to scanned ARP fingerprints that
@@ -285,12 +318,12 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
   The next action is logged-in desktop `Repair Signing`; do not reopen privacy
   panes for this state.
-- Current rc82 readiness matrix command:
+- Last rc82 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1-tb --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution;
   `mbp1-tb` is `ready_reported` with `activeFieldSmokeReady=false` and next
-  action `Repair Signing`. These are current host/matrix blockers, not app
+  action `Repair Signing`. These were host/matrix blockers, not app
   regressions. `studio2` remains excluded from microphone/STT smoke until a
   microphone is attached.
 - The rc82 proof gate run against required `local`, `s1`, and `mbp1-tb`,

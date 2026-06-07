@@ -54,7 +54,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc71 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc72 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
@@ -62,8 +62,12 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   without a trust prompt, so there was no signing-trust prompt. After warm-up,
   readiness reports `speechModel=Ready`, `inputPipelineReady=true`,
   `microphoneHardwareDetected=true`, and
-  `activeFieldInsertionStatus=needs_signing_repair`.
-- Current rc71 readiness matrix command:
+  `activeFieldInsertionStatus=needs_signing_repair`. The read-only repair
+  verifier reports `Result: not proven`,
+  `inputMethodFallbackStatus=recognized_disabled`, and
+  `targetCaptureFailureHint=input_method_enable_no_effect`; the next action is
+  logged-in desktop `Repair Signing`, not another permission grant.
+- Current rc72 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -73,6 +77,10 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
+- A focused rc72 `--local --host mbp1-tb` matrix reports `local` with
+  `physicalSTTSmokeReady=true` and `activeFieldSmokeReady=true`, and `mbp1-tb`
+  with `physicalSTTSmokeReady=true` but `activeFieldSmokeReady=false` pending
+  the same logged-in desktop signing repair.
 - Bonjour SSH discovery advertises `mba1`, `studio1`, `studio2`, and `mbp1`,
   but no `s1`. `mba1` resolves through Bonjour as `mba1.local:22`, but strict
   SSH remains blocked because the host key is not trusted locally. Observed

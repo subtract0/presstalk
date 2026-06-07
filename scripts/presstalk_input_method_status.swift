@@ -242,10 +242,11 @@ if options.enable {
 
 private var selectStatus: Any = "not_requested"
 if options.select {
-    if enabledSources.isEmpty {
-        selectStatus = allSources.isEmpty ? "source_not_recognized" : "source_not_enabled"
+    if enabledSources.isEmpty && allSources.isEmpty {
+        selectStatus = "source_not_recognized"
     } else {
-        let source = preferredSelectableSource(from: enabledSources) ?? enabledSources[0]
+        let source = preferredSelectableSource(from: enabledSources) ?? enabledSources.first ??
+            preferredSelectableSource(from: allSources) ?? allSources[0]
         selectStatus = Int(TISSelectInputSource(source))
         enabledSources = findPressTalkSources(includeAllInstalled: false)
         allSources = findPressTalkSources(includeAllInstalled: true)

@@ -227,6 +227,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
     private var disableStatus: Any = "not_requested"
     private var wasEnabledBeforeProbe = false
     private var pressTalkSourceBeforeProbe: [String: Any] = [:]
+    private var prepareFailureReason = "input_method_not_selectable"
 
     init(options: Options) {
         self.options = options
@@ -237,7 +238,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
 
         guard prepareInputMethod() else {
-            finish(success: false, reason: "input_method_not_selectable")
+            finish(success: false, reason: prepareFailureReason)
             return
         }
 
@@ -258,6 +259,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
         let bundleURL = installedBundleURL()
         guard FileManager.default.fileExists(atPath: bundleURL.path) else {
             registerStatus = "bundle_missing"
+            prepareFailureReason = "input_method_bundle_missing"
             return false
         }
 
@@ -268,21 +270,28 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
 
         var allSources = findPressTalkSources(includeAllInstalled: true)
         guard let allSource = preferredSelectableSource(from: allSources) ?? allSources.first else {
+            prepareFailureReason = "input_method_source_not_recognized"
             return false
         }
         pressTalkSourceBeforeProbe = sourceSummary(allSource)
 
         if enabledBefore.isEmpty {
             enableStatus = Int(TISEnableInputSource(allSource))
+            if "\(enableStatus)" != "0" {
+                prepareFailureReason = "input_method_enable_failed"
+                return false
+            }
         } else {
             enableStatus = "already_enabled"
         }
 
         let enabledSources = findPressTalkSources(includeAllInstalled: false)
-        guard let enabledSource = preferredSelectableSource(from: enabledSources) ?? enabledSources.first else {
+        let enabledSource = preferredSelectableSource(from: enabledSources) ?? enabledSources.first ?? allSource
+        selectStatus = Int(TISSelectInputSource(enabledSource))
+        if "\(selectStatus)" != "0" {
+            prepareFailureReason = "input_method_select_failed"
             return false
         }
-        selectStatus = Int(TISSelectInputSource(enabledSource))
 
         allSources = findPressTalkSources(includeAllInstalled: true)
         if let selected = allSources.first(where: { boolProperty($0, kTISPropertyInputSourceIsSelected) == true }),
@@ -290,7 +299,7 @@ private final class ClientProbeApp: NSObject, NSApplicationDelegate {
             return true
         }
 
-        return Int("\(selectStatus)") == 0
+        return true
     }
 
     private func openProbeWindow() {

@@ -727,6 +727,17 @@ Known current proof gaps:
   `Stable local signing requested: 1` and `Stable local signing applied: 0`.
   Treat that as a signing/identity caveat for remote installs, not as a missing
   microphone/input permission.
+- `mbp1` rc44 input-method fallback is not yet a proven insertion path. After
+  installing the bundled `PressTalkInputMethod.app`, status reported
+  `registerStatus=0`, `recognizedSourceCount=1`,
+  `source.id=com.am.presstalk.inputmethod.container`,
+  `type=TISTypeKeyboardInputMethodWithoutModes`, and `selectCapable=true`, but
+  `recognizedEnabledSourceCount=0`. A patched reversible client probe then
+  reported `success=false`, `reason=input_method_select_failed`,
+  `enableStatus=0`, `selectStatus=-50`, `restoreStatus=0`, and
+  `disableStatus=0`. This means macOS recognizes the input method but refuses
+  selection on the ad-hoc mbp1 install; active-field insertion remains blocked
+  there unless Accessibility is trusted or input-method selectability is fixed.
 - Karabiner-Elements is installed on `studio1`, but `karabiner_cli` only exposes
   profile/device/variable management. It does not provide a direct command to
   emit a virtual Cmd-V paste event, so it is not currently a no-Accessibility

@@ -114,6 +114,14 @@ If `reason=input_method_not_selectable`, TIS did not expose the installed input
 method as an enable/select-capable source. In that state, manual notification
 probes are not meaningful yet because no focused client can be attached.
 
+If `reason=input_method_select_failed` with `selectStatus=-50`, macOS recognized
+the input method but refused to select it. On `mbp1`, this happened with the
+ad-hoc rc44 input-method bundle: `TISRegisterInputSource` returned `0`,
+`recognizedSourceCount=1`, and `TISEnableInputSource` returned `0`, but the
+enabled-source requery stayed empty and direct `TISSelectInputSource` returned
+`-50`. In that state production dictation will fall back to copying unless
+Accessibility is trusted or the input method can be selected by macOS.
+
 Current studio1 evidence after switching to the no-mode source shape:
 `TISRegisterInputSource` returns `0`, the installed bundle verifies with
 `Authority=PressTalk Local Development Code Signing`, LaunchServices can see the

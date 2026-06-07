@@ -264,6 +264,12 @@ posts a payload into a local text view, and restores the original input source:
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-input-method-client-probe.swift" --json
 ```
 
+If the client probe reports `reason=input_method_select_failed` with
+`selectStatus=-50`, macOS recognized the input method but refused to select it.
+That is an active-field insertion blocker: dictation may still transcribe, but
+without Accessibility trust the app will copy instead of inserting into the
+focused field.
+
 After macOS recognizes and you select `PressTalk Input Method`, focus an
 editable text field and run:
 

@@ -4476,10 +4476,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         allSources = pressTalkInputMethodSources(includeAllInstalled: false)
-        guard let enabledSource = preferredPressTalkInputMethodSource(from: allSources) else {
-            traceLogger.log("Input method insertion unavailable reason=source_not_enabled")
-            disableIfEnabledOnlyForInsertion([candidate])
-            return nil
+        let enabledSource = preferredPressTalkInputMethodSource(from: allSources) ?? candidate
+        if allSources.isEmpty {
+            traceLogger.log("Input method insertion selecting recognized source because enabled-source requery is empty")
         }
 
         let selectStatus = TISSelectInputSource(enabledSource)

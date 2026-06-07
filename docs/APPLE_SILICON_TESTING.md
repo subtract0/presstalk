@@ -11,7 +11,7 @@ Verify that a fresh machine can install PressTalk with minimal thinking:
 
 1. install
 2. approve permissions if the machine has not already granted PressTalk
-3. hold `Fn / Globe`
+3. hold `Option`
 4. dictate
 
 ## Machine Readiness Preflight
@@ -110,7 +110,7 @@ mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn \
+  PRESSTALK_TRIGGER_KEY=option \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -255,7 +255,7 @@ PressTalk identity:
 - PressTalk input monitoring
 - PressTalk accessibility
 
-Karabiner is not required for the default `Fn / Globe` path. Do not install or
+Karabiner is not required for the default `Option` path. Do not install or
 approve Karabiner during the core smoke unless you are explicitly testing the
 optional legacy `F5` fallback.
 
@@ -276,18 +276,20 @@ privacy panes:
 PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
 PRESSTALK_OPEN_PERMISSION_PANES=0 \
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-PRESSTALK_TRIGGER_KEY=fn \
+PRESSTALK_TRIGGER_KEY=option \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
-Karabiner is only needed when testing the optional `F5` fallback path. The default
-trigger is native `Fn / Globe`.
+Karabiner is only needed when testing the optional `F5` fallback path. The
+default trigger is `Option`. `Fn / Globe` remains supported where the keyboard
+emits a normal Fn modifier event, but do not treat an inert Fn key as a
+permission problem.
 
 For a fresh machine, keep bootstrap quiet and inspect diagnostics before opening
 any macOS privacy panes manually:
 
 ```bash
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=fn \
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=option \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -296,17 +298,17 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_T
 The default LaunchAgent value is:
 
 ```bash
-PRESSTALK_TRIGGER_KEY=fn
+PRESSTALK_TRIGGER_KEY=option
 ```
 
 Supported values:
 
-- `fn`
 - `option`
 - `left_option`
 - `right_option`
-- `f5`
+- `fn`
 - `trackpad_hold`
+- `f5`
 
 ## Smoke Test
 
@@ -337,7 +339,7 @@ Expected readiness fields:
 - `runtime.inputPipelineReady=true`
 - `runtime.inputListener` is not `failed`
 - `status.speechModel=Ready`
-- `status.triggerPath=Fn / Globe ready`
+- `status.triggerPath=Either Option ready`
 
 Then run the bundled manual smoke helper:
 
@@ -379,7 +381,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-automated-f5-smoke.swift"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn \
+  PRESSTALK_TRIGGER_KEY=option \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 

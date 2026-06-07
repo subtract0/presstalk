@@ -16,7 +16,14 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `swift build -c release` succeeds.
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
-- `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `scripts/install_jarvistap_launchd.sh` now defaults to `PRESSTALK_TRIGGER_KEY=option`.
+- Current studio1 manual trigger triage: physical F5/Mic generated
+  `systemDefined subtype=7 mediaKeyCode=0` debug events and system beeps but no
+  PressTalk capture because the app was configured for Fn; physical Fn did not
+  emit the expected modifier event in the trace. The local studio1 LaunchAgent
+  has therefore been switched to `PRESSTALK_TRIGGER_KEY=option` for the next
+  meatspace smoke test. Treat Option as the primary portability route until Fn
+  is proven per keyboard and keep F5/Mic as a legacy fallback.
 - `v0.1.5-rc82` adds read-only `known_hosts` fingerprint matching to the
   bundled host-discovery helper. The helper now records local known-host
   fingerprints and adds `knownHostMatches` to scanned ARP fingerprints that

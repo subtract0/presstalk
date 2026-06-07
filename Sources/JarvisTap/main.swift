@@ -132,10 +132,10 @@ struct JarvisTapConfig {
         let triggerKeyValue =
             env["PRESSTALK_TRIGGER_KEY"] ??
             env["JARVISTAP_TRIGGER_KEY"] ??
-            "fn"
+            "option"
         let triggerKey =
             JarvisTapSettingsStore.TriggerKeyOption(rawValue: triggerKeyValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ??
-            .fn
+            .option
 
         let enableNativeMicrophoneKey =
             env["PRESSTALK_ENABLE_NATIVE_MICROPHONE_KEY"] == "1" ||
@@ -2244,7 +2244,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func configureKarabinerFallback(enabled: Bool) {
         if enabled && settingsStore.triggerKey != .f5 {
             traceLogger.log("Karabiner fallback enable blocked reason=trigger_key_not_f5 selected=\(settingsStore.triggerKey.rawValue)")
-            present(.error("Choose F5 / Mic as the trigger before enabling the F5 fallback."))
+            present(.error("Choose Legacy F5 / Mic as the trigger before enabling the F5 fallback."))
             refreshRuntimeStatusUI()
             return
         }

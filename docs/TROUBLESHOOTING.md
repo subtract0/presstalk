@@ -86,7 +86,7 @@ legacy privacy identity instead of reopening settings:
 PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
 PRESSTALK_OPEN_PERMISSION_PANES=0 \
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-PRESSTALK_TRIGGER_KEY=fn \
+PRESSTALK_TRIGGER_KEY=option \
   "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -111,7 +111,7 @@ restart the LaunchAgent without opening panes:
 
 ```bash
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+  PRESSTALK_TRIGGER_KEY=option bash scripts/install_jarvistap_launchd.sh
 ```
 
 Only when intentionally preparing a fresh machine, and only with the user's
@@ -130,7 +130,7 @@ for bundle_id in com.am.presstalk com.am.jarvistap; do
   tccutil reset Accessibility "$bundle_id"
 done
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+  PRESSTALK_TRIGGER_KEY=option bash scripts/install_jarvistap_launchd.sh
 ```
 
 Current bootstrap helpers try to stabilize local signing automatically. They
@@ -139,7 +139,7 @@ create or reuse a self-signed local development identity, re-sign
 debugging:
 
 ```bash
-PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 PRESSTALK_TRIGGER_KEY=fn \
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 PRESSTALK_TRIGGER_KEY=option \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -153,7 +153,7 @@ CDHash.
 ```bash
 bash scripts/create_presstalk_local_codesign_identity.sh
 PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" bash scripts/build_jarvistap.sh
-PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+PRESSTALK_TRIGGER_KEY=option bash scripts/install_jarvistap_launchd.sh
 ```
 
 If you need to force the local compatibility identity, make it explicit:
@@ -163,7 +163,7 @@ PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
 PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" \
   bash scripts/build_jarvistap.sh
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
+  PRESSTALK_TRIGGER_KEY=option bash scripts/install_jarvistap_launchd.sh
 ```
 
 If stable signing is disabled or the helper cannot prepare an identity, the

@@ -276,7 +276,11 @@ elif [[ "$active_field_ready" != "true" ]]; then
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi
 else
-  next_action="Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+  if [[ -n "$trigger_path" && "$trigger_path" != "unknown" ]]; then
+    next_action="Ready for physical dictation smoke using configured trigger: $trigger_path."
+  else
+    next_action="Ready for physical dictation smoke with the configured trigger."
+  fi
 fi
 
 print_text_report() {

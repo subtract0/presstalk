@@ -16,9 +16,9 @@ Production naming:
   the legacy app identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`
 
 Current packaged behavior:
-- hold `Fn / Globe` by default to bring up the light and start recording
+- hold `Option` by default to bring up the light and start recording
 - release the trigger key to finalize transcription with silence-aware tail capture
-- choose `Fn`, either `Option`, left/right `Option`, `F5`, or trackpad hold from settings
+- choose either `Option`, left/right `Option`, `Fn`, `F5`, or trackpad hold from settings
 - moving too far while using the trackpad trigger cancels the capture instead of pasting garbage
 - paste the final transcript into the currently focused app
 - no cloud round-trip in the default path
@@ -46,7 +46,7 @@ The Homebrew cask runs the bundled bootstrap helper so a fresh Mac lands closer 
 
 - install
 - approve only any fresh macOS prompts that have not already been granted
-- hold `Fn / Globe` to dictate
+- hold `Option` to dictate
 
 Legacy F5 compatibility still ships as an optional helper, but it is no longer the default path:
 
@@ -104,15 +104,15 @@ That installs `com.am.jarvistap` with these defaults:
 - `JARVISTAP_WHISPER_LANGUAGE=de`
 - `JARVISTAP_SAY_VOICE=Samantha`
 - `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.35`
-- `PRESSTALK_TRIGGER_KEY=fn`
+- `PRESSTALK_TRIGGER_KEY=option`
 
 Supported trigger values:
-- `fn`
 - `option`
 - `left_option`
 - `right_option`
-- `f5`
+- `fn`
 - `trackpad_hold`
+- `f5`
 
 ## Public Packaging
 Package a Homebrew release zip:

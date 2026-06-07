@@ -28,7 +28,7 @@ NOTES_TEMPLATE_PATH="$(mktemp "${TMPDIR:-/tmp}/presstalk-release-notes.XXXXXX")"
 cat >"$NOTES_TEMPLATE_PATH" <<'EOF'
 PressTalk __PRESSTALK_VERSION__ prerelease smoke artifact for Apple Silicon macOS.
 
-Default trigger: Fn / Globe.
+Default trigger: Option.
 
 The bundled bootstrap creates or reuses a local development code-signing
 identity on the target Mac, re-signs PressTalk.app before launchd starts it

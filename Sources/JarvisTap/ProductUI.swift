@@ -369,12 +369,12 @@ final class JarvisTapSettingsStore {
     }
 
     enum TriggerKeyOption: String, CaseIterable {
-        case fn = "fn"
         case option = "option"
         case leftOption = "left_option"
         case rightOption = "right_option"
-        case f5 = "f5"
+        case fn = "fn"
         case trackpadHold = "trackpad_hold"
+        case f5 = "f5"
 
         var displayName: String {
             switch self {
@@ -387,7 +387,7 @@ final class JarvisTapSettingsStore {
             case .rightOption:
                 return "Right Option"
             case .f5:
-                return "F5 / Mic"
+                return "Legacy F5 / Mic"
             case .trackpadHold:
                 return "Trackpad Hold"
             }
@@ -467,7 +467,7 @@ final class JarvisTapSettingsStore {
 
     var triggerKey: TriggerKeyOption {
         get {
-            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .fn
+            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .option
         }
         set {
             defaults.set(newValue.rawValue, forKey: Key.triggerKey)
@@ -907,7 +907,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let titleLabel = NSTextField(labelWithString: "Hold a key. Speak. Release.")
         titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
 
-        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Fn, Option, F5, or the trackpad to bring up the light, speak, then release to paste cleaned dictation into the focused app. These settings apply immediately.")
+        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Option, Fn, or the trackpad to bring up the light, speak, then release to paste cleaned dictation into the focused app. F5 / Mic is a legacy fallback. These settings apply immediately.")
         subtitleLabel.font = NSFont.systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabelColor
 

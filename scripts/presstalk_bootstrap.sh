@@ -18,7 +18,7 @@ LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
 LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
 TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
-PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
+PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-option}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING+x}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
 if [[ -z "$PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT" && -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]; then
@@ -377,10 +377,10 @@ Installed:
 
 Next:
 1. Use the PressTalk menu bar icon for Settings or diagnostics
-2. Hold Fn/Globe to speak, then release to paste
+2. Hold Option to speak, then release to paste
 
 To use another trigger, set PRESSTALK_TRIGGER_KEY before bootstrapping.
-Supported values: fn, option, left_option, right_option, f5, trackpad_hold.
+Supported values: option, left_option, right_option, fn, trackpad_hold, f5.
 
 Optional legacy F5 fallback:
 - PressTalk still ships a built-in F5 bridge helper:

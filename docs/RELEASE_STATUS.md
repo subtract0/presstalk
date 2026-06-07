@@ -26,8 +26,8 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - The `v0.1.5-rc61` GitHub release was verified as a prerelease. GitHub reports
   asset digest
   `sha256:b4e9b48f2fd3e5b7840e374884d2bff31ac0daa4f5a3266abea8f9cdb1cb166d`,
-  matching the local `dist/PressTalk-0.1.5-rc61-macos-arm64.zip`. The remote
-  `main` branch and `v0.1.5-rc61` tag both point at
+  matching the local `dist/PressTalk-0.1.5-rc61-macos-arm64.zip`. The
+  `v0.1.5-rc61` tag points at
   `06be461f87b8cbf255340f65d559888701346430`, and the inspected asset contains
   `presstalk-verify-repair-result.sh`.
 - After rc61 packaging, `studio1` was restored to the stable local

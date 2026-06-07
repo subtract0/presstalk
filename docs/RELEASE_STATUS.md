@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc73`
-- Commit: `ed5f36e1f96ad15689b279115a0164516b1057e3`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc73`
-- Asset: `PressTalk-0.1.5-rc73-macos-arm64.zip`
-- SHA-256: `2455a1b5bf38f15f03d150a53af2e790616f55ab7fd70e7be92c69aff12c254a`
+- Tag: `v0.1.5-rc74`
+- Commit: `c278d90c6212c6defd283245b3dbf5291cc93605`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc74`
+- Asset: `PressTalk-0.1.5-rc74-macos-arm64.zip`
+- SHA-256: `9718cca16bfe200ae9fbf621f1e94c27e90d52461ca18ca86dba5f54d17d17fd`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,26 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc74` adds bundled `presstalk-release-proof-gate.sh`, a
+  machine-readable release gate for readiness matrix JSON. It exits `0` only
+  when every required target is reachable, reports readiness, has
+  `physicalSTTSmokeReady=true`, and has `activeFieldSmokeReady=true`. Fixture
+  coverage proves the gate passes a fully ready matrix, fails a matrix where
+  mbp1 has `activeFieldSmokeReady=false`, and fails when a required target such
+  as `s1` is missing.
+- The `v0.1.5-rc74` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:9718cca16bfe200ae9fbf621f1e94c27e90d52461ca18ca86dba5f54d17d17fd`,
+  matching the local `dist/PressTalk-0.1.5-rc74-macos-arm64.zip`. The
+  `v0.1.5-rc74` tag points at
+  `c278d90c6212c6defd283245b3dbf5291cc93605`.
+- After rc74 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle includes executable `presstalk-release-proof-gate.sh`, reports CDHash
+  `a555bfdca1bdc4da13ede7bdf222666d29d17e59`, `speechModel=Ready`,
+  `inputPipelineReady=true`, `microphoneAuthorizationStatus=authorized`,
+  `inputMonitoringEffective=true`, `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`.
 - `v0.1.5-rc73` adds a no-prompt
   `presstalk-repair-local-signing.sh --preflight` mode. It reports whether
   signing repair is needed, whether repair is refused over SSH, whether an
@@ -76,7 +96,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc73 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc74 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
@@ -98,7 +118,12 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `MicrophoneAuthorizationStatus=authorized`, and
   `InputMonitoringEffective=true`. It did not create or trust a certificate,
   sign or restart PressTalk, run an insertion probe, or open System Settings.
-- Current rc73 readiness matrix command:
+- The installed rc74 bundle on `mbp1` includes executable
+  `presstalk-release-proof-gate.sh`. A focused bundled gate run against
+  `--local --host mbp1-tb` reports `PASS local` and
+  `FAIL mbp1-tb: activeFieldSmokeReady=false`, then exits nonzero with
+  `Result: not proven`.
+- Current rc74 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -108,7 +133,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- A focused rc73 `--local --host mbp1-tb` matrix reports `local` with
+- A focused rc74 `--local --host mbp1-tb` matrix reports `local` with
   `physicalSTTSmokeReady=true` and `activeFieldSmokeReady=true`, and `mbp1-tb`
   with `physicalSTTSmokeReady=true` but `activeFieldSmokeReady=false` pending
   the same logged-in desktop signing repair.

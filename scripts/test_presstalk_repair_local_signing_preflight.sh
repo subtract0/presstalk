@@ -126,4 +126,10 @@ grep -Fq "SigningTrustPromptNeeded: true" "$untrusted_output"
 grep -Fq "ExistingSigningIdentity: untrusted" "$untrusted_output"
 grep -Fq "ExistingSigningIdentityDetail: UNTRUSTEDHASH" "$untrusted_output"
 
+rm -f "$status_dir/runtime-status.json"
+default_trigger_output="$TEST_TMPDIR/default-trigger.txt"
+HOME="$home_dir" PRESSTALK_APP_BUNDLE="$app_bundle" PRESSTALK_TEST_EXISTING_IDENTITY=ready "$HELPER" --preflight >"$default_trigger_output"
+grep -Fq "Trigger: option_space" "$default_trigger_output"
+grep -Fq "RepairNeeded: false" "$default_trigger_output"
+
 echo "PASS signing_repair_preflight"

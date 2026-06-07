@@ -201,6 +201,12 @@ with strict host-key checking and a short connect timeout. Failed host
 resolution, host-key verification, and SSH timeouts are recorded as failed
 targets instead of being confused with app regressions.
 
+The bundle also includes presstalk-release-proof-gate.sh. It consumes the
+readiness matrix and exits 0 only when every required target is reachable,
+reports readiness, has physical STT smoke ready, and has active-field smoke
+ready. This makes the current cross-machine proof gaps fail mechanically instead
+of relying on release-status prose.
+
 The app bundle also includes presstalk-verify-repair-result.sh. This is a
 read-only post-repair verifier for SSH checks: it reports the current runtime
 signing/input-method state plus the latest production insertion probe, exits 0

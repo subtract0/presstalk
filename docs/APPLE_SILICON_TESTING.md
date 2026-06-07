@@ -55,6 +55,17 @@ To collect a matrix that includes local readiness plus SSH host blockers, run:
 plutil -extract targets raw -o - "$HOME/Desktop/presstalk-readiness-matrix.json"
 ```
 
+Then run the release proof gate against the required machines. It exits nonzero
+until every required target is reachable, physical-STT ready, and active-field
+ready:
+
+```bash
+/bin/bash scripts/presstalk_release_proof_gate.sh \
+  --matrix "$HOME/Desktop/presstalk-readiness-matrix.json" \
+  --require local --require s1 --require mbp1-tb \
+  --exclude "studio2=no attached microphone"
+```
+
 It does not open System Settings or start signing repair. It reports Apple
 Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
 speech readiness, active-field insertion readiness, latest production insertion

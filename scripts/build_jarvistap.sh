@@ -60,6 +60,8 @@ cp "$PKG_DIR/scripts/presstalk_machine_readiness.sh" "$APP_RESOURCES_DIR/pressta
 chmod 755 "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"
 cp "$PKG_DIR/scripts/presstalk_readiness_matrix.sh" "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
+cp "$PKG_DIR/scripts/presstalk_release_proof_gate.sh" "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
 cp "$PKG_DIR/scripts/presstalk_verify_repair_result.sh" "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
 cp "$PKG_DIR/scripts/presstalk_accessibility_identity_probe.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"

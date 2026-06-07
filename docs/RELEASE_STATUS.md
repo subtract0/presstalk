@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc75`
-- Commit: `2761bf21a940790e5e94a353b52687755fa78e15`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc75`
-- Asset: `PressTalk-0.1.5-rc75-macos-arm64.zip`
-- SHA-256: `b32e89be07ee6dca2d5930076a01d60d234e922acda826a2cf8dd72087331bb3`
+- Tag: `v0.1.5-rc76`
+- Commit: `4c040a2d4561691c25d15ea92cf12d4c1cf46755`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc76`
+- Asset: `PressTalk-0.1.5-rc76-macos-arm64.zip`
+- SHA-256: `4121ba2093f8045a1ef87a92a3501e016b8430421f4ca6deaf3fef91f73a80be`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,24 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc76` adds bundled `presstalk-host-discovery.sh`. This read-only
+  helper records local SSH config aliases, Bonjour SSH advertisements, target
+  `ssh -G` resolution, and optional strict BatchMode SSH probes before release
+  matrix runs. It does not install, repair, open System Settings, or request a
+  signing trust prompt.
+- The `v0.1.5-rc76` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:4121ba2093f8045a1ef87a92a3501e016b8430421f4ca6deaf3fef91f73a80be`,
+  matching the local `dist/PressTalk-0.1.5-rc76-macos-arm64.zip`. The
+  `v0.1.5-rc76` tag points at
+  `4c040a2d4561691c25d15ea92cf12d4c1cf46755`.
+- After rc76 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `e1d0a5e07f82b22a3283c51ea3597b5d2c4cb00f`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`.
 - `v0.1.5-rc75` adds `--json-output PATH` to
   `presstalk-release-proof-gate.sh`. The proof gate now writes a parseable
   result with `proven`, `failureCount`, required targets, excluded targets,
@@ -114,19 +132,18 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc75 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc76 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
   signing skipped because no existing valid local signing identity was available
   without a trust prompt, so there was no signing-trust prompt. After warm-up,
   readiness reports `speechModel=Ready`, `inputPipelineReady=true`,
-  `microphoneHardwareDetected=true`, and
-  `activeFieldInsertionStatus=needs_signing_repair`. The read-only repair
-  verifier reports `Result: not proven`,
-  `inputMethodFallbackStatus=recognized_disabled`, and
-  `targetCaptureFailureHint=input_method_enable_no_effect`; the next action is
-  logged-in desktop `Repair Signing`, not another permission grant.
+  `microphoneHardwareDetected=true`, `physicalSTTSmokeReady=true`,
+  `activeFieldInsertionStatus=needs_signing_repair`,
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`;
+  the next action is logged-in desktop `Repair Signing`, not another
+  permission grant.
 - The installed rc73 repair preflight on `mbp1` reports
   `RunningOverSSH=true`, `RepairNeeded=true`, `RepairAllowedHere=false`,
   `WouldRunRepair=false`, `SigningTrustPromptNeeded=true`,
@@ -136,15 +153,15 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `MicrophoneAuthorizationStatus=authorized`, and
   `InputMonitoringEffective=true`. It did not create or trust a certificate,
   sign or restart PressTalk, run an insertion probe, or open System Settings.
-- The installed rc75 bundle on `mbp1` includes executable
-  `presstalk-release-proof-gate.sh`. A focused bundled gate run with
-  `--json-output` against
-  `--local --host mbp1-tb` reports `PASS local` and
-  `FAIL mbp1-tb: activeFieldSmokeReady=false`, then exits nonzero with
-  `Result: not proven`. Its JSON artifact records `proven=false`,
-  `failureCount=1`, local target `passed=true`, and mbp1 target `passed=false`
-  with failure `active_field_not_ready`.
-- Current rc75 readiness matrix command:
+- The installed rc76 bundle on `mbp1` includes executable
+  `presstalk-host-discovery.sh`, and `mbp1` readiness still reports
+  `speechModel=Ready`, `inputPipelineReady=true`, `microphoneHardwareDetected=true`,
+  `physicalSTTSmokeReady=true`, `activeFieldInsertionReady=false`,
+  `activeFieldInsertionStatus=needs_signing_repair`,
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
+  The next action is logged-in desktop `Repair Signing`; do not reopen privacy
+  panes for this state.
+- Current rc76 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -154,15 +171,19 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- A focused rc75 `--local --host mbp1-tb` matrix reports `local` with
-  `physicalSTTSmokeReady=true` and `activeFieldSmokeReady=true`, and `mbp1-tb`
-  with `physicalSTTSmokeReady=true` but `activeFieldSmokeReady=false` pending
-  the same logged-in desktop signing repair.
-- Bonjour SSH discovery advertises `mba1`, `studio1`, `studio2`, and `mbp1`,
-  but no `s1`. `mba1` resolves through Bonjour as `mba1.local:22`, but strict
-  SSH remains blocked because the host key is not trusted locally. Observed
-  `mba1.local` key fingerprints from read-only `ssh-keyscan`, not trusted or
-  added: RSA
+- The rc76 proof gate run against required `local`, `s1`, and `mbp1-tb`,
+  excluding `studio2=no attached microphone`, exits nonzero with `proven=false`
+  and `failureCount=5`. It passes `local`, fails `s1` for not reachable /
+  missing physical STT / missing active-field readiness, and fails `mbp1-tb`
+  only for `active_field_not_ready`.
+- The rc76 host discovery probe targeted `local`, `s1`, `s1.local`, `mbp1`,
+  `mbp1-tb`, `studio1.local`, and `mba1.local`. Only `mbp1-tb` answered the
+  strict SSH probe. `s1` and `s1.local` do not resolve, plain `mbp1` times out
+  at `100.106.125.111:22`, and `studio1.local` / `mba1.local` remain strict
+  host-key blockers. Bonjour passively advertises `studio1`, `studio2`,
+  `mbp1`, and `mba1`, but no `s1`; `studio2` was not an SSH or STT target in
+  this probe. Earlier read-only `ssh-keyscan` observed `mba1.local` key
+  fingerprints, not trusted or added: RSA
   `SHA256:uA9g7l4TV0EVDgTn1d1X3g/aDQ5vBJmVaTe7gwj7lnI`, ED25519
   `SHA256:3d9YHlo6UXSwPW8JCg9GoVIuSGAU38SVhm4a9Ow1Mg4`, ECDSA
   `SHA256:BhdJk5PV1aV/VhYi8FCJu5oR0DTzA8K+bdIN+rVzS+Q`. Do not bypass or add

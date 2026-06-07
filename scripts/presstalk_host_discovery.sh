@@ -6,6 +6,7 @@ OUTPUT_FORMAT="text"
 JSON_OUTPUT_PATH=""
 BONJOUR_ENABLED=1
 TAILSCALE_ENABLED=1
+ARP_ENABLED=1
 BONJOUR_TIMEOUT="${PRESSTALK_BONJOUR_TIMEOUT:-3}"
 SSH_CONNECT_TIMEOUT="${PRESSTALK_SSH_CONNECT_TIMEOUT:-3}"
 PROBE_SSH=0
@@ -16,8 +17,8 @@ usage() {
 Usage: presstalk-host-discovery.sh [options]
 
 Collects read-only host/alias evidence before PressTalk release matrix runs.
-It can parse local SSH config aliases, browse Bonjour SSH advertisements, and
-optionally run strict read-only SSH probes.
+It can parse local SSH config aliases, browse Bonjour SSH advertisements, record
+Tailscale and ARP status, and optionally run strict read-only SSH probes.
 
 Options:
   --target HOST       Target alias to inspect. May be repeated.
@@ -26,6 +27,7 @@ Options:
   --timeout SECONDS   SSH ConnectTimeout and Bonjour browse timeout. Default: 3.
   --no-bonjour        Skip Bonjour browsing.
   --no-tailscale      Skip Tailscale status collection.
+  --no-arp            Skip ARP table collection.
   --json              Write only machine-readable JSON to stdout.
   --json-output PATH  Also write machine-readable JSON to PATH.
   -h, --help          Show this help.
@@ -75,6 +77,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --no-tailscale)
       TAILSCALE_ENABLED=0
+      shift
+      ;;
+    --no-arp)
+      ARP_ENABLED=0
       shift
       ;;
     --json)
@@ -160,6 +166,7 @@ plist_insert_int "sshConnectTimeoutSeconds" "$SSH_CONNECT_TIMEOUT"
 plist_insert_int "bonjourTimeoutSeconds" "$BONJOUR_TIMEOUT"
 plist_insert_bool "sshProbeEnabled" "$([[ "$PROBE_SSH" == "1" ]] && echo true || echo false)"
 plist_insert_bool "tailscaleEnabled" "$([[ "$TAILSCALE_ENABLED" == "1" ]] && echo true || echo false)"
+plist_insert_bool "arpEnabled" "$([[ "$ARP_ENABLED" == "1" ]] && echo true || echo false)"
 plutil -insert sshConfig.hosts -array "$RESULT_PLIST" >/dev/null
 
 if [[ -f "$SSH_CONFIG" ]]; then
@@ -227,6 +234,57 @@ else
   plist_insert_int "tailscale.exitStatus" 0
   plist_insert_bool "tailscale.statusAvailable" false
   plist_insert_string "tailscale.error" "disabled"
+fi
+
+plutil -insert arp -dictionary "$RESULT_PLIST" >/dev/null
+plist_insert_bool "arp.enabled" "$([[ "$ARP_ENABLED" == "1" ]] && echo true || echo false)"
+plutil -insert arp.rawLines -array "$RESULT_PLIST" >/dev/null
+plutil -insert arp.entries -array "$RESULT_PLIST" >/dev/null
+if [[ "$ARP_ENABLED" == "1" ]]; then
+  arp_bin="${PRESSTALK_ARP_PATH:-$(command -v arp 2>/dev/null || true)}"
+  plist_insert_string "arp.path" "${arp_bin:-missing}"
+  if [[ -n "$arp_bin" && -x "$arp_bin" ]]; then
+    arp_output="$RUN_TMPDIR/arp.out"
+    arp_error="$RUN_TMPDIR/arp.err"
+    arp_status=0
+    set +e
+    "$arp_bin" -a >"$arp_output" 2>"$arp_error"
+    arp_status=$?
+    set -e
+    plist_insert_int "arp.exitStatus" "$arp_status"
+    plist_insert_string "arp.error" "$(single_line_file "$arp_error")"
+    while IFS= read -r line; do
+      [[ -z "$line" ]] && continue
+      plutil -insert arp.rawLines -string "$line" -append "$RESULT_PLIST" >/dev/null
+      if [[ "$line" == *" ("* && "$line" == *") at "* && "$line" == *" on "* ]]; then
+        host="${line%% (*}"
+        ip_part="${line#*(}"
+        ip="${ip_part%%)*}"
+        if [[ "$ip" == 224.* || "$ip" == 239.* ]]; then
+          continue
+        fi
+        after_at="${line#*) at }"
+        mac="${after_at%% on *}"
+        after_on="${line##* on }"
+        interface="${after_on%% *}"
+        entry_plist="$RUN_TMPDIR/arp-entry-$RANDOM.plist"
+        plutil -create xml1 "$entry_plist" >/dev/null
+        plutil -insert host -string "${host:-unknown}" "$entry_plist" >/dev/null
+        plutil -insert ip -string "${ip:-unknown}" "$entry_plist" >/dev/null
+        plutil -insert mac -string "${mac:-unknown}" "$entry_plist" >/dev/null
+        plutil -insert interface -string "${interface:-unknown}" "$entry_plist" >/dev/null
+        plutil -insert rawLine -string "$line" "$entry_plist" >/dev/null
+        entry_json="$(plutil -convert json -r -o - "$entry_plist")"
+        plutil -insert arp.entries -json "$entry_json" -append "$RESULT_PLIST" >/dev/null
+      fi
+    done <"$arp_output"
+  else
+    plist_insert_int "arp.exitStatus" 0
+    plist_insert_string "arp.error" "arp unavailable"
+  fi
+else
+  plist_insert_int "arp.exitStatus" 0
+  plist_insert_string "arp.error" "disabled"
 fi
 
 plutil -insert targets -array "$RESULT_PLIST" >/dev/null
@@ -343,6 +401,7 @@ else
   echo "Targets: $targets_text"
   echo "Bonjour: $([[ "$BONJOUR_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "Tailscale: $([[ "$TAILSCALE_ENABLED" == "1" ]] && echo enabled || echo disabled)"
+  echo "ARP: $([[ "$ARP_ENABLED" == "1" ]] && echo enabled || echo disabled)"
   echo "SSH probe: $([[ "$PROBE_SSH" == "1" ]] && echo enabled || echo disabled)"
   if [[ -n "$JSON_OUTPUT_PATH" ]]; then
     echo "HostDiscoveryJSON: $JSON_OUTPUT_PATH"

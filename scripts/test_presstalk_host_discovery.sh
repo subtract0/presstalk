@@ -12,6 +12,7 @@ text_report="$TEST_TMPDIR/host-discovery.txt"
 probe_json_report="$TEST_TMPDIR/host-discovery-probe.json"
 tailscale_failure_json_report="$TEST_TMPDIR/host-discovery-tailscale-failure.json"
 fake_tailscale="$TEST_TMPDIR/tailscale"
+fake_arp="$TEST_TMPDIR/arp"
 
 cat >"$ssh_config" <<'SSHCONFIG'
 Host mbp1-tb
@@ -46,7 +47,20 @@ STATUS
 SH
 chmod +x "$fake_tailscale"
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" "$HELPER" \
+cat >"$fake_arp" <<'SH'
+#!/usr/bin/env bash
+if [[ "${1:-}" != "-a" ]]; then
+  echo "unexpected arp arg: $*" >&2
+  exit 2
+fi
+cat <<'ARP'
+s1.local (192.168.0.23) at 1:2:3:4:5:6 on en1 ifscope [ethernet]
+macbookpro (192.168.0.41) at 86:13:32:de:1:a7 on en1 ifscope [ethernet]
+ARP
+SH
+chmod +x "$fake_arp"
+
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" PRESSTALK_ARP_PATH="$fake_arp" "$HELPER" \
   --no-bonjour \
   --target mbp1-tb \
   --target s1 \
@@ -62,6 +76,10 @@ if ! grep -Fq "HostDiscoveryJSON: $json_report" "$text_report"; then
 fi
 if ! grep -Fq "Tailscale: enabled" "$text_report"; then
   echo "FAIL: host discovery text did not report Tailscale status"
+  exit 1
+fi
+if ! grep -Fq "ARP: enabled" "$text_report"; then
+  echo "FAIL: host discovery text did not report ARP status"
   exit 1
 fi
 
@@ -106,8 +124,30 @@ if [[ "$tailscale_first_node" != "s1" ]]; then
   exit 1
 fi
 
+arp_entry_count="$(plutil -extract arp.entries raw -o - "$json_report")"
+if [[ "$arp_entry_count" != "2" ]]; then
+  echo "FAIL: expected 2 ARP entries, got $arp_entry_count"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_first_host="$(plutil -extract arp.entries.0.host raw -o - "$json_report")"
+if [[ "$arp_first_host" != "s1.local" ]]; then
+  echo "FAIL: unexpected first ARP host $arp_first_host"
+  plutil -p "$json_report"
+  exit 1
+fi
+
+arp_second_ip="$(plutil -extract arp.entries.1.ip raw -o - "$json_report")"
+if [[ "$arp_second_ip" != "192.168.0.41" ]]; then
+  echo "FAIL: unexpected second ARP IP $arp_second_ip"
+  plutil -p "$json_report"
+  exit 1
+fi
+
 PRESSTALK_SSH_CONFIG_PATH="$ssh_config" \
   PRESSTALK_TAILSCALE_PATH="$fake_tailscale" \
+  PRESSTALK_ARP_PATH="$fake_arp" \
   PRESSTALK_FAKE_TAILSCALE_FAIL_STDOUT=1 \
   "$HELPER" \
   --no-bonjour \
@@ -141,7 +181,7 @@ if [[ "$invalid_probe" != "false" ]]; then
   exit 1
 fi
 
-PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" "$HELPER" \
+PRESSTALK_SSH_CONFIG_PATH="$ssh_config" PRESSTALK_TAILSCALE_PATH="$fake_tailscale" PRESSTALK_ARP_PATH="$fake_arp" "$HELPER" \
   --no-bonjour \
   --timeout 1 \
   --probe-ssh \

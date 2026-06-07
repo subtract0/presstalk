@@ -45,6 +45,14 @@ plutil -extract eligibility.physicalSTTSmokeReady raw -o - "$HOME/Desktop/presst
 plutil -extract eligibility.activeFieldSmokeReady raw -o - "$HOME/Desktop/presstalk-readiness.json"
 ```
 
+To collect a matrix that includes local readiness plus SSH host blockers, run:
+
+```bash
+/bin/bash scripts/presstalk_readiness_matrix.sh \
+  --local --host s1 --host mbp1 --json-output "$HOME/Desktop/presstalk-readiness-matrix.json"
+plutil -extract targets raw -o - "$HOME/Desktop/presstalk-readiness-matrix.json"
+```
+
 It does not open System Settings or start signing repair. It reports Apple
 Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
 speech readiness, active-field insertion readiness, latest production insertion

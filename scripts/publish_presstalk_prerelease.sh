@@ -189,6 +189,12 @@ separate host/setup blockers from app regressions before cross-machine release
 claims. It also supports --json and --json-output PATH so each machine can
 produce a parseable readiness artifact for release evidence.
 
+The bundle also includes presstalk-readiness-matrix.sh. It collects local and
+SSH-host readiness reports into one parseable JSON matrix, using BatchMode SSH
+with strict host-key checking and a short connect timeout. Failed host
+resolution, host-key verification, and SSH timeouts are recorded as failed
+targets instead of being confused with app regressions.
+
 The app bundle also includes presstalk-verify-repair-result.sh. This is a
 read-only post-repair verifier for SSH checks: it reports the current runtime
 signing/input-method state plus the latest production insertion probe, exits 0

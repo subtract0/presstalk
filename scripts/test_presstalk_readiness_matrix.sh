@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+MATRIX_HELPER="$SCRIPT_DIR/presstalk_readiness_matrix.sh"
+TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-matrix-test.XXXXXX")"
+trap 'rm -rf "$TEST_TMPDIR"' EXIT
+
+local_json="$TEST_TMPDIR/local-matrix.json"
+blocked_json="$TEST_TMPDIR/blocked-matrix.json"
+
+"$MATRIX_HELPER" --local --json >"$local_json"
+
+extract_required() {
+  local file="$1"
+  local key_path="$2"
+  local value
+  value="$(plutil -extract "$key_path" raw -o - "$file" 2>/dev/null || true)"
+  if [[ -z "$value" ]]; then
+    echo "FAIL: missing JSON key $key_path in $file"
+    exit 1
+  fi
+  printf '%s\n' "$value"
+}
+
+schema_version="$(extract_required "$local_json" schemaVersion)"
+if [[ "$schema_version" != "1" ]]; then
+  echo "FAIL: unexpected matrix schemaVersion $schema_version"
+  exit 1
+fi
+local_count="$(extract_required "$local_json" targets)"
+if [[ "$local_count" != "1" ]]; then
+  echo "FAIL: expected one local target, got $local_count"
+  exit 1
+fi
+local_status="$(extract_required "$local_json" targets.0.status)"
+if [[ "$local_status" != "ready_reported" ]]; then
+  echo "FAIL: expected local ready_reported, got $local_status"
+  exit 1
+fi
+extract_required "$local_json" targets.0.readiness.schemaVersion >/dev/null
+extract_required "$local_json" targets.0.summary.activeFieldSmokeReady >/dev/null
+
+"$MATRIX_HELPER" --host presstalk-invalid-host.invalid --timeout 1 --json >"$blocked_json"
+blocked_status="$(extract_required "$blocked_json" targets.0.status)"
+blocked_reachable="$(extract_required "$blocked_json" targets.0.reachable)"
+if [[ "$blocked_status" != "failed" || "$blocked_reachable" != "false" ]]; then
+  echo "FAIL: expected blocked host to be recorded as failed/reachable=false"
+  plutil -convert json -r -o - "$blocked_json"
+  exit 1
+fi
+
+echo "PASS readiness_matrix_json"

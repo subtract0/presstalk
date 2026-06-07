@@ -363,7 +363,7 @@ print_text_report() {
 write_json_report() {
   local output_path="$1"
   local tmp_plist
-  tmp_plist="$(mktemp "${TMPDIR:-/tmp}/presstalk-readiness.XXXXXX.plist")"
+  tmp_plist="$(mktemp "${TMPDIR:-/tmp}/presstalk-readiness.XXXXXX")"
   trap 'rm -f "$tmp_plist"' RETURN
 
   plutil -create xml1 "$tmp_plist" >/dev/null

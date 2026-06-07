@@ -5,11 +5,11 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc76`
-- Commit: `4c040a2d4561691c25d15ea92cf12d4c1cf46755`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc76`
-- Asset: `PressTalk-0.1.5-rc76-macos-arm64.zip`
-- SHA-256: `4121ba2093f8045a1ef87a92a3501e016b8430421f4ca6deaf3fef91f73a80be`
+- Tag: `v0.1.5-rc77`
+- Commit: `eb53617b6d6ac972bb56544eda2dd74d7d76bc5f`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc77`
+- Asset: `PressTalk-0.1.5-rc77-macos-arm64.zip`
+- SHA-256: `e321d2da0cad0c8ae602a52eb457cb6ab53eb48c2207ca49b63bf809be113005`
 
 Verified on `studio1` during 2026-06-06 and 2026-06-07:
 
@@ -17,6 +17,25 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.
 - `scripts/install_jarvistap_launchd.sh` writes and starts `com.am.jarvistap` with `PRESSTALK_TRIGGER_KEY=fn`.
+- `v0.1.5-rc77` routes the non-ad-hoc
+  `PressTalk Local Development Code Signing` plus `recognized_disabled`
+  input-method state to the same no-pane `Repair Signing` path as the ad-hoc
+  release install. This covers the mbp1 no-prompt signing experiment where
+  signing without adding trust changed `AdHocSigned=false` but TIS still left
+  the input method disabled.
+- The `v0.1.5-rc77` GitHub release was verified as a prerelease. GitHub reports
+  asset digest
+  `sha256:e321d2da0cad0c8ae602a52eb457cb6ab53eb48c2207ca49b63bf809be113005`,
+  matching the local `dist/PressTalk-0.1.5-rc77-macos-arm64.zip`. The
+  `v0.1.5-rc77` tag points at
+  `eb53617b6d6ac972bb56544eda2dd74d7d76bc5f`.
+- After rc77 packaging, `studio1` was restored to stable local
+  `com.am.jarvistap` identity with no-pane flags and Fn trigger. The restored
+  bundle reports CDHash `92c0506759f2496b6d0109b2f0fca833af706b1e`,
+  `speechModel=Ready`, `inputPipelineReady=true`,
+  `microphoneAuthorizationStatus=authorized`, `inputMonitoringEffective=true`,
+  `activeFieldInsertionReady=true`, and
+  `activeFieldInsertionStatus=ready_input_method`.
 - `v0.1.5-rc76` adds bundled `presstalk-host-discovery.sh`. This read-only
   helper records local SSH config aliases, Bonjour SSH advertisements, target
   `ssh -G` resolution, and optional strict BatchMode SSH probes before release
@@ -132,18 +151,21 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `com.am.jarvistap` identity with no-pane flags and Fn trigger. The bundled
   matrix helper reports local `activeFieldSmokeReady=true`; the bundled
   verifier exits `0`.
-- `mbp1` is reachable through the configured `mbp1-tb` alias. rc76 was
+- `mbp1` is reachable through the configured `mbp1-tb` alias. rc77 was
   downloaded from GitHub over `mbp1-tb` with the expected SHA, installed with
   no-pane flags, and bootstrapped with
   `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. Bootstrap reported stable
   signing skipped because no existing valid local signing identity was available
   without a trust prompt, so there was no signing-trust prompt. After warm-up,
-  readiness reports `speechModel=Ready`, `inputPipelineReady=true`,
+  rc77 was also signed with the existing untrusted local PressTalk identity to
+  verify the new route without adding trust or requesting a password. Readiness
+  reports `speechModel=Ready`, `inputPipelineReady=true`,
   `microphoneHardwareDetected=true`, `physicalSTTSmokeReady=true`,
+  `CodeSignatureAuthority=PressTalk Local Development Code Signing`,
   `activeFieldInsertionStatus=needs_signing_repair`,
-  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`;
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=false`;
   the next action is logged-in desktop `Repair Signing`, not another
-  permission grant.
+  permission grant or remote signing flow.
 - The installed rc73 repair preflight on `mbp1` reports
   `RunningOverSSH=true`, `RepairNeeded=true`, `RepairAllowedHere=false`,
   `WouldRunRepair=false`, `SigningTrustPromptNeeded=true`,
@@ -161,7 +183,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
   The next action is logged-in desktop `Repair Signing`; do not reopen privacy
   panes for this state.
-- Current rc76 readiness matrix command:
+- Current rc77 readiness matrix command:
   `scripts/presstalk_readiness_matrix.sh --local --host s1 --host s1.local --host mbp1 --host mbp1-tb --host studio1.local --host mba1.local --timeout 3 --json-output <path>`.
   The matrix reports `local` as `ready_reported` with
   `activeFieldSmokeReady=true`; `s1` and `s1.local` fail DNS resolution; `mbp1`
@@ -171,7 +193,7 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   verification. These are current host/matrix blockers, not app regressions.
   `studio2` remains excluded from microphone/STT smoke until a microphone is
   attached.
-- The rc76 proof gate run against required `local`, `s1`, and `mbp1-tb`,
+- The rc77 proof gate run against required `local`, `s1`, and `mbp1-tb`,
   excluding `studio2=no attached microphone`, exits nonzero with `proven=false`
   and `failureCount=5`. It passes `local`, fails `s1` for not reachable /
   missing physical STT / missing active-field readiness, and fails `mbp1-tb`

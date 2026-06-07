@@ -4,16 +4,50 @@ set -euo pipefail
 LABEL="${PRESSTALK_LAUNCH_LABEL:-com.am.jarvistap}"
 STATUS_JSON="${PRESSTALK_STATUS_JSON:-$HOME/Library/Application Support/JarvisTap/runtime-status.json}"
 TRACE_LOG="${PRESSTALK_TRACE_LOG:-$HOME/Library/Logs/jarvistap_trace.log}"
+DIAGNOSTICS_DIR="${PRESSTALK_DIAGNOSTICS_DIR:-$HOME/Library/Application Support/JarvisTap/Diagnostics}"
 
 section() {
   printf '\n== %s ==\n' "$1"
 }
 
+json_file_value() {
+  local file="$1"
+  local key_path="$2"
+  if [[ -f "$file" ]]; then
+    plutil -extract "$key_path" raw -o - "$file" 2>/dev/null || true
+  fi
+}
+
 json_value() {
   local key_path="$1"
-  if [[ -f "$STATUS_JSON" ]]; then
-    plutil -extract "$key_path" raw -o - "$STATUS_JSON" 2>/dev/null || true
+  json_file_value "$STATUS_JSON" "$key_path"
+}
+
+latest_diagnostic_file() {
+  local name_pattern="$1"
+  if [[ ! -d "$DIAGNOSTICS_DIR" ]]; then
+    return 0
   fi
+
+  local matches=()
+  while IFS= read -r -d '' file; do
+    matches+=("$file")
+  done < <(find "$DIAGNOSTICS_DIR" -maxdepth 1 -type f -name "$name_pattern" -print0 2>/dev/null)
+
+  if [[ "${#matches[@]}" -eq 0 ]]; then
+    return 0
+  fi
+
+  ls -t "${matches[@]}" 2>/dev/null | head -n 1
+}
+
+print_json_field_line() {
+  local file="$1"
+  local label="$2"
+  local key_path="$3"
+  local value
+  value="$(json_file_value "$file" "$key_path")"
+  echo "$label: ${value:-unknown}"
 }
 
 app_signature_value() {
@@ -193,6 +227,77 @@ print_tcc_code_requirements() {
   rm -rf "$tmpdir"
 }
 
+print_repair_and_probe_status() {
+  echo "Diagnostics directory: $DIAGNOSTICS_DIR"
+
+  if [[ -f "$STATUS_JSON" ]]; then
+    local ad_hoc_signed
+    local input_method_fallback
+    local accessibility_status
+    local speech_model
+    local input_listener
+    local microphone_authorization
+    local input_monitoring_effective
+    ad_hoc_signed="$(json_value status.adHocSigned)"
+    input_method_fallback="$(json_value permissions.inputMethodFallbackStatus)"
+    accessibility_status="$(json_value permissions.accessibilityStatus)"
+    speech_model="$(json_value status.speechModel)"
+    input_listener="$(json_value runtime.inputListener)"
+    microphone_authorization="$(json_value permissions.microphoneAuthorizationStatus)"
+    input_monitoring_effective="$(json_value permissions.inputMonitoringEffective)"
+
+    echo "adHocSigned: ${ad_hoc_signed:-unknown}"
+    echo "inputMethodFallbackStatus: ${input_method_fallback:-unknown}"
+    echo "accessibilityStatus: ${accessibility_status:-unknown}"
+    echo "speechModel: ${speech_model:-unknown}"
+    echo "inputListener: ${input_listener:-unknown}"
+    echo "microphoneAuthorizationStatus: ${microphone_authorization:-unknown}"
+    echo "inputMonitoringEffective: ${input_monitoring_effective:-unknown}"
+
+    if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+      cat <<EOF
+Next action: from the logged-in desktop session, click Repair Signing in PressTalk Settings and approve only the PressTalk local signing password prompt.
+No Microphone, Input Monitoring, or Accessibility re-grant is needed for this state.
+EOF
+    elif [[ "$input_method_fallback" == "ready" ]]; then
+      echo "Next action: insertion path reports ready; run the production insertion probe if proof is needed."
+    elif [[ -n "$input_method_fallback" ]]; then
+      echo "Next action: inspect the input-method status above before changing permissions."
+    fi
+  else
+    echo "Runtime status file missing: $STATUS_JSON"
+  fi
+
+  local latest_repair_log
+  latest_repair_log="$(latest_diagnostic_file 'presstalk-signing-repair-*.log')"
+  if [[ -n "$latest_repair_log" ]]; then
+    echo
+    echo "Latest signing repair log: $latest_repair_log"
+    tail -40 "$latest_repair_log" 2>/dev/null || true
+  else
+    echo
+    echo "Latest signing repair log: none found"
+  fi
+
+  local latest_probe_json
+  latest_probe_json="$(latest_diagnostic_file 'production-insertion-probe-*.json')"
+  if [[ -n "$latest_probe_json" ]]; then
+    echo
+    echo "Latest production insertion probe: $latest_probe_json"
+    print_json_field_line "$latest_probe_json" "generatedAt" generatedAt
+    print_json_field_line "$latest_probe_json" "success" success
+    print_json_field_line "$latest_probe_json" "reason" reason
+    print_json_field_line "$latest_probe_json" "targetCaptureSuccess" targetCaptureSuccess
+    print_json_field_line "$latest_probe_json" "targetCaptureFailureHint" targetCaptureFailureHint
+    print_json_field_line "$latest_probe_json" "traceProductionMethod" traceProductionMethod
+    print_json_field_line "$latest_probe_json" "traceCopyFallback" traceCopyFallback
+    print_json_field_line "$latest_probe_json" "traceInputMethodEnableNoEffect" traceInputMethodEnableNoEffect
+  else
+    echo
+    echo "Latest production insertion probe: none found"
+  fi
+}
+
 presstalk_processes() {
   ps -axo pid=,ppid=,command= |
     awk '
@@ -336,6 +441,9 @@ print_tcc_rows "System TCC" "/Library/Application Support/com.apple.TCC/TCC.db"
 section "TCC Code Requirements Read-Only"
 print_tcc_code_requirements "User TCC" "$HOME/Library/Application Support/com.apple.TCC/TCC.db"
 print_tcc_code_requirements "System TCC" "/Library/Application Support/com.apple.TCC/TCC.db"
+
+section "Repair And Probe Status"
+print_repair_and_probe_status
 
 section "Trace Tail"
 if [[ -f "$TRACE_LOG" ]]; then

@@ -237,6 +237,26 @@ if [[ -n "$latest_probe_json" ]]; then
   probe_trace_production_method="$(json_file_value "$latest_probe_json" traceProductionMethod)"
 fi
 
+latest_manual_json="$(latest_diagnostic_file 'manual-trigger-smoke-*.json')"
+manual_generated_at=""
+manual_success=""
+manual_reason=""
+manual_expected_trigger_key=""
+manual_expected_trigger_proof=""
+manual_target_capture_success=""
+manual_trace_registered_hotkey_observed=""
+manual_trace_final_transcript=""
+if [[ -n "$latest_manual_json" ]]; then
+  manual_generated_at="$(json_file_value "$latest_manual_json" generatedAt)"
+  manual_success="$(json_file_value "$latest_manual_json" success)"
+  manual_reason="$(json_file_value "$latest_manual_json" reason)"
+  manual_expected_trigger_key="$(json_file_value "$latest_manual_json" expectedTriggerKey)"
+  manual_expected_trigger_proof="$(json_file_value "$latest_manual_json" expectedTriggerProof)"
+  manual_target_capture_success="$(json_file_value "$latest_manual_json" targetCaptureSuccess)"
+  manual_trace_registered_hotkey_observed="$(json_file_value "$latest_manual_json" traceRegisteredHotKeyObserved)"
+  manual_trace_final_transcript="$(json_file_value "$latest_manual_json" traceFinalTranscript)"
+fi
+
 install_smoke_eligible="false"
 if [[ "$apple_silicon" == "true" && "$microphone_detected" != "false" ]]; then
   install_smoke_eligible="true"
@@ -356,6 +376,22 @@ print_text_report() {
   fi
 
   echo
+  echo "Latest manual physical trigger smoke"
+  if [[ -n "$latest_manual_json" ]]; then
+    print_field "ManualSmokePath" "$latest_manual_json"
+    print_field "ManualSmokeGeneratedAt" "$manual_generated_at"
+    print_field "ManualSmokeSuccess" "$manual_success"
+    print_field "ManualSmokeReason" "$manual_reason"
+    print_field "ManualSmokeExpectedTriggerKey" "$manual_expected_trigger_key"
+    print_field "ManualSmokeExpectedTriggerProof" "$manual_expected_trigger_proof"
+    print_field "ManualSmokeTargetCaptureSuccess" "$manual_target_capture_success"
+    print_field "ManualSmokeTraceRegisteredHotKeyObserved" "$manual_trace_registered_hotkey_observed"
+    print_field "ManualSmokeTraceFinalTranscript" "$manual_trace_final_transcript"
+  else
+    echo "ManualSmokePath: none found"
+  fi
+
+  echo
   echo "Eligibility"
   print_field "InstallSmokeEligible" "$install_smoke_eligible"
   print_field "PhysicalSTTSmokeReady" "$physical_stt_smoke_ready"
@@ -422,6 +458,17 @@ write_json_report() {
   plist_insert_bool_or_string "$tmp_plist" "latestProductionInsertionProbe.success" "$probe_success"
   plist_insert_bool_or_string "$tmp_plist" "latestProductionInsertionProbe.targetCaptureSuccess" "$probe_target_capture_success"
   plist_insert_string "$tmp_plist" "latestProductionInsertionProbe.traceProductionMethod" "$probe_trace_production_method"
+
+  plutil -insert "latestManualPhysicalTriggerSmoke" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.path" "${latest_manual_json:-none}"
+  plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.generatedAt" "$manual_generated_at"
+  plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.success" "$manual_success"
+  plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.reason" "$manual_reason"
+  plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.expectedTriggerKey" "$manual_expected_trigger_key"
+  plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.expectedTriggerProof" "$manual_expected_trigger_proof"
+  plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.targetCaptureSuccess" "$manual_target_capture_success"
+  plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.traceRegisteredHotKeyObserved" "$manual_trace_registered_hotkey_observed"
+  plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.traceFinalTranscript" "$manual_trace_final_transcript"
 
   plutil -insert "eligibility" -dictionary "$tmp_plist" >/dev/null
   plist_insert_bool_or_string "$tmp_plist" "eligibility.installSmokeEligible" "$install_smoke_eligible"

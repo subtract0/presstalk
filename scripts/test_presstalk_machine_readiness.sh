@@ -36,6 +36,8 @@ extract_required runtime.statusAvailable >/dev/null
 extract_required eligibility.installSmokeEligible >/dev/null
 extract_required eligibility.physicalSTTSmokeReady >/dev/null
 extract_required eligibility.activeFieldSmokeReady >/dev/null
+extract_required latestProductionInsertionProbe.path >/dev/null
+extract_required latestManualPhysicalTriggerSmoke.path >/dev/null
 extract_required nextAction >/dev/null
 
 "$HELPER" --json-output "$json_output_report" >"$text_report"

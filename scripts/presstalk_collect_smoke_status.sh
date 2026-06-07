@@ -320,6 +320,25 @@ EOF
     echo
     echo "Latest production insertion probe: none found"
   fi
+
+  local latest_manual_json
+  latest_manual_json="$(latest_diagnostic_file 'manual-trigger-smoke-*.json')"
+  if [[ -n "$latest_manual_json" ]]; then
+    echo
+    echo "Latest manual physical trigger smoke: $latest_manual_json"
+    print_json_field_line "$latest_manual_json" "generatedAt" generatedAt
+    print_json_field_line "$latest_manual_json" "success" success
+    print_json_field_line "$latest_manual_json" "reason" reason
+    print_json_field_line "$latest_manual_json" "expectedTriggerKey" expectedTriggerKey
+    print_json_field_line "$latest_manual_json" "expectedTriggerProof" expectedTriggerProof
+    print_json_field_line "$latest_manual_json" "targetCaptureSuccess" targetCaptureSuccess
+    print_json_field_line "$latest_manual_json" "targetCaptureFailureHint" targetCaptureFailureHint
+    print_json_field_line "$latest_manual_json" "traceRegisteredHotKeyObserved" traceRegisteredHotKeyObserved
+    print_json_field_line "$latest_manual_json" "traceFinalTranscript" traceFinalTranscript
+  else
+    echo
+    echo "Latest manual physical trigger smoke: none found"
+  fi
 }
 
 presstalk_processes() {

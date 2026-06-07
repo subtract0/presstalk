@@ -35,6 +35,16 @@ After installing the app, the same helper is bundled at:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-machine-readiness.sh"
 ```
 
+For machine-readable release evidence, write JSON and extract the proof fields
+with `plutil`:
+
+```bash
+/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-machine-readiness.sh" \
+  --json-output "$HOME/Desktop/presstalk-readiness.json"
+plutil -extract eligibility.physicalSTTSmokeReady raw -o - "$HOME/Desktop/presstalk-readiness.json"
+plutil -extract eligibility.activeFieldSmokeReady raw -o - "$HOME/Desktop/presstalk-readiness.json"
+```
+
 It does not open System Settings or start signing repair. It reports Apple
 Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
 speech readiness, active-field insertion readiness, latest production insertion

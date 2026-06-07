@@ -186,7 +186,8 @@ PressTalk identity, runtime speech readiness, active-field insertion readiness,
 latest production insertion probe, and a concrete next action. It is intended to
 exclude machines without an attached microphone from physical STT smoke and to
 separate host/setup blockers from app regressions before cross-machine release
-claims.
+claims. It also supports --json and --json-output PATH so each machine can
+produce a parseable readiness artifact for release evidence.
 
 The app bundle also includes presstalk-verify-repair-result.sh. This is a
 read-only post-repair verifier for SSH checks: it reports the current runtime

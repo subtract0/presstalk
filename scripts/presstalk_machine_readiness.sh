@@ -4,6 +4,49 @@ set -euo pipefail
 APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-$HOME/Applications/PressTalk.app}"
 STATUS_JSON="${PRESSTALK_STATUS_JSON:-$HOME/Library/Application Support/JarvisTap/runtime-status.json}"
 DIAGNOSTICS_DIR="${PRESSTALK_DIAGNOSTICS_DIR:-$HOME/Library/Application Support/JarvisTap/Diagnostics}"
+OUTPUT_FORMAT="text"
+JSON_OUTPUT_PATH=""
+
+usage() {
+  cat <<'EOF'
+Usage: presstalk-machine-readiness.sh [--json] [--json-output PATH]
+
+Reports whether this Mac is eligible for PressTalk physical STT smoke, whether
+the running app is ready, and what the next action is. It is read-only: it does
+not open System Settings, bootstrap PressTalk, or run signing repair.
+
+Options:
+  --json              Write only machine-readable JSON to stdout.
+  --json-output PATH  Also write the machine-readable JSON report to PATH.
+  -h, --help          Show this help.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --json)
+      OUTPUT_FORMAT="json"
+      ;;
+    --json-output)
+      shift
+      if [[ $# -eq 0 || -z "$1" ]]; then
+        echo "Missing value for --json-output" >&2
+        exit 2
+      fi
+      JSON_OUTPUT_PATH="$1"
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+  shift
+done
 
 json_file_value() {
   local file="$1"
@@ -81,8 +124,37 @@ audio_input_devices() {
     sort -u
 }
 
-echo "PressTalk machine readiness"
-echo
+plist_insert_string() {
+  local plist="$1"
+  local key="$2"
+  local value="${3:-}"
+  plutil -insert "$key" -string "${value:-unknown}" "$plist" >/dev/null
+}
+
+plist_insert_bool_or_string() {
+  local plist="$1"
+  local key="$2"
+  local value="${3:-}"
+  case "$value" in
+    true|false)
+      plutil -insert "$key" -bool "$value" "$plist" >/dev/null
+      ;;
+    *)
+      plutil -insert "$key" -string "${value:-unknown}" "$plist" >/dev/null
+      ;;
+  esac
+}
+
+plist_insert_array() {
+  local plist="$1"
+  local key="$2"
+  shift 2
+  plutil -insert "$key" -array "$plist" >/dev/null
+  local value
+  for value in "$@"; do
+    plutil -insert "$key" -string "$value" -append "$plist" >/dev/null
+  done
+}
 
 hostname_value="$(hostname 2>/dev/null || true)"
 local_hostname="$(scutil --get LocalHostName 2>/dev/null || true)"
@@ -94,52 +166,52 @@ hardware_model="$(sysctl -n hw.model 2>/dev/null || true)"
 cpu_brand="$(sysctl -n machdep.cpu.brand_string 2>/dev/null || true)"
 apple_silicon="$(if [[ "$arch" == "arm64" ]]; then echo "true"; else echo "false"; fi)"
 
-print_field "Host" "$hostname_value"
-print_field "LocalHostName" "$local_hostname"
-print_field "ComputerName" "$computer_name"
-print_field "Architecture" "$arch"
-print_field "AppleSilicon" "$apple_silicon"
-print_field "macOS" "${os_version}${build_version:+ ($build_version)}"
-print_field "HardwareModel" "$hardware_model"
-print_field "CPU" "$cpu_brand"
-
-echo
-echo "Audio input hardware"
 input_devices=()
 while IFS= read -r input_device; do
   [[ -z "$input_device" ]] && continue
   input_devices+=("$input_device")
 done < <(audio_input_devices)
-if ! command -v system_profiler >/dev/null 2>&1; then
-  echo "MicrophoneHardwareDetected: unknown"
-  echo "Reason: system_profiler unavailable"
-elif [[ "${#input_devices[@]}" -gt 0 ]]; then
-  echo "MicrophoneHardwareDetected: true"
-  printf 'InputDevices:\n'
-  printf -- '- %s\n' "${input_devices[@]}"
+
+microphone_detected="unknown"
+audio_reason=""
+if command -v system_profiler >/dev/null 2>&1; then
+  if [[ "${#input_devices[@]}" -gt 0 ]]; then
+    microphone_detected="true"
+  else
+    microphone_detected="false"
+    audio_reason="no audio device with input channels was reported"
+  fi
 else
-  echo "MicrophoneHardwareDetected: false"
-  echo "Reason: no audio device with input channels was reported"
+  audio_reason="system_profiler unavailable"
 fi
 
-echo
-echo "PressTalk install"
-print_field "AppBundle" "$APP_BUNDLE"
+press_talk_installed="false"
+bundle_id=""
+signature_identifier=""
+signature_cdhash=""
+signature_authority=""
 if [[ -d "$APP_BUNDLE" ]]; then
-  echo "PressTalkInstalled: true"
-  print_field "BundleIdentifier" "$(bundle_identifier "$APP_BUNDLE")"
-  print_field "CodeSignatureIdentifier" "$(bundle_signature_value "$APP_BUNDLE" Identifier)"
-  print_field "CodeSignatureCDHash" "$(bundle_signature_value "$APP_BUNDLE" CDHash)"
-  print_field "CodeSignatureAuthority" "$(bundle_signature_value "$APP_BUNDLE" Authority)"
-else
-  echo "PressTalkInstalled: false"
+  press_talk_installed="true"
+  bundle_id="$(bundle_identifier "$APP_BUNDLE")"
+  signature_identifier="$(bundle_signature_value "$APP_BUNDLE" Identifier)"
+  signature_cdhash="$(bundle_signature_value "$APP_BUNDLE" CDHash)"
+  signature_authority="$(bundle_signature_value "$APP_BUNDLE" Authority)"
 fi
 
-echo
-echo "Runtime status"
-print_field "RuntimeStatus" "$STATUS_JSON"
+runtime_status_available="false"
+speech_model=""
+input_pipeline_ready=""
+input_listener=""
+trigger_path=""
+microphone_authorization=""
+input_monitoring_effective=""
+active_field_ready=""
+active_field_status=""
+input_method_fallback=""
+accessibility_status=""
+ad_hoc_signed=""
 if [[ -f "$STATUS_JSON" ]]; then
-  echo "RuntimeStatusAvailable: true"
+  runtime_status_available="true"
   speech_model="$(status_value status.speechModel)"
   input_pipeline_ready="$(status_value runtime.inputPipelineReady)"
   input_listener="$(status_value runtime.inputListener)"
@@ -151,87 +223,221 @@ if [[ -f "$STATUS_JSON" ]]; then
   input_method_fallback="$(status_value permissions.inputMethodFallbackStatus)"
   accessibility_status="$(status_value permissions.accessibilityStatus)"
   ad_hoc_signed="$(status_value status.adHocSigned)"
-
-  print_field "SpeechModel" "$speech_model"
-  print_field "InputPipelineReady" "$input_pipeline_ready"
-  print_field "InputListener" "$input_listener"
-  print_field "TriggerPath" "$trigger_path"
-  print_field "MicrophoneAuthorizationStatus" "$microphone_authorization"
-  print_field "InputMonitoringEffective" "$input_monitoring_effective"
-  print_field "ActiveFieldInsertionReady" "$active_field_ready"
-  print_field "ActiveFieldInsertionStatus" "$active_field_status"
-  print_field "InputMethodFallbackStatus" "$input_method_fallback"
-  print_field "AccessibilityStatus" "$accessibility_status"
-  print_field "AdHocSigned" "$ad_hoc_signed"
-else
-  echo "RuntimeStatusAvailable: false"
 fi
 
-echo
-echo "Latest production insertion probe"
 latest_probe_json="$(latest_diagnostic_file 'production-insertion-probe-*.json')"
+probe_generated_at=""
+probe_success=""
+probe_target_capture_success=""
+probe_trace_production_method=""
 if [[ -n "$latest_probe_json" ]]; then
-  print_field "ProbePath" "$latest_probe_json"
-  print_field "ProbeGeneratedAt" "$(json_file_value "$latest_probe_json" generatedAt)"
-  print_field "ProbeSuccess" "$(json_file_value "$latest_probe_json" success)"
-  print_field "ProbeTargetCaptureSuccess" "$(json_file_value "$latest_probe_json" targetCaptureSuccess)"
-  print_field "ProbeTraceProductionMethod" "$(json_file_value "$latest_probe_json" traceProductionMethod)"
-else
-  echo "ProbePath: none found"
-fi
-
-echo
-echo "Eligibility"
-microphone_detected="unknown"
-if command -v system_profiler >/dev/null 2>&1; then
-  if [[ "${#input_devices[@]}" -gt 0 ]]; then
-    microphone_detected="true"
-  else
-    microphone_detected="false"
-  fi
+  probe_generated_at="$(json_file_value "$latest_probe_json" generatedAt)"
+  probe_success="$(json_file_value "$latest_probe_json" success)"
+  probe_target_capture_success="$(json_file_value "$latest_probe_json" targetCaptureSuccess)"
+  probe_trace_production_method="$(json_file_value "$latest_probe_json" traceProductionMethod)"
 fi
 
 install_smoke_eligible="false"
 if [[ "$apple_silicon" == "true" && "$microphone_detected" != "false" ]]; then
   install_smoke_eligible="true"
 fi
-print_field "InstallSmokeEligible" "$install_smoke_eligible"
 
 physical_stt_smoke_ready="false"
-if [[ -f "$STATUS_JSON" ]] &&
+if [[ "$runtime_status_available" == "true" ]] &&
    [[ "$apple_silicon" == "true" ]] &&
    [[ "$microphone_detected" == "true" ]] &&
-   [[ "${input_pipeline_ready:-}" == "true" ]] &&
-   [[ "${speech_model:-}" == "Ready" ]] &&
-   [[ "${microphone_authorization:-}" == "authorized" ]]; then
+   [[ "$input_pipeline_ready" == "true" ]] &&
+   [[ "$speech_model" == "Ready" ]] &&
+   [[ "$microphone_authorization" == "authorized" ]]; then
   physical_stt_smoke_ready="true"
 fi
-print_field "PhysicalSTTSmokeReady" "$physical_stt_smoke_ready"
 
 active_field_smoke_ready="false"
-if [[ "$physical_stt_smoke_ready" == "true" && "${active_field_ready:-}" == "true" ]]; then
+if [[ "$physical_stt_smoke_ready" == "true" && "$active_field_ready" == "true" ]]; then
   active_field_smoke_ready="true"
 fi
-print_field "ActiveFieldSmokeReady" "$active_field_smoke_ready"
 
-echo
-echo "Next action"
 if [[ "$apple_silicon" != "true" ]]; then
-  echo "Not eligible: this is not an arm64 Apple Silicon Mac."
+  next_action="Not eligible: this is not an arm64 Apple Silicon Mac."
 elif [[ "$microphone_detected" == "false" ]]; then
-  echo "Attach or select an input microphone before running physical STT smoke."
-elif [[ ! -d "$APP_BUNDLE" ]]; then
-  echo "Install the current PressTalk prerelease, then rerun this helper."
-elif [[ ! -f "$STATUS_JSON" ]]; then
-  echo "Run PressTalk bootstrap/startup, wait for runtime-status.json, then rerun this helper."
-elif [[ "${input_pipeline_ready:-}" != "true" || "${speech_model:-}" != "Ready" ]]; then
-  echo "Speech pipeline is not ready; collect smoke status before running a physical dictation smoke."
-elif [[ "${active_field_ready:-}" != "true" ]]; then
-  if [[ "${ad_hoc_signed:-}" == "true" && "${input_method_fallback:-}" == "recognized_disabled" ]]; then
-    echo "Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
+  next_action="Attach or select an input microphone before running physical STT smoke."
+elif [[ "$press_talk_installed" != "true" ]]; then
+  next_action="Install the current PressTalk prerelease, then rerun this helper."
+elif [[ "$runtime_status_available" != "true" ]]; then
+  next_action="Run PressTalk bootstrap/startup, wait for runtime-status.json, then rerun this helper."
+elif [[ "$input_pipeline_ready" != "true" || "$speech_model" != "Ready" ]]; then
+  next_action="Speech pipeline is not ready; collect smoke status before running a physical dictation smoke."
+elif [[ "$active_field_ready" != "true" ]]; then
+  if [[ "$ad_hoc_signed" == "true" && "$input_method_fallback" == "recognized_disabled" ]]; then
+    next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
   else
-    echo "Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
+    next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi
 else
-  echo "Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+  next_action="Ready for physical Fn/Option dictation smoke with active-field insertion proof."
+fi
+
+print_text_report() {
+  echo "PressTalk machine readiness"
+  echo
+
+  print_field "Host" "$hostname_value"
+  print_field "LocalHostName" "$local_hostname"
+  print_field "ComputerName" "$computer_name"
+  print_field "Architecture" "$arch"
+  print_field "AppleSilicon" "$apple_silicon"
+  print_field "macOS" "${os_version}${build_version:+ ($build_version)}"
+  print_field "HardwareModel" "$hardware_model"
+  print_field "CPU" "$cpu_brand"
+
+  echo
+  echo "Audio input hardware"
+  if ! command -v system_profiler >/dev/null 2>&1; then
+    echo "MicrophoneHardwareDetected: unknown"
+    echo "Reason: $audio_reason"
+  elif [[ "$microphone_detected" == "true" ]]; then
+    echo "MicrophoneHardwareDetected: true"
+    printf 'InputDevices:\n'
+    printf -- '- %s\n' "${input_devices[@]}"
+  else
+    echo "MicrophoneHardwareDetected: false"
+    echo "Reason: $audio_reason"
+  fi
+
+  echo
+  echo "PressTalk install"
+  print_field "AppBundle" "$APP_BUNDLE"
+  if [[ "$press_talk_installed" == "true" ]]; then
+    echo "PressTalkInstalled: true"
+    print_field "BundleIdentifier" "$bundle_id"
+    print_field "CodeSignatureIdentifier" "$signature_identifier"
+    print_field "CodeSignatureCDHash" "$signature_cdhash"
+    print_field "CodeSignatureAuthority" "$signature_authority"
+  else
+    echo "PressTalkInstalled: false"
+  fi
+
+  echo
+  echo "Runtime status"
+  print_field "RuntimeStatus" "$STATUS_JSON"
+  if [[ "$runtime_status_available" == "true" ]]; then
+    echo "RuntimeStatusAvailable: true"
+    print_field "SpeechModel" "$speech_model"
+    print_field "InputPipelineReady" "$input_pipeline_ready"
+    print_field "InputListener" "$input_listener"
+    print_field "TriggerPath" "$trigger_path"
+    print_field "MicrophoneAuthorizationStatus" "$microphone_authorization"
+    print_field "InputMonitoringEffective" "$input_monitoring_effective"
+    print_field "ActiveFieldInsertionReady" "$active_field_ready"
+    print_field "ActiveFieldInsertionStatus" "$active_field_status"
+    print_field "InputMethodFallbackStatus" "$input_method_fallback"
+    print_field "AccessibilityStatus" "$accessibility_status"
+    print_field "AdHocSigned" "$ad_hoc_signed"
+  else
+    echo "RuntimeStatusAvailable: false"
+  fi
+
+  echo
+  echo "Latest production insertion probe"
+  if [[ -n "$latest_probe_json" ]]; then
+    print_field "ProbePath" "$latest_probe_json"
+    print_field "ProbeGeneratedAt" "$probe_generated_at"
+    print_field "ProbeSuccess" "$probe_success"
+    print_field "ProbeTargetCaptureSuccess" "$probe_target_capture_success"
+    print_field "ProbeTraceProductionMethod" "$probe_trace_production_method"
+  else
+    echo "ProbePath: none found"
+  fi
+
+  echo
+  echo "Eligibility"
+  print_field "InstallSmokeEligible" "$install_smoke_eligible"
+  print_field "PhysicalSTTSmokeReady" "$physical_stt_smoke_ready"
+  print_field "ActiveFieldSmokeReady" "$active_field_smoke_ready"
+
+  echo
+  echo "Next action"
+  echo "$next_action"
+}
+
+write_json_report() {
+  local output_path="$1"
+  local tmp_plist
+  tmp_plist="$(mktemp "${TMPDIR:-/tmp}/presstalk-readiness.XXXXXX.plist")"
+  trap 'rm -f "$tmp_plist"' RETURN
+
+  plutil -create xml1 "$tmp_plist" >/dev/null
+  plist_insert_string "$tmp_plist" "schemaVersion" "1"
+  plist_insert_string "$tmp_plist" "generatedAt" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+  plist_insert_string "$tmp_plist" "appBundle" "$APP_BUNDLE"
+  plist_insert_string "$tmp_plist" "statusJson" "$STATUS_JSON"
+  plist_insert_string "$tmp_plist" "diagnosticsDir" "$DIAGNOSTICS_DIR"
+
+  plutil -insert "machine" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_string "$tmp_plist" "machine.host" "$hostname_value"
+  plist_insert_string "$tmp_plist" "machine.localHostName" "$local_hostname"
+  plist_insert_string "$tmp_plist" "machine.computerName" "$computer_name"
+  plist_insert_string "$tmp_plist" "machine.architecture" "$arch"
+  plist_insert_bool_or_string "$tmp_plist" "machine.appleSilicon" "$apple_silicon"
+  plist_insert_string "$tmp_plist" "machine.macOSVersion" "$os_version"
+  plist_insert_string "$tmp_plist" "machine.macOSBuild" "$build_version"
+  plist_insert_string "$tmp_plist" "machine.hardwareModel" "$hardware_model"
+  plist_insert_string "$tmp_plist" "machine.cpu" "$cpu_brand"
+
+  plutil -insert "audio" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_bool_or_string "$tmp_plist" "audio.microphoneHardwareDetected" "$microphone_detected"
+  plist_insert_string "$tmp_plist" "audio.reason" "$audio_reason"
+  plist_insert_array "$tmp_plist" "audio.inputDevices" "${input_devices[@]}"
+
+  plutil -insert "pressTalk" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_bool_or_string "$tmp_plist" "pressTalk.installed" "$press_talk_installed"
+  plist_insert_string "$tmp_plist" "pressTalk.bundleIdentifier" "$bundle_id"
+  plist_insert_string "$tmp_plist" "pressTalk.codeSignatureIdentifier" "$signature_identifier"
+  plist_insert_string "$tmp_plist" "pressTalk.codeSignatureCDHash" "$signature_cdhash"
+  plist_insert_string "$tmp_plist" "pressTalk.codeSignatureAuthority" "$signature_authority"
+
+  plutil -insert "runtime" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_bool_or_string "$tmp_plist" "runtime.statusAvailable" "$runtime_status_available"
+  plist_insert_string "$tmp_plist" "runtime.speechModel" "$speech_model"
+  plist_insert_bool_or_string "$tmp_plist" "runtime.inputPipelineReady" "$input_pipeline_ready"
+  plist_insert_string "$tmp_plist" "runtime.inputListener" "$input_listener"
+  plist_insert_string "$tmp_plist" "runtime.triggerPath" "$trigger_path"
+  plist_insert_string "$tmp_plist" "runtime.microphoneAuthorizationStatus" "$microphone_authorization"
+  plist_insert_bool_or_string "$tmp_plist" "runtime.inputMonitoringEffective" "$input_monitoring_effective"
+  plist_insert_bool_or_string "$tmp_plist" "runtime.activeFieldInsertionReady" "$active_field_ready"
+  plist_insert_string "$tmp_plist" "runtime.activeFieldInsertionStatus" "$active_field_status"
+  plist_insert_string "$tmp_plist" "runtime.inputMethodFallbackStatus" "$input_method_fallback"
+  plist_insert_string "$tmp_plist" "runtime.accessibilityStatus" "$accessibility_status"
+  plist_insert_bool_or_string "$tmp_plist" "runtime.adHocSigned" "$ad_hoc_signed"
+
+  plutil -insert "latestProductionInsertionProbe" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_string "$tmp_plist" "latestProductionInsertionProbe.path" "${latest_probe_json:-none}"
+  plist_insert_string "$tmp_plist" "latestProductionInsertionProbe.generatedAt" "$probe_generated_at"
+  plist_insert_bool_or_string "$tmp_plist" "latestProductionInsertionProbe.success" "$probe_success"
+  plist_insert_bool_or_string "$tmp_plist" "latestProductionInsertionProbe.targetCaptureSuccess" "$probe_target_capture_success"
+  plist_insert_string "$tmp_plist" "latestProductionInsertionProbe.traceProductionMethod" "$probe_trace_production_method"
+
+  plutil -insert "eligibility" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_bool_or_string "$tmp_plist" "eligibility.installSmokeEligible" "$install_smoke_eligible"
+  plist_insert_bool_or_string "$tmp_plist" "eligibility.physicalSTTSmokeReady" "$physical_stt_smoke_ready"
+  plist_insert_bool_or_string "$tmp_plist" "eligibility.activeFieldSmokeReady" "$active_field_smoke_ready"
+  plist_insert_string "$tmp_plist" "nextAction" "$next_action"
+
+  plutil -convert json -r -o "$output_path" "$tmp_plist"
+  rm -f "$tmp_plist"
+  trap - RETURN
+}
+
+if [[ "$OUTPUT_FORMAT" == "json" ]]; then
+  write_json_report "-"
+else
+  print_text_report
+fi
+
+if [[ -n "$JSON_OUTPUT_PATH" ]]; then
+  write_json_report "$JSON_OUTPUT_PATH"
+  if [[ "$OUTPUT_FORMAT" != "json" ]]; then
+    echo
+    echo "ReadinessJSON: $JSON_OUTPUT_PATH"
+  fi
 fi

@@ -24,8 +24,9 @@ if [[ ! -f "$ASSET_PATH" || ! -f "$SHA_PATH" ]]; then
 fi
 
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
-NOTES="$(cat <<EOF
-PressTalk ${VERSION} prerelease smoke artifact for Apple Silicon macOS.
+NOTES_TEMPLATE_PATH="$(mktemp "${TMPDIR:-/tmp}/presstalk-release-notes.XXXXXX")"
+cat >"$NOTES_TEMPLATE_PATH" <<'EOF'
+PressTalk __PRESSTALK_VERSION__ prerelease smoke artifact for Apple Silicon macOS.
 
 Default trigger: Fn / Globe.
 
@@ -236,10 +237,14 @@ This prerelease is for machine verification on studio1, s1, s2, and mbp1. Do not
 SHA-256:
 
 \`\`\`
-${SHA256}
+__PRESSTALK_SHA256__
 \`\`\`
 EOF
-)"
+NOTES="$(sed \
+  -e "s/__PRESSTALK_VERSION__/$VERSION/g" \
+  -e "s/__PRESSTALK_SHA256__/$SHA256/g" \
+  "$NOTES_TEMPLATE_PATH")"
+rm -f "$NOTES_TEMPLATE_PATH"
 
 if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
   gh release upload "$RELEASE_TAG" "$ASSET_PATH" --repo "$RELEASE_REPO" --clobber

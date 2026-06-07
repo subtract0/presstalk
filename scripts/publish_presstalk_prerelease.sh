@@ -65,9 +65,9 @@ that records physical trigger dictation smoke results as JSON without opening
 macOS permission panes. It now reads the configured runtime trigger key, supports
 Fn/Option/F5/trackpad labels, and records readiness before and after the manual
 paste smoke. It also records traceFinalTranscript, traceInserted,
-traceCopyFallback, targetCaptureSuccess, and targetCaptureFailureHint, so a
-physical trigger/STT success is visibly separate from an active-field insertion
-failure.
+traceCopyFallback, traceInputMethodSelectFailed, targetCaptureSuccess, and
+targetCaptureFailureHint, so a physical trigger/STT success is visibly separate
+from an active-field insertion failure.
 
 The bundle now also carries a separate PressTalkInputMethod.app plus
 presstalk-install-input-method.sh, presstalk-input-method-status.swift,

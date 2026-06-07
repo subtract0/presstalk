@@ -181,8 +181,12 @@ sentence, then release. It writes a machine-readable result under
 expected trigger, runtime readiness before and after the attempt, runtime status,
 and trace lines since the helper started. Current helpers also record
 `traceFinalTranscript`, `traceInserted`, `traceCopyFallback`,
-`targetCaptureSuccess`, and `targetCaptureFailureHint`, so physical trigger/STT
-proof is separate from active-field insertion proof.
+`traceInputMethodSelectFailed`, `targetCaptureSuccess`, and
+`targetCaptureFailureHint`, so physical trigger/STT proof is separate from
+active-field insertion proof. On a machine like the current mbp1 ad-hoc SSH
+install, `targetCaptureFailureHint=input_method_select_failed` means the trigger
+and transcription path may have worked, but macOS refused to select the
+InputMethodKit fallback for active-field insertion.
 
 Expected:
 

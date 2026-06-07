@@ -25,6 +25,8 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
     private var traceCopyFallback = false
     private var traceTriggerPressed = false
     private var traceTriggerReleased = false
+    private var traceInputMethodSelectFailed = false
+    private var traceInputMethodFailure: String?
 
     override init() {
         let env = ProcessInfo.processInfo.environment
@@ -169,6 +171,13 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             if line.contains("Dictation copied because paste unavailable") {
                 traceCopyFallback = true
             }
+            if let range = line.range(of: "Input method insertion unavailable reason=") {
+                traceInputMethodFailure = String(line[range.upperBound...])
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if line.contains("reason=select_failed") {
+                    traceInputMethodSelectFailed = true
+                }
+            }
         }
     }
 
@@ -204,6 +213,8 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
         let targetCaptureFailureHint: Any
         if targetCaptureSuccess {
             targetCaptureFailureHint = NSNull()
+        } else if traceInputMethodSelectFailed {
+            targetCaptureFailureHint = "input_method_select_failed"
         } else if traceCopyFallback {
             targetCaptureFailureHint = "accessibility_untrusted_copy_fallback"
         } else if traceInserted {
@@ -231,6 +242,8 @@ final class ManualFnSmokeDelegate: NSObject, NSApplicationDelegate {
             "tracePasteCommandPosted": tracePasteCommandPosted,
             "traceInserted": traceInserted,
             "traceCopyFallback": traceCopyFallback,
+            "traceInputMethodSelectFailed": traceInputMethodSelectFailed,
+            "traceInputMethodFailure": traceInputMethodFailure ?? NSNull(),
             "tracePipelineComplete": tracePipelineComplete,
             "traceTriggerPressed": traceTriggerPressed,
             "traceTriggerReleased": traceTriggerReleased,

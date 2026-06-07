@@ -695,7 +695,9 @@ Known current proof gaps:
   adjusted InputMethodKit diagnostics, and bootstrap output that separates
   stable-signing requested from stable-signing applied. Input-method diagnostics
   also report `input_method_select_failed` when source recognition succeeds but
-  `TISSelectInputSource` fails. It also includes
+  `TISSelectInputSource` fails, and manual physical-trigger smoke records
+  `traceInputMethodSelectFailed` / `traceInputMethodFailure` so STT success can
+  be separated from active-field insertion failure. It also includes
   `presstalk-manual-fn-smoke.swift`, which opens a focused text window and
   records physical Fn dictation smoke results as JSON, plus the rc29
   success-path setup-window fix, the rc30 manual-smoke insertion evidence

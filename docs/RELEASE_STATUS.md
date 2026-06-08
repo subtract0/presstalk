@@ -1,15 +1,16 @@
 # Release Status
 
-Current status: public rc99 prerelease smoke artifact published with the
-Accessibility insertion handoff; full cross-machine release not yet proven.
+Current status: public rc100 prerelease smoke artifact published with direct
+Accessibility handoff guidance for the mbp1 post-repair blocker; full
+cross-machine release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc99`
-- Commit: `07ac2f2ca62bba60a580f8137d66b65d22e49170`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc99`
-- Asset: `PressTalk-0.1.5-rc99-macos-arm64.zip`
-- SHA-256: `ecdfb09f9ac65b705dfbecd1b28c1f9a19a7c15c6e305870bc09555c6b67e6b2`
+- Tag: `v0.1.5-rc100`
+- Commit: `f5d2808fd587aecd88b43d8012470e5913d08201`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc100`
+- Asset: `PressTalk-0.1.5-rc100-macos-arm64.zip`
+- SHA-256: `6d44d56e0d12e50525481b6876c12d2796b451bf46bf850e0dade5b91d566589`
 
 Verified on `studio1` during 2026-06-06 through 2026-06-08:
 
@@ -24,26 +25,49 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc99` is the current public prerelease smoke artifact. It keeps the
-  `Option + Space` registered-hotkey route, requests native microphone approval
-  once when the current signed identity is truly `not_determined`, and includes
-  the desktop signing-repair handoff for mbp1. It also fixes the post-repair
-  `mbp1` diagnostic state: trusted local-signing plus `recognized_disabled` is
-  reported as an input-method/TIS enable blocker, not another signing repair
-  loop. New in rc99, the bundle includes `presstalk-accessibility-handoff.sh`,
-  which can write a double-clickable desktop command for the one remaining mbp1
-  meatspace step: grant Accessibility to the exact installed PressTalk app and
-  immediately run the production insertion probe plus verifier. The production
-  insertion probe is marker-gated and skips bootstrap/re-signing when a live
-  PressTalk process is already running, avoiding unnecessary CDHash churn and
-  InputMethodKit acknowledgement races.
-- The `v0.1.5-rc99` GitHub release was verified as a prerelease. GitHub reports
-  asset digest
-  `sha256:ecdfb09f9ac65b705dfbecd1b28c1f9a19a7c15c6e305870bc09555c6b67e6b2`,
-  matching the local `dist/PressTalk-0.1.5-rc99-macos-arm64.zip`. The
-  `v0.1.5-rc99` tag points at
-  `07ac2f2ca62bba60a580f8137d66b65d22e49170`.
-- `v0.1.5-rc98` is the previous public prerelease smoke artifact. It fixed the
+- `v0.1.5-rc100` is the current public prerelease smoke artifact. It keeps the
+  `Option + Space` registered-hotkey route and the Accessibility handoff helper
+  from rc99, and now routes trusted local-signing `recognized_disabled`
+  diagnostics directly to the existing
+  `~/Desktop/Grant PressTalk Accessibility.command` when present, or to the
+  handoff-command writer when absent. Ad-hoc `recognized_disabled` remains on
+  the no-pane Repair Signing path. The app and bundled diagnostics no longer
+  imply another Microphone, Input Monitoring, signing repair, Karabiner, or
+  generic privacy-pane pass for the mbp1 post-repair state.
+- The `v0.1.5-rc100` GitHub release was verified as a prerelease. GitHub
+  reports asset digest
+  `sha256:6d44d56e0d12e50525481b6876c12d2796b451bf46bf850e0dade5b91d566589`,
+  matching the local `dist/PressTalk-0.1.5-rc100-macos-arm64.zip`. The
+  `v0.1.5-rc100` tag points at
+  `f5d2808fd587aecd88b43d8012470e5913d08201`.
+- After rc100 packaging, `studio1` was restored to stable local signing and
+  no-pane launch. The current installed app reports
+  `CodeSignatureCDHash=eece670e59d61753d9410219a457d5e57af84f01`,
+  `inputListener=carbon:registered`, `triggerPath=Option + Space ready`,
+  `speechModel=Ready`, and `activeFieldInsertionStatus=ready_input_method`.
+  The fresh production insertion probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-24-53-347Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification`.
+- The rc100 candidate was also installed on `mbp1` with no-pane bootstrap and
+  `PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing`. It reused the existing mbp1
+  PressTalk local signing identity and reports
+  `CodeSignatureCDHash=dc5c2c466ebb08366d6ed0d0c9156c1a55af4a83`,
+  `inputListener=carbon:registered`, `triggerPath=Option + Space ready`,
+  `speechModel=Ready`, `activeFieldInsertionStatus=blocked_recognized_disabled`,
+  and `inputMethodFallbackStatus=recognized_disabled`. The refreshed desktop
+  command at `/Users/alexandermonas/Desktop/Grant PressTalk Accessibility.command`
+  is the next meatspace step.
+- The fresh rc100 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc100-local-mbp1-20260608T012519Z.json`
+  required `local` and `mbp1-tb` and excluded `studio2=no_attached_microphone`.
+  The matching proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc100-local-mbp1-20260608T012519Z.json`
+  remains `proven=false` with one failure:
+  `mbp1-tb active_field_not_ready`.
+- `v0.1.5-rc99` is the previous public prerelease smoke artifact. It added the
+  Accessibility handoff helper, but its post-repair diagnostics still needed
+  the direct handoff-command guidance added in rc100. `v0.1.5-rc98` fixed the
   trusted-local-signing diagnostic loop, but it did not include the
   Accessibility handoff helper.
 - On mbp1, no-prompt preflight for the rc99 candidate reports

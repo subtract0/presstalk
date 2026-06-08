@@ -132,4 +132,15 @@ HOME="$home_dir" PRESSTALK_APP_BUNDLE="$app_bundle" PRESSTALK_TEST_EXISTING_IDEN
 grep -Fq "Trigger: option_space" "$default_trigger_output"
 grep -Fq "RepairNeeded: false" "$default_trigger_output"
 
+desktop_command="$TEST_TMPDIR/Repair PressTalk Signing.command"
+desktop_output="$TEST_TMPDIR/desktop-command.txt"
+HOME="$home_dir" PRESSTALK_APP_BUNDLE="$app_bundle" PRESSTALK_REPAIR_DESKTOP_COMMAND_PATH="$desktop_command" "$HELPER" --write-desktop-command >"$desktop_output"
+test -x "$desktop_command"
+grep -Fq "DesktopCommand: $desktop_command" "$desktop_output"
+grep -Fq "did not create or trust a certificate" "$desktop_output"
+grep -Fq -- "--app-bundle '$app_bundle'" "$desktop_command"
+grep -Fq -- "--trigger-key 'option_space'" "$desktop_command"
+grep -Fq -- "--probe" "$desktop_command"
+grep -Fq "Press Return to close this window." "$desktop_command"
+
 echo "PASS signing_repair_preflight"

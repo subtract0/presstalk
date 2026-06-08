@@ -89,6 +89,12 @@ existing but untrusted PressTalk local signing identity, reporting the latter as
 ExistingSigningIdentity=untrusted with its hash. That keeps mbp1-style repair
 diagnostics honest without starting the signing trust prompt remotely.
 
+The repair helper now also supports --write-desktop-command. Over SSH it can
+write a double-clickable ~/Desktop/Repair PressTalk Signing.command for the
+logged-in user without starting the trust flow. The generated command runs the
+same no-pane repair with --probe from the desktop session and keeps Terminal
+open with the result.
+
 Settings now shows a Repair Signing button for PressTalk signing states where
 macOS recognizes the PressTalk input method but has not enabled it. The button
 runs the bundled repair helper with permission panes disabled and then runs the

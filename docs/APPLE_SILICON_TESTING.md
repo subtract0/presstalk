@@ -198,6 +198,20 @@ running app insertion path immediately after repair:
 The repair wrapper refuses to start the signing trust flow over SSH unless
 `--allow-ssh` is passed deliberately.
 
+If you are diagnosing over SSH and need to hand the repair to the logged-in
+desktop user without starting a remote trust prompt, write a double-clickable
+Desktop command:
+
+```bash
+ssh mbp1-tb '/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --write-desktop-command'
+```
+
+That command only writes `~/Desktop/Repair PressTalk Signing.command`. It does
+not create or trust a certificate, sign or restart PressTalk, run a probe, open
+System Settings, or request any privacy approval. The desktop user then
+double-clicks it and approves only the PressTalk local signing password prompt
+if macOS asks.
+
 The normal bootstrap summary now also reports `Bundled input method signing
 applied` and `Installed input method refreshed`. On mbp1, those fields must be
 `1` before treating the repaired input-method path as tested.

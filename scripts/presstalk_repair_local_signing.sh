@@ -6,9 +6,11 @@ DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk.app"
 STATUS_JSON="$HOME/Library/Application Support/JarvisTap/runtime-status.json"
 RUN_PROBE=0
 PREFLIGHT=0
+WRITE_DESKTOP_COMMAND=0
 APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-}"
 TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-}"
 ALLOW_SSH="${PRESSTALK_REPAIR_ALLOW_SSH:-0}"
+DESKTOP_COMMAND_PATH="${PRESSTALK_REPAIR_DESKTOP_COMMAND_PATH:-}"
 
 usage() {
   cat <<EOF
@@ -27,6 +29,10 @@ Options:
   --preflight         Report whether repair is needed and whether a signing
                       trust password prompt would be required. Does not repair,
                       create, sign, bootstrap, probe, or open any panes.
+  --write-desktop-command
+                      Write a double-clickable Desktop command that runs this
+                      repair with --probe from the logged-in desktop session.
+                      Does not repair, sign, bootstrap, probe, or open panes.
   --probe             Run the production insertion probe after repair.
   --allow-ssh         Permit running the signing trust flow from SSH.
   -h, --help          Show this help.
@@ -57,6 +63,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --preflight)
       PREFLIGHT=1
+      shift
+      ;;
+    --write-desktop-command)
+      WRITE_DESKTOP_COMMAND=1
       shift
       ;;
     --allow-ssh)
@@ -117,6 +127,62 @@ status_value() {
 
 running_over_ssh() {
   [[ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ]]
+}
+
+shell_quote() {
+  printf "'"
+  printf "%s" "$1" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
+write_desktop_command() {
+  local command_path command_dir helper_path
+  command_path="${DESKTOP_COMMAND_PATH:-$HOME/Desktop/Repair PressTalk Signing.command}"
+  command_dir="$(dirname "$command_path")"
+  helper_path="$SCRIPT_DIR/$(basename "$0")"
+
+  mkdir -p "$command_dir"
+  cat >"$command_path" <<EOF
+#!/usr/bin/env bash
+set -uo pipefail
+
+clear
+echo "PressTalk signing repair"
+echo
+echo "This will not open System Settings or privacy panes."
+echo "If macOS asks for your Mac login password, approve it only for"
+echo "the PressTalk local signing certificate trust prompt."
+echo
+
+/bin/bash $(shell_quote "$helper_path") --app-bundle $(shell_quote "$APP_BUNDLE") --trigger-key $(shell_quote "$TRIGGER_KEY") --probe
+status=\$?
+
+echo
+if [[ "\$status" == "0" ]]; then
+  echo "PressTalk signing repair completed."
+else
+  echo "PressTalk signing repair failed with exit status \$status."
+fi
+echo
+echo "Press Return to close this window."
+read -r _
+exit "\$status"
+EOF
+  chmod 700 "$command_path"
+
+  cat <<EOF
+PressTalk desktop repair command written
+
+DesktopCommand: $command_path
+App: $APP_BUNDLE
+Trigger: $TRIGGER_KEY
+
+This did not create or trust a certificate, did not sign or restart PressTalk,
+did not run an insertion probe, and did not open System Settings.
+
+NextAction: From the logged-in desktop session, double-click the command and
+approve only the PressTalk local signing password prompt if macOS asks.
+EOF
 }
 
 existing_identity_status() {
@@ -217,6 +283,11 @@ EOF
 
 if [[ "$PREFLIGHT" == "1" ]]; then
   print_preflight
+  exit 0
+fi
+
+if [[ "$WRITE_DESKTOP_COMMAND" == "1" ]]; then
+  write_desktop_command
   exit 0
 fi
 

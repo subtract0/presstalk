@@ -16,6 +16,26 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
+GIT_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+if ! git -C "$ROOT" diff --quiet || ! git -C "$ROOT" diff --cached --quiet; then
+  echo "Refusing to publish from a dirty working tree. Commit or stash changes first." >&2
+  exit 1
+fi
+
+BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD || true)"
+if [[ -n "$BRANCH" ]]; then
+  REMOTE="$(git -C "$ROOT" config "branch.${BRANCH}.remote" || true)"
+  MERGE_REF="$(git -C "$ROOT" config "branch.${BRANCH}.merge" || true)"
+  if [[ -n "$REMOTE" && -n "$MERGE_REF" ]]; then
+    REMOTE_HEAD="$(git -C "$ROOT" ls-remote "$REMOTE" "$MERGE_REF" | awk 'NR == 1 { print $1 }')"
+    if [[ -n "$REMOTE_HEAD" && "$REMOTE_HEAD" != "$GIT_HEAD" ]]; then
+      echo "Refusing to publish: $REMOTE/$BRANCH is not at local HEAD $GIT_HEAD." >&2
+      echo "Push the tested commit first, then rerun this script." >&2
+      exit 1
+    fi
+  fi
+fi
+
 bash "$ROOT/scripts/package_presstalk_release.sh" "$VERSION" >/dev/null
 
 if [[ ! -f "$ASSET_PATH" || ! -f "$SHA_PATH" ]]; then
@@ -456,6 +476,7 @@ if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
 else
   gh release create "$RELEASE_TAG" "$ASSET_PATH" \
     --repo "$RELEASE_REPO" \
+    --target "$GIT_HEAD" \
     --title "PressTalk ${VERSION}" \
     --notes "$NOTES" \
     --prerelease

@@ -5,13 +5,13 @@ release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc91`
-- Commit: `b7d3dc56b3a2ad5d3fbaa3603282d42e6675e29a`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc91`
-- Asset: `PressTalk-0.1.5-rc91-macos-arm64.zip`
-- SHA-256: `a5225bdd7fba113e25775a487af712a3bcae7b2a021e325fc157aded87fe67f1`
+- Tag: `v0.1.5-rc94`
+- Commit: `2c8049c4ca07151d86e7cb4173c44069f9bdd98d`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc94`
+- Asset: `PressTalk-0.1.5-rc94-macos-arm64.zip`
+- SHA-256: `e24082d144d3c21a795a4e05666855ad652ca7024c96434d438895b921eda259`
 
-Verified on `studio1` during 2026-06-06 and 2026-06-07:
+Verified on `studio1` during 2026-06-06 through 2026-06-08:
 
 - `swift build -c release` succeeds.
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
@@ -24,33 +24,36 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc91` is the current public prerelease smoke artifact. It includes the
-  rc90 production input-method insertion retry hardening plus a direct
-  Settings/menu manual-smoke launcher. The launcher no longer shells out through
-  detached `nohup`, which could exit without a result artifact; the app now
-  launches and retains the helper process directly while still writing
-  diagnostic log/pid files. The rc91 helper also classifies per-run `Option +
-  Space` pressed/released trace lines as registered-hotkey evidence.
-- The `v0.1.5-rc91` GitHub release was verified as a prerelease. GitHub reports
+- `v0.1.5-rc94` is the current public prerelease smoke artifact. It keeps the
+  `Option + Space` registered-hotkey route and replaces the restart-dependent
+  production insertion probe with a marker-gated observer that is installed
+  during normal no-pane app startup. The app ignores diagnostic insertion
+  notifications unless the probe has created a fresh local marker file, so the
+  probe tests the real running app without depending on a probe-only launch
+  environment.
+- The `v0.1.5-rc94` GitHub release was verified as a prerelease. GitHub reports
   asset digest
-  `sha256:a5225bdd7fba113e25775a487af712a3bcae7b2a021e325fc157aded87fe67f1`,
-  matching the local `dist/PressTalk-0.1.5-rc91-macos-arm64.zip`. The
-  `v0.1.5-rc91` tag points at
-  `b7d3dc56b3a2ad5d3fbaa3603282d42e6675e29a`.
-- After rc91 packaging, `studio1` was restored to stable local
-  `com.am.jarvistap` identity with no-pane flags and
-  `PRESSTALK_TRIGGER_KEY=option_space`. The final restored readiness report
-  shows `CodeSignatureCDHash=d5531da42a8b49dd8226121b89512cd0f05c0372`,
-  `inputListener=carbon:registered`, `speechModel=Ready`,
-  `activeFieldInsertionStatus=ready_input_method`, and trigger path
-  `Option + Space ready`.
-- The latest rc91 current-signed-app production insertion probe on `studio1`
+  `sha256:e24082d144d3c21a795a4e05666855ad652ca7024c96434d438895b921eda259`,
+  matching the local `dist/PressTalk-0.1.5-rc94-macos-arm64.zip`. The
+  `v0.1.5-rc94` tag points at
+  `2c8049c4ca07151d86e7cb4173c44069f9bdd98d`.
+- The latest rc94 marker-gated production insertion probes on `studio1`
   reported `success=true`, `targetCaptureSuccess=true`, and
   `traceProductionMethod=input_method_notification` at
-  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T23-20-16-365Z.json`.
-  Its trace includes
-  `Input method insertion acknowledgement inserted=1 attempt=1` before
-  `Production insertion probe inserted`.
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-07T23-59-36-341Z.json`
+  and
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T00-00-05-709Z.json`.
+  The second repeated run inserted on input-method attempt 1 and the probe
+  marker and payload files were removed after completion.
+- After rc94 packaging, `studio1` was restored with the public
+  `com.am.presstalk` identity, no-pane flags, and
+  `PRESSTALK_TRIGGER_KEY=option_space`. The current readiness report at
+  `~/Library/Application Support/JarvisTap/Diagnostics/machine-readiness-rc94-local-20260608T000441Z.json`
+  shows `CodeSignatureCDHash=57c6e6a027d9cc9bfc245acca2265a6e9f8ec530`,
+  `inputListener=carbon:registered`, `speechModel=Ready`,
+  `activeFieldInsertionStatus=ready_input_method`, `InputMethodFallbackStatus=ready`,
+  `AccessibilityStatus=ax_false_input_method_fallback_ready`, and trigger path
+  `Option + Space ready`.
 - The latest studio1 manual physical `Option + Space` smoke at
   `~/Library/Application Support/JarvisTap/Diagnostics/manual-trigger-smoke-2026-06-07T23-11-42.644Z.json`
   reported `success=true`, `expectedTriggerProof=true`,
@@ -59,22 +62,30 @@ Verified on `studio1` during 2026-06-06 and 2026-06-07:
   `traceRegisteredHotKeyObserved=false` field is stale; the trace contains the
   actual `Option + Space` pressed/released lines and rc91 classifies those as
   registered-hotkey evidence in future manual-smoke JSON.
-- `mbp1` was updated from the public rc91 artifact over `mbp1-tb` with the
+- `mbp1` was updated from the public rc94 artifact over `mbp1-tb` with the
   expected SHA and no-pane bootstrap flags. It reports
   `triggerPath=Option + Space ready`, `inputListener=carbon:registered`,
   `speechModel=Ready`, and `microphoneAuthorizationStatus=authorized`.
   Active-field insertion is still blocked by signing repair:
   `activeFieldInsertionStatus=needs_signing_repair`,
   `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
-  The rc91 bootstrap reused only existing signing state, skipped stable signing
+  The rc94 bootstrap reused only existing signing state, skipped stable signing
   because the existing PressTalk local identity is still untrusted, did not open
   System Settings, and did not start a signing trust prompt.
-- The latest rc91 readiness matrix at
-  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc91-mbp1-updated-20260607T232111Z.json`
-  required `local` and `mbp1-tb`. It reports `local` as ready for physical
-  dictation smoke and `mbp1-tb` as reachable with speech ready but
-  `activeFieldSmokeReady=false`. The matching rc91 proof gate at
-  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc91-mbp1-updated-20260607T232111Z.json`
+- The rc94 mbp1 repair preflight reports `RepairNeeded=true`,
+  `RepairAllowedHere=false`, `WouldRunRepair=false`,
+  `SigningTrustPromptNeeded=true`, and
+  `ExistingSigningIdentity=untrusted` with identity
+  `2EA0B09365E72779413B98BA6319E5D9FBA09205`. The next action is logged-in
+  desktop Repair Signing; SSH repair remains refused unless `--allow-ssh` is
+  passed deliberately.
+- The latest rc94 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc94-local-mbp1-20260608T000549Z.json`
+  required `local` and `mbp1-tb` and excluded `studio2` because it has no
+  attached microphone. It reports `local` as ready for physical dictation smoke
+  and active-field smoke, while `mbp1-tb` is reachable with speech ready but
+  `activeFieldSmokeReady=false`. The matching rc94 proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc94-local-mbp1-20260608T000556Z.json`
   is still `proven=false` with `failureCount=1`, failing only `mbp1-tb` for
   `active_field_not_ready`.
 - `v0.1.5-rc90` was superseded by rc91 after proving that the Settings/menu

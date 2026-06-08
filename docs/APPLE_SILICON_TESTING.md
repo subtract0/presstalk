@@ -102,10 +102,10 @@ For the current prerelease smoke artifact:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc91-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc91/PressTalk-0.1.5-rc91-macos-arm64.zip
-echo "a5225bdd7fba113e25775a487af712a3bcae7b2a021e325fc157aded87fe67f1  $tmpdir/PressTalk-0.1.5-rc91-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc91-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.5-rc94-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc94/PressTalk-0.1.5-rc94-macos-arm64.zip
+echo "e24082d144d3c21a795a4e05666855ad652ca7024c96434d438895b921eda259  $tmpdir/PressTalk-0.1.5-rc94-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.5-rc94-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -117,7 +117,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-a5225bdd7fba113e25775a487af712a3bcae7b2a021e325fc157aded87fe67f1
+e24082d144d3c21a795a4e05666855ad652ca7024c96434d438895b921eda259
 ```
 
 Homebrew install is the intended stable path after the smoke artifact is
@@ -249,11 +249,15 @@ values:
 ## Runtime Checks
 
 Approve only fresh macOS prompts that are not already granted for the current
-PressTalk identity:
+PressTalk identity, and only when runtime status says the selected path needs
+them:
 
-- PressTalk microphone access
-- PressTalk input monitoring
-- PressTalk accessibility
+- Microphone access is required for local STT.
+- Accessibility is optional when `inputMethodFallbackStatus=ready`; it is only
+  needed if you choose the Accessibility/paste-command insertion path.
+- Input Monitoring is not required for the default `Option + Space` registered
+  hotkey path. It is only relevant for modifier-only, trackpad, or legacy
+  trigger paths that report it as required.
 
 Karabiner is not required for the default `Option` path. Do not install or
 approve Karabiner during the core smoke unless you are explicitly testing the

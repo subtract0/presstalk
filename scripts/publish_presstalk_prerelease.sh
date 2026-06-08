@@ -355,6 +355,11 @@ Runtime status also records microphoneAuthorizationStatus, so a blocked machine
 can distinguish authorized, denied, restricted, not_determined, and unknown
 microphone preflight states without opening System Settings.
 
+When microphone authorization is truly not_determined for the current signed
+PressTalk identity, startup now asks through the native macOS microphone prompt
+once and retries setup after the user responds. It still does not open System
+Settings panes for no-pane runs.
+
 For insertion, PressTalk now tries direct Accessibility insertion into the
 focused text element when Accessibility is trusted. If Accessibility is not
 trusted, it tries the InputMethodKit insertion fallback before copying the

@@ -24,8 +24,11 @@ bash scripts/presstalk_collect_smoke_status.sh
 ```
 
 Current builds keep the setup retry loop quiet. They do not auto-open System
-Settings panes, do not call macOS permission-request APIs during startup/setup,
-and do not auto-show the PressTalk Settings window after successful startup.
+Settings panes and do not auto-show the PressTalk Settings window after
+successful startup. If microphone authorization is truly `not_determined` for
+the current signed PressTalk identity, startup asks once through the native
+macOS microphone prompt; that is the expected first-run path and is not a
+reason to open privacy panes repeatedly.
 Even when `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is deliberately set for a
 first-run guide, the window is only auto-shown for a real startup failure.
 When launched with `PRESSTALK_OPEN_PERMISSION_PANES=0`, the Settings window's

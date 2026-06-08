@@ -179,7 +179,7 @@ struct PressTalkRuntimeStatus {
         }
         switch microphoneAuthorizationStatus {
         case "not_determined":
-            return PressTalkPermissionLabel(text: "Not determined", tone: .warning)
+            return PressTalkPermissionLabel(text: "Needs microphone approval", tone: .warning)
         case "denied":
             return PressTalkPermissionLabel(text: "Preflight denied", tone: .warning)
         case "restricted":

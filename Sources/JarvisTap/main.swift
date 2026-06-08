@@ -1191,6 +1191,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var firstPointerEventLogged = false
     private var trackpadHoldState: TrackpadHoldState?
     private var trackpadArmWorkItem: DispatchWorkItem?
+    private var microphonePermissionRequestInFlight = false
+    private var microphonePermissionRequestAttempted = false
 
     private var statusItem: NSStatusItem?
     private var statusSummaryMenuItem: NSMenuItem?
@@ -1305,6 +1307,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             fflush(stdout)
         }
         guard permissions.microphoneGranted else {
+            if permissions.microphoneAuthorizationStatus == "not_determined" {
+                requestMicrophonePermissionAndRetry(
+                    showSetupWindowOnFailure: showSetupWindowOnFailure,
+                    forcePresentSetupWindow: forcePresentSetupWindow,
+                    presentFailureStatus: presentFailureStatus
+                )
+                return
+            }
             if presentFailureStatus {
                 traceLogger.log("Startup blocked: microphone unavailable to current build status=\(permissions.microphoneAuthorizationStatus)")
                 printMicrophoneHelp()
@@ -2984,6 +2994,47 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             FileHandle.standardOutput.write(Data("\n".utf8))
         } catch {
             fputs("[PressTalk] Accessibility trust probe JSON failed: \(error)\n", stderr)
+        }
+    }
+
+    private func requestMicrophonePermissionAndRetry(
+        showSetupWindowOnFailure: Bool,
+        forcePresentSetupWindow: Bool,
+        presentFailureStatus: Bool
+    ) {
+        guard !microphonePermissionRequestInFlight && !microphonePermissionRequestAttempted else {
+            if presentFailureStatus {
+                traceLogger.log("Startup blocked: microphone still not determined after request attempt")
+                present(.setupRequired("Microphone approval is still pending. Approve the native PressTalk microphone prompt; do not open privacy panes repeatedly."))
+            }
+            refreshRuntimeStatusUI()
+            scheduleSetupRetry()
+            return
+        }
+
+        microphonePermissionRequestInFlight = true
+        microphonePermissionRequestAttempted = true
+        traceLogger.log("Requesting native microphone permission reason=not_determined")
+        if presentFailureStatus {
+            print("Requesting microphone access...")
+            fflush(stdout)
+            present(.setupRequired("Approve the native PressTalk microphone prompt to enable local dictation."))
+        }
+        refreshRuntimeStatusUI()
+
+        AVCaptureDevice.requestAccess(for: .audio) { [weak self] granted in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.microphonePermissionRequestInFlight = false
+                let status = AVCaptureDevice.authorizationStatus(for: .audio)
+                self.traceLogger.log("Native microphone permission request completed granted=\(granted ? 1 : 0) status=\(self.microphoneAuthorizationStatusDescription(status))")
+                self.refreshRuntimeStatusUI()
+                self.completeStartupIfPossible(
+                    showSetupWindowOnFailure: showSetupWindowOnFailure,
+                    forcePresentSetupWindow: forcePresentSetupWindow,
+                    presentFailureStatus: true
+                )
+            }
         }
     }
 

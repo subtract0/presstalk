@@ -1291,7 +1291,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
                 return "Microphone preflight denies \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
             }
             if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
-                return "Microphone preflight has no approval record for \(identity). Export diagnostics before changing settings.\(noPaneSuffix)"
+                return "Microphone has no approval record for \(identity). Approve the native PressTalk microphone prompt; do not open privacy panes repeatedly.\(noPaneSuffix)"
             }
             if runtimeStatus.adHocSigned {
                 return "Microphone preflight is unavailable to this ad-hoc build (\(identity)). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"

@@ -187,10 +187,10 @@ inserted=1`.
 
 The standalone client probe proves whether a selected PressTalk input method can
 insert into its own focused helper window. The production insertion probe tests
-the running PressTalk app process instead. It temporarily restarts PressTalk with
-`PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1`, opens a focused helper window,
-posts a payload request to PressTalk, records whether the payload lands, and
-then restores normal no-probe startup:
+the running PressTalk app process instead. It runs PressTalk in normal no-pane
+mode, waits for the marker-gated diagnostic observer, opens a focused helper
+window, posts a payload request to PressTalk, and records whether the payload
+lands:
 
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-run-production-insertion-probe.sh" --json

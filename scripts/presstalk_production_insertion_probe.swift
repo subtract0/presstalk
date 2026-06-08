@@ -4,6 +4,7 @@ import Foundation
 
 private let notificationName = "com.am.presstalk.production-insertion-probe.insert"
 private let payloadFileName = "production-insertion-probe.txt"
+private let markerFileName = "production-insertion-probe.enabled"
 
 private struct Options {
     var payload = "PressTalk production insertion probe"
@@ -36,8 +37,8 @@ private func parseOptions() -> Options {
 
             Opens a focused local text window, asks the already-running
             PressTalk app to insert a payload through its production insertion
-            path, and records whether text lands. The running app must have
-            PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1.
+            path, and records whether text lands. The probe creates a fresh
+            local marker file before posting the diagnostic request.
             """)
             exit(0)
         default:
@@ -59,6 +60,10 @@ private func diagnosticsDirectory() -> URL {
 
 private func payloadURL() -> URL {
     supportDirectory().appendingPathComponent(payloadFileName)
+}
+
+private func markerURL() -> URL {
+    supportDirectory().appendingPathComponent(markerFileName)
 }
 
 private func traceLogURL() -> URL {
@@ -225,6 +230,7 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
         do {
             try FileManager.default.createDirectory(at: supportDirectory(), withIntermediateDirectories: true)
             try options.payload.write(to: payloadURL(), atomically: true, encoding: .utf8)
+            try ISO8601DateFormatter().string(from: Date()).write(to: markerURL(), atomically: true, encoding: .utf8)
             CFNotificationCenterPostNotification(
                 CFNotificationCenterGetDarwinNotifyCenter(),
                 CFNotificationName(notificationName as CFString),
@@ -296,6 +302,11 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
         }
     }
 
+    private func removeProbeFiles() {
+        try? FileManager.default.removeItem(at: markerURL())
+        try? FileManager.default.removeItem(at: payloadURL())
+    }
+
     private func writeDiagnostics(_ payload: [String: Any]) -> String {
         do {
             try FileManager.default.createDirectory(at: outputURL.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -312,6 +323,7 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
         didFinish = true
         timer?.invalidate()
         refreshTraceState()
+        removeProbeFiles()
 
         let finalRuntimeStatus = runtimeStatusDictionary(from: runtimeURL)
         let traceSinceStart = Array(traceLines(from: traceURL).dropFirst(initialTraceLineCount).suffix(160))
@@ -350,6 +362,7 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
             "targetCaptureFailureHint": targetCaptureFailureHint,
             "notification": notificationName,
             "payloadFile": payloadURL().path,
+            "markerFile": markerURL().path,
             "timeoutSeconds": options.timeoutSeconds,
             "durationSeconds": Date().timeIntervalSince(startedAt),
             "readinessAtStart": readinessPayload(from: initialRuntimeStatus),

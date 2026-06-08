@@ -38,16 +38,6 @@ if [[ -f "$STATUS_JSON" ]]; then
   fi
 fi
 
-restore_normal() {
-  PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=0 \
-  PRESSTALK_OPEN_PERMISSION_PANES=0 \
-  PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY="$trigger_key" \
-    /bin/bash "$BOOTSTRAP" >/dev/null 2>&1 || true
-}
-
-trap restore_normal EXIT
-
 trace_line_count() {
   if [[ -f "$TRACE_LOG" ]]; then
     wc -l <"$TRACE_LOG" | tr -d '[:space:]'
@@ -76,7 +66,7 @@ wait_for_probe_notification() {
 
 start_line_count="$(trace_line_count)"
 
-PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1 \
+PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=0 \
 PRESSTALK_OPEN_PERMISSION_PANES=0 \
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 PRESSTALK_TRIGGER_KEY="$trigger_key" \

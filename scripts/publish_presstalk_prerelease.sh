@@ -170,15 +170,17 @@ traceRegisteredHotKeyObserved does not depend on whether the app had already
 seen the registered hotkey earlier in the same session.
 
 The bundle also includes presstalk-run-production-insertion-probe.sh and
-presstalk-production-insertion-probe.swift. The wrapper temporarily restarts
-PressTalk with PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=1, opens a focused
-local text window, asks the running PressTalk app to insert a payload through
-the same production insertion path used after dictation, records whether the
-payload lands, then restores normal no-probe startup. It reads the current
-trigger key through macOS plutil rather than a Python dependency. The wrapper
-now waits until the restarted app logs that the production insertion probe
-notification is installed before opening the probe window, avoiding false
-production_probe_not_enabled artifacts after immediate app rebuilds or repairs.
+presstalk-production-insertion-probe.swift. The wrapper runs PressTalk in normal
+no-pane mode, opens a focused local text window, asks the running PressTalk app
+to insert a payload through the same production insertion path used after
+dictation, and records whether the payload lands. It reads the current trigger
+key through macOS plutil rather than a Python dependency. The app installs the
+diagnostic notification observer during normal startup, but only acts when the
+probe creates a fresh local marker file. The wrapper waits until the app logs
+that the marker-gated notification is installed before opening the probe window,
+which avoids false production_probe_not_enabled artifacts after immediate app
+rebuilds or repairs without depending on a special probe-only launch
+environment.
 This tests the app process itself rather than only the standalone input-method
 client probe.
 

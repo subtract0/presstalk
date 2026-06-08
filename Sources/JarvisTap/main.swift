@@ -1107,6 +1107,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private enum ProductionInsertionProbeNotification {
         static let insert = "com.am.presstalk.production-insertion-probe.insert"
         static let payloadFileName = "production-insertion-probe.txt"
+        static let markerFileName = "production-insertion-probe.enabled"
+        static let markerMaxAgeSeconds: TimeInterval = 60
     }
 
     private let config = JarvisTapConfig.load()
@@ -1260,7 +1262,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         speaker.configure(voiceIdentifier: config.sayVoice)
         installProductUI()
-        installProductionInsertionProbeNotificationIfEnabled()
+        installProductionInsertionProbeNotification()
         applyWhisperDecodingPreferences()
         refreshRuntimeStatusUI()
 
@@ -3422,10 +3424,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             .appendingPathComponent(ProductionInsertionProbeNotification.payloadFileName)
     }
 
-    private func installProductionInsertionProbeNotificationIfEnabled() {
-        guard ProcessInfo.processInfo.environment["PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE"] == "1" else {
-            return
-        }
+    private func productionInsertionProbeMarkerURL() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent(ProductionInsertionProbeNotification.markerFileName)
+    }
+
+    private func installProductionInsertionProbeNotification() {
         guard !productionInsertionProbeObserverInstalled else { return }
 
         let callback: CFNotificationCallback = { _, observer, name, _, _ in
@@ -3453,6 +3458,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Production insertion probe notification received")
         DispatchQueue.main.async { [self] in
             do {
+                let markerURL = productionInsertionProbeMarkerURL()
+                let markerAttributes = try FileManager.default.attributesOfItem(atPath: markerURL.path)
+                guard let markerModifiedAt = markerAttributes[.modificationDate] as? Date else {
+                    traceLogger.log("Production insertion probe ignored reason=marker_timestamp_missing")
+                    return
+                }
+                guard abs(markerModifiedAt.timeIntervalSinceNow) <= ProductionInsertionProbeNotification.markerMaxAgeSeconds else {
+                    traceLogger.log("Production insertion probe ignored reason=marker_stale")
+                    return
+                }
+
                 let payload = try String(
                     contentsOf: productionInsertionProbePayloadURL(),
                     encoding: .utf8
@@ -3472,7 +3488,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     traceLogger.log("Production insertion probe copied fallback reason=\(reason)")
                 }
             } catch {
-                traceLogger.log("Production insertion probe failed error=\(error)")
+                if (error as NSError).domain == NSCocoaErrorDomain &&
+                    (error as NSError).code == NSFileReadNoSuchFileError {
+                    traceLogger.log("Production insertion probe ignored reason=marker_or_payload_missing")
+                } else {
+                    traceLogger.log("Production insertion probe failed error=\(error)")
+                }
             }
         }
     }

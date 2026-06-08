@@ -79,6 +79,18 @@ prints the exact bundle path, bundle id, CDHash, signing authority, and
 "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-actual-accessibility-probe.sh"
 ```
 
+If the exact app is not trusted and the input method is stuck in
+`recognized_disabled` after signing repair, use the deliberate Accessibility
+handoff instead of another permission loop:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command
+```
+
+Double-click the generated `~/Desktop/Grant PressTalk Accessibility.command`
+from the logged-in desktop, enable only PressTalk in Accessibility, then let the
+command run the insertion probe and verifier.
+
 If the TCC databases are not readable or the actual bundle probe still leaves
 the identity question unclear, run the bundled Accessibility identity probe. It
 launches tiny background probes for `com.am.jarvistap` and `com.am.presstalk`

@@ -54,6 +54,8 @@ cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCE
 chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
+cp "$PKG_DIR/scripts/presstalk_accessibility_handoff.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-handoff.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-handoff.sh"
 cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 cp "$PKG_DIR/scripts/presstalk_machine_readiness.sh" "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"

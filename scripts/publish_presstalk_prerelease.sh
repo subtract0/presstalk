@@ -95,6 +95,14 @@ logged-in user without starting the trust flow. The generated command runs the
 same no-pane repair with --probe from the desktop session and keeps Terminal
 open with the result.
 
+The bundle now also includes presstalk-accessibility-handoff.sh. For the mbp1
+post-repair state where microphone, speech, and Option + Space are ready but
+TIS still reports recognized_disabled / input_method_enable_no_effect, this
+helper can write ~/Desktop/Grant PressTalk Accessibility.command without
+opening System Settings. The desktop command requests Accessibility for the
+exact installed PressTalk app, waits for the user to enable only PressTalk, then
+runs the production insertion probe and verifier.
+
 Settings shows a Repair Signing button for ad-hoc PressTalk states where macOS
 recognizes the PressTalk input method but has not enabled it. The button runs
 the bundled repair helper with permission panes disabled and then runs the

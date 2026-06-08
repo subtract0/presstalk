@@ -43,6 +43,31 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   the marker-gated production insertion probe and live-app no-rebootstrap probe
   behavior, but its mbp1 post-repair status could still point back to signing
   repair after the local signing identity was already trusted.
+- The current unreleased candidate adds `presstalk-accessibility-handoff.sh`.
+  On mbp1, no-prompt preflight for the updated candidate reports
+  `AccessibilityTrusted=false` for the exact installed `com.am.presstalk` app,
+  `CodeSignatureCDHash=54fad20b0c5c406be99e2b83f14205298a44e469`,
+  `activeFieldInsertionStatus=blocked_recognized_disabled`, and
+  `inputMethodFallbackStatus=recognized_disabled`. It also wrote
+  `~/Desktop/Grant PressTalk Accessibility.command` without opening System
+  Settings; that command is the next meatspace step for proving the
+  Accessibility insertion fallback on mbp1.
+- The same candidate's latest `studio1` insertion probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-05-55-400Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`,
+  `CodeSignatureCDHash=a2fcc828dd8373495c4279f35f58e17020bf6ba5`, and
+  `traceProductionMethod=input_method_notification`. The latest mbp1 probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-05-55-869Z.json`
+  still reports `success=false`,
+  `targetCaptureFailureHint=input_method_enable_no_effect`, and
+  `traceProductionFailure=accessibility_preflight_unavailable`.
+- The fresh accessibility-handoff readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-accessibility-handoff-local-mbp1-20260608T010618Z.json`
+  required `local` and `mbp1-tb` and excluded `studio2=no_attached_microphone`.
+  The matching proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-accessibility-handoff-local-mbp1-20260608T010618Z.json`
+  remains `proven=false` with one failure:
+  `mbp1-tb active_field_not_ready`.
 - The latest rc97 marker-gated production insertion probe on `studio1`
   reported `success=true`, `targetCaptureSuccess=true`, and
   `traceProductionMethod=input_method_notification` at

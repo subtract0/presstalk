@@ -188,6 +188,19 @@ If `--preflight` reports `ExistingSigningIdentity=ready` and
 that state is a TIS/input-method enable blocker or an Accessibility insertion
 choice, not a signing prompt problem.
 
+For that post-repair state, write the one-time Accessibility handoff command
+instead of reopening generic permission panes:
+
+```bash
+ssh mbp1-tb '/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command'
+```
+
+That only writes `~/Desktop/Grant PressTalk Accessibility.command`. It does not
+open System Settings, request Accessibility, run insertion, or alter Microphone
+or Input Monitoring. The logged-in desktop user double-clicks it, enables only
+PressTalk in Accessibility if macOS asks, and the command then runs the
+production insertion probe plus verifier.
+
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
 restarts PressTalk with stable signing, signs the bundled

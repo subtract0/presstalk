@@ -2967,8 +2967,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func printAccessibilityTrustProbe() {
+        let promptRequested = ProcessInfo.processInfo.environment["PRESSTALK_ACCESSIBILITY_TRUST_PROMPT"] == "1"
         let promptOptions = [
-            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: false,
+            kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: promptRequested,
         ] as CFDictionary
         let accessibilityTrusted = AXIsProcessTrustedWithOptions(promptOptions)
         let formatter = ISO8601DateFormatter()
@@ -2976,7 +2977,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let payload: [String: Any] = [
             "generatedAt": formatter.string(from: Date()),
             "probeKind": "actual_bundle_accessibility_trust",
-            "promptRequested": false,
+            "promptRequested": promptRequested,
             "accessibilityTrusted": accessibilityTrusted,
             "bundleIdentifier": Bundle.main.bundleIdentifier ?? "unknown",
             "bundlePath": Bundle.main.bundleURL.path,

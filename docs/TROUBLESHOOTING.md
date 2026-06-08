@@ -88,8 +88,9 @@ handoff instead of another permission loop:
 ```
 
 Double-click the generated `~/Desktop/Grant PressTalk Accessibility.command`
-from the logged-in desktop, enable only PressTalk in Accessibility, then let the
-command run the insertion probe and verifier.
+from the logged-in desktop. If PressTalk is already listed in Accessibility but
+off, turn on that existing entry only. If it is not listed yet, add or enable
+only PressTalk. Then let the command run the insertion probe and verifier.
 
 If the TCC databases are not readable or the actual bundle probe still leaves
 the identity question unclear, run the bundled Accessibility identity probe. It

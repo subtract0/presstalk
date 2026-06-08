@@ -45,6 +45,43 @@ accessibility_handoff_command_path() {
   printf '%s\n' "${PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
 }
 
+accessibility_tcc_auth_value() {
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local client db value
+  client="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
+  client="${client:-com.am.presstalk}"
+
+  for db in \
+    "${PRESSTALK_SYSTEM_TCC_DB:-/Library/Application Support/com.apple.TCC/TCC.db}" \
+    "${PRESSTALK_USER_TCC_DB:-$HOME/Library/Application Support/com.apple.TCC/TCC.db}"; do
+    [[ -r "$db" ]] || continue
+    value="$(sqlite3 "$db" "
+      SELECT auth_value
+      FROM access
+      WHERE service='kTCCServiceAccessibility'
+        AND client='$client'
+      ORDER BY last_modified DESC
+      LIMIT 1;
+    " 2>/dev/null || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done
+}
+
+accessibility_tcc_summary() {
+  case "$(accessibility_tcc_auth_value)" in
+    2) printf 'granted' ;;
+    0) printf 'listed_disabled' ;;
+    "") printf 'missing_or_unreadable' ;;
+    *) printf 'present_non_granted' ;;
+  esac
+}
+
 print_json_field_line() {
   local file="$1"
   local label="$2"
@@ -245,6 +282,7 @@ print_repair_and_probe_status() {
     local microphone_authorization
     local input_monitoring_effective
     local code_signature_authority
+    local accessibility_tcc_state
     ad_hoc_signed="$(json_value status.adHocSigned)"
     code_signature_authority="$(json_value status.codeSignatureAuthority)"
     input_method_fallback="$(json_value permissions.inputMethodFallbackStatus)"
@@ -255,11 +293,13 @@ print_repair_and_probe_status() {
     active_field_insertion_status="$(json_value runtime.activeFieldInsertionStatus)"
     microphone_authorization="$(json_value permissions.microphoneAuthorizationStatus)"
     input_monitoring_effective="$(json_value permissions.inputMonitoringEffective)"
+    accessibility_tcc_state="$(accessibility_tcc_summary)"
 
     echo "adHocSigned: ${ad_hoc_signed:-unknown}"
     echo "codeSignatureAuthority: ${code_signature_authority:-unknown}"
     echo "inputMethodFallbackStatus: ${input_method_fallback:-unknown}"
     echo "accessibilityStatus: ${accessibility_status:-unknown}"
+    echo "accessibilityTCC: ${accessibility_tcc_state:-unknown}"
     echo "speechModel: ${speech_model:-unknown}"
     echo "inputListener: ${input_listener:-unknown}"
     echo "activeFieldInsertionReady: ${active_field_insertion_ready:-unknown}"
@@ -277,12 +317,22 @@ EOF
       handoff_command=""
       handoff_command="$(accessibility_handoff_command_path)"
       if [[ -x "$handoff_command" ]]; then
-        cat <<EOF
+        if [[ "$accessibility_tcc_state" == "listed_disabled" ]]; then
+          cat <<EOF
+Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
+Do not rerun signing repair or privacy panes for this state. PressTalk is already listed in Accessibility but disabled.
+From the logged-in desktop, double-click:
+$handoff_command
+Turn on the existing PressTalk entry only, then let the command run the insertion probe and verifier.
+EOF
+        else
+          cat <<EOF
 Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
 Do not rerun signing repair or privacy panes for this state. From the logged-in desktop, double-click:
 $handoff_command
 That command grants only PressTalk Accessibility, then runs the insertion probe and verifier.
 EOF
+        fi
       elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
         cat <<EOF
 Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.

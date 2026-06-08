@@ -58,7 +58,10 @@ fixture_status_dir="$fixture_home/Library/Application Support/JarvisTap"
 fixture_status="$fixture_status_dir/runtime-status.json"
 fixture_diagnostics="$fixture_status_dir/Diagnostics"
 fixture_handoff="$fixture_home/Desktop/Grant PressTalk Accessibility.command"
+fixture_tcc_system="$TEST_TMPDIR/system.TCC.db"
+fixture_tcc_user="$TEST_TMPDIR/user.TCC.db"
 mkdir -p "$fixture_bin" "$fixture_resources" "$fixture_status_dir" "$fixture_diagnostics" "$(dirname "$fixture_handoff")"
+touch "$fixture_tcc_system" "$fixture_tcc_user"
 
 cat >"$fixture_bin/system_profiler" <<'SH'
 #!/usr/bin/env bash
@@ -85,6 +88,14 @@ fi
 exit 0
 SH
 chmod +x "$fixture_bin/codesign"
+
+cat >"$fixture_bin/sqlite3" <<'SH'
+#!/usr/bin/env bash
+if [[ "$*" == *"kTCCServiceAccessibility"* ]]; then
+  printf '%s\n' "${PRESSTALK_TEST_TCC_AUTH_VALUE:-}"
+fi
+SH
+chmod +x "$fixture_bin/sqlite3"
 
 cat >"$fixture_app/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -130,6 +141,9 @@ PATH="$fixture_bin:$PATH" \
   PRESSTALK_STATUS_JSON="$fixture_status" \
   PRESSTALK_DIAGNOSTICS_DIR="$fixture_diagnostics" \
   PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH="$fixture_handoff" \
+  PRESSTALK_SYSTEM_TCC_DB="$fixture_tcc_system" \
+  PRESSTALK_USER_TCC_DB="$fixture_tcc_user" \
+  PRESSTALK_TEST_TCC_AUTH_VALUE=0 \
   "$HELPER" --json >"$fixture_with_command_json"
 
 with_command_next_action="$(plutil -extract nextAction raw -o - "$fixture_with_command_json")"
@@ -138,9 +152,20 @@ if [[ "$with_command_next_action" != *"double-click $fixture_handoff"* ]]; then
   plutil -p "$fixture_with_command_json"
   exit 1
 fi
+if [[ "$with_command_next_action" != *"already listed in Accessibility but disabled"* ||
+      "$with_command_next_action" != *"turn on the existing PressTalk entry only"* ]]; then
+  echo "FAIL: recognized_disabled denied-row guidance did not point at existing disabled Accessibility entry"
+  printf '%s\n' "$with_command_next_action"
+  exit 1
+fi
 if [[ "$with_command_next_action" == *"Repair Signing"* || "$with_command_next_action" == *"Microphone"* || "$with_command_next_action" == *"Input Monitoring"* ]]; then
   echo "FAIL: recognized_disabled post-repair guidance regressed to repair/permission wording"
   printf '%s\n' "$with_command_next_action"
+  exit 1
+fi
+if [[ "$(plutil -extract runtime.accessibilityTCCAuthValue raw -o - "$fixture_with_command_json")" != "0" ]]; then
+  echo "FAIL: denied-row fixture did not record runtime.accessibilityTCCAuthValue=0"
+  plutil -p "$fixture_with_command_json"
   exit 1
 fi
 
@@ -158,6 +183,9 @@ PATH="$fixture_bin:$PATH" \
   PRESSTALK_STATUS_JSON="$fixture_status" \
   PRESSTALK_DIAGNOSTICS_DIR="$fixture_diagnostics" \
   PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH="$fixture_handoff" \
+  PRESSTALK_SYSTEM_TCC_DB="$fixture_tcc_system" \
+  PRESSTALK_USER_TCC_DB="$fixture_tcc_user" \
+  PRESSTALK_TEST_TCC_AUTH_VALUE=0 \
   "$HELPER" --json >"$fixture_write_command_json"
 
 write_command_next_action="$(plutil -extract nextAction raw -o - "$fixture_write_command_json")"

@@ -197,9 +197,10 @@ ssh mbp1-tb '/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/pres
 
 That only writes `~/Desktop/Grant PressTalk Accessibility.command`. It does not
 open System Settings, request Accessibility, run insertion, or alter Microphone
-or Input Monitoring. The logged-in desktop user double-clicks it, enables only
-PressTalk in Accessibility if macOS asks, and the command then runs the
-production insertion probe plus verifier.
+or Input Monitoring. The logged-in desktop user double-clicks it, turns on the
+existing PressTalk Accessibility entry if PressTalk is already listed but off,
+or adds/enables only PressTalk if it is not listed yet. The command then runs
+the production insertion probe plus verifier.
 
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,

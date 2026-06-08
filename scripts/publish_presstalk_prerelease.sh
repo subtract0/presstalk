@@ -108,6 +108,10 @@ recognized_disabled states directly at that desktop Accessibility command when
 it exists, or at the command writer when it does not. They keep ad-hoc
 recognized_disabled states on the Repair Signing path, and they do not ask for
 another Microphone, Input Monitoring, Karabiner, or generic permission-pane pass.
+When TCC already contains a disabled Accessibility row for PressTalk, diagnostics
+say that PressTalk is already listed in Accessibility but disabled, and the
+Desktop command tells the user to turn on that existing PressTalk entry only
+before running the insertion probe and verifier.
 
 Settings shows a Repair Signing button for ad-hoc PressTalk states where macOS
 recognizes the PressTalk input method but has not enabled it. The button runs

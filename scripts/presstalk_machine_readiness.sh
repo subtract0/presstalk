@@ -83,11 +83,50 @@ accessibility_handoff_command_path() {
   printf '%s\n' "${PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
 }
 
+accessibility_tcc_auth_value() {
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local client db value
+  client="${bundle_id:-com.am.presstalk}"
+  for db in \
+    "${PRESSTALK_SYSTEM_TCC_DB:-/Library/Application Support/com.apple.TCC/TCC.db}" \
+    "${PRESSTALK_USER_TCC_DB:-$HOME/Library/Application Support/com.apple.TCC/TCC.db}"; do
+    [[ -r "$db" ]] || continue
+    value="$(sqlite3 "$db" "
+      SELECT auth_value
+      FROM access
+      WHERE service='kTCCServiceAccessibility'
+        AND client='$client'
+      ORDER BY last_modified DESC
+      LIMIT 1;
+    " 2>/dev/null || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done
+}
+
+accessibility_tcc_summary() {
+  case "${accessibility_tcc_auth_value:-}" in
+    2) printf 'granted' ;;
+    0) printf 'listed_disabled' ;;
+    "") printf 'missing_or_unreadable' ;;
+    *) printf 'present_non_granted' ;;
+  esac
+}
+
 recognized_disabled_next_action() {
   local command_path
   command_path="$(accessibility_handoff_command_path)"
   if [[ -x "$command_path" ]]; then
-    printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. From the logged-in desktop, double-click %s to grant only PressTalk Accessibility and run the insertion probe.' "$command_path"
+    if [[ "$(accessibility_tcc_summary)" == "listed_disabled" ]]; then
+      printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. PressTalk is already listed in Accessibility but disabled; from the logged-in desktop, double-click %s, turn on the existing PressTalk entry only, then let it run the insertion probe.' "$command_path"
+    else
+      printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. From the logged-in desktop, double-click %s to grant only PressTalk Accessibility and run the insertion probe.' "$command_path"
+    fi
   elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
     printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. Write the desktop Accessibility handoff with: /bin/bash "%s/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command' "$APP_BUNDLE"
   else
@@ -226,6 +265,7 @@ active_field_status=""
 input_method_fallback=""
 accessibility_status=""
 ad_hoc_signed=""
+accessibility_tcc_auth_value=""
 if [[ -f "$STATUS_JSON" ]]; then
   runtime_status_available="true"
   speech_model="$(status_value status.speechModel)"
@@ -240,6 +280,7 @@ if [[ -f "$STATUS_JSON" ]]; then
   accessibility_status="$(status_value permissions.accessibilityStatus)"
   ad_hoc_signed="$(status_value status.adHocSigned)"
 fi
+accessibility_tcc_auth_value="$(accessibility_tcc_auth_value)"
 
 latest_probe_json="$(latest_diagnostic_file 'production-insertion-probe-*.json')"
 probe_generated_at=""
@@ -375,6 +416,7 @@ print_text_report() {
     print_field "ActiveFieldInsertionStatus" "$active_field_status"
     print_field "InputMethodFallbackStatus" "$input_method_fallback"
     print_field "AccessibilityStatus" "$accessibility_status"
+    print_field "AccessibilityTCCAuthValue" "$accessibility_tcc_auth_value"
     print_field "AdHocSigned" "$ad_hoc_signed"
   else
     echo "RuntimeStatusAvailable: false"
@@ -467,6 +509,7 @@ write_json_report() {
   plist_insert_string "$tmp_plist" "runtime.activeFieldInsertionStatus" "$active_field_status"
   plist_insert_string "$tmp_plist" "runtime.inputMethodFallbackStatus" "$input_method_fallback"
   plist_insert_string "$tmp_plist" "runtime.accessibilityStatus" "$accessibility_status"
+  plist_insert_string "$tmp_plist" "runtime.accessibilityTCCAuthValue" "$accessibility_tcc_auth_value"
   plist_insert_bool_or_string "$tmp_plist" "runtime.adHocSigned" "$ad_hoc_signed"
 
   plutil -insert "latestProductionInsertionProbe" -dictionary "$tmp_plist" >/dev/null

@@ -123,6 +123,47 @@ status_value() {
   json_value "$STATUS_JSON" "$1"
 }
 
+accessibility_tcc_auth_value() {
+  if ! command -v sqlite3 >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local client db value
+  client="$(
+    if [[ -f "$APP_BUNDLE/Contents/Info.plist" ]]; then
+      /usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true
+    fi
+  )"
+  client="${client:-com.am.presstalk}"
+
+  for db in \
+    "${PRESSTALK_SYSTEM_TCC_DB:-/Library/Application Support/com.apple.TCC/TCC.db}" \
+    "${PRESSTALK_USER_TCC_DB:-$HOME/Library/Application Support/com.apple.TCC/TCC.db}"; do
+    [[ -r "$db" ]] || continue
+    value="$(sqlite3 "$db" "
+      SELECT auth_value
+      FROM access
+      WHERE service='kTCCServiceAccessibility'
+        AND client='$client'
+      ORDER BY last_modified DESC
+      LIMIT 1;
+    " 2>/dev/null || true)"
+    if [[ -n "$value" ]]; then
+      printf '%s\n' "$value"
+      return 0
+    fi
+  done
+}
+
+accessibility_tcc_summary() {
+  case "$(accessibility_tcc_auth_value)" in
+    2) printf 'granted' ;;
+    0) printf 'listed_disabled' ;;
+    "") printf 'missing_or_unreadable' ;;
+    *) printf 'present_non_granted' ;;
+  esac
+}
+
 shell_quote() {
   printf "'"
   printf "%s" "$1" | sed "s/'/'\\\\''/g"
@@ -167,11 +208,21 @@ run_accessibility_probe() {
   fi
 }
 
+open_accessibility_settings_once() {
+  /usr/bin/open "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility" >/dev/null 2>&1 || true
+}
+
 write_desktop_command() {
-  local command_path command_dir helper_path
+  local command_path command_dir helper_path tcc_summary next_action
   command_path="${DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
   command_dir="$(dirname "$command_path")"
   helper_path="$SCRIPT_DIR/$(basename "$0")"
+  tcc_summary="$(accessibility_tcc_summary)"
+  if [[ "$tcc_summary" == "listed_disabled" ]]; then
+    next_action="From the logged-in desktop session, double-click the command, turn on the existing PressTalk entry in Accessibility, then let it run the probe."
+  else
+    next_action="From the logged-in desktop session, double-click the command, enable only PressTalk in Accessibility if macOS asks, then let it run the probe."
+  fi
 
   mkdir -p "$command_dir"
   cat >"$command_path" <<EOF
@@ -185,7 +236,9 @@ echo "This is only for active-field insertion on this Mac."
 echo "Do not change Microphone, Input Monitoring, or signing settings here."
 echo
 echo "macOS may open Privacy & Security > Accessibility."
-echo "Enable PressTalk.app for Accessibility, then return here."
+echo "If PressTalk.app is already listed but off, turn on that existing entry."
+echo "If it is not listed yet, add or enable only PressTalk.app."
+echo "Then return here."
 echo
 
 /bin/bash $(shell_quote "$helper_path") --app-bundle $(shell_quote "$APP_BUNDLE") --trigger-key $(shell_quote "$TRIGGER_KEY") --prompt
@@ -218,12 +271,12 @@ PressTalk Accessibility desktop command written
 DesktopCommand: $command_path
 App: $APP_BUNDLE
 Trigger: $TRIGGER_KEY
+AccessibilityTCC: $tcc_summary
 
 This did not open System Settings, did not request Accessibility, did not run an
 insertion probe, and did not change Microphone or Input Monitoring.
 
-NextAction: From the logged-in desktop session, double-click the command,
-enable only PressTalk in Accessibility if macOS asks, then let it run the probe.
+NextAction: $next_action
 EOF
 }
 
@@ -237,6 +290,7 @@ print_preflight() {
   echo "CodeSignatureAuthority: $(status_value status.codeSignatureAuthority)"
   echo "InputMethodFallbackStatus: $(status_value permissions.inputMethodFallbackStatus)"
   echo "AccessibilityStatus: $(status_value permissions.accessibilityStatus)"
+  echo "AccessibilityTCC: $(accessibility_tcc_summary)"
   echo "ActiveFieldInsertionReady: $(status_value runtime.activeFieldInsertionReady)"
   echo "ActiveFieldInsertionStatus: $(status_value runtime.activeFieldInsertionStatus)"
   echo "MicrophoneAuthorizationStatus: $(status_value permissions.microphoneAuthorizationStatus)"
@@ -261,6 +315,10 @@ if [[ "$PROMPT" == "1" ]]; then
   echo "Requesting Accessibility trust for the exact installed PressTalk app."
   echo "This may open macOS Accessibility settings once."
   run_accessibility_probe 1
+  if [[ "$(accessibility_tcc_summary)" != "granted" ]]; then
+    echo "Opening Privacy & Security > Accessibility so you can turn on PressTalk."
+    open_accessibility_settings_once
+  fi
 fi
 
 if [[ "$PROBE" == "1" ]]; then

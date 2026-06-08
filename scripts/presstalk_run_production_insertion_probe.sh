@@ -64,20 +64,35 @@ wait_for_probe_notification() {
   return 1
 }
 
+running_presstalk_pid() {
+  local pid=""
+  if [[ -f "$STATUS_JSON" ]]; then
+    pid="$(plutil -extract app.processID raw -o - "$STATUS_JSON" 2>/dev/null || true)"
+  fi
+  if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+    printf '%s\n' "$pid"
+    return 0
+  fi
+  return 1
+}
+
 start_line_count="$(trace_line_count)"
 
-PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=0 \
-PRESSTALK_OPEN_PERMISSION_PANES=0 \
-PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-PRESSTALK_TRIGGER_KEY="$trigger_key" \
-  /bin/bash "$BOOTSTRAP" >/dev/null
+if [[ "${PRESSTALK_PRODUCTION_INSERTION_PROBE_FORCE_BOOTSTRAP:-0}" == "1" ]] ||
+   ! running_presstalk_pid >/dev/null; then
+  PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE=0 \
+  PRESSTALK_OPEN_PERMISSION_PANES=0 \
+  PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY="$trigger_key" \
+    /bin/bash "$BOOTSTRAP" >/dev/null
 
-if ! wait_for_probe_notification "$start_line_count"; then
-  echo "Timed out waiting for PressTalk to install production insertion probe notification." >&2
-  echo "Trace: $TRACE_LOG" >&2
-  exit 1
+  if ! wait_for_probe_notification "$start_line_count"; then
+    echo "Timed out waiting for PressTalk to install production insertion probe notification." >&2
+    echo "Trace: $TRACE_LOG" >&2
+    exit 1
+  fi
+
+  sleep "${PRESSTALK_PRODUCTION_INSERTION_PROBE_STARTUP_DELAY_SECONDS:-0.5}"
 fi
-
-sleep "${PRESSTALK_PRODUCTION_INSERTION_PROBE_STARTUP_DELAY_SECONDS:-0.5}"
 
 swift "$PROBE" "$@"

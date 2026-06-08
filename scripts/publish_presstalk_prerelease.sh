@@ -197,16 +197,16 @@ seen the registered hotkey earlier in the same session.
 
 The bundle also includes presstalk-run-production-insertion-probe.sh and
 presstalk-production-insertion-probe.swift. The wrapper runs PressTalk in normal
-no-pane mode, opens a focused local text window, asks the running PressTalk app
-to insert a payload through the same production insertion path used after
-dictation, and records whether the payload lands. It reads the current trigger
-key through macOS plutil rather than a Python dependency. The app installs the
-diagnostic notification observer during normal startup, but only acts when the
-probe creates a fresh local marker file. The wrapper waits until the app logs
-that the marker-gated notification is installed before opening the probe window,
-which avoids false production_probe_not_enabled artifacts after immediate app
-rebuilds or repairs without depending on a special probe-only launch
-environment.
+no-pane mode only when no live PressTalk process is available. If PressTalk is
+already running, it skips bootstrap/re-signing and probes the current app
+process directly. It opens a focused local text window, asks the running
+PressTalk app to insert a payload through the same production insertion path
+used after dictation, and records whether the payload lands. It reads the
+current trigger key through macOS plutil rather than a Python dependency. The
+app installs the diagnostic notification observer during normal startup, but
+only acts when the probe creates a fresh local marker file. Avoiding an
+unnecessary bootstrap before every probe prevents local signing CDHash churn and
+InputMethodKit acknowledgement races.
 This tests the app process itself rather than only the standalone input-method
 client probe.
 

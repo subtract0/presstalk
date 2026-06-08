@@ -1,15 +1,15 @@
 # Release Status
 
-Current status: public rc98 prerelease smoke artifact published with the
-trusted-local-signing diagnostic fix; full cross-machine release not yet proven.
+Current status: public rc99 prerelease smoke artifact published with the
+Accessibility insertion handoff; full cross-machine release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc98`
-- Commit: `439e20210bc51638297b0cf18ea0a187308969b5`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc98`
-- Asset: `PressTalk-0.1.5-rc98-macos-arm64.zip`
-- SHA-256: `713b97a374f07c36a060b8139bc41c152c6d34b94416e5c55b5ddc1141d142a6`
+- Tag: `v0.1.5-rc99`
+- Commit: `07ac2f2ca62bba60a580f8137d66b65d22e49170`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc99`
+- Asset: `PressTalk-0.1.5-rc99-macos-arm64.zip`
+- SHA-256: `ecdfb09f9ac65b705dfbecd1b28c1f9a19a7c15c6e305870bc09555c6b67e6b2`
 
 Verified on `studio1` during 2026-06-06 through 2026-06-08:
 
@@ -24,27 +24,29 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc98` is the current public prerelease smoke artifact. It keeps the
+- `v0.1.5-rc99` is the current public prerelease smoke artifact. It keeps the
   `Option + Space` registered-hotkey route, requests native microphone approval
   once when the current signed identity is truly `not_determined`, and includes
   the desktop signing-repair handoff for mbp1. It also fixes the post-repair
   `mbp1` diagnostic state: trusted local-signing plus `recognized_disabled` is
-  now reported as an input-method/TIS enable blocker, not another signing repair
-  loop. The production insertion probe is marker-gated and skips
-  bootstrap/re-signing when a live PressTalk process is already running,
-  avoiding unnecessary CDHash churn and InputMethodKit acknowledgement races.
-- The `v0.1.5-rc98` GitHub release was verified as a prerelease. GitHub reports
+  reported as an input-method/TIS enable blocker, not another signing repair
+  loop. New in rc99, the bundle includes `presstalk-accessibility-handoff.sh`,
+  which can write a double-clickable desktop command for the one remaining mbp1
+  meatspace step: grant Accessibility to the exact installed PressTalk app and
+  immediately run the production insertion probe plus verifier. The production
+  insertion probe is marker-gated and skips bootstrap/re-signing when a live
+  PressTalk process is already running, avoiding unnecessary CDHash churn and
+  InputMethodKit acknowledgement races.
+- The `v0.1.5-rc99` GitHub release was verified as a prerelease. GitHub reports
   asset digest
-  `sha256:713b97a374f07c36a060b8139bc41c152c6d34b94416e5c55b5ddc1141d142a6`,
-  matching the local `dist/PressTalk-0.1.5-rc98-macos-arm64.zip`. The
-  `v0.1.5-rc98` tag points at
-  `439e20210bc51638297b0cf18ea0a187308969b5`.
-- `v0.1.5-rc97` is the previous public prerelease smoke artifact. It introduced
-  the marker-gated production insertion probe and live-app no-rebootstrap probe
-  behavior, but its mbp1 post-repair status could still point back to signing
-  repair after the local signing identity was already trusted.
-- The current unreleased candidate adds `presstalk-accessibility-handoff.sh`.
-  On mbp1, no-prompt preflight for the updated candidate reports
+  `sha256:ecdfb09f9ac65b705dfbecd1b28c1f9a19a7c15c6e305870bc09555c6b67e6b2`,
+  matching the local `dist/PressTalk-0.1.5-rc99-macos-arm64.zip`. The
+  `v0.1.5-rc99` tag points at
+  `07ac2f2ca62bba60a580f8137d66b65d22e49170`.
+- `v0.1.5-rc98` is the previous public prerelease smoke artifact. It fixed the
+  trusted-local-signing diagnostic loop, but it did not include the
+  Accessibility handoff helper.
+- On mbp1, no-prompt preflight for the rc99 candidate reports
   `AccessibilityTrusted=false` for the exact installed `com.am.presstalk` app,
   `CodeSignatureCDHash=54fad20b0c5c406be99e2b83f14205298a44e469`,
   `activeFieldInsertionStatus=blocked_recognized_disabled`, and
@@ -53,19 +55,19 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   Settings; that command is the next meatspace step for proving the
   Accessibility insertion fallback on mbp1.
 - The same candidate's latest `studio1` insertion probe at
-  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-05-55-400Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-08-50-764Z.json`
   reports `success=true`, `targetCaptureSuccess=true`,
-  `CodeSignatureCDHash=a2fcc828dd8373495c4279f35f58e17020bf6ba5`, and
+  `CodeSignatureCDHash=feeabc565c8e465747ad60245064d3f5d304df2a`, and
   `traceProductionMethod=input_method_notification`. The latest mbp1 probe at
   `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T01-05-55-869Z.json`
   still reports `success=false`,
   `targetCaptureFailureHint=input_method_enable_no_effect`, and
   `traceProductionFailure=accessibility_preflight_unavailable`.
-- The fresh accessibility-handoff readiness matrix at
-  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-accessibility-handoff-local-mbp1-20260608T010618Z.json`
+- The fresh rc99 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc99-local-mbp1-20260608T010903Z.json`
   required `local` and `mbp1-tb` and excluded `studio2=no_attached_microphone`.
   The matching proof gate at
-  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-accessibility-handoff-local-mbp1-20260608T010618Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-rc99-local-mbp1-20260608T010903Z.json`
   remains `proven=false` with one failure:
   `mbp1-tb active_field_not_ready`.
 - The latest rc97 marker-gated production insertion probe on `studio1`

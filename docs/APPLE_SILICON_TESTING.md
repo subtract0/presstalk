@@ -183,6 +183,10 @@ For the `recognized_disabled` input-method state caused by either ad-hoc
 signing or an untrusted PressTalk local signing identity, current builds show
 `Repair Signing` in the PressTalk menu bar and in Settings. That action runs
 the same no-pane repair wrapper and then runs the production insertion probe.
+If `--preflight` reports `ExistingSigningIdentity=ready` and
+`RepairNeeded=false`, do not rerun signing repair for `recognized_disabled`;
+that state is a TIS/input-method enable blocker or an Accessibility insertion
+choice, not a signing prompt problem.
 
 The repair wrapper keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
 `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
@@ -250,13 +254,17 @@ latest production insertion probe. If it says `adHocSigned=true` and
 `inputMethodFallbackStatus=recognized_disabled`, use desktop `Repair Signing`
 from the menu bar or Settings; do not re-grant Microphone, Input Monitoring, or
 Accessibility for that state.
+If it says `adHocSigned=false`, `ExistingSigningIdentity=ready`, and
+`inputMethodFallbackStatus=recognized_disabled`, do not run Repair Signing
+again; inspect `input_method_enable_no_effect` evidence or use the
+Accessibility insertion path.
 
 Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
 values:
 
 - `ready`: the fallback is enabled and worth probing.
 - `recognized_disabled`: macOS sees a select-capable PressTalk source but has
-  not enabled it; this is the current mbp1 ad-hoc blocker.
+  not enabled it; this is the current mbp1 TIS blocker after signing repair.
 - `recognized_not_selectable`, `source_not_recognized`, or `not_installed`:
   collect diagnostics before treating insertion as a runtime/STT failure.
 
@@ -473,8 +481,8 @@ focused field.
 If the client probe reports `reason=input_method_enable_no_effect`,
 `enableStatus=0`, and `enableNoEffect=true`, macOS recognized the input method
 and accepted the enable API call, but the enabled-source list still did not
-contain PressTalk. That is the current mbp1 ad-hoc SSH-install blocker; do not
-reopen privacy panes for it.
+contain PressTalk. That is the current mbp1 TIS blocker even after local signing
+trust was repaired; do not reopen privacy panes or rerun signing repair for it.
 
 To test the actual running PressTalk app process rather than only the standalone
 client probe, run the production insertion probe. It runs PressTalk in normal

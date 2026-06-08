@@ -220,10 +220,13 @@ print_preflight() {
   existing_detail="${existing_status#*:}"
 
   repair_needed=false
-  if [[ "$input_method" == "recognized_disabled" &&
-        ( "$ad_hoc" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ]]; then
+  if [[ "$input_method" == "recognized_disabled" && "$ad_hoc" == "true" ]]; then
     repair_needed=true
-  elif [[ "$active_status" == "needs_signing_repair" ]]; then
+  elif [[ "$input_method" == "recognized_disabled" &&
+          "$code_signature_authority" == "PressTalk Local Development Code Signing" &&
+          "$existing_state" != "ready" ]]; then
+    repair_needed=true
+  elif [[ "$active_status" == "needs_signing_repair" && "$existing_state" != "ready" ]]; then
     repair_needed=true
   fi
 

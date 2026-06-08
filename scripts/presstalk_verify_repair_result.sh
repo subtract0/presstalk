@@ -125,9 +125,10 @@ print_field "probe.traceInputMethodEnableNoEffect" "$probe_enable_no_effect"
 if [[ "$active_field_insertion_ready" != "true" ]]; then
   echo "Result: not proven"
   if [[ "$active_field_insertion_status" == "needs_signing_repair" ||
-        ( "$input_method_fallback" == "recognized_disabled" &&
-          ( "$ad_hoc_signed" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
+        ( "$input_method_fallback" == "recognized_disabled" && "$ad_hoc_signed" == "true" ) ]]; then
     echo "Reason: active-field insertion needs signing repair"
+  elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
+    echo "Reason: active-field insertion is blocked because the PressTalk input method is recognized but disabled"
   else
     echo "Reason: active-field insertion is not ready"
   fi

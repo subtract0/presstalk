@@ -260,5 +260,6 @@ enabled, select-capable `com.am.presstalk.inputmethod.container` source.
 The app also writes `permissions.inputMethodFallbackStatus` into
 `runtime-status.json`. `ready` means the InputMethodKit fallback is enabled.
 `recognized_disabled` means macOS recognizes PressTalk but has not enabled it,
-which is the mbp1 ad-hoc signing/TIS blocker. Do not treat that state as a
-missing Microphone or Input Monitoring grant.
+which is the mbp1 TIS blocker after signing repair when
+`ExistingSigningIdentity=ready`. Do not treat that state as a missing
+Microphone/Input Monitoring grant or another signing repair loop.

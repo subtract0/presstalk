@@ -1317,6 +1317,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
             if runtimeStatus.localSigningRepairNeeded {
                 return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but has not enabled it for this PressTalk signing state. Run the logged-in desktop signing repair helper, then the production insertion probe; do not re-grant Microphone, Input Monitoring, or Accessibility repeatedly.\(noPaneSuffix)"
             }
+            if runtimeStatus.inputMethodFallbackStatus == "recognized_disabled" {
+                return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but leaves it disabled for this signed app. This is not a Microphone or Input Monitoring problem; use diagnostics instead of rerunning signing repair or privacy panes.\(noPaneSuffix)"
+            }
             return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, and the input method fallback status is \(runtimeStatus.inputMethodFallbackStatus). PressTalk will copy if insertion is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
         }
 

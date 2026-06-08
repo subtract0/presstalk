@@ -289,9 +289,10 @@ elif [[ "$input_pipeline_ready" != "true" || "$speech_model" != "Ready" ]]; then
   next_action="Speech pipeline is not ready; collect smoke status before running a physical dictation smoke."
 elif [[ "$active_field_ready" != "true" ]]; then
   if [[ "$active_field_status" == "needs_signing_repair" ||
-        ( "$input_method_fallback" == "recognized_disabled" &&
-          ( "$ad_hoc_signed" == "true" || "$signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
+        ( "$input_method_fallback" == "recognized_disabled" && "$ad_hoc_signed" == "true" ) ]]; then
     next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
+  elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
+    next_action="Input method is recognized but still disabled; do not rerun signing repair or privacy panes. Inspect TIS enable-no-effect or use the Accessibility insertion path."
   else
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi

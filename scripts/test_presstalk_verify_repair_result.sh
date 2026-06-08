@@ -113,7 +113,7 @@ signing_repair_blocked_fixture() {
   write_probe_json "$2" true true '"input_method_notification"' false false false
 }
 
-local_signing_repair_blocked_fixture() {
+post_repair_disabled_fixture() {
   write_status_json "$1" false recognized_disabled ax_false_input_method_recognized_disabled false blocked_recognized_disabled "PressTalk Local Development Code Signing"
   write_probe_json "$2" true true '"input_method_notification"' false false false
 }
@@ -122,4 +122,4 @@ run_case input_method_success 0 "Result: proven" input_method_success_fixture
 run_case accessibility_success 0 "Result: proven" accessibility_success_fixture
 run_case paste_command_success 0 "Result: proven" paste_command_success_fixture
 run_case signing_repair_blocked 1 "Reason: active-field insertion needs signing repair" signing_repair_blocked_fixture
-run_case local_signing_repair_blocked 1 "Reason: active-field insertion needs signing repair" local_signing_repair_blocked_fixture
+run_case post_repair_disabled 1 "Reason: active-field insertion is blocked because the PressTalk input method is recognized but disabled" post_repair_disabled_fixture

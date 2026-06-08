@@ -264,11 +264,15 @@ print_repair_and_probe_status() {
     echo "inputMonitoringEffective: ${input_monitoring_effective:-unknown}"
 
     if [[ "$active_field_insertion_status" == "needs_signing_repair" ||
-          ( "$input_method_fallback" == "recognized_disabled" &&
-            ( "$ad_hoc_signed" == "true" || "$code_signature_authority" == "PressTalk Local Development Code Signing" ) ) ]]; then
+          ( "$input_method_fallback" == "recognized_disabled" && "$ad_hoc_signed" == "true" ) ]]; then
       cat <<EOF
 Next action: from the logged-in desktop session, click Repair Signing in the PressTalk menu bar or Settings and approve only the PressTalk local signing password prompt.
 No Microphone, Input Monitoring, or Accessibility re-grant is needed for this state.
+EOF
+    elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
+      cat <<EOF
+Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
+Do not rerun signing repair or privacy panes for this state; inspect TIS enable-no-effect or use the Accessibility insertion path.
 EOF
     elif [[ "$input_method_fallback" == "ready" ]]; then
       echo "Next action: insertion path reports ready; run the production insertion probe if proof is needed."

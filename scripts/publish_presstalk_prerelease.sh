@@ -95,9 +95,9 @@ logged-in user without starting the trust flow. The generated command runs the
 same no-pane repair with --probe from the desktop session and keeps Terminal
 open with the result.
 
-Settings now shows a Repair Signing button for PressTalk signing states where
-macOS recognizes the PressTalk input method but has not enabled it. The button
-runs the bundled repair helper with permission panes disabled and then runs the
+Settings shows a Repair Signing button for ad-hoc PressTalk states where macOS
+recognizes the PressTalk input method but has not enabled it. The button runs
+the bundled repair helper with permission panes disabled and then runs the
 production insertion probe, so the desktop repair path no longer requires typing
 a shell command. The settings action launches the helper through nohup and
 writes a diagnostics .pid file next to the signing repair log, so the repair can
@@ -107,11 +107,10 @@ the helper now appends a full post-repair smoke-status snapshot to the same
 diagnostics log after the production insertion probe, while preserving the probe
 exit status.
 
-The status menu also shows Repair Signing... in the PressTalk signing states
-where macOS recognizes the input method but leaves it disabled. This covers both
-ad-hoc release installs and local-signing identities that exist but still need
-desktop trust repair. It gives a logged-in desktop user a direct repair action
-from the menu bar without reopening the full Settings window.
+The status menu also shows Repair Signing... for ad-hoc release installs where
+macOS recognizes the input method but leaves it disabled. A trusted local-signing
+state that still reports recognized_disabled is now classified as a TIS/input
+method blocker instead of another signing repair loop.
 
 The menu-bar status no longer says plain "Ready" for that state. It now reports
 Paste Repair Needed while transcription is ready but active-field paste still
@@ -122,18 +121,19 @@ Runtime status now also records activeFieldInsertionReady and
 activeFieldInsertionStatus. These fields separate a ready speech pipeline from
 a proven active-field insertion path, and the bundled smoke collector and repair
 verifier print them for cross-machine evidence. The repair preflight,
-machine-readiness helper, smoke collector, and verifier now route the
-non-ad-hoc PressTalk Local Development Code Signing plus recognized_disabled
-state to the same no-pane Repair Signing action instead of calling it a generic
-insertion blocker.
+machine-readiness helper, smoke collector, and verifier now keep ad-hoc
+recognized_disabled states on the no-pane Repair Signing path, but classify a
+trusted local-signing recognized_disabled state as a TIS/input-method enable
+blocker.
 
 The production insertion probe now records active-field insertion readiness in
 its start/finish snapshots, including activeFieldInsertionReady,
 activeFieldInsertionStatus, and inputMethodFallbackStatus. The read-only repair
 verifier accepts every proven active-field insertion path: InputMethodKit,
 direct Accessibility insertion, or Accessibility-backed paste command. It still
-fails mbp1 recognized_disabled states as signing repair blockers when they are
-ad-hoc or signed by the PressTalk local development identity.
+fails ad-hoc recognized_disabled states as signing repair blockers, and now
+reports trusted local-signing recognized_disabled states as input-method disabled
+rather than signing repair.
 
 Bootstrap now re-signs the bundled PressTalkInputMethod.app whenever it
 re-signs PressTalk.app, then refreshes the installed input-method bundle before

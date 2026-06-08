@@ -125,15 +125,14 @@ API call, but the enabled-source requery still showed no PressTalk source. On
 visible as `com.am.presstalk.inputmethod.container` with
 `TISTypeKeyboardInputMethodWithoutModes`, `enableCapable=true`, and
 `selectCapable=true`, but `enabled=false` before and after enable, and direct
-`TISSelectInputSource` returned `-50`. A no-prompt mbp1 experiment later showed
-that signing with an untrusted PressTalk local identity changes the app from
-ad-hoc to locally signed, but the input method can still remain
-`recognized_disabled`. In either state production dictation will fall back to
-copying unless Accessibility is trusted, the signing/trust state is repaired,
-or the input method can be selected by macOS.
+`TISSelectInputSource` returned `-50`. Later mbp1 tests showed that repairing
+the PressTalk local signing trust can change the app from ad-hoc to locally
+signed while the input method still remains `recognized_disabled`. In that
+post-repair state, production dictation will fall back to copying unless
+Accessibility is trusted or the input method can be selected by macOS.
 
-For that state, run the bundled signing repair wrapper from the logged-in
-desktop session:
+For an ad-hoc or untrusted-local-signing `recognized_disabled` state, run the
+bundled signing repair wrapper from the logged-in desktop session:
 
 ```bash
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
@@ -144,6 +143,10 @@ re-signs the bundled `PressTalkInputMethod.app` before the outer app, refreshes
 the installed input-method copy, then restarts PressTalk with no-pane flags. Add
 `--probe` when a focused-window production insertion check should run
 immediately after repair.
+If repair preflight reports `ExistingSigningIdentity=ready` and
+`RepairNeeded=false` while the input method is still `recognized_disabled`, do
+not rerun signing repair; the remaining blocker is TIS enable no-effect or the
+missing Accessibility insertion path.
 
 The smoke-status collector now includes the read-only input-method checks needed
 before interpreting probes:

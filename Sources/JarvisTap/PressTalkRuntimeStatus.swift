@@ -118,8 +118,7 @@ struct PressTalkRuntimeStatus {
     }
 
     var localSigningRepairNeeded: Bool {
-        inputMethodFallbackStatus == "recognized_disabled" &&
-            (adHocSigned || codeSignatureAuthority == "PressTalk Local Development Code Signing")
+        inputMethodFallbackStatus == "recognized_disabled" && adHocSigned
     }
 
     var activeFieldInsertionStatus: String {

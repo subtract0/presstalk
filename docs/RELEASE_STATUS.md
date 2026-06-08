@@ -1,7 +1,8 @@
 # Release Status
 
-Current status: public prerelease smoke artifact published, full cross-machine
-release not yet proven.
+Current status: public prerelease smoke artifact published, unreleased
+diagnostic fix validated locally and on `mbp1`; full cross-machine release not
+yet proven.
 
 Public prerelease:
 
@@ -59,26 +60,46 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   `traceRegisteredHotKeyObserved=false` field is stale; the trace contains the
   actual `Option + Space` pressed/released lines and rc91 classifies those as
   registered-hotkey evidence in future manual-smoke JSON.
-- `mbp1` was updated from the public rc97 artifact over `mbp1-tb` with the
-  expected SHA and no-pane bootstrap flags. It reports
+- After the logged-in desktop repair command was approved on `mbp1`, the
+  current unreleased candidate was copied over `mbp1-tb` and bootstrapped with
+  no-pane flags plus stable local signing. The signed app reports
+  `CodeSignatureAuthority=PressTalk Local Development Code Signing`,
+  `CodeSignatureCDHash=aebf72503e121385ff1b1f47b5a7a22bce3d0c2c`,
   `triggerPath=Option + Space ready`, `inputListener=carbon:registered`,
   `speechModel=Ready`, and `microphoneAuthorizationStatus=authorized`.
-  Active-field insertion is still blocked by signing repair:
-  `activeFieldInsertionStatus=needs_signing_repair`,
-  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=true`.
-  The rc97 bootstrap reused only existing signing state, skipped stable signing
-  because the existing PressTalk local identity is still untrusted, did not open
-  System Settings, and did not start a signing trust prompt.
-- The rc97 mbp1 repair preflight reports `RepairNeeded=true`,
-  `RepairAllowedHere=false`, `WouldRunRepair=false`,
-  `SigningTrustPromptNeeded=true`, and
-  `ExistingSigningIdentity=untrusted` with identity
-  `2EA0B09365E72779413B98BA6319E5D9FBA09205`. The next action is logged-in
-  desktop Repair Signing; SSH repair remains refused unless `--allow-ssh` is
-  passed deliberately. rc97 also wrote
-  `~/Desktop/Repair PressTalk Signing.command` on mbp1; double-clicking that
-  command from the logged-in desktop runs the same no-pane repair with
-  `--probe`.
+  The repair preflight now correctly reports `RepairNeeded=false`,
+  `SigningTrustPromptNeeded=false`, and `ExistingSigningIdentity=ready`.
+- `mbp1` active-field insertion is still not proven, but the blocker is now
+  classified correctly as TIS/input-method enable no-effect rather than signing
+  repair. Runtime reports `activeFieldInsertionStatus=blocked_recognized_disabled`,
+  `inputMethodFallbackStatus=recognized_disabled`, and `AdHocSigned=false`.
+  The fresh production insertion probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T00-47-10-218Z.json`
+  reports `success=false`, `targetCaptureFailureHint=input_method_enable_no_effect`,
+  `traceInputMethodEnableNoEffect=true`, and
+  `traceInputMethodFailure="enable_no_effect status=-50"`.
+- A second reversible mbp1 HIToolbox test added PressTalk to
+  `AppleEnabledInputSources`, flushed `cfprefsd`, `TextInputMenuAgent`,
+  `keyboardservicesd`, and `imklaunchagent`, then reran
+  `TISRegisterInputSource`/`TISEnableInputSource`. TIS still returned
+  `enableStatus=0` plus `enableNoEffect=true`; the backup at
+  `~/Library/Application Support/JarvisTap/Diagnostics/hitoolbox-before-presstalk-enabled-test-20260608T003922Z.plist`
+  was restored. Do not add a HIToolbox plist repair helper for this state.
+- The current rebuilt `studio1` app remains green after the diagnostic fix:
+  `CodeSignatureCDHash=b76fba3da525b96307544600a1cd3623154cf6fa`,
+  `activeFieldInsertionStatus=ready_input_method`, and the production insertion
+  probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-08T00-46-14-615Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification`.
+- The fresh post-rc97 readiness matrix at
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-post-rc97-local-mbp1-20260608T005000Z.json`
+  required `local` and `mbp1-tb` and excluded `studio2=no_attached_microphone`.
+  The matching proof gate at
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-post-rc97-local-mbp1-20260608T005000Z.json`
+  remains `proven=false` with one failure:
+  `mbp1-tb active_field_not_ready`. `mbp1` is reachable and
+  `physicalSTTSmokeReady=true`; only active-field insertion is blocked.
 - The latest rc97 readiness matrix at
   `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-rc97-local-mbp1-20260608T002634Z.json`
   required `local` and `mbp1-tb` and excluded `studio2` because it has no
@@ -466,7 +487,7 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   `inputPipelineReady=true`, `microphoneAuthorizationStatus=authorized`,
   `AXIsProcessTrusted=false`, and `inputMethodFallbackStatus=ready` displays as
   `Listener ready`, `Granted`, and `Input method ready` rather than a missing
-  permission loop. It also proves the current mbp1 ad-hoc
+  permission loop. It also proved the then-current mbp1 ad-hoc
   `recognized_disabled` state points to `Needs signing repair`.
 - The `v0.1.5-rc72` GitHub release was verified as a prerelease. GitHub reports
   asset digest

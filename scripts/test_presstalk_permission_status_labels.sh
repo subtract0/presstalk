@@ -101,9 +101,9 @@ enum PermissionStatusLabelTest {
         require(mbp1Repair.activeFieldInsertionStatus == "needs_signing_repair", "ad-hoc recognized-disabled state should not ask for permission re-grants")
         require(!mbp1Repair.readyWithoutPermissionPaneWork, "signing repair state should not be marked ready without pane work")
 
-        let mbp1TrustRepair = makeStatus(inputMethodFallbackStatus: "recognized_disabled", adHocSigned: false)
-        require(mbp1TrustRepair.accessibilityPermissionLabel.text == "Needs signing repair", "local-signing recognized-disabled state should point to signing repair")
-        require(mbp1TrustRepair.activeFieldInsertionStatus == "needs_signing_repair", "local-signing recognized-disabled state should not ask for permission re-grants")
+        let mbp1PostRepair = makeStatus(inputMethodFallbackStatus: "recognized_disabled", adHocSigned: false)
+        require(mbp1PostRepair.accessibilityPermissionLabel.text == "Input method disabled", "local-signing recognized-disabled state should not keep asking for signing repair")
+        require(mbp1PostRepair.activeFieldInsertionStatus == "blocked_recognized_disabled", "local-signing recognized-disabled state should stay a TIS/input-method blocker")
 
         let disabledInputMethod = makeStatus(
             inputMethodFallbackStatus: "recognized_disabled",

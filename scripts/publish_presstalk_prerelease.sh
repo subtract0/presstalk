@@ -103,6 +103,12 @@ opening System Settings. The desktop command requests Accessibility for the
 exact installed PressTalk app, waits for the user to enable only PressTalk, then
 runs the production insertion probe and verifier.
 
+Machine readiness and smoke-status diagnostics now point trusted local-signing
+recognized_disabled states directly at that desktop Accessibility command when
+it exists, or at the command writer when it does not. They keep ad-hoc
+recognized_disabled states on the Repair Signing path, and they do not ask for
+another Microphone, Input Monitoring, Karabiner, or generic permission-pane pass.
+
 Settings shows a Repair Signing button for ad-hoc PressTalk states where macOS
 recognizes the PressTalk input method but has not enabled it. The button runs
 the bundled repair helper with permission panes disabled and then runs the

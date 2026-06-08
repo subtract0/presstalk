@@ -41,6 +41,10 @@ latest_diagnostic_file() {
   ls -t "${matches[@]}" 2>/dev/null | head -n 1
 }
 
+accessibility_handoff_command_path() {
+  printf '%s\n' "${PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
+}
+
 print_json_field_line() {
   local file="$1"
   local label="$2"
@@ -270,10 +274,27 @@ Next action: from the logged-in desktop session, click Repair Signing in the Pre
 No Microphone, Input Monitoring, or Accessibility re-grant is needed for this state.
 EOF
     elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
-      cat <<EOF
+      handoff_command=""
+      handoff_command="$(accessibility_handoff_command_path)"
+      if [[ -x "$handoff_command" ]]; then
+        cat <<EOF
+Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
+Do not rerun signing repair or privacy panes for this state. From the logged-in desktop, double-click:
+$handoff_command
+That command grants only PressTalk Accessibility, then runs the insertion probe and verifier.
+EOF
+      elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
+        cat <<EOF
+Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
+Do not rerun signing repair or privacy panes for this state. Write the desktop Accessibility handoff with:
+/bin/bash "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command
+EOF
+      else
+        cat <<EOF
 Next action: macOS recognizes the PressTalk input method but leaves it disabled for this signed app.
 Do not rerun signing repair or privacy panes for this state; inspect TIS enable-no-effect or use the Accessibility insertion path.
 EOF
+      fi
     elif [[ "$input_method_fallback" == "ready" ]]; then
       echo "Next action: insertion path reports ready; run the production insertion probe if proof is needed."
     elif [[ -n "$input_method_fallback" ]]; then

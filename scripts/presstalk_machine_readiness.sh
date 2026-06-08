@@ -79,6 +79,22 @@ latest_diagnostic_file() {
   ls -t "${matches[@]}" 2>/dev/null | head -n 1
 }
 
+accessibility_handoff_command_path() {
+  printf '%s\n' "${PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
+}
+
+recognized_disabled_next_action() {
+  local command_path
+  command_path="$(accessibility_handoff_command_path)"
+  if [[ -x "$command_path" ]]; then
+    printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. From the logged-in desktop, double-click %s to grant only PressTalk Accessibility and run the insertion probe.' "$command_path"
+  elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
+    printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. Write the desktop Accessibility handoff with: /bin/bash "%s/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command' "$APP_BUNDLE"
+  else
+    printf 'Input method is recognized but still disabled; do not rerun signing repair or privacy panes. Inspect TIS enable-no-effect or use the Accessibility insertion path.'
+  fi
+}
+
 print_field() {
   local label="$1"
   local value="$2"
@@ -292,7 +308,7 @@ elif [[ "$active_field_ready" != "true" ]]; then
         ( "$input_method_fallback" == "recognized_disabled" && "$ad_hoc_signed" == "true" ) ]]; then
     next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
   elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
-    next_action="Input method is recognized but still disabled; do not rerun signing repair or privacy panes. Inspect TIS enable-no-effect or use the Accessibility insertion path."
+    next_action="$(recognized_disabled_next_action)"
   else
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi

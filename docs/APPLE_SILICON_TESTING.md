@@ -276,7 +276,12 @@ Accessibility insertion path.
 Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
 values:
 
-- `ready`: the fallback is enabled and worth probing.
+- `ready`: the fallback is enabled, has no recent real insertion failure, and is
+  worth probing.
+- `client_unavailable`: the fallback is enabled, but a recent real insertion
+  attempt reached the helper and could not attach to the focused text client.
+- `ack_timeout`: the fallback is enabled, but the helper did not acknowledge the
+  insertion request.
 - `recognized_disabled`: macOS sees a select-capable PressTalk source but has
   not enabled it; this is the current mbp1 TIS blocker after signing repair.
 - `recognized_not_selectable`, `source_not_recognized`, or `not_installed`:
@@ -289,8 +294,9 @@ PressTalk identity, and only when runtime status says the selected path needs
 them:
 
 - Microphone access is required for local STT.
-- Accessibility is optional when `inputMethodFallbackStatus=ready`; it is only
-  needed if you choose the Accessibility/paste-command insertion path.
+- Accessibility is optional while `inputMethodFallbackStatus=ready`; it becomes
+  the active-field insertion path when real input-method insertion reports
+  `client_unavailable` or `ack_timeout`.
 - Input Monitoring is not required for the default `Option + Space` registered
   hotkey path. It is only relevant for modifier-only, trackpad, or legacy
   trigger paths that report it as required.

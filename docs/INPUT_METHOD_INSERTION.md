@@ -164,7 +164,16 @@ machine is still in the TIS enable no-effect state.
 The app-level runtime status mirrors this check through
 `permissions.inputMethodFallbackStatus`:
 
-- `ready` means the fallback source is enabled.
+- `ready` means the fallback source is enabled and PressTalk has no recent real
+  insertion failure for the running app.
+- `client_unavailable` means the source is enabled, but a recent production
+  dictation attempt reached the helper and the helper could not attach to the
+  focused `IMKTextInput` client. This can show macOS's small input-source badge
+  near the cursor while insertion still fails. PressTalk copies instead of
+  repeatedly selecting the input source until Accessibility is trusted, the
+  failure cooldown expires, or a production insertion probe succeeds.
+- `ack_timeout` means the source is enabled, but the helper did not acknowledge
+  the insertion request before timeout.
 - `recognized_disabled` means TIS sees the source but the enabled-source list is
   empty.
 - `recognized_not_selectable`, `source_not_recognized`, and `not_installed`

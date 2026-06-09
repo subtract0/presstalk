@@ -1111,6 +1111,30 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         static let markerMaxAgeSeconds: TimeInterval = 60
     }
 
+    private enum InputMethodInsertionContext {
+        case dictation
+        case productionProbe
+    }
+
+    private struct InputMethodInsertionAcknowledgement {
+        let inserted: Bool
+        let reason: String?
+    }
+
+    private struct InputMethodInsertionFailure {
+        let reason: String
+        let occurredAt: Date
+
+        var runtimeStatus: String {
+            switch reason {
+            case "input_method_ack_timeout":
+                return "ack_timeout"
+            default:
+                return "client_unavailable"
+            }
+        }
+    }
+
     private let config = JarvisTapConfig.load()
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
@@ -1141,6 +1165,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let trackpadPreviewTickSeconds: TimeInterval = 1.0 / 30.0
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
+    private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let stateLock = NSLock()
 
     private var eventTap: CFMachPort?
@@ -1193,6 +1218,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var trackpadArmWorkItem: DispatchWorkItem?
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
+    private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
 
     private var statusItem: NSStatusItem?
     private var statusSummaryMenuItem: NSMenuItem?
@@ -3530,7 +3556,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     return
                 }
 
-                let result = try insertTranscriptIntoFocusedApp(payload)
+                let result = try insertTranscriptIntoFocusedApp(payload, context: .productionProbe)
                 switch result {
                 case .inserted(let method):
                     traceLogger.log("Production insertion probe inserted method=\(method)")
@@ -4968,6 +4994,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let enabledSources = pressTalkInputMethodSources(includeAllInstalled: false)
         if preferredPressTalkInputMethodSource(from: enabledSources) != nil {
+            if let recentFailure = recentInputMethodInsertionFailure() {
+                return recentFailure.runtimeStatus
+            }
             return "ready"
         }
 
@@ -4981,13 +5010,68 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return "recognized_not_selectable"
     }
 
-    private func inputMethodInsertionAcknowledgementInserted(at url: URL) -> Bool? {
+    private func recentInputMethodInsertionFailure(now: Date = Date()) -> InputMethodInsertionFailure? {
+        guard let failure = withStateLock({ lastInputMethodInsertionFailure }) else {
+            return nil
+        }
+        guard now.timeIntervalSince(failure.occurredAt) <= inputMethodFailureCooldownSeconds else {
+            withStateLock {
+                if lastInputMethodInsertionFailure?.occurredAt == failure.occurredAt {
+                    lastInputMethodInsertionFailure = nil
+                }
+            }
+            traceLogger.log("Input method insertion degradation expired reason=\(failure.reason)")
+            return nil
+        }
+        return failure
+    }
+
+    private func recordInputMethodInsertionFailure(reason: String) {
+        let failure = InputMethodInsertionFailure(reason: reason, occurredAt: Date())
+        withStateLock {
+            lastInputMethodInsertionFailure = failure
+        }
+        traceLogger.log("Input method insertion degraded status=\(failure.runtimeStatus) reason=\(reason)")
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshRuntimeStatusUI()
+        }
+    }
+
+    private func clearInputMethodInsertionFailure(reason: String) {
+        let hadFailure = withStateLock { () -> Bool in
+            let hadFailure = lastInputMethodInsertionFailure != nil
+            lastInputMethodInsertionFailure = nil
+            return hadFailure
+        }
+        guard hadFailure else { return }
+        traceLogger.log("Input method insertion degradation cleared reason=\(reason)")
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshRuntimeStatusUI()
+        }
+    }
+
+    private func copiedFallbackReason(for failure: InputMethodInsertionFailure) -> String {
+        switch failure.runtimeStatus {
+        case "ack_timeout":
+            return "input_method_ack_timeout_accessibility_required"
+        default:
+            return "input_method_client_unavailable_accessibility_required"
+        }
+    }
+
+    private func inputMethodInsertionAcknowledgement(at url: URL) -> InputMethodInsertionAcknowledgement? {
         guard let data = try? Data(contentsOf: url),
               let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
             return nil
         }
-        return object["inserted"] as? Bool
+        guard let inserted = object["inserted"] as? Bool else {
+            return nil
+        }
+        return InputMethodInsertionAcknowledgement(
+            inserted: inserted,
+            reason: object["reason"] as? String
+        )
     }
 
     private func accessibilityStatusDescription(_ status: PressTalkRuntimeStatus) -> String {
@@ -5000,6 +5084,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         switch status.inputMethodFallbackStatus {
         case "ready":
             return "ax_false_input_method_fallback_ready"
+        case "client_unavailable":
+            return "ax_false_input_method_client_unavailable"
+        case "ack_timeout":
+            return "ax_false_input_method_ack_timeout"
         case "recognized_disabled":
             return "ax_false_input_method_recognized_disabled"
         case "recognized_not_selectable":
@@ -5113,11 +5201,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Input method insertion notification posted source=com.am.presstalk.inputmethod.container attempt=\(attempt)")
         }
 
-        func waitForInsertionAcknowledgement(timeout: TimeInterval) -> Bool? {
+        func waitForInsertionAcknowledgement(timeout: TimeInterval) -> InputMethodInsertionAcknowledgement? {
             let acknowledgementDeadline = Date().addingTimeInterval(timeout)
             while Date() < acknowledgementDeadline {
-                if let inserted = inputMethodInsertionAcknowledgementInserted(at: acknowledgementURL) {
-                    return inserted
+                if let acknowledgement = inputMethodInsertionAcknowledgement(at: acknowledgementURL) {
+                    return acknowledgement
                 }
                 Thread.sleep(forTimeInterval: 0.05)
             }
@@ -5129,12 +5217,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             postInsertionNotification(attempt: attempt)
             Thread.sleep(forTimeInterval: 0.25)
 
-            if let inserted = waitForInsertionAcknowledgement(timeout: attempt == 1 ? 2.0 : 3.0) {
-                if inserted {
+            if let acknowledgement = waitForInsertionAcknowledgement(timeout: attempt == 1 ? 2.0 : 3.0) {
+                if acknowledgement.inserted {
                     traceLogger.log("Input method insertion acknowledgement inserted=1 attempt=\(attempt)")
+                    clearInputMethodInsertionFailure(reason: "input_method_ack_inserted")
                     return "input_method_notification"
                 }
-                traceLogger.log("Input method insertion unavailable reason=input_method_ack_false")
+                let detail = acknowledgement.reason ?? "input_method_ack_false"
+                traceLogger.log("Input method insertion unavailable reason=input_method_ack_false detail=\(detail)")
+                recordInputMethodInsertionFailure(reason: detail)
                 return nil
             }
 
@@ -5153,6 +5244,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         traceLogger.log("Input method insertion unavailable reason=input_method_ack_timeout")
+        recordInputMethodInsertionFailure(reason: "input_method_ack_timeout")
         return nil
     }
 
@@ -5253,13 +5345,24 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         keyUp.post(tap: .cgSessionEventTap)
     }
 
-    private func insertTranscriptIntoFocusedApp(_ transcript: String) throws -> TranscriptInsertionResult {
+    private func insertTranscriptIntoFocusedApp(
+        _ transcript: String,
+        context: InputMethodInsertionContext
+    ) throws -> TranscriptInsertionResult {
         let preparedTranscript = transcriptForInsertion(transcript)
         guard !preparedTranscript.isEmpty else {
             return .copiedFallback(reason: "empty_transcript")
         }
 
         guard AXIsProcessTrusted() else {
+            if context == .dictation, let recentFailure = recentInputMethodInsertionFailure() {
+                let fallbackReason = copiedFallbackReason(for: recentFailure)
+                traceLogger.log(
+                    "Accessibility preflight unavailable and input method insertion skipped reason=recent_\(recentFailure.reason); copying transcript"
+                )
+                copyPreparedTranscriptToPasteboard(preparedTranscript)
+                return .copiedFallback(reason: fallbackReason)
+            }
             if let method = insertPreparedTranscriptUsingInputMethod(preparedTranscript) {
                 return .inserted(method: method)
             }
@@ -5711,7 +5814,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if agentMode == "dictation" {
                     if pasteAutomatically {
                         traceLogger.log("Pasting dictated transcript into focused app")
-                        let insertionResult = try insertTranscriptIntoFocusedApp(transcript)
+                        let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
                         switch insertionResult {
                         case .inserted(let method):
                             traceLogger.log("Dictation inserted method=\(method)")
@@ -5840,7 +5943,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             if config.agentMode == "dictation" {
                 traceLogger.log("Pasting dictated transcript into focused app")
-                let insertionResult = try insertTranscriptIntoFocusedApp(transcript)
+                let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
                 switch insertionResult {
                 case .inserted(let method):
                     traceLogger.log("Dictation inserted method=\(method)")

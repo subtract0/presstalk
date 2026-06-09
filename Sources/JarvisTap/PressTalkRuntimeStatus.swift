@@ -198,6 +198,10 @@ struct PressTalkRuntimeStatus {
         switch inputMethodFallbackStatus {
         case "ready":
             return PressTalkPermissionLabel(text: "Input method ready", tone: .ready)
+        case "client_unavailable":
+            return PressTalkPermissionLabel(text: "Input method client unavailable", tone: .warning)
+        case "ack_timeout":
+            return PressTalkPermissionLabel(text: "Input method unresponsive", tone: .warning)
         case "recognized_disabled":
             return PressTalkPermissionLabel(
                 text: localSigningRepairNeeded ? "Needs signing repair" : "Input method disabled",

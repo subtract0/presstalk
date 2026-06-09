@@ -271,8 +271,10 @@ installed input method should match the bundled CDHash and show a recognized,
 enabled, select-capable `com.am.presstalk.inputmethod.container` source.
 
 The app also writes `permissions.inputMethodFallbackStatus` into
-`runtime-status.json`. `ready` means the InputMethodKit fallback is enabled.
-`recognized_disabled` means macOS recognizes PressTalk but has not enabled it,
-which is the mbp1 TIS blocker after signing repair when
-`ExistingSigningIdentity=ready`. Do not treat that state as a missing
-Microphone/Input Monitoring grant or another signing repair loop.
+`runtime-status.json`. `ready` means the InputMethodKit fallback is enabled and
+has no recent real insertion failure. `client_unavailable` means the helper
+received the request but could not attach to the focused text client; `ack_timeout`
+means it did not acknowledge in time. `recognized_disabled` means macOS
+recognizes PressTalk but has not enabled it, which is the mbp1 TIS blocker after
+signing repair when `ExistingSigningIdentity=ready`. Do not treat these states
+as missing Microphone/Input Monitoring grants or another signing repair loop.

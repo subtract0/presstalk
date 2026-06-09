@@ -350,6 +350,8 @@ elif [[ "$active_field_ready" != "true" ]]; then
     next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
   elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
     next_action="$(recognized_disabled_next_action)"
+  elif [[ "$input_method_fallback" == "client_unavailable" || "$input_method_fallback" == "ack_timeout" ]]; then
+    next_action="Input method is enabled but failed a real insertion attempt; run the production insertion probe or use the Accessibility handoff, not repeated Microphone/Input Monitoring grants."
   else
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi

@@ -129,6 +129,10 @@ if [[ "$active_field_insertion_ready" != "true" ]]; then
     echo "Reason: active-field insertion needs signing repair"
   elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
     echo "Reason: active-field insertion is blocked because the PressTalk input method is recognized but disabled"
+  elif [[ "$input_method_fallback" == "client_unavailable" ]]; then
+    echo "Reason: active-field insertion is blocked because the PressTalk input method could not attach to the focused text field"
+  elif [[ "$input_method_fallback" == "ack_timeout" ]]; then
+    echo "Reason: active-field insertion is blocked because the PressTalk input method did not acknowledge insertion"
   else
     echo "Reason: active-field insertion is not ready"
   fi

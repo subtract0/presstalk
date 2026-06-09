@@ -245,6 +245,9 @@ the PressTalkInputMethod helper before PressTalk reports
 input_method_notification as inserted. If the helper never handles the
 notification, PressTalk logs input_method_ack_timeout and falls back instead of
 treating a posted Darwin notification as proof that text landed.
+If the helper acknowledges but cannot attach to the focused text client,
+PressTalk records inputMethodFallbackStatus=client_unavailable and copies future
+dictation during the cooldown instead of repeatedly selecting the input source.
 
 When bootstrap refreshes the installed PressTalkInputMethod.app, it also
 restarts the per-user InputMethodKit launch agent so macOS cannot keep a stale
@@ -354,9 +357,10 @@ effective readiness.
 
 Runtime status and Settings now also expose inputMethodFallbackStatus. When
 Accessibility is false and auto-paste is enabled, PressTalk reports whether the
-InputMethodKit fallback is ready, recognized but disabled, not selectable, not
-installed, or not recognized. This prevents mbp1's ad-hoc TIS state from being
-presented as a working fallback merely because auto-paste is on.
+InputMethodKit fallback is ready, recently client-unavailable, timed out,
+recognized but disabled, not selectable, not installed, or not recognized. This
+prevents enabled-but-failed input-method states from being presented as a working
+fallback merely because auto-paste is on.
 
 When Accessibility is not trusted but dictation can use the InputMethodKit
 fallback, Settings labels the Accessibility row as input method ready and

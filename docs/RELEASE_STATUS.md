@@ -14,6 +14,23 @@ Public prerelease:
 
 Verified on `studio1` during 2026-06-06 through 2026-06-08:
 
+- Post-rc101 local fix candidate on 2026-06-09 handles the terminal/text-field
+  blue input-source badge failure. The input-method helper now writes an
+  acknowledgement failure reason (`no_active_controller` or `no_current_client`),
+  and the main app records recent real insertion failures as
+  `inputMethodFallbackStatus=client_unavailable` or `ack_timeout` instead of
+  continuing to report `ready_input_method`. Normal dictation copies during the
+  cooldown instead of repeatedly selecting the input source; production insertion
+  probes can still force a retry and clear the degraded state on success. The
+  rebuilt local app reports
+  `CodeSignatureCDHash=4b9beee715576f9fcb43412a997e84685d6c555a`,
+  `inputListener=carbon:registered`, `triggerPath=Option + Space ready`,
+  `speechModel=Ready`, and `inputMethodFallbackStatus=ready` before a new real
+  failure. The fresh production insertion probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-09T10-36-55-843Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=input_method_notification`; it required IMK retries and
+  succeeded on attempt 3.
 - `swift build -c release` succeeds.
 - `scripts/build_jarvistap.sh` produces `~/Applications/PressTalk.app`.
 - The generated bundle declares microphone, input monitoring, and accessibility usage descriptions.

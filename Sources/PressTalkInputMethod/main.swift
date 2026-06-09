@@ -61,6 +61,11 @@ private final class InputMethodLog {
 
 private let inputMethodLog = InputMethodLog()
 
+private struct InputMethodInsertAttempt {
+    let inserted: Bool
+    let reason: String?
+}
+
 @objc(PressTalkIMController)
 public final class PressTalkIMController: IMKInputController {
     private static weak var activeController: PressTalkIMController?
@@ -99,10 +104,10 @@ public final class PressTalkIMController: IMKInputController {
         inputMethodLog.write("client updated context=\(context)")
     }
 
-    private func insert(_ text: String) -> Bool {
+    private func insert(_ text: String) -> InputMethodInsertAttempt {
         guard let currentClient else {
             inputMethodLog.write("insert failed reason=no_current_client")
-            return false
+            return InputMethodInsertAttempt(inserted: false, reason: "no_current_client")
         }
 
         currentClient.insertText(
@@ -110,11 +115,15 @@ public final class PressTalkIMController: IMKInputController {
             replacementRange: NSRange(location: NSNotFound, length: 0)
         )
         inputMethodLog.write("insert requested characters=\(text.count)")
-        return true
+        return InputMethodInsertAttempt(inserted: true, reason: nil)
     }
 
-    static func insertIntoActiveClient(_ text: String) -> Bool {
-        activeController?.insert(text) ?? false
+    fileprivate static func insertIntoActiveClient(_ text: String) -> InputMethodInsertAttempt {
+        guard let activeController else {
+            inputMethodLog.write("insert failed reason=no_active_controller")
+            return InputMethodInsertAttempt(inserted: false, reason: "no_active_controller")
+        }
+        return activeController.insert(text)
     }
 }
 
@@ -169,20 +178,25 @@ private final class PressTalkInputMethodAppDelegate: NSObject, NSApplicationDele
                 return
             }
 
-            let inserted = PressTalkIMController.insertIntoActiveClient(text)
-            writeInsertionAcknowledgement(inserted: inserted, characters: text.count)
-            inputMethodLog.write("insert notification handled inserted=\(inserted ? 1 : 0)")
+            let attempt = PressTalkIMController.insertIntoActiveClient(text)
+            writeInsertionAcknowledgement(attempt: attempt, characters: text.count)
+            inputMethodLog.write(
+                "insert notification handled inserted=\(attempt.inserted ? 1 : 0) reason=\(attempt.reason ?? "none")"
+            )
         } catch {
             inputMethodLog.write("insert notification failed reason=read_payload error=\(error)")
         }
     }
 
-    private func writeInsertionAcknowledgement(inserted: Bool, characters: Int) {
-        let payload: [String: Any] = [
+    private func writeInsertionAcknowledgement(attempt: InputMethodInsertAttempt, characters: Int) {
+        var payload: [String: Any] = [
             "generatedAt": ISO8601DateFormatter().string(from: Date()),
-            "inserted": inserted,
+            "inserted": attempt.inserted,
             "characters": characters,
         ]
+        if let reason = attempt.reason {
+            payload["reason"] = reason
+        }
         do {
             try FileManager.default.createDirectory(
                 at: PressTalkInputMethodConfig.supportDirectory,

@@ -118,8 +118,14 @@ post_repair_disabled_fixture() {
   write_probe_json "$2" true true '"input_method_notification"' false false false
 }
 
+client_unavailable_fixture() {
+  write_status_json "$1" false client_unavailable ax_false_input_method_client_unavailable false blocked_client_unavailable "PressTalk Local Development Code Signing"
+  write_probe_json "$2" false false null false true false
+}
+
 run_case input_method_success 0 "Result: proven" input_method_success_fixture
 run_case accessibility_success 0 "Result: proven" accessibility_success_fixture
 run_case paste_command_success 0 "Result: proven" paste_command_success_fixture
 run_case signing_repair_blocked 1 "Reason: active-field insertion needs signing repair" signing_repair_blocked_fixture
 run_case post_repair_disabled 1 "Reason: active-field insertion is blocked because the PressTalk input method is recognized but disabled" post_repair_disabled_fixture
+run_case client_unavailable 1 "Reason: active-field insertion is blocked because the PressTalk input method could not attach to the focused text field" client_unavailable_fixture

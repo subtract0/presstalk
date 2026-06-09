@@ -94,7 +94,19 @@ enum PermissionStatusLabelTest {
         require(readyNoPane.microphonePermissionLabel.tone == .ready, "authorized microphone must use ready tone")
         require(readyNoPane.accessibilityPermissionLabel.text == "Input method ready", "enabled input method fallback must not be labelled missing Accessibility")
         require(readyNoPane.accessibilityPermissionLabel.tone == .ready, "enabled input method fallback must use ready tone")
-        require(readyNoPane.activeFieldInsertionStatus == "ready_input_method", "input method fallback should prove active-field insertion readiness")
+        require(readyNoPane.activeFieldInsertionStatus == "ready_input_method", "input method fallback without recent client failure should prove active-field insertion readiness")
+
+        let clientUnavailable = makeStatus(inputListenerStatus: "carbon:registered", triggerKey: "option_space", inputMethodFallbackStatus: "client_unavailable")
+        require(!clientUnavailable.activeFieldInsertionReady, "recent input-method client failure must not be marked active-field ready")
+        require(!clientUnavailable.readyWithoutPermissionPaneWork, "recent input-method client failure must not pass ready-without-pane checks")
+        require(clientUnavailable.accessibilityPermissionLabel.text == "Input method client unavailable", "recent input-method client failure should be labelled explicitly")
+        require(clientUnavailable.accessibilityPermissionLabel.tone == .warning, "recent input-method client failure should use warning tone")
+        require(clientUnavailable.activeFieldInsertionStatus == "blocked_client_unavailable", "recent input-method client failure should block active-field insertion")
+
+        let acknowledgementTimeout = makeStatus(inputMethodFallbackStatus: "ack_timeout")
+        require(!acknowledgementTimeout.activeFieldInsertionReady, "input-method ack timeout must not be marked active-field ready")
+        require(acknowledgementTimeout.accessibilityPermissionLabel.text == "Input method unresponsive", "input-method ack timeout should be labelled explicitly")
+        require(acknowledgementTimeout.activeFieldInsertionStatus == "blocked_ack_timeout", "input-method ack timeout should block active-field insertion")
 
         let mbp1Repair = makeStatus(inputMethodFallbackStatus: "recognized_disabled", adHocSigned: true)
         require(mbp1Repair.accessibilityPermissionLabel.text == "Needs signing repair", "ad-hoc recognized-disabled state should point to signing repair")

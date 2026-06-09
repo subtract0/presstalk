@@ -1,9 +1,9 @@
 # Release Status
 
-Current status: local `main` has proven Option+Space active-field insertion on
-`studio1` and `mbp1` through the Accessibility menu-paste path; full
-cross-machine release is not yet proven because `s1` is not reachable from this
-host and `studio2` is excluded until a microphone is attached.
+Current status: local `main` has proven Option+Space real-field dictation and
+active-field insertion on the currently eligible machines: `studio1` / `s1`
+and `mbp1`. Both use the Accessibility menu-paste path. `studio2` / `s2`
+remains excluded until a microphone is attached.
 
 Latest local evidence:
 
@@ -27,6 +27,13 @@ Latest local evidence:
   `Paste menu pressed target_pid=39451`, and
   `Dictation inserted method=ax_menu_paste`. This closes the local insertion
   transport blocker for the current signed app.
+- On 2026-06-09 at 13:11 UTC, Alex focused a ZSH terminal text field on `mbp1`,
+  held Option+Space, said "I'm gonna test what is going to happen if I say a
+  short phrase", released, and reported that it auto-inserted correctly. The
+  trace confirms the end-to-end run using `MacBook Pro-Mikrofon`, with
+  `Primary offline Whisper transcript: I'm gonna test what is gonna happen if I
+  say a short phrase.`, `Paste menu pressed target_pid=1231`, and
+  `Dictation inserted method=ax_menu_paste`.
 - On 2026-06-09, Alex focused a real text field on `studio1`, held
   Option+Space, said "Does it work now?" three times, and released each time.
   PressTalk heard the trigger, selected the Shure/MV7 audio input, transcribed
@@ -77,8 +84,10 @@ Verified during 2026-06-06 through 2026-06-09:
 - The local plus `mbp1-tb` proof gate at
   `~/Desktop/presstalk-proof-gate-local-mbp1-rc104.json` reports
   `Result: proven`. The full matrix at
-  `~/Desktop/presstalk-readiness-matrix-after-mbp1-rc104.json` still fails when
-  `s1` is required because `s1` / `s1.local` do not resolve from `studio1`.
+  `~/Desktop/presstalk-readiness-matrix-after-mbp1-rc104.json` still records
+  that SSH host aliases `s1` / `s1.local` do not resolve from `studio1`, but
+  this is not a separate app proof blocker while `s1` means the local
+  `studio1` machine already covered by the `local` target.
 - `v0.1.5-rc103` is the previous public prerelease smoke artifact. It includes
   the `ax_menu_paste` trusted insertion path and isolated release packaging, but
   it predates the self-healing Accessibility desktop command.
@@ -2083,14 +2092,11 @@ Known current proof gaps:
 
 Do not claim full release coverage until these are recorded:
 
-- `studio1`: local Option+Space dictation and real-field paste smoke is proven
-  on 2026-06-09 through `ax_menu_paste`; rerun the bundled physical smoke helper
-  only if a fresh machine-readable JSON artifact is required for the final
-  release gate.
-- `s1`: host resolution or SSH alias setup, install, then Option+Space
-  dictation and paste smoke.
+- `studio1` / `s1`: local Option+Space dictation and real-field paste smoke is
+  proven on 2026-06-09 through `ax_menu_paste`; rerun the bundled physical
+  smoke helper only if a fresh machine-readable JSON artifact is required for
+  the final release gate.
 - `s2`: install plus Option+Space dictation smoke after a microphone is
   available.
-- `mbp1`: rc104 install and active-field production insertion probe are proven
-  through `ax_menu_paste`; record a physical Option+Space real-field dictation
-  on mbp1 before claiming human end-to-end use there.
+- `mbp1`: rc104 install, active-field production insertion probe, and physical
+  Option+Space real-field dictation are proven through `ax_menu_paste`.

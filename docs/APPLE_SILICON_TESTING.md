@@ -78,12 +78,13 @@ plutil -extract targets raw -o - "$HOME/Desktop/presstalk-readiness-matrix.json"
 
 Then run the release proof gate against the required machines. It exits nonzero
 until every required target is reachable, physical-STT ready, and active-field
-ready:
+ready. If `s1` means the local `studio1` machine, require `local`; do not also
+require an unresolved SSH alias for the same Mac.
 
 ```bash
 /bin/bash scripts/presstalk_release_proof_gate.sh \
   --matrix "$HOME/Desktop/presstalk-readiness-matrix.json" \
-  --require local --require s1 --require mbp1-tb \
+  --require local --require mbp1-tb \
   --exclude "studio2=no attached microphone" \
   --json-output "$HOME/Desktop/presstalk-proof-gate.json"
 ```
@@ -565,8 +566,7 @@ launchctl print gui/$(id -u)/com.am.jarvistap | sed -n '1,80p'
 
 Record each machine result before claiming release coverage:
 
-- `studio1`: M4 Max, local build/runtime smoke
-- `s1`: install + Option + Space smoke
+- `studio1` / `s1`: M4 Max, local build/runtime and Option + Space smoke
 - `s2` / `studio2`: excluded from current microphone/STT coverage until a
   microphone is attached
 - `mbp1`: M1 Max install + Option + Space smoke after logged-in signing repair

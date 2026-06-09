@@ -43,6 +43,7 @@ let package = Package(
             name: "PressTalkAsrBench",
             dependencies: [
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                "WhisperKit",
             ]
         ),
     ]

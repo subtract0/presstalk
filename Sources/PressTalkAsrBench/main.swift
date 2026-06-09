@@ -2,6 +2,7 @@
 @preconcurrency import CoreML
 import FluidAudio
 import Foundation
+import WhisperKit
 
 @main
 struct PressTalkAsrBench {
@@ -38,6 +39,8 @@ struct PressTalkAsrBench {
                 report = try await runParakeetV3(inputURL: inputURL, options: options, runIndex: runIndex)
             case .streaming:
                 report = try await runStreaming(inputURL: inputURL, options: options, runIndex: runIndex)
+            case .whisperKit:
+                report = try await runWhisperKit(inputURL: inputURL, options: options, runIndex: runIndex)
             }
             reports.append(report)
             print(report.prettyPrinted)
@@ -79,6 +82,8 @@ struct PressTalkAsrBench {
         let totalSeconds = Date().timeIntervalSince(transcribeStart)
         let audioDurationSeconds = try inputURL.audioDurationSeconds()
 
+        let transcript = result.text
+        let accuracy = options.accuracy(for: transcript)
         return BenchReport(
             backend: options.backend.rawValue,
             runIndex: runIndex,
@@ -90,8 +95,11 @@ struct PressTalkAsrBench {
             maxProcessSliceSeconds: nil,
             rtfx: audioDurationSeconds / max(totalSeconds, 0.000_001),
             partialUpdates: 0,
-            transcript: result.text,
+            transcript: transcript,
             confidence: Double(result.confidence),
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
             notes: options.backend.note
         )
     }
@@ -147,6 +155,7 @@ struct PressTalkAsrBench {
         let finalizationSeconds = Date().timeIntervalSince(finishStart)
         let totalSeconds = Date().timeIntervalSince(processStart)
 
+        let accuracy = options.accuracy(for: transcript)
         return BenchReport(
             backend: options.backend.rawValue,
             runIndex: runIndex,
@@ -160,6 +169,81 @@ struct PressTalkAsrBench {
             partialUpdates: partialUpdates.value,
             transcript: transcript,
             confidence: nil,
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
+            notes: options.backend.note
+        )
+    }
+
+    private static func runWhisperKit(
+        inputURL: URL,
+        options: BenchOptions,
+        runIndex: Int
+    ) async throws -> BenchReport {
+        let model = "openai_whisper-large-v3-v20240930_turbo_632MB"
+        let downloadBase = whisperModelSearchRoots().first
+        let localModelFolder = localWhisperModelFolder(for: model)
+        let localTokenizerFolder = localWhisperTokenizerFolder(for: model)
+        let shouldDownload = !options.offline && localModelFolder == nil
+
+        let loadStart = Date()
+        let config = WhisperKitConfig(
+            model: model,
+            downloadBase: downloadBase,
+            modelFolder: localModelFolder,
+            tokenizerFolder: localTokenizerFolder,
+            computeOptions: ModelComputeOptions(
+                melCompute: .cpuAndGPU,
+                audioEncoderCompute: .cpuAndGPU,
+                textDecoderCompute: .cpuAndGPU,
+                prefillCompute: .cpuOnly
+            ),
+            verbose: false,
+            logLevel: .error,
+            prewarm: false,
+            load: true,
+            download: shouldDownload
+        )
+        let whisperKit = try await WhisperKit(config)
+        let loadSeconds = Date().timeIntervalSince(loadStart)
+
+        let decodingOptions = DecodingOptions(
+            verbose: false,
+            task: .transcribe,
+            language: options.language.whisperLanguage,
+            temperature: 0,
+            usePrefillPrompt: true,
+            usePrefillCache: true,
+            detectLanguage: options.language == .auto,
+            skipSpecialTokens: true,
+            withoutTimestamps: true,
+            wordTimestamps: false
+        )
+
+        let transcribeStart = Date()
+        let results = try await whisperKit.transcribe(audioPath: inputURL.path, decodeOptions: decodingOptions)
+        let totalSeconds = Date().timeIntervalSince(transcribeStart)
+        let transcript = results.map(\.text).joined(separator: " ").cleanedTranscript
+        let audioDurationSeconds = try inputURL.audioDurationSeconds()
+        let accuracy = options.accuracy(for: transcript)
+
+        return BenchReport(
+            backend: options.backend.rawValue,
+            runIndex: runIndex,
+            inputPath: inputURL.path,
+            audioDurationSeconds: audioDurationSeconds,
+            loadSeconds: loadSeconds,
+            totalProcessingSeconds: totalSeconds,
+            finalizationSeconds: totalSeconds,
+            maxProcessSliceSeconds: nil,
+            rtfx: audioDurationSeconds / max(totalSeconds, 0.000_001),
+            partialUpdates: 0,
+            transcript: transcript,
+            confidence: nil,
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
             notes: options.backend.note
         )
     }
@@ -171,6 +255,7 @@ private struct BenchOptions {
     var language: BenchLanguage = .auto
     var runs = 1
     var feedSeconds = 0.10
+    var reference: String?
     var offline = false
     var json = false
     var showProgress = false
@@ -197,9 +282,11 @@ private struct BenchOptions {
       nemotron-560          Nemotron English streaming 0.6B, 560ms tier
       nemotron-1120         Nemotron English streaming 0.6B, 1120ms tier
       nemotron-2240         Nemotron English streaming 0.6B, 2240ms tier
+      stock-v1-gpu          PressTalk v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE
 
     Options:
       --language <auto|en|de|fr|es|it|pt|...>   v3 script hint; streaming ignores this
+      --reference <text-or-path>                 reference text for WER/CER scoring
       --runs <n>                                repeat benchmark, default 1
       --feed-ms <n>                             simulated streaming feed interval, default 100
       --offline                                 fail instead of downloading missing models
@@ -241,6 +328,9 @@ private struct BenchOptions {
                     throw BenchError.invalidNumber("--feed-ms", value)
                 }
                 options.feedSeconds = feedMilliseconds / 1000.0
+            case "--reference":
+                let value = try arguments.popValue(after: argument)
+                options.reference = try Self.loadReference(value)
             case "--offline":
                 options.offline = true
             case "--progress":
@@ -260,6 +350,19 @@ private struct BenchOptions {
 
         return options
     }
+
+    private static func loadReference(_ value: String) throws -> String {
+        let expanded = (value as NSString).expandingTildeInPath
+        if FileManager.default.fileExists(atPath: expanded) {
+            return try String(contentsOfFile: expanded, encoding: .utf8)
+        }
+        return value
+    }
+
+    func accuracy(for transcript: String) -> AccuracyScores? {
+        guard let reference else { return nil }
+        return AccuracyScores(reference: reference, hypothesis: transcript)
+    }
 }
 
 private enum BenchBackend: String {
@@ -271,10 +374,12 @@ private enum BenchBackend: String {
     case nemotron560 = "nemotron-560"
     case nemotron1120 = "nemotron-1120"
     case nemotron2240 = "nemotron-2240"
+    case stockV1GPU = "stock-v1-gpu"
 
     enum Kind {
         case parakeetV3
         case streaming
+        case whisperKit
     }
 
     var kind: Kind {
@@ -283,6 +388,8 @@ private enum BenchBackend: String {
             return .parakeetV3
         case .parakeetEOU160, .parakeetEOU320, .parakeetEOU1280, .nemotron560, .nemotron1120, .nemotron2240:
             return .streaming
+        case .stockV1GPU:
+            return .whisperKit
         }
     }
 
@@ -301,7 +408,7 @@ private enum BenchBackend: String {
             return .cpuAndNeuralEngine
         case .nemotron560, .nemotron1120, .nemotron2240:
             return .cpuAndNeuralEngine
-        case .parakeetV3ANE, .parakeetV3GPU:
+        case .parakeetV3ANE, .parakeetV3GPU, .stockV1GPU:
             return .cpuAndNeuralEngine
         }
     }
@@ -320,7 +427,7 @@ private enum BenchBackend: String {
             return .nemotron1120ms
         case .nemotron2240:
             return .nemotron2240ms
-        case .parakeetV3ANE, .parakeetV3GPU:
+        case .parakeetV3ANE, .parakeetV3GPU, .stockV1GPU:
             return .parakeetEou160ms
         }
     }
@@ -343,6 +450,8 @@ private enum BenchBackend: String {
             return "True streaming Nemotron 0.6B English, balanced tier."
         case .nemotron2240:
             return "True streaming Nemotron 0.6B English, highest-throughput tier."
+        case .stockV1GPU:
+            return "Frozen PressTalk v1 route: WhisperKit large-v3-turbo with cpu-gpu-no-ane compute placement."
         }
     }
 }
@@ -401,6 +510,75 @@ private enum BenchLanguage: String {
             return .greek
         }
     }
+
+    var whisperLanguage: String? {
+        switch self {
+        case .auto:
+            return nil
+        default:
+            return rawValue
+        }
+    }
+}
+
+private struct AccuracyScores: Codable {
+    let reference: String
+    let wordErrorRate: Double
+    let characterErrorRate: Double
+
+    init(reference: String, hypothesis: String) {
+        self.reference = reference
+        let referenceWords = Self.normalizedWords(reference)
+        let hypothesisWords = Self.normalizedWords(hypothesis)
+        let referenceCharacters = Array(Self.normalizedText(reference))
+        let hypothesisCharacters = Array(Self.normalizedText(hypothesis))
+        wordErrorRate = Self.errorRate(reference: referenceWords, hypothesis: hypothesisWords)
+        characterErrorRate = Self.errorRate(reference: referenceCharacters, hypothesis: hypothesisCharacters)
+    }
+
+    private static func normalizedWords(_ text: String) -> [String] {
+        normalizedText(text)
+            .split(separator: " ")
+            .map(String.init)
+    }
+
+    private static func normalizedText(_ text: String) -> String {
+        let folded = text
+            .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        var normalized = ""
+        for scalar in folded.unicodeScalars {
+            if CharacterSet.alphanumerics.contains(scalar) {
+                normalized.unicodeScalars.append(scalar)
+            } else {
+                normalized.append(" ")
+            }
+        }
+        return normalized
+            .split(separator: " ")
+            .joined(separator: " ")
+    }
+
+    private static func errorRate<T: Equatable>(reference: [T], hypothesis: [T]) -> Double {
+        guard !reference.isEmpty else { return hypothesis.isEmpty ? 0 : 1 }
+        let distance = levenshtein(reference, hypothesis)
+        return Double(distance) / Double(reference.count)
+    }
+
+    private static func levenshtein<T: Equatable>(_ a: [T], _ b: [T]) -> Int {
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+        var previous = Array(0...b.count)
+        var current = Array(repeating: 0, count: b.count + 1)
+        for i in 1...a.count {
+            current[0] = i
+            for j in 1...b.count {
+                let substitution = previous[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)
+                current[j] = min(previous[j] + 1, current[j - 1] + 1, substitution)
+            }
+            swap(&previous, &current)
+        }
+        return previous[b.count]
+    }
 }
 
 private struct BenchReport: Codable {
@@ -416,6 +594,9 @@ private struct BenchReport: Codable {
     let partialUpdates: Int
     let transcript: String
     let confidence: Double?
+    let wordErrorRate: Double?
+    let characterErrorRate: Double?
+    let referenceText: String?
     let notes: String
 
     var prettyPrinted: String {
@@ -429,6 +610,9 @@ private struct BenchReport: Codable {
         if let confidence {
             lines.append("confidence=\(confidence.formattedNumber)")
         }
+        if let wordErrorRate, let characterErrorRate {
+            lines.append("wer=\(wordErrorRate.formattedPercent) cer=\(characterErrorRate.formattedPercent)")
+        }
         lines.append("transcript=\(transcript)")
         return lines.joined(separator: "\n")
     }
@@ -441,7 +625,13 @@ private struct BenchAggregate {
         let processing = reports.map(\.totalProcessingSeconds).median
         let final = reports.map(\.finalizationSeconds).median
         let rtfx = reports.map(\.rtfx).median
-        return "median runs=\(reports.count) processing=\(processing.formattedSeconds) final=\(final.formattedSeconds) rtfx=\(rtfx.formattedNumber)"
+        var parts = ["median runs=\(reports.count) processing=\(processing.formattedSeconds) final=\(final.formattedSeconds) rtfx=\(rtfx.formattedNumber)"]
+        let werValues = reports.compactMap(\.wordErrorRate)
+        let cerValues = reports.compactMap(\.characterErrorRate)
+        if !werValues.isEmpty, !cerValues.isEmpty {
+            parts.append("wer=\(werValues.median.formattedPercent) cer=\(cerValues.median.formattedPercent)")
+        }
+        return parts.joined(separator: " ")
     }
 }
 
@@ -528,6 +718,13 @@ private extension URL {
     }
 }
 
+private extension String {
+    var cleanedTranscript: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+    }
+}
+
 private extension Double {
     var formattedSeconds: String {
         String(format: "%.3fs", self)
@@ -535,5 +732,110 @@ private extension Double {
 
     var formattedNumber: String {
         String(format: "%.2f", self)
+    }
+
+    var formattedPercent: String {
+        String(format: "%.2f%%", self * 100.0)
+    }
+}
+
+private func whisperModelSearchRoots() -> [URL] {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    return [
+        home.appendingPathComponent("Library/Application Support/JarvisTap/Models", isDirectory: true)
+    ]
+}
+
+private func whisperTokenizerSearchRoots() -> [URL] {
+    let home = FileManager.default.homeDirectoryForCurrentUser
+    return [
+        home.appendingPathComponent("Library/Application Support/JarvisTap/Tokenizers", isDirectory: true),
+        home.appendingPathComponent("Library/Application Support/JarvisTap/Models", isDirectory: true)
+    ]
+}
+
+private func localWhisperModelFolder(for model: String) -> String? {
+    for root in whisperModelSearchRoots() {
+        for folder in localWhisperModelFolderCandidates(root: root, model: model) {
+            if isUsableLocalWhisperModelFolder(folder, model: model) {
+                return folder.path
+            }
+        }
+    }
+    return nil
+}
+
+private func localWhisperModelFolderCandidates(root: URL, model: String) -> [URL] {
+    let repositoryPath = "argmaxinc/whisperkit-coreml"
+    return [
+        root
+            .appendingPathComponent(repositoryPath, isDirectory: true)
+            .appendingPathComponent(model, isDirectory: true),
+        root
+            .appendingPathComponent("models", isDirectory: true)
+            .appendingPathComponent(repositoryPath, isDirectory: true)
+            .appendingPathComponent(model, isDirectory: true)
+    ]
+}
+
+private func localWhisperTokenizerFolder(for model: String) -> URL? {
+    guard let tokenizerModelName = whisperTokenizerModelName(for: model) else { return nil }
+    for root in whisperTokenizerSearchRoots() {
+        for folder in localWhisperTokenizerFolderCandidates(root: root, tokenizerModelName: tokenizerModelName) {
+            let tokenizerPath = folder.appendingPathComponent("tokenizer.json")
+            let tokenizerConfigPath = folder.appendingPathComponent("tokenizer_config.json")
+            if FileManager.default.fileExists(atPath: tokenizerPath.path),
+               FileManager.default.fileExists(atPath: tokenizerConfigPath.path) {
+                return folder
+            }
+        }
+    }
+    return nil
+}
+
+private func whisperTokenizerModelName(for model: String) -> String? {
+    switch model {
+    case let name where name.contains("whisper-large-v3"):
+        return "whisper-large-v3"
+    default:
+        return nil
+    }
+}
+
+private func localWhisperTokenizerFolderCandidates(root: URL, tokenizerModelName: String) -> [URL] {
+    return [
+        root
+            .appendingPathComponent("openai", isDirectory: true)
+            .appendingPathComponent(tokenizerModelName, isDirectory: true),
+        root
+            .appendingPathComponent("models", isDirectory: true)
+            .appendingPathComponent("openai", isDirectory: true)
+            .appendingPathComponent(tokenizerModelName, isDirectory: true)
+    ]
+}
+
+private func isUsableLocalWhisperModelFolder(_ folder: URL, model: String) -> Bool {
+    requiredWhisperModelFiles(for: model).allSatisfy { relativePath in
+        FileManager.default.fileExists(atPath: folder.appendingPathComponent(relativePath).path)
+    }
+}
+
+private func requiredWhisperModelFiles(for model: String) -> [String] {
+    switch model {
+    case let name where name.contains("whisper-large-v3") && name.contains("turbo"):
+        return [
+            "config.json",
+            "generation_config.json",
+            "AudioEncoder.mlmodelc/model.mil",
+            "AudioEncoder.mlmodelc/weights/weight.bin",
+            "MelSpectrogram.mlmodelc/model.mil",
+            "MelSpectrogram.mlmodelc/weights/weight.bin",
+            "TextDecoder.mlmodelc/model.mil",
+            "TextDecoder.mlmodelc/weights/weight.bin",
+            "TextDecoderContextPrefill.mlmodelc/model.mil",
+            "TextDecoderContextPrefill.mlmodelc/weights/weight.bin"
+        ]
+    default:
+        return []
     }
 }

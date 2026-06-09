@@ -29,6 +29,58 @@ On a remote Mac with SSH already working:
 ssh <host> 'bash -s' < scripts/presstalk_machine_readiness.sh
 ```
 
+## ASR Backend Benchmark
+
+The `feature/ane-parakeet-backend` branch includes an isolated benchmark
+executable. It does not touch the installed PressTalk app, microphone
+permissions, or active-field insertion. It transcribes local audio files and
+measures model load time, processing time, finalization time, RTFx, and partial
+updates.
+
+Generate repeatable fixtures:
+
+```bash
+/bin/bash scripts/make_presstalk_asr_bench_fixtures.sh
+```
+
+Build the benchmark:
+
+```bash
+swift build -c release --product presstalk-asr-bench
+```
+
+Run the warmed-cache ANE baseline:
+
+```bash
+./.build/release/presstalk-asr-bench \
+  --input /tmp/presstalk-asr-bench/en-30s.aiff \
+  --backend parakeet-v3-ane --language en --runs 3 --json
+./.build/release/presstalk-asr-bench \
+  --input /tmp/presstalk-asr-bench/de-30s.aiff \
+  --backend parakeet-v3-ane --language de --runs 3 --json
+```
+
+Run true-streaming contenders:
+
+```bash
+./.build/release/presstalk-asr-bench \
+  --input /tmp/presstalk-asr-bench/en-30s.aiff \
+  --backend parakeet-eou-320 --runs 3 --json
+./.build/release/presstalk-asr-bench \
+  --input /tmp/presstalk-asr-bench/en-30s.aiff \
+  --backend nemotron-560 --runs 3 --json
+```
+
+The first run for each backend may download and compile CoreML model bundles.
+After caches are populated, rerun with `--offline` to ensure no benchmark result
+depends on network access:
+
+```bash
+./.build/release/presstalk-asr-bench \
+  --input /tmp/presstalk-asr-bench/en-30s.aiff \
+  --backend parakeet-v3-ane --language en --runs 3 --offline --json
+```
+
 After installing the app, the same helper is bundled at:
 
 ```bash

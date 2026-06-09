@@ -91,6 +91,52 @@ from a true incremental/tail-only decoder or a separate ANE/CoreML backend
 targeted at base M-series machines such as MacBook Air, not from repeatedly
 tuning full-buffer Whisper passes on M4 Max.
 
+## CoreML ASR Backend Benchmark Branch
+
+Measured locally on `studio1` / M4 Max on `2026-06-09`, branch
+`feature/ane-parakeet-backend`, release build product
+`presstalk-asr-bench`. Fixtures were generated with:
+
+```bash
+/bin/bash scripts/make_presstalk_asr_bench_fixtures.sh
+```
+
+The English fixture was `17.18 s`; the German fixture was `17.71 s`. These are
+synthetic TTS fixtures, so they are useful for repeatable speed comparisons and
+basic transcription sanity, not final product-quality WER claims.
+
+Studio1 warmed-cache results:
+
+| Backend | Fixture | Median Processing | Finalize | RTFx | Notes |
+| --- | --- | ---: | ---: | ---: | --- |
+| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.161 s` | `0.161 s` | `106.5x` | Accurate on fixture |
+| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.154 s` | `0.154 s` | `114.8x` | Mostly good; TTS payment terms misheard |
+| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.285 s` | `0.285 s` | `60.2x` | Slower than ANE on studio1 |
+| Parakeet EOU 120M true streaming, 160ms | English | `1.138 s` | `0.003 s` | `15.1x` | Fast partials; weaker accuracy |
+| Parakeet EOU 120M true streaming, 320ms | English | `0.688 s` | `0.005 s` | `25.0x` | Best EOU tier so far; correct words, no casing/punctuation |
+| Parakeet EOU 120M true streaming, 1280ms | English | `0.516 s` | `0.006 s` | `33.3x` | Faster but unacceptable transcription degradation |
+| Nemotron 0.6B English true streaming, 560ms | English | `0.828 s` | `0.013 s` | `20.8x` | Accurate fixture text; CoreML emitted slice-by-index warning |
+
+First-load timings include one-time Hugging Face download and CoreML compile,
+so they are not included in the warmed-cache table. The largest first loads
+observed here were about `61 s` for current Parakeet v3, `48 s` for each EOU
+tier, and `70 s` for Nemotron 560ms.
+
+Current interpretation:
+
+- For release-on-key final dictation, Parakeet v3 on ANE is the leading local
+  CoreML candidate. It is batch/sliding-window rather than true streaming, but
+  the final pass is already far below the current WhisperKit final-pass cost.
+- For live partial text, Parakeet EOU 320ms is the most promising true
+  streaming candidate tested so far. It needs capitalization, punctuation, and
+  quality validation before it can replace final text.
+- Nemotron 560ms remains a benchmark contender, but the observed CoreML shape
+  warning makes it a higher-risk production dependency until reproduced and
+  understood.
+- On this M4 Max, FluidAudio's GPU encoder placement for Parakeet v3 was slower
+  than ANE on the PressTalk fixture. This reinforces the ANE-first target for
+  base M-series Macs such as M4 MacBook Air.
+
 ## Wispr Flow Snapshot
 
 This is not a full benchmark and it is not a quality judgment. It is only a local footprint snapshot on the same Mac, taken from a hidden launch of the installed app:

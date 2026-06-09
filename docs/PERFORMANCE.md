@@ -93,39 +93,54 @@ tuning full-buffer Whisper passes on M4 Max.
 
 ## CoreML ASR Backend Benchmark Branch
 
-Measured locally on `studio1` / M4 Max on `2026-06-09`, branch
-`feature/ane-parakeet-backend`, release build product
+Measured locally on `studio1` / M4 Max and `mba1` / M4 MacBook Air on
+`2026-06-09`, branch `feature/ane-parakeet-backend`, release build product
 `presstalk-asr-bench`. Fixtures were generated with:
 
 ```bash
 /bin/bash scripts/make_presstalk_asr_bench_fixtures.sh
 ```
 
-The English fixture was `17.18 s`; the German fixture was `17.71 s`. These are
-synthetic TTS fixtures, so they are useful for repeatable speed comparisons and
-basic transcription sanity, not final product-quality WER claims.
+The English fixture was about `17.2 s`; the German fixture was `17.71 s`.
+These are synthetic TTS fixtures, so they are useful for repeatable speed
+comparisons and basic transcription sanity, not final product-quality WER
+claims. WER/CER below are normalized scores: lowercased, diacritic-insensitive,
+and punctuation-insensitive. That intentionally tests recognized words more
+than dictation formatting.
+
+The `stock-v1-gpu` row is the frozen PressTalk v1 route:
+WhisperKit `openai_whisper-large-v3-v20240930_turbo_632MB` with
+`cpu-gpu-no-ane` compute placement.
 
 Studio1 warmed-cache results:
 
-| Backend | Fixture | Median Processing | Finalize | RTFx | Notes |
-| --- | --- | ---: | ---: | ---: | --- |
-| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.161 s` | `0.161 s` | `106.5x` | Accurate on fixture |
-| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.154 s` | `0.154 s` | `114.8x` | Mostly good; TTS payment terms misheard |
-| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.285 s` | `0.285 s` | `60.2x` | Slower than ANE on studio1 |
-| Parakeet EOU 120M true streaming, 160ms | English | `1.138 s` | `0.003 s` | `15.1x` | Fast partials; weaker accuracy |
-| Parakeet EOU 120M true streaming, 320ms | English | `0.688 s` | `0.005 s` | `25.0x` | Best EOU tier so far; correct words, no casing/punctuation |
-| Parakeet EOU 120M true streaming, 1280ms | English | `0.516 s` | `0.006 s` | `33.3x` | Faster but unacceptable transcription degradation |
-| Nemotron 0.6B English true streaming, 560ms | English | `0.828 s` | `0.013 s` | `20.8x` | Accurate fixture text; CoreML emitted slice-by-index warning |
+| Backend | Fixture | Median Processing | Finalize | RTFx | WER | CER | Notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | English | `3.362 s` | `3.362 s` | `5.12x` | `4.26%` | `0.35%` | Frozen v1 quality baseline |
+| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.166 s` | `0.166 s` | `103.71x` | `4.26%` | `0.35%` | Same normalized English score as stock; about `20x` faster final pass |
+| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.290 s` | `0.290 s` | `59.31x` | `4.26%` | `0.35%` | Slower than ANE on studio1 |
+| Parakeet EOU 120M true streaming, 160ms | English | `1.153 s` | `0.003 s` | `14.92x` | `10.64%` | `3.48%` | Fast partials; weaker accuracy |
+| Parakeet EOU 120M true streaming, 320ms | English | `0.682 s` | `0.004 s` | `25.21x` | `6.38%` | `3.14%` | Best EOU tier so far; no casing/punctuation |
+| Parakeet EOU 120M true streaming, 1280ms | English | `0.533 s` | `0.006 s` | `32.26x` | `14.89%` | `19.16%` | Faster but unacceptable transcription degradation |
+| Nemotron 0.6B English true streaming, 560ms | English | `0.871 s` | `0.013 s` | `19.76x` | `4.26%` | `0.35%` | Accurate fixture text; CoreML emitted slice-by-index warning |
+| Nemotron 0.6B English true streaming, 1120ms | English | `0.678 s` | `0.014 s` | `25.36x` | `4.26%` | `0.35%` | Accurate fixture text; optional tier |
+| Nemotron 0.6B English true streaming, 2240ms | English | `0.607 s` | `0.022 s` | `28.32x` | `4.26%` | `0.35%` | Accurate fixture text; optional tier |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | German | `3.484 s` | `3.484 s` | `5.08x` | `13.51%` | `1.22%` | Better German CER than Parakeet on payment terms |
+| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.168 s` | `0.168 s` | `105.21x` | `13.51%` | `3.25%` | Same normalized German WER as stock; higher CER on payment terms |
+| Parakeet v3 0.6B, CPU+GPU encoder | German | `0.278 s` | `0.278 s` | `63.76x` | `13.51%` | `3.25%` | Slower than ANE on studio1 |
 
 Mba1 warmed-cache results on a base M4 MacBook Air / macOS 26.3:
 
-| Backend | Fixture | Median Processing | Finalize | RTFx | Notes |
-| --- | --- | ---: | ---: | ---: | --- |
-| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.180 s` | `0.180 s` | `95.6x` | Accurate on fixture |
-| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.182 s` | `0.182 s` | `97.1x` | Same synthetic-TTS payment-term errors as studio1 |
-| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.435 s` | `0.435 s` | `39.5x` | Much slower than ANE on base M4 |
-| Parakeet EOU 120M true streaming, 320ms | English | `0.716 s` | `0.006 s` | `24.0x` | Same correct words/no casing-punctuation behavior as studio1 |
-| Nemotron 0.6B English true streaming, 560ms | English | `0.913 s` | `0.015 s` | `18.8x` | Accurate fixture text; no CoreML warning observed on mba1 run |
+| Backend | Fixture | Median Processing | Finalize | RTFx | WER | CER | Notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | English | `6.297 s` | `6.297 s` | `2.74x` | `4.26%` | `0.35%` | Frozen v1 route slows sharply on base M4 |
+| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.165 s` | `0.165 s` | `104.43x` | `4.26%` | `0.35%` | Same normalized English score as stock; about `38x` faster final pass |
+| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.420 s` | `0.420 s` | `41.03x` | `4.26%` | `0.35%` | Much slower than ANE on base M4 |
+| Parakeet EOU 120M true streaming, 320ms | English | `0.692 s` | `0.005 s` | `24.88x` | `10.64%` | `3.83%` | Live partial candidate; no casing/punctuation |
+| Nemotron 0.6B English true streaming, 560ms | English | `0.882 s` | `0.015 s` | `19.52x` | `4.26%` | `0.35%` | Accurate fixture text |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | German | `6.686 s` | `6.686 s` | `2.65x` | `13.51%` | `1.22%` | Better German CER than Parakeet on payment terms |
+| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.169 s` | `0.169 s` | `104.69x` | `13.51%` | `3.25%` | Same normalized German WER as stock; higher CER on payment terms |
+| Parakeet v3 0.6B, CPU+GPU encoder | German | `0.427 s` | `0.427 s` | `41.50x` | `13.51%` | `3.25%` | Much slower than ANE on base M4 |
 
 First-load timings include one-time Hugging Face download and CoreML compile,
 so they are not included in the warmed-cache table. The largest first loads
@@ -136,19 +151,34 @@ were much longer because it was a fresh checkout and fresh model cache: about
 
 Current interpretation:
 
+- The frozen stock v1 WhisperKit route remains the quality baseline, but it is
+  too slow for near-instant release on longer dictations, especially on the base
+  M4 Air class: `6.297 s` for a `17.2 s` English fixture.
 - For release-on-key final dictation, Parakeet v3 on ANE is the leading local
   CoreML candidate. It is batch/sliding-window rather than true streaming, but
-  the final pass is already far below the current WhisperKit final-pass cost.
+  the final pass is already far below the current WhisperKit final-pass cost:
+  about `20x` faster on studio1 and `38x` faster on mba1 for the English
+  fixture, with the same normalized English WER/CER.
+- Accuracy is not solved by speed alone. On the German TTS fixture, stock
+  WhisperKit and Parakeet v3 tied on normalized WER, but stock had lower CER
+  because Parakeet misheard parts of the payment-term phrase. Real recorded
+  user fixtures should decide whether Parakeet needs a cleanup pass, domain
+  dictionary, or fallback language route.
 - For live partial text, Parakeet EOU 320ms is the most promising true
   streaming candidate tested so far. It needs capitalization, punctuation, and
   quality validation before it can replace final text.
-- Nemotron 560ms remains a benchmark contender, but the observed CoreML shape
-  warning makes it a higher-risk production dependency until reproduced and
-  understood.
-- On this M4 Max, FluidAudio's GPU encoder placement for Parakeet v3 was slower
-  than ANE on the PressTalk fixture. On the base M4 MacBook Air, GPU placement
-  was slower still (`0.435 s` vs `0.180 s` warmed median), reinforcing the
-  ANE-first target for base M-series Macs.
+- Nemotron remains a benchmark contender. It matched the normalized English
+  score on the synthetic fixture, but it is English-only in the tested
+  configuration and has higher production risk until model availability,
+  language coverage, and CoreML warnings are understood.
+- The base M4 GPU route did slow down versus M4 Max, but not linearly with GPU
+  core count or memory bandwidth. This benchmark is not purely GPU-bandwidth
+  bound. The stronger product signal is that ANE performance stayed nearly flat
+  across M4 Max and base M4 while stock WhisperKit GPU became much slower on the
+  Air.
+- The ANE-first target for base M-series Macs is reinforced. The app should keep
+  the frozen WhisperKit route available as a quality/fallback baseline while
+  Parakeet v3 ANE gets broader real-speech accuracy validation.
 
 ## Wispr Flow Snapshot
 

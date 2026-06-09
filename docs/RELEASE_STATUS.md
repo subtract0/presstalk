@@ -1,8 +1,9 @@
 # Release Status
 
-Current status: local `main` has proven real-field Option+Space dictation
-auto-insert on `studio1` through the Accessibility menu-paste path; full
-cross-machine release is not yet proven.
+Current status: local `main` has proven Option+Space active-field insertion on
+`studio1` and `mbp1` through the Accessibility menu-paste path; full
+cross-machine release is not yet proven because `s1` is not reachable from this
+host and `studio2` is excluded until a microphone is attached.
 
 Latest local evidence:
 
@@ -42,22 +43,45 @@ Latest local evidence:
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc103`
-- Commit: `d35e662dcf79e91d361b8e8b247e02ea128d6443`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc103`
-- Asset: `PressTalk-0.1.5-rc103-macos-arm64.zip`
-- SHA-256: `5cd91a560997a482359778bdf717d79166fb87e9204ffc045493b9cc99749d2b`
+- Tag: `v0.1.5-rc104`
+- Commit: `827f274c6a464c3bc073b4f7c63217974a3f98e6`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc104`
+- Asset: `PressTalk-0.1.5-rc104-macos-arm64.zip`
+- SHA-256: `69d246492b7d38f4adb358021b547f49d8fadda34e365e605bb494b5f888f6b9`
 
-Verified on `studio1` during 2026-06-06 through 2026-06-09:
+Verified during 2026-06-06 through 2026-06-09:
 
-- `v0.1.5-rc103` is the current public prerelease smoke artifact. It includes
+- `v0.1.5-rc104` is the current public prerelease smoke artifact. It includes
   the `ax_menu_paste` trusted insertion path proven by the 2026-06-09 real-field
-  Option+Space test on `studio1`, plus isolated release packaging so publishing
-  no longer overwrites the live local app in `~/Applications/PressTalk.app`.
-  GitHub reports asset digest
-  `sha256:5cd91a560997a482359778bdf717d79166fb87e9204ffc045493b9cc99749d2b`,
-  matching the local `dist/PressTalk-0.1.5-rc103-macos-arm64.zip`, and the tag
-  points at `d35e662dcf79e91d361b8e8b247e02ea128d6443`.
+  Option+Space test on `studio1`, isolated release packaging so publishing no
+  longer overwrites the live local app in `~/Applications/PressTalk.app`, and a
+  self-healing Accessibility desktop command that falls back to the current
+  user's `~/Applications/PressTalk.app` when a stale command contains another
+  user's home directory. GitHub reports asset digest
+  `sha256:69d246492b7d38f4adb358021b547f49d8fadda34e365e605bb494b5f888f6b9`,
+  matching the local `dist/PressTalk-0.1.5-rc104-macos-arm64.zip`, and the tag
+  points at `827f274c6a464c3bc073b4f7c63217974a3f98e6`.
+- `v0.1.5-rc104` was installed on `mbp1` from the GitHub release artifact with
+  SHA-256 verified. Bootstrap used the existing trusted local signing identity
+  without opening permission panes, and the refreshed runtime reports
+  `CodeSignatureCDHash=dc881cde2820913f3dd14ede322d94c977a9f31f`,
+  `AccessibilityStatus=ax_trusted`, `ActiveFieldInsertionStatus=ready_accessibility`,
+  `InputMethodFallbackStatus=probe_only`, `InputListener=carbon:registered`,
+  and `SpeechModel=Ready`.
+- The `mbp1` production insertion probe at
+  `/Users/alexandermonas/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-09T13-08-24-985Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=ax_menu_paste`. The verifier reports `Result: proven`.
+  The refreshed `mbp1` readiness artifact is
+  `/Users/alexandermonas/Desktop/presstalk-readiness-mbp1-rc104.json`.
+- The local plus `mbp1-tb` proof gate at
+  `~/Desktop/presstalk-proof-gate-local-mbp1-rc104.json` reports
+  `Result: proven`. The full matrix at
+  `~/Desktop/presstalk-readiness-matrix-after-mbp1-rc104.json` still fails when
+  `s1` is required because `s1` / `s1.local` do not resolve from `studio1`.
+- `v0.1.5-rc103` is the previous public prerelease smoke artifact. It includes
+  the `ax_menu_paste` trusted insertion path and isolated release packaging, but
+  it predates the self-healing Accessibility desktop command.
 - Local source commit `3d95bb7` uses Accessibility to press the focused app's
   Paste menu item for trusted insertion, with targeted Cmd+V and direct AX text
   writes only as backups. The latest local readiness report at
@@ -2067,4 +2091,6 @@ Do not claim full release coverage until these are recorded:
   dictation and paste smoke.
 - `s2`: install plus Option+Space dictation smoke after a microphone is
   available.
-- `mbp1`: M1 Max physical Fn or Option dictation and paste smoke.
+- `mbp1`: rc104 install and active-field production insertion probe are proven
+  through `ax_menu_paste`; record a physical Option+Space real-field dictation
+  on mbp1 before claiming human end-to-end use there.

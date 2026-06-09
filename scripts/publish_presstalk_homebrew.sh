@@ -28,6 +28,12 @@ ensure_repo() {
   gh repo create "$repo" --public --confirm
 }
 
+configure_git_identity() {
+  local repo_dir="$1"
+  git -C "$repo_dir" config user.name "${PRESSTALK_RELEASE_GIT_NAME:-PressTalk Release Bot}"
+  git -C "$repo_dir" config user.email "${PRESSTALK_RELEASE_GIT_EMAIL:-presstalk-release-bot@users.noreply.github.com}"
+}
+
 require_cmd gh
 require_cmd git
 
@@ -53,6 +59,7 @@ git -C "$TMP_DIR" clone "https://github.com/${RELEASE_REPO}.git" presstalk-relea
 if [[ ! -d "$TMP_DIR/presstalk-releases/.git" ]]; then
   gh repo clone "$RELEASE_REPO" "$TMP_DIR/presstalk-releases" >/dev/null
 fi
+configure_git_identity "$TMP_DIR/presstalk-releases"
 
 cat >"$TMP_DIR/presstalk-releases/README.md" <<EOF
 # PressTalk Releases
@@ -97,6 +104,7 @@ fi
 
 gh repo clone "$TAP_REPO" "$TMP_DIR/homebrew-presstalk" >/dev/null 2>&1 || true
 mkdir -p "$TMP_DIR/homebrew-presstalk/Casks"
+configure_git_identity "$TMP_DIR/homebrew-presstalk"
 
 cat >"$TMP_DIR/homebrew-presstalk/README.md" <<EOF
 # homebrew-presstalk

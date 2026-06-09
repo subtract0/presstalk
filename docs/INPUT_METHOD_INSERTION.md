@@ -4,10 +4,10 @@ PressTalk's current production insertion path is:
 
 1. direct Accessibility insertion when `AXIsProcessTrusted()` is true
 2. pasteboard plus Cmd-V when Accessibility is trusted but direct AX insertion fails
-3. temporary PressTalk input-method selection plus Darwin insert notification
-   when Accessibility is not trusted
-4. copy fallback when both Accessibility and input-method insertion are
-   unavailable
+3. copy fallback when Accessibility is not trusted
+4. temporary PressTalk input-method selection plus Darwin insert notification
+   only for diagnostics, production probes, or explicit experiments launched
+   with `PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION=1`
 
 The automated paste self-test has already shown that synthetic Cmd-V events do
 not reliably land in a focused text field without Accessibility trust. Keep that
@@ -32,10 +32,12 @@ current `IMKTextInput` client, and listens for the Darwin notification
 and asks the active input client to insert that text at the current insertion
 point.
 
-Production PressTalk now uses this as the first fallback when Accessibility is
-not trusted. It installs/registers the bundled input method if needed, briefly
-selects it, posts the same Darwin notification, restores the previous input
-source, and copies only if that setup fails.
+Production PressTalk no longer uses this as the default dictation fallback when
+Accessibility is not trusted. The 2026-06-09 real-field Option+Space test on
+`studio1` transcribed speech correctly but the input-method helper acknowledged
+`no_active_controller` three times, so the normal app now copies instead of
+briefly selecting the input method and showing the macOS input-source badge.
+The same code remains available for diagnostics and explicit experiments.
 
 ## Build
 
@@ -165,7 +167,12 @@ The app-level runtime status mirrors this check through
 `permissions.inputMethodFallbackStatus`:
 
 - `ready` means the fallback source is enabled and PressTalk has no recent real
-  insertion failure for the running app.
+  insertion failure for the running app. It does not by itself prove arbitrary
+  real focused text fields; active-field readiness still requires Accessibility.
+- `probe_only` means normal dictation will not select the input method. This is
+  the default after the 2026-06-09 real-field `no_active_controller` result.
+  PressTalk copies and reports `activeFieldInsertionStatus=blocked_accessibility_required`
+  until Accessibility is trusted for the exact app.
 - `client_unavailable` means the source is enabled, but a recent production
   dictation attempt reached the helper and the helper could not attach to the
   focused `IMKTextInput` client. This can show macOS's small input-source badge
@@ -208,8 +215,10 @@ lands:
 /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-run-production-insertion-probe.sh" --json
 ```
 
-On `studio1`, this probe succeeds with `success=true`,
-`targetCaptureSuccess=true`, and `traceProductionMethod=input_method_notification`.
+On `studio1`, this probe can succeed with `success=true`,
+`targetCaptureSuccess=true`, and `traceProductionMethod=input_method_notification`,
+but that result is no longer sufficient release proof for arbitrary real text
+fields.
 On the current ad-hoc `mbp1` install, it fails with
 `targetCaptureFailureHint=input_method_enable_no_effect` and trace evidence from
 the running PressTalk app: `Input method insertion enable had no visible effect`,
@@ -259,9 +268,10 @@ appears, the client accepted the request path but insertion is still not proven.
 
 ## Promotion Rule
 
-The focused editable-field probe has succeeded on `studio1`, so production
-dictation may use the same pending-insert file plus Darwin notification path
-before falling back to copy when Accessibility is untrusted. It still needs
-cross-machine smoke on `s1` and `mbp1` before the full app goal is proven.
+Do not promote IMK helper-window success to product proof. Production dictation
+may only claim real active-field auto-insert when Accessibility is trusted for
+the exact signed PressTalk app and a real focused-field meatspace test inserts
+without Cmd-V. The input-method path remains a diagnostic/probe path until a
+separate real-field design proves it can attach to arbitrary focused clients.
 `s2` / `studio2` is intentionally out of the current microphone/STT smoke matrix
 until a microphone is attached.

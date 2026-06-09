@@ -169,6 +169,35 @@ if [[ "$(plutil -extract runtime.accessibilityTCCAuthValue raw -o - "$fixture_wi
   exit 1
 fi
 
+plutil -replace runtime.activeFieldInsertionStatus -string "blocked_accessibility_required" "$fixture_status"
+plutil -replace permissions.accessibilityStatus -string "ax_false_input_method_probe_only" "$fixture_status"
+plutil -replace permissions.inputMethodFallbackStatus -string "probe_only" "$fixture_status"
+
+fixture_probe_only_json="$TEST_TMPDIR/fixture-probe-only.json"
+PATH="$fixture_bin:$PATH" \
+  HOME="$fixture_home" \
+  PRESSTALK_APP_BUNDLE="$fixture_app" \
+  PRESSTALK_STATUS_JSON="$fixture_status" \
+  PRESSTALK_DIAGNOSTICS_DIR="$fixture_diagnostics" \
+  PRESSTALK_ACCESSIBILITY_DESKTOP_COMMAND_PATH="$fixture_handoff" \
+  PRESSTALK_SYSTEM_TCC_DB="$fixture_tcc_system" \
+  PRESSTALK_USER_TCC_DB="$fixture_tcc_user" \
+  PRESSTALK_TEST_TCC_AUTH_VALUE=0 \
+  "$HELPER" --json >"$fixture_probe_only_json"
+
+probe_only_next_action="$(plutil -extract nextAction raw -o - "$fixture_probe_only_json")"
+if [[ "$probe_only_next_action" != *"real-field auto-insert requires Accessibility"* ||
+      "$probe_only_next_action" != *"double-click $fixture_handoff"* ]]; then
+  echo "FAIL: probe_only guidance did not point at Accessibility handoff"
+  printf '%s\n' "$probe_only_next_action"
+  plutil -p "$fixture_probe_only_json"
+  exit 1
+fi
+
+plutil -replace runtime.activeFieldInsertionStatus -string "blocked_recognized_disabled" "$fixture_status"
+plutil -replace permissions.accessibilityStatus -string "ax_false_input_method_recognized_disabled" "$fixture_status"
+plutil -replace permissions.inputMethodFallbackStatus -string "recognized_disabled" "$fixture_status"
+
 rm -f "$fixture_handoff"
 cat >"$fixture_resources/presstalk-accessibility-handoff.sh" <<'SH'
 #!/usr/bin/env bash

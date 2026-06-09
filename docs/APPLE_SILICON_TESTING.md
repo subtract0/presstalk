@@ -277,7 +277,10 @@ Runtime status also reports `permissions.inputMethodFallbackStatus`. Expected
 values:
 
 - `ready`: the fallback is enabled, has no recent real insertion failure, and is
-  worth probing.
+  worth probing. It does not prove arbitrary real focused text fields.
+- `probe_only`: normal dictation will copy instead of selecting the input
+  method; real active-field auto-insert requires Accessibility for the exact
+  signed PressTalk app.
 - `client_unavailable`: the fallback is enabled, but a recent real insertion
   attempt reached the helper and could not attach to the focused text client.
 - `ack_timeout`: the fallback is enabled, but the helper did not acknowledge the
@@ -294,9 +297,9 @@ PressTalk identity, and only when runtime status says the selected path needs
 them:
 
 - Microphone access is required for local STT.
-- Accessibility is optional while `inputMethodFallbackStatus=ready`; it becomes
-  the active-field insertion path when real input-method insertion reports
-  `client_unavailable` or `ack_timeout`.
+- Accessibility is required for real active-field auto-insert. Without it,
+  PressTalk should still transcribe and copy, but helper-window or production
+  input-method probes are not release proof for arbitrary focused fields.
 - Input Monitoring is not required for the default `Option + Space` registered
   hotkey path. It is only relevant for modifier-only, trackpad, or legacy
   trigger paths that report it as required.

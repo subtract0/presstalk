@@ -345,8 +345,34 @@ Next action: macOS recognizes the PressTalk input method but leaves it disabled 
 Do not rerun signing repair or privacy panes for this state; inspect TIS enable-no-effect or use the Accessibility insertion path.
 EOF
       fi
-    elif [[ "$input_method_fallback" == "ready" ]]; then
-      echo "Next action: insertion path reports ready; run the production insertion probe if proof is needed."
+    elif [[ "$input_method_fallback" == "probe_only" || "$input_method_fallback" == "ready" ]]; then
+      handoff_command=""
+      handoff_command="$(accessibility_handoff_command_path)"
+      if [[ -x "$handoff_command" ]]; then
+        if [[ "$accessibility_tcc_state" == "listed_disabled" ]]; then
+          cat <<EOF
+Next action: speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app.
+PressTalk is already listed in Accessibility but disabled. From the logged-in desktop, double-click:
+$handoff_command
+Turn on the existing PressTalk entry only, then let the command run the insertion probe and verifier.
+EOF
+        else
+          cat <<EOF
+Next action: speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app.
+From the logged-in desktop, double-click:
+$handoff_command
+That command grants only PressTalk Accessibility, then runs the insertion probe and verifier.
+EOF
+        fi
+      elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
+        cat <<EOF
+Next action: speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app.
+Write the desktop Accessibility handoff with:
+/bin/bash "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command
+EOF
+      else
+        echo "Next action: speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app."
+      fi
     elif [[ -n "$input_method_fallback" ]]; then
       echo "Next action: inspect the input-method status above before changing permissions."
     fi

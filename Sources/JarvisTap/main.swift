@@ -1226,6 +1226,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
+    private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
     private let stateLock = NSLock()
 
     private var eventTap: CFMachPort?
@@ -1903,11 +1904,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     nil
                 )
             } else if settingsStore.pasteAutomatically &&
-                !status.accessibilityGranted &&
-                status.inputMethodFallbackStatus != "ready" {
+                !status.activeFieldInsertionReady {
                 uiState = (
                     "Paste Fallback Blocked",
-                    "Transcription ready. Input method status: \(status.inputMethodFallbackStatus).",
+                    (status.inputMethodFallbackStatus == "probe_only" || status.inputMethodFallbackStatus == "ready")
+                        ? "Transcription ready. Auto-insert needs Accessibility; dictation will copy."
+                        : "Transcription ready. Input method status: \(status.inputMethodFallbackStatus).",
                     "exclamationmark.triangle.fill",
                     .warming,
                     nil
@@ -5264,9 +5266,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Input method preselection restored reason=\(reason) age_seconds=\(String(format: "%.2f", age))")
     }
 
+    private func inputMethodDictationInsertionEnabled() -> Bool {
+        ProcessInfo.processInfo.environment[inputMethodDictationEnvKey] == "1"
+    }
+
     private func scheduleInputMethodHelperWarmupIfNeeded() {
         guard config.agentMode == "dictation",
               settingsStore.pasteAutomatically,
+              inputMethodDictationInsertionEnabled(),
               !AXIsProcessTrusted()
         else {
             return
@@ -5287,6 +5294,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func warmInputMethodHelperForInsertionIfNeeded() {
         guard config.agentMode == "dictation",
               settingsStore.pasteAutomatically,
+              inputMethodDictationInsertionEnabled(),
               !AXIsProcessTrusted()
         else {
             return
@@ -5371,6 +5379,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func beginInputMethodPreselectionForDictationIfNeeded() {
         guard config.agentMode == "dictation",
               settingsStore.pasteAutomatically,
+              inputMethodDictationInsertionEnabled(),
               !AXIsProcessTrusted()
         else {
             return
@@ -5450,6 +5459,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func currentInputMethodFallbackStatus() -> String {
         guard settingsStore.pasteAutomatically else {
             return "not_used"
+        }
+        guard inputMethodDictationInsertionEnabled() else {
+            return "probe_only"
         }
 
         let installedURL = installedInputMethodBundleURL()
@@ -5551,7 +5563,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         switch status.inputMethodFallbackStatus {
         case "ready":
-            return "ax_false_input_method_fallback_ready"
+            return "ax_false_accessibility_required"
+        case "probe_only":
+            return "ax_false_input_method_probe_only"
         case "client_unavailable":
             return "ax_false_input_method_client_unavailable"
         case "ack_timeout":
@@ -5852,7 +5866,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let copiedBeforeFallback = context == .dictation
             if copiedBeforeFallback {
                 copyPreparedTranscriptToPasteboard(preparedTranscript)
-                traceLogger.log("Accessibility preflight unavailable; copied transcript before input method fallback")
+                traceLogger.log("Accessibility preflight unavailable; copied transcript before insertion fallback")
+            }
+
+            if context == .dictation && !inputMethodDictationInsertionEnabled() {
+                restoreInputMethodPreselectionIfNeeded(reason: "dictation_input_method_probe_only")
+                traceLogger.log("Accessibility preflight unavailable; input method dictation insertion disabled after real-field client failures; copying transcript")
+                return .copiedFallback(reason: "accessibility_required_for_auto_insert")
             }
 
             let preselectedSession = context == .dictation ? takeInputMethodPreselection() : nil

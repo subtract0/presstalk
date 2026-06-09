@@ -362,16 +362,17 @@ recognized but disabled, not selectable, not installed, or not recognized. This
 prevents enabled-but-failed input-method states from being presented as a working
 fallback merely because auto-paste is on.
 
-When Accessibility is not trusted but dictation can use the InputMethodKit
-fallback, Settings labels the Accessibility row as input method ready and
-runtime status records accessibilityStatus=ax_false_input_method_fallback_ready
-instead of naming it as a missing permission or copy-only path.
+When Accessibility is not trusted, normal dictation treats the InputMethodKit
+route as probe-only after real-field no_active_controller failures. Settings
+labels the Accessibility row as required for real auto-insert, runtime status
+records accessibilityStatus=ax_false_input_method_probe_only, and PressTalk
+copies instead of repeatedly selecting the input source.
 
 The Settings window is now resizable and scrollable, and the Accessibility row
 names the exact runtime state when AXIsProcessTrusted=false for this signed app.
-With auto-paste enabled, PressTalk tries the input method fallback before copy
-fallback instead of sending users back through an already-enabled macOS Privacy
-toggle.
+With auto-paste enabled, PressTalk requires Accessibility for real auto-insert
+and keeps the input-method route for diagnostics unless explicitly enabled for
+experiments.
 
 Runtime status also records microphoneAuthorizationStatus, so a blocked machine
 can distinguish authorized, denied, restricted, not_determined, and unknown
@@ -384,8 +385,9 @@ Settings panes for no-pane runs.
 
 For insertion, PressTalk now tries direct Accessibility insertion into the
 focused text element when Accessibility is trusted. If Accessibility is not
-trusted, it tries the InputMethodKit insertion fallback before copying the
-transcript to the clipboard. It does not post a Cmd-V event that cannot land.
+trusted, normal dictation copies the transcript to the clipboard. It does not
+post a Cmd-V event that cannot land or select the input method unless the
+experimental IMK dictation flag is set.
 The automated smoke helper records traceInserted, traceCopyFallback, and
 targetCaptureFailureHint so these paths are visible in JSON.
 

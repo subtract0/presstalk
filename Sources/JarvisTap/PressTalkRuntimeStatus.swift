@@ -110,7 +110,7 @@ struct PressTalkRuntimeStatus {
     }
 
     var activeFieldInsertionReady: Bool {
-        pasteAutomatically && (accessibilityGranted || inputMethodFallbackStatus == "ready")
+        pasteAutomatically && accessibilityGranted
     }
 
     var readyWithoutPermissionPaneWork: Bool {
@@ -128,8 +128,8 @@ struct PressTalkRuntimeStatus {
         if accessibilityGranted {
             return "ready_accessibility"
         }
-        if inputMethodFallbackStatus == "ready" {
-            return "ready_input_method"
+        if inputMethodFallbackStatus == "ready" || inputMethodFallbackStatus == "probe_only" {
+            return "blocked_accessibility_required"
         }
         if localSigningRepairNeeded {
             return "needs_signing_repair"
@@ -197,7 +197,9 @@ struct PressTalkRuntimeStatus {
         }
         switch inputMethodFallbackStatus {
         case "ready":
-            return PressTalkPermissionLabel(text: "Input method ready", tone: .ready)
+            return PressTalkPermissionLabel(text: "Accessibility required", tone: .warning)
+        case "probe_only":
+            return PressTalkPermissionLabel(text: "Accessibility required", tone: .warning)
         case "client_unavailable":
             return PressTalkPermissionLabel(text: "Input method client unavailable", tone: .warning)
         case "ack_timeout":

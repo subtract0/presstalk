@@ -1312,13 +1312,16 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
             if runtimeStatus.inputMethodFallbackStatus == "ready" {
-                return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, but the input method fallback is currently enabled; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+                return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app. The input method can be probed, but real-field auto-insert now requires Accessibility; PressTalk will copy instead of repeatedly selecting the input source.\(noPaneSuffix)"
+            }
+            if runtimeStatus.inputMethodFallbackStatus == "probe_only" {
+                return "Input listener and microphone are ready for \(identity). The input-method route is probe-only after real-field client failures; real auto-insert needs Accessibility. PressTalk will copy instead of repeatedly selecting the input source.\(noPaneSuffix)"
             }
             if runtimeStatus.inputMethodFallbackStatus == "client_unavailable" {
-                return "Input listener and microphone are ready for \(identity). The input method is enabled, but its last real insertion could not attach to the focused text field. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility or a passing production insertion probe.\(noPaneSuffix)"
+                return "Input listener and microphone are ready for \(identity). The input method is enabled, but its last real insertion could not attach to the focused text field. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility.\(noPaneSuffix)"
             }
             if runtimeStatus.inputMethodFallbackStatus == "ack_timeout" {
-                return "Input listener and microphone are ready for \(identity). The input method is enabled, but the helper did not acknowledge the last insertion request. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility or a passing production insertion probe.\(noPaneSuffix)"
+                return "Input listener and microphone are ready for \(identity). The input method is enabled, but the helper did not acknowledge the last insertion request. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility.\(noPaneSuffix)"
             }
             if runtimeStatus.localSigningRepairNeeded {
                 return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but has not enabled it for this PressTalk signing state. Run the logged-in desktop signing repair helper, then the production insertion probe; do not re-grant Microphone, Input Monitoring, or Accessibility repeatedly.\(noPaneSuffix)"

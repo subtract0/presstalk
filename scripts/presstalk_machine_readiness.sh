@@ -134,6 +134,22 @@ recognized_disabled_next_action() {
   fi
 }
 
+accessibility_required_next_action() {
+  local command_path
+  command_path="$(accessibility_handoff_command_path)"
+  if [[ -x "$command_path" ]]; then
+    if [[ "$(accessibility_tcc_summary)" == "listed_disabled" ]]; then
+      printf 'Speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app. PressTalk is already listed in Accessibility but disabled; from the logged-in desktop, double-click %s, turn on the existing PressTalk entry only, then let it run the insertion probe.' "$command_path"
+    else
+      printf 'Speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app. From the logged-in desktop, double-click %s to grant only PressTalk Accessibility and run the insertion probe.' "$command_path"
+    fi
+  elif [[ -x "$APP_BUNDLE/Contents/Resources/presstalk-accessibility-handoff.sh" ]]; then
+    printf 'Speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app. Write the desktop Accessibility handoff with: /bin/bash "%s/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command' "$APP_BUNDLE"
+  else
+    printf 'Speech and clipboard fallback are ready, but real-field auto-insert requires Accessibility for this exact PressTalk app. Do not rerun Microphone or Input Monitoring grants.'
+  fi
+}
+
 print_field() {
   local label="$1"
   local value="$2"
@@ -350,8 +366,10 @@ elif [[ "$active_field_ready" != "true" ]]; then
     next_action="Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
   elif [[ "$input_method_fallback" == "recognized_disabled" ]]; then
     next_action="$(recognized_disabled_next_action)"
+  elif [[ "$input_method_fallback" == "probe_only" || "$input_method_fallback" == "ready" ]]; then
+    next_action="$(accessibility_required_next_action)"
   elif [[ "$input_method_fallback" == "client_unavailable" || "$input_method_fallback" == "ack_timeout" ]]; then
-    next_action="Input method is enabled but failed a real insertion attempt; run the production insertion probe or use the Accessibility handoff, not repeated Microphone/Input Monitoring grants."
+    next_action="Input method is enabled but failed a real insertion attempt; use the Accessibility handoff, not repeated Microphone/Input Monitoring grants."
   else
     next_action="Active-field insertion is not ready; collect smoke status and inspect the insertion blocker."
   fi

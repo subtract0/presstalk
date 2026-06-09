@@ -1,8 +1,24 @@
 # Release Status
 
-Current status: public rc102 prerelease smoke artifact published with
-input-method client-failure handling for the terminal/text-field blue input-source
-badge failure; full cross-machine release not yet proven.
+Current status: local `main` has downgraded the input-method insertion route to
+probe-only for normal dictation after the 2026-06-09 real-field Option+Space
+test; full cross-machine release not yet proven.
+
+Latest local evidence:
+
+- On 2026-06-09, Alex focused a real text field on `studio1`, held
+  Option+Space, said "Does it work now?" three times, and released each time.
+  PressTalk heard the trigger, selected the Shure/MV7 audio input, transcribed
+  the phrase correctly, copied it to the clipboard, and then failed direct
+  input-method insertion with `no_active_controller` on each attempt. This
+  proves the current blocker is real-field insertion transport, not microphone,
+  STT, trigger registration, or clipboard fallback.
+- Normal dictation now treats the bundled input method as `probe_only` unless
+  launched with `PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION=1`.
+  Runtime active-field readiness requires Accessibility for the exact signed
+  PressTalk app; helper-window or production-probe
+  `input_method_notification` success is no longer release proof for arbitrary
+  focused text fields.
 
 Public prerelease:
 

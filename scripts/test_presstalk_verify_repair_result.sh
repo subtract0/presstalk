@@ -93,8 +93,8 @@ run_case() {
   echo "PASS $name"
 }
 
-input_method_success_fixture() {
-  write_status_json "$1" false ready ax_false_input_method_fallback_ready true ready_input_method
+input_method_probe_only_fixture() {
+  write_status_json "$1" false probe_only ax_false_input_method_probe_only false blocked_accessibility_required
   write_probe_json "$2" true true '"input_method_notification"' false false false
 }
 
@@ -123,7 +123,7 @@ client_unavailable_fixture() {
   write_probe_json "$2" false false null false true false
 }
 
-run_case input_method_success 0 "Result: proven" input_method_success_fixture
+run_case input_method_probe_only 1 "Reason: active-field insertion requires Accessibility for real focused text fields" input_method_probe_only_fixture
 run_case accessibility_success 0 "Result: proven" accessibility_success_fixture
 run_case paste_command_success 0 "Result: proven" paste_command_success_fixture
 run_case signing_repair_blocked 1 "Reason: active-field insertion needs signing repair" signing_repair_blocked_fixture

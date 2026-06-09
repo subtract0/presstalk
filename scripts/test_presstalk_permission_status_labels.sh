@@ -22,7 +22,7 @@ enum PermissionStatusLabelTest {
         triggerKey: String = "option",
         selectedTriggerObserved: Bool = false,
         pasteAutomatically: Bool = true,
-        inputMethodFallbackStatus: String = "ready",
+        inputMethodFallbackStatus: String = "probe_only",
         adHocSigned: Bool = false,
         codeSignatureAuthority: String = "PressTalk Local Development Code Signing"
     ) -> PressTalkRuntimeStatus {
@@ -73,7 +73,10 @@ enum PermissionStatusLabelTest {
         require(registeredHotkeyReady.inputMonitoringStatus == "registered_hotkey_ready", "registered hotkey status should not ask for Input Monitoring")
         require(registeredHotkeyReady.inputMonitoringPermissionLabel.text == "Registered hotkey ready", "registered hotkey should have a specific ready label")
         require(registeredHotkeyReady.inputMonitoringPermissionLabel.tone == .ready, "registered hotkey ready label should use ready tone")
-        require(registeredHotkeyReady.readyWithoutPermissionPaneWork, "registered hotkey with input method insertion should be ready without permission pane work")
+        require(!registeredHotkeyReady.readyWithoutPermissionPaneWork, "registered hotkey without Accessibility should not be active-field ready")
+
+        let registeredHotkeyAccessible = makeStatus(accessibilityGranted: true, inputListenerStatus: "carbon:registered", triggerKey: "option_space")
+        require(registeredHotkeyAccessible.readyWithoutPermissionPaneWork, "registered hotkey with Accessibility should be ready without permission pane work")
 
         let registeredHotkeyUnavailable = makeStatus(inputListenerStatus: "carbon:register_failed_-9878", triggerKey: "option_space")
         require(!registeredHotkeyUnavailable.inputMonitoringEffective, "failed registered hotkey trigger should not be effective")
@@ -92,9 +95,20 @@ enum PermissionStatusLabelTest {
         let readyNoPane = trackpadObserved
         require(readyNoPane.microphonePermissionLabel.text == "Granted", "authorized microphone must be labelled granted")
         require(readyNoPane.microphonePermissionLabel.tone == .ready, "authorized microphone must use ready tone")
-        require(readyNoPane.accessibilityPermissionLabel.text == "Input method ready", "enabled input method fallback must not be labelled missing Accessibility")
-        require(readyNoPane.accessibilityPermissionLabel.tone == .ready, "enabled input method fallback must use ready tone")
-        require(readyNoPane.activeFieldInsertionStatus == "ready_input_method", "input method fallback without recent client failure should prove active-field insertion readiness")
+        require(readyNoPane.accessibilityPermissionLabel.text == "Accessibility required", "probe-only input method must not be labelled active-field ready")
+        require(readyNoPane.accessibilityPermissionLabel.tone == .warning, "probe-only input method should use warning tone")
+        require(readyNoPane.activeFieldInsertionStatus == "blocked_accessibility_required", "probe-only input method should require Accessibility for active-field insertion")
+
+        let accessibilityReady = makeStatus(accessibilityGranted: true)
+        require(accessibilityReady.accessibilityPermissionLabel.text == "Granted", "trusted Accessibility must be labelled granted")
+        require(accessibilityReady.accessibilityPermissionLabel.tone == .ready, "trusted Accessibility must use ready tone")
+        require(accessibilityReady.activeFieldInsertionReady, "trusted Accessibility should prove active-field insertion readiness")
+        require(accessibilityReady.activeFieldInsertionStatus == "ready_accessibility", "trusted Accessibility should be the active insertion path")
+
+        let inputMethodReadyButUntrusted = makeStatus(inputMethodFallbackStatus: "ready")
+        require(!inputMethodReadyButUntrusted.activeFieldInsertionReady, "enabled input method must not prove arbitrary real-field insertion")
+        require(inputMethodReadyButUntrusted.accessibilityPermissionLabel.text == "Accessibility required", "enabled input method without AX should still require Accessibility")
+        require(inputMethodReadyButUntrusted.activeFieldInsertionStatus == "blocked_accessibility_required", "enabled input method without AX should not be active-field ready")
 
         let clientUnavailable = makeStatus(inputListenerStatus: "carbon:registered", triggerKey: "option_space", inputMethodFallbackStatus: "client_unavailable")
         require(!clientUnavailable.activeFieldInsertionReady, "recent input-method client failure must not be marked active-field ready")

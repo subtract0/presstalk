@@ -133,6 +133,8 @@ if [[ "$active_field_insertion_ready" != "true" ]]; then
     echo "Reason: active-field insertion is blocked because the PressTalk input method could not attach to the focused text field"
   elif [[ "$input_method_fallback" == "ack_timeout" ]]; then
     echo "Reason: active-field insertion is blocked because the PressTalk input method did not acknowledge insertion"
+  elif [[ "$input_method_fallback" == "probe_only" || "$input_method_fallback" == "ready" ]]; then
+    echo "Reason: active-field insertion requires Accessibility for real focused text fields"
   else
     echo "Reason: active-field insertion is not ready"
   fi
@@ -153,11 +155,9 @@ fi
 
 case "$probe_trace_method" in
   input_method_notification)
-    if [[ "$input_method_fallback" != "ready" ]]; then
-      echo "Result: not proven"
-      echo "Reason: latest probe used input method, but current input method fallback is not ready"
-      exit 1
-    fi
+    echo "Result: not proven"
+    echo "Reason: latest probe used the probe-only input method path, not the real-field Accessibility path"
+    exit 1
     ;;
   ax_selected_text|ax_value_range)
     if [[ "$accessibility_status" != "ax_trusted" ]]; then

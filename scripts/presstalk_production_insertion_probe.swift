@@ -177,6 +177,7 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
+        installProbeMenu()
         openProbeWindow()
         timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { [weak self] _ in
             self?.tick()
@@ -184,6 +185,26 @@ private final class ProductionInsertionProbeDelegate: NSObject, NSApplicationDel
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
             self?.postProbeRequest()
         }
+    }
+
+    private func installProbeMenu() {
+        let mainMenu = NSMenu()
+
+        let appMenuItem = NSMenuItem()
+        let appMenu = NSMenu(title: "PressTalk Production Insertion Probe")
+        appMenu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        appMenuItem.submenu = appMenu
+        mainMenu.addItem(appMenuItem)
+
+        let editMenuItem = NSMenuItem()
+        let editMenu = NSMenu(title: "Edit")
+        let pasteItem = NSMenuItem(title: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        pasteItem.keyEquivalentModifierMask = .command
+        editMenu.addItem(pasteItem)
+        editMenuItem.submenu = editMenu
+        mainMenu.addItem(editMenuItem)
+
+        NSApp.mainMenu = mainMenu
     }
 
     private func openProbeWindow() {

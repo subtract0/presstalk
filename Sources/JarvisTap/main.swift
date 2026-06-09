@@ -5839,18 +5839,151 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return "ax_value_range"
     }
 
+    private func focusedApplicationProcessID() -> pid_t? {
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedApplicationObject: CFTypeRef?
+        let focusedApplicationError = AXUIElementCopyAttributeValue(
+            systemWideElement,
+            kAXFocusedApplicationAttribute as CFString,
+            &focusedApplicationObject
+        )
+        guard focusedApplicationError == .success, let focusedApplicationObject else {
+            traceLogger.log("Focused application PID unavailable reason=focused_application error=\(focusedApplicationError.rawValue)")
+            return nil
+        }
+
+        guard CFGetTypeID(focusedApplicationObject) == AXUIElementGetTypeID() else {
+            traceLogger.log("Focused application PID unavailable reason=focused_application_not_ax_element")
+            return nil
+        }
+
+        let focusedApplication = unsafeBitCast(focusedApplicationObject, to: AXUIElement.self)
+        var processID: pid_t = 0
+        let processIDError = AXUIElementGetPid(focusedApplication, &processID)
+        guard processIDError == .success, processID > 0 else {
+            traceLogger.log("Focused application PID unavailable reason=get_pid error=\(processIDError.rawValue) pid=\(processID)")
+            return nil
+        }
+        return processID
+    }
+
+    private func axStringAttribute(_ element: AXUIElement, _ attribute: String) -> String? {
+        var valueObject: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &valueObject)
+        guard error == .success else { return nil }
+        return valueObject as? String
+    }
+
+    private func axBoolAttribute(_ element: AXUIElement, _ attribute: String) -> Bool? {
+        var valueObject: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, attribute as CFString, &valueObject)
+        guard error == .success else { return nil }
+        return valueObject as? Bool
+    }
+
+    private func axChildren(of element: AXUIElement) -> [AXUIElement] {
+        var childrenObject: CFTypeRef?
+        let error = AXUIElementCopyAttributeValue(element, kAXChildrenAttribute as CFString, &childrenObject)
+        guard error == .success, let childrenObject else { return [] }
+        return (childrenObject as? [AXUIElement]) ?? []
+    }
+
+    private func findPasteMenuItem(in element: AXUIElement, depth: Int = 0) -> AXUIElement? {
+        guard depth <= 8 else { return nil }
+
+        let role = axStringAttribute(element, kAXRoleAttribute as String)
+        let title = axStringAttribute(element, kAXTitleAttribute as String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let pasteTitles: Set<String> = ["paste", "einsetzen", "einfügen"]
+        if role == kAXMenuItemRole as String,
+           let title,
+           pasteTitles.contains(title),
+           axBoolAttribute(element, kAXEnabledAttribute as String) != false {
+            return element
+        }
+
+        for child in axChildren(of: element) {
+            if let match = findPasteMenuItem(in: child, depth: depth + 1) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private func pressFocusedApplicationPasteMenuItem() -> Bool {
+        guard let focusedPID = focusedApplicationProcessID() else {
+            return false
+        }
+
+        let focusedApplication = AXUIElementCreateApplication(focusedPID)
+        var menuBarObject: CFTypeRef?
+        let menuBarError = AXUIElementCopyAttributeValue(
+            focusedApplication,
+            kAXMenuBarAttribute as CFString,
+            &menuBarObject
+        )
+        guard menuBarError == .success,
+              let menuBarObject,
+              CFGetTypeID(menuBarObject) == AXUIElementGetTypeID()
+        else {
+            traceLogger.log("Paste menu unavailable reason=menu_bar error=\(menuBarError.rawValue) target_pid=\(focusedPID)")
+            return false
+        }
+
+        let menuBar = unsafeBitCast(menuBarObject, to: AXUIElement.self)
+        guard let pasteMenuItem = findPasteMenuItem(in: menuBar) else {
+            traceLogger.log("Paste menu unavailable reason=item_not_found target_pid=\(focusedPID)")
+            return false
+        }
+
+        let pressError = AXUIElementPerformAction(pasteMenuItem, kAXPressAction as CFString)
+        guard pressError == .success else {
+            traceLogger.log("Paste menu press failed error=\(pressError.rawValue) target_pid=\(focusedPID)")
+            return false
+        }
+
+        traceLogger.log("Paste menu pressed target_pid=\(focusedPID)")
+        return true
+    }
+
     private func postPasteShortcut() throws {
         guard let source = CGEventSource(stateID: .hidSystemState),
+              let commandDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: true),
+              let commandUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_Command), keyDown: false),
               let keyDown = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: true),
               let keyUp = CGEvent(keyboardEventSource: source, virtualKey: CGKeyCode(kVK_ANSI_V), keyDown: false)
         else {
             throw JarvisTapError.eventSynthesisUnavailable
         }
 
+        commandDown.flags = .maskCommand
         keyDown.flags = .maskCommand
         keyUp.flags = .maskCommand
-        keyDown.post(tap: .cgSessionEventTap)
-        keyUp.post(tap: .cgSessionEventTap)
+        commandUp.flags = []
+
+        func postPasteSequence(_ post: (CGEvent) -> Void) {
+            post(commandDown)
+            Thread.sleep(forTimeInterval: 0.035)
+            post(keyDown)
+            Thread.sleep(forTimeInterval: 0.035)
+            post(keyUp)
+            Thread.sleep(forTimeInterval: 0.035)
+            post(commandUp)
+        }
+
+        if let focusedPID = focusedApplicationProcessID() {
+            postPasteSequence { event in
+                event.postToPid(focusedPID)
+            }
+            traceLogger.log("Paste shortcut posted target_pid=\(focusedPID)")
+            return
+        }
+
+        postPasteSequence { event in
+            event.post(tap: .cgSessionEventTap)
+        }
+        traceLogger.log("Paste shortcut posted target=session")
     }
 
     private func insertTranscriptIntoFocusedApp(
@@ -5901,19 +6034,27 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return .copiedFallback(reason: "accessibility_preflight_unavailable")
         }
 
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(preparedTranscript, forType: .string)
+
+        if pressFocusedApplicationPasteMenuItem() {
+            return .inserted(method: "ax_menu_paste")
+        }
+
+        do {
+            try postPasteShortcut()
+            traceLogger.log("Accessibility trusted; paste command posted with transcript on pasteboard")
+            return .pasteCommandPosted
+        } catch {
+            traceLogger.log("Accessibility paste command unavailable error=\(error)")
+        }
+
         if let method = insertPreparedTranscriptUsingAccessibility(preparedTranscript) {
             return .inserted(method: method)
         }
 
-        let pasteboardSnapshot = snapshotPasteboardItems()
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(preparedTranscript, forType: .string)
-        let pasteboardChangeCount = pasteboard.changeCount
-
-        try postPasteShortcut()
-        restorePasteboardItems(pasteboardSnapshot, expectedChangeCount: pasteboardChangeCount)
-        return .pasteCommandPosted
+        return .copiedFallback(reason: "accessibility_paste_command_unavailable")
     }
 
     private func recordTriggerSource(_ source: TriggerSource, phase: TriggerPhase) {

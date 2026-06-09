@@ -148,8 +148,8 @@ The production insertion probe now records active-field insertion readiness in
 its start/finish snapshots, including activeFieldInsertionReady,
 activeFieldInsertionStatus, and inputMethodFallbackStatus. The read-only repair
 verifier accepts every proven active-field insertion path: InputMethodKit,
-direct Accessibility insertion, or Accessibility-backed paste command. It still
-fails ad-hoc recognized_disabled states as signing repair blockers, and now
+Accessibility menu paste, direct Accessibility backup, or Accessibility-backed
+paste command. It still fails ad-hoc recognized_disabled states as signing repair blockers, and now
 reports trusted local-signing recognized_disabled states as input-method disabled
 rather than signing repair.
 
@@ -383,11 +383,12 @@ PressTalk identity, startup now asks through the native macOS microphone prompt
 once and retries setup after the user responds. It still does not open System
 Settings panes for no-pane runs.
 
-For insertion, PressTalk now tries direct Accessibility insertion into the
-focused text element when Accessibility is trusted. If Accessibility is not
-trusted, normal dictation copies the transcript to the clipboard. It does not
-post a Cmd-V event that cannot land or select the input method unless the
-experimental IMK dictation flag is set.
+For insertion, PressTalk now sets the clipboard and presses the focused app's
+Paste menu item when Accessibility is trusted. If menu paste is unavailable, it
+tries a targeted Cmd-V event and then direct Accessibility insertion as backup.
+If Accessibility is not trusted, normal dictation copies the transcript to the
+clipboard. It does not select the input method unless the experimental IMK
+dictation flag is set.
 The automated smoke helper records traceInserted, traceCopyFallback, and
 targetCaptureFailureHint so these paths are visible in JSON.
 

@@ -2,10 +2,13 @@
 
 PressTalk's current production insertion path is:
 
-1. direct Accessibility insertion when `AXIsProcessTrusted()` is true
-2. pasteboard plus Cmd-V when Accessibility is trusted but direct AX insertion fails
-3. copy fallback when Accessibility is not trusted
-4. temporary PressTalk input-method selection plus Darwin insert notification
+1. pasteboard plus the focused app's Paste menu item when
+   `AXIsProcessTrusted()` is true
+2. pasteboard plus targeted Cmd-V when the Accessibility menu paste route is
+   unavailable
+3. direct Accessibility text insertion only as a last trusted-AX backup
+4. copy fallback when Accessibility is not trusted
+5. temporary PressTalk input-method selection plus Darwin insert notification
    only for diagnostics, production probes, or explicit experiments launched
    with `PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION=1`
 

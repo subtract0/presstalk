@@ -103,6 +103,11 @@ accessibility_success_fixture() {
   write_probe_json "$2" true true '"ax_selected_text"' false false false
 }
 
+accessibility_menu_paste_success_fixture() {
+  write_status_json "$1" false probe_only ax_trusted true ready_accessibility
+  write_probe_json "$2" true true '"ax_menu_paste"' false false false
+}
+
 paste_command_success_fixture() {
   write_status_json "$1" false not_installed ax_trusted true ready_accessibility
   write_probe_json "$2" true true null true false false
@@ -125,6 +130,7 @@ client_unavailable_fixture() {
 
 run_case input_method_probe_only 1 "Reason: active-field insertion requires Accessibility for real focused text fields" input_method_probe_only_fixture
 run_case accessibility_success 0 "Result: proven" accessibility_success_fixture
+run_case accessibility_menu_paste_success 0 "Result: proven" accessibility_menu_paste_success_fixture
 run_case paste_command_success 0 "Result: proven" paste_command_success_fixture
 run_case signing_repair_blocked 1 "Reason: active-field insertion needs signing repair" signing_repair_blocked_fixture
 run_case post_repair_disabled 1 "Reason: active-field insertion is blocked because the PressTalk input method is recognized but disabled" post_repair_disabled_fixture

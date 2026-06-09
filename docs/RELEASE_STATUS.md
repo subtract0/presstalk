@@ -6,6 +6,19 @@ test; full cross-machine release not yet proven.
 
 Latest local evidence:
 
+- After Accessibility was granted for the exact signed `com.am.presstalk` app,
+  a real-field test still failed because direct AX insertion returned success
+  without visible text. Three attempts saying "A short phrase" were transcribed
+  correctly, but the trace logged `Dictation inserted method=ax_selected_text`.
+  Local `main` now avoids that false-success path for normal dictation: it sets
+  the clipboard, presses the focused app's Paste menu item through
+  Accessibility, and falls back to synthesized Cmd+V only if menu paste is
+  unavailable.
+- The fresh `studio1` production insertion probe at
+  `~/Library/Application Support/JarvisTap/Diagnostics/production-insertion-probe-2026-06-09T12-37-30-590Z.json`
+  reports `success=true`, `targetCaptureSuccess=true`, and
+  `traceProductionMethod=ax_menu_paste`. The verifier exits `0` with
+  `Result: proven` for this menu-paste path.
 - On 2026-06-09, Alex focused a real text field on `studio1`, held
   Option+Space, said "Does it work now?" three times, and released each time.
   PressTalk heard the trigger, selected the Shure/MV7 audio input, transcribed

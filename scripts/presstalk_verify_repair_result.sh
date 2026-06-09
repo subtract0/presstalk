@@ -159,7 +159,7 @@ case "$probe_trace_method" in
     echo "Reason: latest probe used the probe-only input method path, not the real-field Accessibility path"
     exit 1
     ;;
-  ax_selected_text|ax_value_range)
+  ax_selected_text|ax_value_range|ax_menu_paste)
     if [[ "$accessibility_status" != "ax_trusted" ]]; then
       echo "Result: not proven"
       echo "Reason: latest probe used Accessibility, but current Accessibility status is not trusted"

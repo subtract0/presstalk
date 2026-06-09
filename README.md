@@ -24,7 +24,7 @@ Current packaged behavior:
 - compact HUD and menu bar control surface
 - small runtime settings window for HUD, auto-paste, language, and release tail
 
-The current default runtime is a local WhisperKit dictation agent, intended as a Wispr Flow replacement.
+The current default runtime uses the local Parakeet v3 ANE backend for final dictation, with local WhisperKit still available for warmup, streaming experiments, and fallback paths.
 
 ## Release Status
 

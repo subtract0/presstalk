@@ -125,19 +125,20 @@ struct JarvisTapConfig {
         let asrBackend =
             (env["PRESSTALK_ASR_BACKEND"] ??
             env["JARVISTAP_ASR_BACKEND"] ??
-            "whisperkit")
+            "parakeet-v3-ane")
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
             .nonEmpty ??
-            "whisperkit"
+            "parakeet-v3-ane"
 
-        let streamingTranscriptionEnabled =
-            (env["PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"] ??
-            env["JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION"])
-            .map {
-                let value = $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let streamingTranscriptionEnabled: Bool = {
+            if let streamingValue = env["PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"] ??
+                env["JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION"] {
+                let value = streamingValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 return value != "0" && value != "false" && value != "no"
-            } ?? true
+            }
+            return !["parakeet", "parakeet-v3", "parakeet-v3-ane", "ane", "npu"].contains(asrBackend)
+        }()
 
         let traceLogPath =
             env["JARVISTAP_TRACE_LOG"] ??

@@ -5,6 +5,23 @@ active-field insertion on the currently eligible machines: `studio1` / `s1`
 and `mbp1`. Both use the Accessibility menu-paste path. `studio2` / `s2`
 remains excluded until a microphone is attached.
 
+Streaming feature branch:
+
+- `feature/streaming-whisper-tail` is separate from the frozen `main` /
+  `v0.1.5-rc104` direct-distribution baseline. It starts a PressTalk-owned
+  realtime Whisper loop on the existing preferred microphone path, waits after
+  release for `0.10 s` of silence or up to `0.50 s`, and accepts realtime text
+  as final only when the streaming snapshot is fresh and within `0.65 s` of the
+  frozen audio. Offline Whisper remains the fallback.
+- On `studio1` / M4 Max with the Shure MV7i, a `27.3 s` German dictation used
+  the realtime final path and inserted through `ax_menu_paste` about `1.59 s`
+  after release. The trace logged `Realtime release pass lag ... 0.30`,
+  `Using realtime Whisper streaming transcript as final transcript`, and
+  `Dictation inserted method=ax_menu_paste`.
+- This branch still runs WhisperKit with `cpu-gpu-no-ane`; the ANE/NPU path
+  remains a separate backend track aimed at base M-series customer machines
+  such as MacBook Air.
+
 Latest local evidence:
 
 - After Accessibility was granted for the exact signed `com.am.presstalk` app,

@@ -59,6 +59,38 @@ Short finalize / post-release window:
 
 These numbers are encouraging for a local always-available dictation agent. The app is not free, but it is materially lighter than Electron-style speech clients.
 
+## Streaming V1 Branch
+
+Measured locally on `studio1` / M4 Max on `2026-06-09`, branch
+`feature/streaming-whisper-tail`, installed as
+`~/Applications/PressTalk.app` with:
+
+- `PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION=1`
+- `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.50`
+- `JARVISTAP_WHISPER_LANGUAGE=de`
+- `JARVISTAP_WHISPERKIT_MODEL=openai_whisper-large-v3-v20240930_turbo_632MB`
+- `PRESSTALK_WHISPER_COMPUTE=cpu-gpu-no-ane`
+- Shure MV7i selected as the input device
+
+This branch is a UX bridge, not the final ASR architecture. It runs repeated
+realtime WhisperKit passes over the accumulated held audio, keeps the latest
+fresh candidate, waits after release for `0.10 s` of silence or up to `0.50 s`,
+and only uses realtime text as final when it is within `0.65 s` of the frozen
+audio. Offline Whisper remains the fallback.
+
+Observed long-dictation traces:
+
+- `24.2 s` German dictation: realtime was `1.50 s` behind the frozen audio, so
+  the app correctly used offline fallback; release-to-paste was about `1.80 s`.
+- `27.3 s` German dictation: realtime final was used with `0.30 s` lag;
+  release-to-paste was about `1.59 s`.
+
+The remaining latency is dominated by the last full-buffer Whisper pass, which
+took `1.72 s` on the `27.3 s` sample. Further large latency gains should come
+from a true incremental/tail-only decoder or a separate ANE/CoreML backend
+targeted at base M-series machines such as MacBook Air, not from repeatedly
+tuning full-buffer Whisper passes on M4 Max.
+
 ## Wispr Flow Snapshot
 
 This is not a full benchmark and it is not a quality judgment. It is only a local footprint snapshot on the same Mac, taken from a hidden launch of the installed app:

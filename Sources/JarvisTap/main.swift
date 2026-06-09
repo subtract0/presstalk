@@ -35,6 +35,7 @@ struct JarvisTapConfig {
     let whisperModel: String
     let whisperLanguage: String?
     let whisperComputePreset: String
+    let streamingTranscriptionEnabled: Bool
     let sayVoice: String?
     let printPartials: Bool
     let traceLogPath: String
@@ -118,6 +119,14 @@ struct JarvisTapConfig {
             .nonEmpty ??
             "cpu-gpu-no-ane"
 
+        let streamingTranscriptionEnabled =
+            (env["PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"] ??
+            env["JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION"])
+            .map {
+                let value = $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                return value != "0" && value != "false" && value != "no"
+            } ?? true
+
         let traceLogPath =
             env["JARVISTAP_TRACE_LOG"] ??
             "\(homeDirectory)/Library/Logs/jarvistap_trace.log"
@@ -128,7 +137,7 @@ struct JarvisTapConfig {
 
         let releaseTailPaddingSeconds =
             env["JARVISTAP_RELEASE_TAIL_PADDING_SECONDS"].flatMap(TimeInterval.init) ??
-            0.35
+            0.50
 
         let triggerKeyValue =
             env["PRESSTALK_TRIGGER_KEY"] ??
@@ -164,6 +173,7 @@ struct JarvisTapConfig {
             whisperModel: whisperModel,
             whisperLanguage: (whisperLanguage?.isEmpty == false) ? whisperLanguage : nil,
             whisperComputePreset: whisperComputePreset,
+            streamingTranscriptionEnabled: streamingTranscriptionEnabled,
             sayVoice: env["JARVISTAP_SAY_VOICE"],
             printPartials: env["JARVISTAP_PRINT_PARTIALS"].map { $0 != "0" } ?? true,
             traceLogPath: traceLogPath,
@@ -988,6 +998,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         var currentText = ""
         var confirmedText = ""
         var unconfirmedText = ""
+        var updatedAt: Date?
+        var audioDurationSeconds = 0.0
+        var revision = 0
     }
 
     private enum WhisperLoadState {
@@ -1219,6 +1232,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let mediaKeyUpState = 0x0B00
     private let mediaKeyRepeatMask = 0x1
     private let streamShutdownTimeoutSeconds: TimeInterval = 2.0
+    private let realtimeStreamInitialAudioSeconds: TimeInterval = 1.0
+    private let realtimeStreamMinNewAudioSeconds: TimeInterval = 0.75
+    private let realtimeStreamPollSeconds: TimeInterval = 0.15
+    private let realtimeStreamFreshnessSeconds: TimeInterval = 2.0
+    private let realtimeStreamFinalMaxLagSeconds: TimeInterval = 0.65
     private let trackpadHoldDelaySeconds: TimeInterval = 0.50
     private let trackpadHoldCancelDistancePoints: CGFloat = 15.0
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
@@ -1349,6 +1367,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Release tail max seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds))"
         )
+        traceLogger.log("Streaming transcription enabled=\(config.streamingTranscriptionEnabled ? 1 : 0)")
         traceLogger.log("HUD enabled=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)")
         traceLogger.log("Native microphone key path enabled=\(config.enableNativeMicrophoneKey ? 1 : 0)")
         traceLogger.log("Native microphone calibration stored=\(settingsStore.nativeTriggerCalibration == nil ? 0 : 1)")
@@ -4852,15 +4871,176 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func captureSilenceAwareReleaseTail(
-        transcriber: AudioStreamTranscriber,
-        whisperKit: WhisperKit?
-    ) async {
+    private func realtimeStreamingDecodingOptions() -> DecodingOptions {
+        var options = decodingOptions
+        options.withoutTimestamps = true
+        options.wordTimestamps = false
+        options.temperature = 0
+        options.usePrefillPrompt = true
+        options.usePrefillCache = true
+        return options
+    }
+
+    private func commonStableWordPrefix(_ previous: String, _ current: String) -> String {
+        let previousWords = cleanedTranscriptText(previous).split(separator: " ").map(String.init)
+        let currentWords = cleanedTranscriptText(current).split(separator: " ").map(String.init)
+        guard !previousWords.isEmpty, !currentWords.isEmpty else { return "" }
+
+        var prefix: [String] = []
+        for (oldWord, newWord) in zip(previousWords, currentWords) {
+            guard oldWord.caseInsensitiveCompare(newWord) == .orderedSame else { break }
+            prefix.append(newWord)
+        }
+        return prefix.joined(separator: " ")
+    }
+
+    private func updateRealtimeStreamingSnapshot(
+        currentText: String,
+        confirmedText: String,
+        audioDurationSeconds: Double,
+        revision: Int
+    ) {
+        let filteredCurrentText = bestTranscriptCandidate(from: [currentText])
+        let filteredConfirmedText = bestTranscriptCandidate(from: [confirmedText])
+        let filteredUnconfirmedText = bestTranscriptCandidate(from: [currentText])
+        guard !filteredCurrentText.isEmpty || !filteredConfirmedText.isEmpty || !filteredUnconfirmedText.isEmpty else {
+            return
+        }
+
+        var cleanedToLog: String?
+        var shouldPrintPartial = false
+        var shouldPresentPartial = false
+
+        withStateLock {
+            latestStreamingState = StreamingSnapshot(
+                currentText: filteredCurrentText,
+                confirmedText: filteredConfirmedText,
+                unconfirmedText: filteredUnconfirmedText,
+                updatedAt: Date(),
+                audioDurationSeconds: audioDurationSeconds,
+                revision: revision
+            )
+
+            let cleaned = filteredCurrentText
+            guard !cleaned.isEmpty, cleaned != lastPrintedPartial else { return }
+            lastPrintedPartial = cleaned
+            cleanedToLog = cleaned
+            shouldPrintPartial = config.printPartials
+            shouldPresentPartial = isRecording
+        }
+
+        guard let cleanedToLog else { return }
+        traceLogger.log("Realtime partial transcript revision=\(revision): \(cleanedToLog)")
+        if shouldPresentPartial {
+            present(.listening(cleanedToLog))
+        }
+        if shouldPrintPartial {
+            print("📝 [PressTalk partial] \(cleanedToLog)")
+            fflush(stdout)
+        }
+    }
+
+    private func runRealtimeWhisperLoop(whisperKit: WhisperKit) async {
+        let pollNanoseconds = UInt64(realtimeStreamPollSeconds * 1_000_000_000)
+        let minimumNewSamples = Int(Double(WhisperKit.sampleRate) * realtimeStreamMinNewAudioSeconds)
+        var previousTranscript = ""
+        var lastTranscribedSampleCount = 0
+        var revision = 0
+
+        traceLogger.log(
+            "Realtime Whisper streaming loop started min_audio_seconds=\(String(format: "%.2f", realtimeStreamInitialAudioSeconds)) min_new_seconds=\(String(format: "%.2f", realtimeStreamMinNewAudioSeconds)) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))"
+        )
+
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: pollNanoseconds)
+            if Task.isCancelled { break }
+
+            let capturedSamples = Array(whisperKit.audioProcessor.audioSamples)
+            let sampleCount = capturedSamples.count
+            let audioDurationSeconds = Double(sampleCount) / Double(WhisperKit.sampleRate)
+            guard audioDurationSeconds >= realtimeStreamInitialAudioSeconds else { continue }
+            let releaseFinalizeRequested = withStateLock { isProcessing && !isRecording }
+            if releaseFinalizeRequested, lastTranscribedSampleCount > 0, sampleCount == lastTranscribedSampleCount {
+                break
+            }
+            guard lastTranscribedSampleCount == 0 || releaseFinalizeRequested || sampleCount - lastTranscribedSampleCount >= minimumNewSamples else {
+                continue
+            }
+
+            lastTranscribedSampleCount = sampleCount
+            let signalStats = audioLevelStats(for: capturedSamples)
+            guard signalStats.rms > 0.001 || signalStats.peak > 0.01 else { continue }
+
+            let normalizedSamples = normalizedAudioSamples(capturedSamples).0
+            let startedAt = Date()
+            do {
+                let results = try await whisperKit.transcribe(
+                    audioArray: normalizedSamples,
+                    decodeOptions: realtimeStreamingDecodingOptions()
+                )
+                let transcript = cleanedTranscriptText(results.map(\.text).joined(separator: " "))
+                guard isPlausibleTranscript(transcript) else { continue }
+
+                revision += 1
+                let stablePrefix = commonStableWordPrefix(previousTranscript, transcript)
+                let inferenceSeconds = Date().timeIntervalSince(startedAt)
+                traceLogger.log(
+                    "Realtime Whisper pass completed revision=\(revision) samples=\(sampleCount) duration_seconds=\(String(format: "%.2f", audioDurationSeconds)) inference_seconds=\(String(format: "%.2f", inferenceSeconds)) transcript_chars=\(transcript.count) stable_chars=\(stablePrefix.count)"
+                )
+                updateRealtimeStreamingSnapshot(
+                    currentText: transcript,
+                    confirmedText: stablePrefix,
+                    audioDurationSeconds: audioDurationSeconds,
+                    revision: revision
+                )
+                previousTranscript = transcript
+                let shouldStopAfterPass = releaseFinalizeRequested || withStateLock { isProcessing && !isRecording }
+                if shouldStopAfterPass {
+                    let latestSampleCount = whisperKit.audioProcessor.audioSamples.count
+                    let lagSeconds = Double(max(0, latestSampleCount - sampleCount)) / Double(WhisperKit.sampleRate)
+                    traceLogger.log(
+                        "Realtime release pass lag revision=\(revision) lag_seconds=\(String(format: "%.2f", lagSeconds)) max_lag_seconds=\(String(format: "%.2f", realtimeStreamFinalMaxLagSeconds))"
+                    )
+                    guard lagSeconds > realtimeStreamFinalMaxLagSeconds else {
+                        break
+                    }
+                    traceLogger.log("Realtime release pass lag too high; running one final pass over frozen audio")
+                    continue
+                }
+            } catch is CancellationError {
+                break
+            } catch {
+                traceLogger.log("Realtime Whisper pass failed samples=\(sampleCount) error=\(error)")
+                if releaseFinalizeRequested {
+                    break
+                }
+            }
+        }
+
+        traceLogger.log("Realtime Whisper streaming loop stopped")
+    }
+
+    private func streamingSnapshotFreshEnoughForFinal(
+        _ snapshot: StreamingSnapshot,
+        frozenAudioDurationSeconds: Double
+    ) -> Bool {
+        guard let updatedAt = snapshot.updatedAt else { return false }
+        let ageSeconds = Date().timeIntervalSince(updatedAt)
+        let lagSeconds = max(0, frozenAudioDurationSeconds - snapshot.audioDurationSeconds)
+        let allowedLagSeconds = realtimeStreamFinalMaxLagSeconds
+        let fresh = ageSeconds <= realtimeStreamFreshnessSeconds && lagSeconds <= allowedLagSeconds
+        traceLogger.log(
+            "Realtime final freshness revision=\(snapshot.revision) fresh=\(fresh ? 1 : 0) age_seconds=\(String(format: "%.2f", ageSeconds)) lag_seconds=\(String(format: "%.2f", lagSeconds)) frozen_duration_seconds=\(String(format: "%.2f", frozenAudioDurationSeconds)) snapshot_duration_seconds=\(String(format: "%.2f", snapshot.audioDurationSeconds))"
+        )
+        return fresh
+    }
+
+    private func captureSilenceAwareReleaseTail(whisperKit: WhisperKit?) async {
         let maximumTailSeconds = max(0.15, settingsStore.releaseTailMaxSeconds)
-        let minimumTailSeconds = min(0.22, maximumTailSeconds)
-        let silenceWindowSeconds = min(0.22, maximumTailSeconds)
+        let minimumTailSeconds = min(0.10, maximumTailSeconds)
+        let silenceWindowSeconds = min(0.10, maximumTailSeconds)
         let silenceRMSThreshold = 0.011
-        let pollNanoseconds: UInt64 = 50_000_000
+        let pollNanoseconds: UInt64 = 25_000_000
 
         traceLogger.log(
             "Applying silence-aware release tail min_seconds=\(String(format: "%.2f", minimumTailSeconds)) max_seconds=\(String(format: "%.2f", maximumTailSeconds)) silence_window_seconds=\(String(format: "%.2f", silenceWindowSeconds)) silence_rms=\(String(format: "%.4f", silenceRMSThreshold))"
@@ -4896,8 +5076,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             )
         }
 
-        traceLogger.log("Requesting live stream stop")
-        await transcriber.stopStreamTranscription()
+        traceLogger.log("Stopping live audio recording after release tail")
+        whisperKit?.audioProcessor.stopRecording()
     }
 
     private func relaxedDecodingOptions() -> DecodingOptions {
@@ -6206,6 +6386,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 )
                 try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id, callback: nil)
                 traceLogger.log("Audio recording engine started mode=direct")
+                if config.streamingTranscriptionEnabled {
+                    await runRealtimeWhisperLoop(whisperKit: whisperKit)
+                } else {
+                    while !Task.isCancelled {
+                        try? await Task.sleep(nanoseconds: 200_000_000)
+                    }
+                }
             } catch {
                 traceLogger.log("Audio recording failed mode=direct error=\(error)")
                 self.withStateLock {
@@ -6271,10 +6458,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let speaker = self.speaker
         let whisperKit = self.whisperKit
         let decodingOptions = self.decodingOptions
-        let transcriber = self.streamTranscriber
         let pasteAutomatically = self.settingsStore.pasteAutomatically
+        let streamTaskToStop = currentStreamTask
+        let initialCapturedSnapshot = capturedSnapshot
 
         let task = Task(priority: .userInitiated) { [self] in
+            var processingSnapshot = initialCapturedSnapshot
+            var streamShutdownCompleted = true
+
             func finishProcessing(reason: String, spokenText: String? = nil) {
                 self.withStateLock {
                     self.isProcessing = false
@@ -6289,9 +6480,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             func fallbackTranscript() -> String {
                 bestTranscriptCandidate(from: [
-                    capturedSnapshot.confirmedText,
-                    capturedSnapshot.unconfirmedText,
-                    capturedSnapshot.currentText,
+                    processingSnapshot.confirmedText,
+                    processingSnapshot.unconfirmedText,
+                    processingSnapshot.currentText,
                 ])
             }
 
@@ -6299,9 +6490,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let normalizedSamples: [Float]
             let capturedSignalStats: (rms: Double, peak: Double)
             let frozenAudioDurationSeconds: Double
-            if let transcriber {
-                await captureSilenceAwareReleaseTail(transcriber: transcriber, whisperKit: whisperKit)
+            await captureSilenceAwareReleaseTail(whisperKit: whisperKit)
+            if let streamTaskToStop {
+                streamShutdownCompleted = await awaitStreamShutdown(for: streamTaskToStop)
+                traceLogger.log("Realtime stream shutdown completed=\(streamShutdownCompleted ? 1 : 0)")
+                if !streamShutdownCompleted {
+                    streamTaskToStop.cancel()
+                }
             }
+            processingSnapshot = withStateLock { latestStreamingState }
+
             if let whisperKit {
                 capturedAudioSamples = Array(whisperKit.audioProcessor.audioSamples)
                 frozenAudioDurationSeconds = Double(capturedAudioSamples.count) / Double(WhisperKit.sampleRate)
@@ -6325,7 +6523,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 capturedSignalStats = (0, 0)
                 frozenAudioDurationSeconds = 0
             }
-            currentStreamTask?.cancel()
 
             func finalizeTranscript() async throws -> String {
                 let streamingTranscript = fallbackTranscript()
@@ -6336,12 +6533,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "streaming_fallback"
                 )
+                if let acceptedStreamingTranscript,
+                   streamingSnapshotFreshEnoughForFinal(processingSnapshot, frozenAudioDurationSeconds: frozenAudioDurationSeconds) {
+                    traceLogger.log("Using realtime Whisper streaming transcript as final transcript revision=\(processingSnapshot.revision)")
+                    return acceptedStreamingTranscript
+                }
+
                 guard let whisperKit else {
                     if let acceptedStreamingTranscript {
                         traceLogger.log("Whisper unavailable; using streaming transcript fallback")
                         return acceptedStreamingTranscript
                     }
                     throw JarvisTapError.whisperUnavailable
+                }
+
+                if !streamShutdownCompleted {
+                    traceLogger.log("Skipping offline Whisper finalize because realtime stream shutdown timed out")
+                    return acceptedStreamingTranscript ?? ""
                 }
 
                 traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedAudioSamples.count)")
@@ -6584,11 +6792,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let filteredUnconfirmedText = bestTranscriptCandidate(
                 from: [newState.unconfirmedSegments.map { $0.text }.joined(separator: " ")]
             )
+            let nextRevision = latestStreamingState.revision + 1
 
             latestStreamingState = StreamingSnapshot(
                 currentText: filteredCurrentText,
                 confirmedText: filteredConfirmedText,
-                unconfirmedText: filteredUnconfirmedText
+                unconfirmedText: filteredUnconfirmedText,
+                updatedAt: Date(),
+                audioDurationSeconds: Double(newState.lastBufferSize) / Double(WhisperKit.sampleRate),
+                revision: nextRevision
             )
 
             let cleaned = filteredCurrentText

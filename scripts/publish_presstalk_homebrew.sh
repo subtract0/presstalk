@@ -41,6 +41,10 @@ fi
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
 RELEASE_TAG="v$VERSION"
 RELEASE_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
+IS_PRERELEASE=0
+if [[ "${PRESSTALK_RELEASE_PRERELEASE:-0}" == "1" || "$VERSION" == *-* ]]; then
+  IS_PRERELEASE=1
+fi
 
 ensure_repo "$RELEASE_REPO"
 ensure_repo "$TAP_REPO"
@@ -75,11 +79,20 @@ popd >/dev/null
 
 if gh release view "$RELEASE_TAG" --repo "$RELEASE_REPO" >/dev/null 2>&1; then
   gh release upload "$RELEASE_TAG" "$ASSET_PATH" --repo "$RELEASE_REPO" --clobber >/dev/null
+  if [[ "$IS_PRERELEASE" == "1" ]]; then
+    gh release edit "$RELEASE_TAG" --repo "$RELEASE_REPO" --prerelease >/dev/null
+  fi
 else
-  gh release create "$RELEASE_TAG" "$ASSET_PATH" \
-    --repo "$RELEASE_REPO" \
-    --title "PressTalk ${VERSION}" \
-    --notes "PressTalk ${VERSION} for Apple Silicon macOS." >/dev/null
+  release_args=(
+    release create "$RELEASE_TAG" "$ASSET_PATH"
+    --repo "$RELEASE_REPO"
+    --title "PressTalk ${VERSION}"
+    --notes "PressTalk ${VERSION} for Apple Silicon macOS."
+  )
+  if [[ "$IS_PRERELEASE" == "1" ]]; then
+    release_args+=(--prerelease)
+  fi
+  gh "${release_args[@]}" >/dev/null
 fi
 
 gh repo clone "$TAP_REPO" "$TMP_DIR/homebrew-presstalk" >/dev/null 2>&1 || true

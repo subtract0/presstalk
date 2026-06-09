@@ -23,9 +23,21 @@ current_bundle_identifier() {
 DEFAULT_BUNDLE_IDENTIFIER="$(current_bundle_identifier)"
 DEFAULT_BUNDLE_IDENTIFIER="${DEFAULT_BUNDLE_IDENTIFIER:-com.am.presstalk}"
 APP_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-$DEFAULT_BUNDLE_IDENTIFIER}}"
+APP_VERSION="${PRESSTALK_VERSION:-0.1.5}"
+APP_BUILD="${PRESSTALK_BUILD_NUMBER:-6}"
 
 if [[ ! "$APP_BUNDLE_IDENTIFIER" =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]; then
   echo "Invalid PRESSTALK_BUNDLE_IDENTIFIER: $APP_BUNDLE_IDENTIFIER" >&2
+  exit 2
+fi
+
+if [[ -z "$APP_VERSION" ]]; then
+  echo "Invalid PRESSTALK_VERSION: must not be empty" >&2
+  exit 2
+fi
+
+if [[ -z "$APP_BUILD" ]]; then
+  echo "Invalid PRESSTALK_BUILD_NUMBER: must not be empty" >&2
   exit 2
 fi
 
@@ -118,9 +130,9 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.5</string>
+  <string>$APP_VERSION</string>
   <key>CFBundleVersion</key>
-  <string>6</string>
+  <string>$APP_BUILD</string>
   <key>LSUIElement</key>
   <true/>
   <key>NSMicrophoneUsageDescription</key>

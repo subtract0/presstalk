@@ -12,12 +12,26 @@ DISABLE_DICTATION_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-disable-system-d
 INPUT_METHOD_BUNDLE="$APP_CONTENTS_DIR/Resources/PressTalkInputMethod.app"
 INPUT_METHOD_BINARY="$INPUT_METHOD_BUNDLE/Contents/MacOS/presstalk-input-method"
 INSTALLED_INPUT_METHOD_BUNDLE="$HOME/Library/Input Methods/PressTalkInputMethod.app"
-PLIST="$HOME/Library/LaunchAgents/com.am.jarvistap.plist"
-WORKDIR="$HOME/Library/Application Support/JarvisTap"
-LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
-LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
-TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
+PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-com.am.presstalk}"
+LEGACY_LAUNCHD_LABELS="${PRESSTALK_LEGACY_LAUNCHD_LABELS:-com.am.jarvistap}"
+PLIST="$HOME/Library/LaunchAgents/$PRESSTALK_LAUNCHD_LABEL.plist"
+WORKDIR="$HOME/Library/Application Support/PressTalk"
+LOG_OUT="$HOME/Library/Logs/presstalk.out.log"
+LOG_ERR="$HOME/Library/Logs/presstalk.err.log"
+TRACE_LOG="$HOME/Library/Logs/presstalk_trace.log"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
+JARVISTAP_AGENT_MODE="${JARVISTAP_AGENT_MODE:-dictation}"
+JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
+JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS:-0.35}"
+JARVISTAP_WHISPERKIT_MODEL="${JARVISTAP_WHISPERKIT_MODEL:-openai_whisper-large-v3-v20240930_turbo_632MB}"
+JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-de}"
+JARVISTAP_SAY_VOICE="${JARVISTAP_SAY_VOICE:-Samantha}"
+PRESSTALK_ASR_BACKEND="${PRESSTALK_ASR_BACKEND:-${JARVISTAP_ASR_BACKEND:-parakeet-v3-ane}}"
+if [[ -z "${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION+x}" && -z "${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION+x}" && "$PRESSTALK_ASR_BACKEND" == "parakeet-v3-ane" ]]; then
+  PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION=0
+else
+  PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION="${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION:-${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION:-1}}"
+fi
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING+x}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING:-1}"
@@ -67,6 +81,18 @@ terminate_existing_presstalk() {
 
   for pid in $pids; do
     kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
+remove_legacy_launch_agents() {
+  local domain="gui/$(id -u)"
+  for label in $LEGACY_LAUNCHD_LABELS; do
+    [[ -n "$label" && "$label" != "$PRESSTALK_LAUNCHD_LABEL" ]] || continue
+    local legacy_plist="$HOME/Library/LaunchAgents/$label.plist"
+    launchctl bootout "$domain" "$legacy_plist" >/dev/null 2>&1 || true
+    launchctl bootout "$domain/$label" >/dev/null 2>&1 || true
+    launchctl disable "$domain/$label" >/dev/null 2>&1 || true
+    rm -f "$legacy_plist"
   done
 }
 
@@ -142,6 +168,7 @@ terminate_existing_imk_launch_agent() {
 /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
 /usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true
 
+remove_legacy_launch_agents
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 terminate_existing_presstalk
 
@@ -299,17 +326,20 @@ open_env_arg() {
 OPEN_ENV_ARGS="$(
   open_env_arg HOME "$HOME"
   open_env_arg PATH "$PATH_VALUE"
-  open_env_arg JARVISTAP_AGENT_MODE "dictation"
-  open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "30"
-  open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "0.35"
+  open_env_arg JARVISTAP_AGENT_MODE "$JARVISTAP_AGENT_MODE"
+  open_env_arg JARVISTAP_REQUEST_TIMEOUT_SECONDS "$JARVISTAP_REQUEST_TIMEOUT_SECONDS"
+  open_env_arg JARVISTAP_RELEASE_TAIL_PADDING_SECONDS "$JARVISTAP_RELEASE_TAIL_PADDING_SECONDS"
+  open_env_arg PRESSTALK_ASR_BACKEND "$PRESSTALK_ASR_BACKEND"
+  open_env_arg PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION "$PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"
   open_env_arg PRESSTALK_TRIGGER_KEY "$PRESSTALK_TRIGGER_KEY"
   open_env_arg PRESSTALK_AUTO_SHOW_SETUP_WINDOW "$PRESSTALK_AUTO_SHOW_SETUP_WINDOW"
   open_env_arg PRESSTALK_OPEN_PERMISSION_PANES "$PRESSTALK_OPEN_PERMISSION_PANES"
   open_env_arg PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE "$PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE"
+  open_env_arg PRESSTALK_LAUNCHD_LABEL "$PRESSTALK_LAUNCHD_LABEL"
   open_env_arg JARVISTAP_TRACE_LOG "$TRACE_LOG"
-  open_env_arg JARVISTAP_WHISPERKIT_MODEL "openai_whisper-large-v3-v20240930_turbo_632MB"
-  open_env_arg JARVISTAP_WHISPER_LANGUAGE "de"
-  open_env_arg JARVISTAP_SAY_VOICE "Samantha"
+  open_env_arg JARVISTAP_WHISPERKIT_MODEL "$JARVISTAP_WHISPERKIT_MODEL"
+  open_env_arg JARVISTAP_WHISPER_LANGUAGE "$JARVISTAP_WHISPER_LANGUAGE"
+  open_env_arg JARVISTAP_SAY_VOICE "$JARVISTAP_SAY_VOICE"
 )"
 
 cat >"$PLIST" <<PLIST
@@ -318,7 +348,7 @@ cat >"$PLIST" <<PLIST
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.am.jarvistap</string>
+  <string>$PRESSTALK_LAUNCHD_LABEL</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/open</string>
@@ -339,11 +369,15 @@ $OPEN_ENV_ARGS
     <key>PATH</key>
     <string>$PATH_VALUE</string>
     <key>JARVISTAP_AGENT_MODE</key>
-    <string>dictation</string>
+    <string>$JARVISTAP_AGENT_MODE</string>
     <key>JARVISTAP_REQUEST_TIMEOUT_SECONDS</key>
-    <string>30</string>
+    <string>$JARVISTAP_REQUEST_TIMEOUT_SECONDS</string>
     <key>JARVISTAP_RELEASE_TAIL_PADDING_SECONDS</key>
-    <string>0.35</string>
+    <string>$JARVISTAP_RELEASE_TAIL_PADDING_SECONDS</string>
+    <key>PRESSTALK_ASR_BACKEND</key>
+    <string>$PRESSTALK_ASR_BACKEND</string>
+    <key>PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION</key>
+    <string>$PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION</string>
     <key>PRESSTALK_TRIGGER_KEY</key>
     <string>$PRESSTALK_TRIGGER_KEY</string>
     <key>PRESSTALK_AUTO_SHOW_SETUP_WINDOW</key>
@@ -352,14 +386,16 @@ $OPEN_ENV_ARGS
     <string>$PRESSTALK_OPEN_PERMISSION_PANES</string>
     <key>PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE</key>
     <string>$PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE</string>
+    <key>PRESSTALK_LAUNCHD_LABEL</key>
+    <string>$PRESSTALK_LAUNCHD_LABEL</string>
     <key>JARVISTAP_TRACE_LOG</key>
     <string>$TRACE_LOG</string>
     <key>JARVISTAP_WHISPERKIT_MODEL</key>
-    <string>openai_whisper-large-v3-v20240930_turbo_632MB</string>
+    <string>$JARVISTAP_WHISPERKIT_MODEL</string>
     <key>JARVISTAP_WHISPER_LANGUAGE</key>
-    <string>de</string>
+    <string>$JARVISTAP_WHISPER_LANGUAGE</string>
     <key>JARVISTAP_SAY_VOICE</key>
-    <string>Samantha</string>
+    <string>$JARVISTAP_SAY_VOICE</string>
   </dict>
   <key>WorkingDirectory</key>
   <string>$WORKDIR</string>
@@ -383,10 +419,10 @@ chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
 LAUNCHD_DOMAIN="gui/$(id -u)"
-LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/com.am.jarvistap"
+LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/$PRESSTALK_LAUNCHD_LABEL"
 launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
 if ! launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"; then
-  echo "LaunchAgent bootstrap failed; enabling com.am.jarvistap and retrying." >&2
+  echo "LaunchAgent bootstrap failed; enabling $PRESSTALK_LAUNCHD_LABEL and retrying." >&2
   launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
   launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
 fi
@@ -408,6 +444,9 @@ PressTalk bootstrap completed.
 Installed:
 - LaunchAgent: $PLIST
 - Bundle identifier: $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER
+- ASR backend: $PRESSTALK_ASR_BACKEND
+- Streaming transcription: $PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION
+- Trigger: $PRESSTALK_TRIGGER_KEY
 - Stable local signing requested: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING
 - Stable local signing applied: $PRESSTALK_BOOTSTRAP_STABLE_SIGNING_APPLIED
 - Bundled input method signing applied: $PRESSTALK_BOOTSTRAP_INPUT_METHOD_SIGNING_APPLIED
@@ -418,7 +457,7 @@ Installed:
 
 Next:
 1. Use the PressTalk menu bar icon for Settings or diagnostics
-2. Hold Option + Space to speak, then release to paste
+2. Hold Fn / Globe to speak, then release to paste
 
 To use another trigger, set PRESSTALK_TRIGGER_KEY before bootstrapping.
 Supported values: option_space, option, left_option, right_option, fn, trackpad_hold, f5.

@@ -1611,6 +1611,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var appDisplayTitle: String {
+        let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty
+        guard let version else {
+            return "PressTalk"
+        }
+        return "PressTalk \(version)"
+    }
+
     private func installProductUI() {
         guard statusItem == nil else { return }
 
@@ -1669,7 +1679,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
 
-        let statusSummaryMenuItem = NSMenuItem(title: "PressTalk 0.1.5", action: nil, keyEquivalent: "")
+        let statusSummaryMenuItem = NSMenuItem(title: appDisplayTitle, action: nil, keyEquivalent: "")
         statusSummaryMenuItem.isEnabled = false
         self.statusSummaryMenuItem = statusSummaryMenuItem
         menu.addItem(statusSummaryMenuItem)
@@ -1951,7 +1961,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         switch state {
         case .warming:
-            uiState = ("PressTalk 0.1.5", "Warming up the local speech model…", "hourglass.circle.fill", .warming, nil)
+            uiState = (appDisplayTitle, "Warming up the local speech model…", "hourglass.circle.fill", .warming, nil)
         case .ready:
             let status = currentRuntimeStatus()
             if localSigningRepairNeeded(status) {
@@ -1974,7 +1984,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     nil
                 )
             } else {
-                uiState = ("PressTalk 0.1.5", "Ready. Hold \(settingsStore.triggerKey.displayName) to dictate.", "waveform.badge.mic", .ready, 1.1)
+                uiState = (appDisplayTitle, "Ready. Hold \(settingsStore.triggerKey.displayName) to dictate.", "waveform.badge.mic", .ready, 1.1)
             }
         case .listening(let partial):
             uiState = ("Listening", partial?.nonEmpty ?? "Release \(settingsStore.triggerKey.displayName) to paste.", "mic.fill", .listening, nil)

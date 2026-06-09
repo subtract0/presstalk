@@ -1785,6 +1785,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let task = Task(priority: .userInitiated) { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
+                guard self.activeTriggerUsesVoiceLight() else {
+                    try? await Task.sleep(nanoseconds: 33_000_000)
+                    continue
+                }
                 let bands = self.currentLiveListeningLightBands()
                 let anchorPoint = self.currentHoldlightAnchorPoint()
                 let verticalLift = self.currentHoldlightVerticalLift()
@@ -1864,13 +1868,27 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func currentHoldlightAnchorPoint() -> CGPoint? {
-        withStateLock {
-            trackpadHoldState?.downLocation
+        let triggerState = withStateLock { () -> (Trigger?, CGPoint?) in
+            (activeTrigger, trackpadHoldState?.downLocation)
         }
+        if triggerState.0 == .trackpadHold {
+            return triggerState.1
+        }
+        return keyboardTriggerLightAnchorPoint()
     }
 
     private func currentHoldlightVerticalLift() -> CGFloat {
         0
+    }
+
+    private func keyboardTriggerLightAnchorPoint() -> CGPoint? {
+        NSEvent.mouseLocation
+    }
+
+    private func activeTriggerUsesVoiceLight() -> Bool {
+        withStateLock {
+            activeTrigger != nil
+        }
     }
 
     private func frequencyBandLevels(for samples: [Float], sampleRate: Double) -> VoiceLightBands {
@@ -1959,7 +1977,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 uiState = ("PressTalk 0.1.5", "Ready. Hold \(settingsStore.triggerKey.displayName) to dictate.", "waveform.badge.mic", .ready, 1.1)
             }
         case .listening(let partial):
-            uiState = ("Listening", partial?.nonEmpty ?? "Speak now. Release when finished.", "mic.fill", .listening, nil)
+            uiState = ("Listening", partial?.nonEmpty ?? "Release \(settingsStore.triggerKey.displayName) to paste.", "mic.fill", .listening, nil)
         case .processing:
             uiState = ("Processing", "Cleaning and finalizing your dictation…", "ellipsis.circle.fill", .processing, nil)
         case .inserted(let transcript):
@@ -1995,26 +2013,35 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         statusSummaryMenuItem?.title = uiState.summary
         statusDetailMenuItem?.title = uiState.detail
 
-        if let button = statusItem?.button {
-            let image = NSImage(systemSymbolName: uiState.symbol, accessibilityDescription: uiState.summary)
-            image?.isTemplate = true
-            button.image = image
-            button.toolTip = "\(uiState.summary) — \(uiState.detail)"
-        }
+        updateStatusItemPresentation(state: state, uiState: uiState)
 
         guard settingsStore.showHUD else {
+            if case .listening = state {
+                traceLogger.log("HUD listening skipped reason=show_hud_disabled")
+            }
             hudController?.hide()
             return
         }
 
         switch state {
         case .listening:
-            hudController?.showListeningLight(
-                bands: currentLiveListeningLightBands(),
-                anchorPoint: currentHoldlightAnchorPoint(),
-                verticalLift: currentHoldlightVerticalLift(),
-                alpha: 1
-            )
+            if activeTriggerUsesVoiceLight() {
+                traceLogger.log("HUD listening presentation=voice_light")
+                hudController?.showListeningLight(
+                    bands: currentLiveListeningLightBands(),
+                    anchorPoint: currentHoldlightAnchorPoint(),
+                    verticalLift: currentHoldlightVerticalLift(),
+                    alpha: 1
+                )
+            } else {
+                traceLogger.log("HUD listening presentation=card trigger=\(settingsStore.triggerKey.rawValue)")
+                hudController?.show(
+                    title: uiState.summary,
+                    detail: uiState.detail,
+                    style: uiState.hudStyle,
+                    autoHideAfter: uiState.autoHide
+                )
+            }
         case .setupRequired:
             hudController?.hide()
         case .aborted, .error, .diagnosticStarted:
@@ -2026,6 +2053,47 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             )
         case .ready, .warming, .processing, .inserted, .copied:
             hudController?.hide()
+        }
+    }
+
+    private func updateStatusItemPresentation(
+        state: PresentationState,
+        uiState: (summary: String, detail: String, symbol: String, hudStyle: PressTalkHUDController.Style, autoHide: TimeInterval?)
+    ) {
+        guard let statusItem, let button = statusItem.button else { return }
+        button.toolTip = "\(uiState.summary) — \(uiState.detail)"
+
+        switch state {
+        case .listening:
+            statusItem.length = 76
+            button.image = nil
+            button.imagePosition = .noImage
+            button.attributedTitle = NSAttributedString(
+                string: "● REC",
+                attributes: [
+                    .foregroundColor: NSColor.systemRed,
+                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .bold),
+                ]
+            )
+        case .processing:
+            statusItem.length = 82
+            button.image = nil
+            button.imagePosition = .noImage
+            button.attributedTitle = NSAttributedString(
+                string: "… STT",
+                attributes: [
+                    .foregroundColor: NSColor.systemOrange,
+                    .font: NSFont.monospacedSystemFont(ofSize: 12, weight: .semibold),
+                ]
+            )
+        default:
+            statusItem.length = NSStatusItem.squareLength
+            button.title = ""
+            button.attributedTitle = NSAttributedString(string: "")
+            button.imagePosition = .imageOnly
+            let image = NSImage(systemSymbolName: uiState.symbol, accessibilityDescription: uiState.summary)
+            image?.isTemplate = true
+            button.image = image
         }
     }
 

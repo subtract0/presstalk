@@ -157,7 +157,7 @@ private final class VoiceLightView: NSView {
             radius: 214 + (overall * 92) + (lowAccent * 28),
             xScale: 1.04,
             yScale: 1.00,
-            alpha: 0.18 + (overall * 0.20)
+            alpha: 0.26 + (overall * 0.28)
         )
         drawSoftGlow(
             in: context,
@@ -165,7 +165,7 @@ private final class VoiceLightView: NSView {
             radius: 128 + (midAccent * 48),
             xScale: 0.90,
             yScale: 1.18,
-            alpha: 0.10 + (midAccent * 0.13)
+            alpha: 0.16 + (midAccent * 0.18)
         )
         drawSoftGlow(
             in: context,
@@ -173,7 +173,7 @@ private final class VoiceLightView: NSView {
             radius: 116 + (highAccent * 40),
             xScale: 1.26,
             yScale: 0.84,
-            alpha: 0.09 + (highAccent * 0.12)
+            alpha: 0.15 + (highAccent * 0.17)
         )
 
         drawSoftGlow(
@@ -182,13 +182,13 @@ private final class VoiceLightView: NSView {
             radius: 88 + (midAccent * 26) + (highAccent * 22),
             xScale: 1.0,
             yScale: 1.0,
-            alpha: 0.24 + (overall * 0.20)
+            alpha: 0.34 + (overall * 0.26)
         )
         drawGuideCore(
             in: context,
             center: center,
-            radius: 17,
-            alpha: 0.84 + (overall * 0.14)
+            radius: 20,
+            alpha: 0.92 + (overall * 0.08)
         )
         context.restoreGState()
     }
@@ -677,6 +677,7 @@ final class PressTalkHUDController {
         panel.setContentSize(NSSize(width: 460, height: 112))
         positionPanel()
         panel.alphaValue = 1
+        NSApp.unhide(nil)
         panel.orderFrontRegardless()
 
         if let autoHideAfter {
@@ -705,6 +706,7 @@ final class PressTalkHUDController {
         positionPanel()
         panel.contentView?.layoutSubtreeIfNeeded()
         panel.alphaValue = alpha
+        NSApp.unhide(nil)
         panel.orderFrontRegardless()
     }
 
@@ -912,7 +914,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let titleLabel = NSTextField(labelWithString: "Hold a key. Speak. Release.")
         titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
 
-        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Option + Space to bring up the light, speak, then release to paste cleaned dictation into the focused app. Fn, bare Option, trackpad hold, and F5 / Mic are advanced fallback triggers. These settings apply immediately.")
+        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Fn / Globe to show the recording indicator, speak, then release to paste cleaned dictation into the focused app. Option + Space, bare Option, trackpad hold, and F5 / Mic remain available. These settings apply immediately.")
         subtitleLabel.font = NSFont.systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabelColor
 

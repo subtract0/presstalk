@@ -1136,6 +1136,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private struct InputMethodPreselectionSession {
+        let originalSource: TISInputSource
+        let enabledSource: TISInputSource
+        let candidateSource: TISInputSource
+        let enabledBeforeKeys: Set<String>
+        let startedAt: Date
+    }
+
     private struct AudioInputDeviceCandidate {
         let id: AudioDeviceID
         let name: String
@@ -1271,6 +1279,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
+    private var activeInputMethodPreselection: InputMethodPreselectionSession?
+    private var inputMethodHelperWarmupScheduled = false
     private var activeAudioInputDeviceDescription = "unknown"
 
     private var statusItem: NSStatusItem?
@@ -1307,6 +1317,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         stopSetupRetry()
+        restoreInputMethodPreselectionIfNeeded(reason: "application_terminating")
         if singletonLockFileDescriptor >= 0 {
             flock(singletonLockFileDescriptor, LOCK_UN)
             close(singletonLockFileDescriptor)
@@ -1460,6 +1471,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             print("ASR language: \(config.whisperLanguage ?? "auto")")
             print("Agent mode: \(config.agentMode)")
             fflush(stdout)
+            scheduleInputMethodHelperWarmupIfNeeded()
         }
 
         refreshRuntimeStatusUI()
@@ -5194,6 +5206,247 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         } ?? sources.first
     }
 
+    private func disableInputMethodSourcesEnabledOnlyForInsertion(
+        _ sources: [TISInputSource],
+        enabledBeforeKeys: Set<String>
+    ) {
+        var disabled = Set<String>()
+        for source in sources {
+            let key = inputSourceIdentityKey(source)
+            guard !enabledBeforeKeys.contains(key), !disabled.contains(key) else { continue }
+            disabled.insert(key)
+            let disableStatus = runTISOperationOnMainThread {
+                TISDisableInputSource(source)
+            }
+            if disableStatus != 0 {
+                traceLogger.log("Input method insertion disable failed status=\(disableStatus)")
+            }
+        }
+    }
+
+    private func restoreInputMethodSelection(
+        originalSource: TISInputSource,
+        enabledSource: TISInputSource,
+        candidateSource: TISInputSource,
+        enabledBeforeKeys: Set<String>,
+        reason: String
+    ) {
+        let restoreStatus = runTISOperationOnMainThread {
+            TISSelectInputSource(originalSource)
+        }
+        if restoreStatus != 0 {
+            traceLogger.log("Input method insertion restore failed status=\(restoreStatus) reason=\(reason)")
+        }
+        disableInputMethodSourcesEnabledOnlyForInsertion(
+            [enabledSource, candidateSource],
+            enabledBeforeKeys: enabledBeforeKeys
+        )
+    }
+
+    private func takeInputMethodPreselection() -> InputMethodPreselectionSession? {
+        withStateLock {
+            let session = activeInputMethodPreselection
+            activeInputMethodPreselection = nil
+            return session
+        }
+    }
+
+    private func restoreInputMethodPreselectionIfNeeded(reason: String) {
+        guard let session = takeInputMethodPreselection() else { return }
+        restoreInputMethodSelection(
+            originalSource: session.originalSource,
+            enabledSource: session.enabledSource,
+            candidateSource: session.candidateSource,
+            enabledBeforeKeys: session.enabledBeforeKeys,
+            reason: reason
+        )
+        let age = Date().timeIntervalSince(session.startedAt)
+        traceLogger.log("Input method preselection restored reason=\(reason) age_seconds=\(String(format: "%.2f", age))")
+    }
+
+    private func scheduleInputMethodHelperWarmupIfNeeded() {
+        guard config.agentMode == "dictation",
+              settingsStore.pasteAutomatically,
+              !AXIsProcessTrusted()
+        else {
+            return
+        }
+
+        let shouldSchedule = withStateLock { () -> Bool in
+            guard !inputMethodHelperWarmupScheduled else { return false }
+            inputMethodHelperWarmupScheduled = true
+            return true
+        }
+        guard shouldSchedule else { return }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            self?.warmInputMethodHelperForInsertionIfNeeded()
+        }
+    }
+
+    private func warmInputMethodHelperForInsertionIfNeeded() {
+        guard config.agentMode == "dictation",
+              settingsStore.pasteAutomatically,
+              !AXIsProcessTrusted()
+        else {
+            return
+        }
+
+        let busy = withStateLock { isRecording || isProcessing || activeInputMethodPreselection != nil }
+        guard !busy else {
+            traceLogger.log("Input method helper warmup skipped reason=busy")
+            return
+        }
+
+        guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
+            return
+        }
+
+        let registerStatus = runTISOperationOnMainThread {
+            TISRegisterInputSource(bundleURL as CFURL)
+        }
+        guard registerStatus == 0 else {
+            traceLogger.log("Input method helper warmup unavailable reason=register_failed status=\(registerStatus)")
+            return
+        }
+
+        let originalSource = runTISOperationOnMainThread {
+            TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        }
+        let enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
+        let allSources = pressTalkInputMethodSources(includeAllInstalled: true)
+        guard let candidate = preferredPressTalkInputMethodSource(from: allSources) else {
+            traceLogger.log("Input method helper warmup unavailable reason=source_not_recognized")
+            return
+        }
+
+        let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
+        if !candidateWasEnabledBefore {
+            let enableStatus = runTISOperationOnMainThread {
+                TISEnableInputSource(candidate)
+            }
+            guard enableStatus == 0 else {
+                traceLogger.log("Input method helper warmup unavailable reason=enable_failed status=\(enableStatus)")
+                return
+            }
+        }
+
+        let enabledSources = pressTalkInputMethodSources(includeAllInstalled: false)
+        let enabledSource = preferredPressTalkInputMethodSource(from: enabledSources) ?? candidate
+        let selectStatus = runTISOperationOnMainThread {
+            TISSelectInputSource(enabledSource)
+        }
+        guard selectStatus == 0 else {
+            traceLogger.log("Input method helper warmup unavailable reason=select_failed status=\(selectStatus)")
+            disableInputMethodSourcesEnabledOnlyForInsertion(
+                [enabledSource, candidate],
+                enabledBeforeKeys: enabledBeforeKeys
+            )
+            return
+        }
+
+        let sourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
+        traceLogger.log(
+            "Input method helper warmup selected source=\(sourceID) enabled_count=\(enabledSources.count) all_installed_count=\(allSources.count)"
+        )
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { [weak self] in
+            guard let self else { return }
+            let hasPreselection = self.withStateLock { self.activeInputMethodPreselection != nil }
+            guard !hasPreselection else {
+                self.traceLogger.log("Input method helper warmup restore skipped reason=active_preselection")
+                return
+            }
+            self.restoreInputMethodSelection(
+                originalSource: originalSource,
+                enabledSource: enabledSource,
+                candidateSource: candidate,
+                enabledBeforeKeys: enabledBeforeKeys,
+                reason: "helper_warmup"
+            )
+            self.traceLogger.log("Input method helper warmup restored")
+        }
+    }
+
+    private func beginInputMethodPreselectionForDictationIfNeeded() {
+        guard config.agentMode == "dictation",
+              settingsStore.pasteAutomatically,
+              !AXIsProcessTrusted()
+        else {
+            return
+        }
+
+        let alreadyPreselected = withStateLock { activeInputMethodPreselection != nil }
+        guard !alreadyPreselected else { return }
+
+        guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
+            return
+        }
+
+        let registerStatus = runTISOperationOnMainThread {
+            TISRegisterInputSource(bundleURL as CFURL)
+        }
+        guard registerStatus == 0 else {
+            traceLogger.log("Input method preselection unavailable reason=register_failed status=\(registerStatus)")
+            return
+        }
+
+        let originalSource = runTISOperationOnMainThread {
+            TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        }
+        let enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
+        let allSources = pressTalkInputMethodSources(includeAllInstalled: true)
+        guard let candidate = preferredPressTalkInputMethodSource(from: allSources) else {
+            traceLogger.log("Input method preselection unavailable reason=source_not_recognized")
+            return
+        }
+
+        let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
+        if !candidateWasEnabledBefore {
+            let enableStatus = runTISOperationOnMainThread {
+                TISEnableInputSource(candidate)
+            }
+            guard enableStatus == 0 else {
+                traceLogger.log("Input method preselection unavailable reason=enable_failed status=\(enableStatus)")
+                return
+            }
+        }
+
+        let enabledSources = pressTalkInputMethodSources(includeAllInstalled: false)
+        let enabledSource = preferredPressTalkInputMethodSource(from: enabledSources) ?? candidate
+        let enableNoEffect = !candidateWasEnabledBefore && enabledSources.isEmpty
+        if enableNoEffect {
+            traceLogger.log("Input method preselection enable had no visible effect")
+        }
+
+        let selectStatus = runTISOperationOnMainThread {
+            TISSelectInputSource(enabledSource)
+        }
+        guard selectStatus == 0 else {
+            let reason = enableNoEffect ? "enable_no_effect" : "select_failed"
+            traceLogger.log("Input method preselection unavailable reason=\(reason) status=\(selectStatus)")
+            disableInputMethodSourcesEnabledOnlyForInsertion(
+                [enabledSource, candidate],
+                enabledBeforeKeys: enabledBeforeKeys
+            )
+            return
+        }
+
+        let sourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
+        withStateLock {
+            activeInputMethodPreselection = InputMethodPreselectionSession(
+                originalSource: originalSource,
+                enabledSource: enabledSource,
+                candidateSource: candidate,
+                enabledBeforeKeys: enabledBeforeKeys,
+                startedAt: Date()
+            )
+        }
+        traceLogger.log(
+            "Input method preselected for dictation source=\(sourceID) enabled_count=\(enabledSources.count) all_installed_count=\(allSources.count)"
+        )
+    }
+
     private func currentInputMethodFallbackStatus() -> String {
         guard settingsStore.pasteAutomatically else {
             return "not_used"
@@ -5318,89 +5571,95 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func insertPreparedTranscriptUsingInputMethod(
         _ preparedTranscript: String,
-        maxAttempts: Int = 3
+        maxAttempts: Int = 3,
+        preselectedSession: InputMethodPreselectionSession? = nil
     ) -> String? {
-        guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
-            return nil
-        }
-
         let clampedMaxAttempts = min(max(maxAttempts, 1), 3)
-        let registerStatus = runTISOperationOnMainThread {
-            TISRegisterInputSource(bundleURL as CFURL)
-        }
-        guard registerStatus == 0 else {
-            traceLogger.log("Input method insertion unavailable reason=register_failed status=\(registerStatus)")
-            return nil
-        }
+        let originalSource: TISInputSource
+        let enabledBeforeKeys: Set<String>
+        let candidate: TISInputSource
+        let enabledSource: TISInputSource
 
-        let originalSource = runTISOperationOnMainThread {
-            TISCopyCurrentKeyboardInputSource().takeRetainedValue()
-        }
-        let enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
-        var allSources = pressTalkInputMethodSources(includeAllInstalled: true)
-        guard let candidate = preferredPressTalkInputMethodSource(from: allSources) else {
-            traceLogger.log("Input method insertion unavailable reason=source_not_recognized")
-            return nil
-        }
+        if let preselectedSession {
+            originalSource = preselectedSession.originalSource
+            enabledBeforeKeys = preselectedSession.enabledBeforeKeys
+            candidate = preselectedSession.candidateSource
+            enabledSource = preselectedSession.enabledSource
+            let age = Date().timeIntervalSince(preselectedSession.startedAt)
+            let sourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
+            traceLogger.log("Input method insertion using press-time preselection source=\(sourceID) age_seconds=\(String(format: "%.2f", age))")
+        } else {
+            guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
+                return nil
+            }
 
-        func disableIfEnabledOnlyForInsertion(_ sources: [TISInputSource]) {
-            var disabled = Set<String>()
-            for source in sources {
-                let key = inputSourceIdentityKey(source)
-                guard !enabledBeforeKeys.contains(key), !disabled.contains(key) else { continue }
-                disabled.insert(key)
-                let disableStatus = runTISOperationOnMainThread {
-                    TISDisableInputSource(source)
+            let registerStatus = runTISOperationOnMainThread {
+                TISRegisterInputSource(bundleURL as CFURL)
+            }
+            guard registerStatus == 0 else {
+                traceLogger.log("Input method insertion unavailable reason=register_failed status=\(registerStatus)")
+                return nil
+            }
+
+            originalSource = runTISOperationOnMainThread {
+                TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+            }
+            enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
+            var allSources = pressTalkInputMethodSources(includeAllInstalled: true)
+            guard let selectedCandidate = preferredPressTalkInputMethodSource(from: allSources) else {
+                traceLogger.log("Input method insertion unavailable reason=source_not_recognized")
+                return nil
+            }
+            candidate = selectedCandidate
+
+            let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
+            if !candidateWasEnabledBefore {
+                let enableStatus = runTISOperationOnMainThread {
+                    TISEnableInputSource(candidate)
                 }
-                if disableStatus != 0 {
-                    traceLogger.log("Input method insertion disable failed status=\(disableStatus)")
+                guard enableStatus == 0 else {
+                    traceLogger.log("Input method insertion unavailable reason=enable_failed status=\(enableStatus)")
+                    return nil
                 }
             }
-        }
 
-        let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
-        if !candidateWasEnabledBefore {
-            let enableStatus = runTISOperationOnMainThread {
-                TISEnableInputSource(candidate)
+            allSources = pressTalkInputMethodSources(includeAllInstalled: false)
+            enabledSource = preferredPressTalkInputMethodSource(from: allSources) ?? candidate
+            if allSources.isEmpty {
+                traceLogger.log("Input method insertion selecting recognized source because enabled-source requery is empty")
             }
-            guard enableStatus == 0 else {
-                traceLogger.log("Input method insertion unavailable reason=enable_failed status=\(enableStatus)")
+            let enableNoEffect = !candidateWasEnabledBefore && allSources.isEmpty
+            if enableNoEffect {
+                traceLogger.log("Input method insertion enable had no visible effect")
+            }
+            let selectableSourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
+            let allInstalledCountAfterEnable = pressTalkInputMethodSources(includeAllInstalled: true).count
+            traceLogger.log(
+                "Input method insertion source state enabled_count=\(allSources.count) all_installed_count=\(allInstalledCountAfterEnable) selected_candidate=\(selectableSourceID)"
+            )
+
+            let selectStatus = runTISOperationOnMainThread {
+                TISSelectInputSource(enabledSource)
+            }
+            guard selectStatus == 0 else {
+                let reason = enableNoEffect ? "enable_no_effect" : "select_failed"
+                traceLogger.log("Input method insertion unavailable reason=\(reason) status=\(selectStatus)")
+                disableInputMethodSourcesEnabledOnlyForInsertion(
+                    [enabledSource, candidate],
+                    enabledBeforeKeys: enabledBeforeKeys
+                )
                 return nil
             }
         }
 
-        allSources = pressTalkInputMethodSources(includeAllInstalled: false)
-        let enabledSource = preferredPressTalkInputMethodSource(from: allSources) ?? candidate
-        if allSources.isEmpty {
-            traceLogger.log("Input method insertion selecting recognized source because enabled-source requery is empty")
-        }
-        let enableNoEffect = !candidateWasEnabledBefore && allSources.isEmpty
-        if enableNoEffect {
-            traceLogger.log("Input method insertion enable had no visible effect")
-        }
-        let selectableSourceID = inputSourceStringProperty(enabledSource, kTISPropertyInputSourceID) ?? "unknown"
-        let allInstalledCountAfterEnable = pressTalkInputMethodSources(includeAllInstalled: true).count
-        traceLogger.log(
-            "Input method insertion source state enabled_count=\(allSources.count) all_installed_count=\(allInstalledCountAfterEnable) selected_candidate=\(selectableSourceID)"
-        )
-
-        let selectStatus = runTISOperationOnMainThread {
-            TISSelectInputSource(enabledSource)
-        }
-        guard selectStatus == 0 else {
-            let reason = enableNoEffect ? "enable_no_effect" : "select_failed"
-            traceLogger.log("Input method insertion unavailable reason=\(reason) status=\(selectStatus)")
-            disableIfEnabledOnlyForInsertion([enabledSource, candidate])
-            return nil
-        }
         defer {
-            let restoreStatus = runTISOperationOnMainThread {
-                TISSelectInputSource(originalSource)
-            }
-            if restoreStatus != 0 {
-                traceLogger.log("Input method insertion restore failed status=\(restoreStatus)")
-            }
-            disableIfEnabledOnlyForInsertion([enabledSource, candidate])
+            restoreInputMethodSelection(
+                originalSource: originalSource,
+                enabledSource: enabledSource,
+                candidateSource: candidate,
+                enabledBeforeKeys: enabledBeforeKeys,
+                reason: preselectedSession == nil ? "post_insert" : "post_preselected_insert"
+            )
         }
 
         let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
@@ -5596,7 +5855,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 traceLogger.log("Accessibility preflight unavailable; copied transcript before input method fallback")
             }
 
-            if context == .dictation, let recentFailure = recentInputMethodInsertionFailure() {
+            let preselectedSession = context == .dictation ? takeInputMethodPreselection() : nil
+            if context == .dictation, let recentFailure = recentInputMethodInsertionFailure(), preselectedSession == nil {
                 let fallbackReason = copiedFallbackReason(for: recentFailure)
                 traceLogger.log(
                     "Accessibility preflight unavailable and input method insertion skipped reason=recent_\(recentFailure.reason); copying transcript"
@@ -5609,7 +5869,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let maxInputMethodAttempts = context == .productionProbe ? 3 : 1
             if let method = insertPreparedTranscriptUsingInputMethod(
                 preparedTranscript,
-                maxAttempts: maxInputMethodAttempts
+                maxAttempts: maxInputMethodAttempts,
+                preselectedSession: preselectedSession
             ) {
                 return .inserted(method: method)
             }
@@ -5754,6 +6015,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return
         }
 
+        beginInputMethodPreselectionForDictationIfNeeded()
+
         if announce {
             traceLogger.log(triggerStartLogMessage(for: trigger))
             present(.listening(nil))
@@ -5791,6 +6054,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     self.activeTriggerStartedAt = nil
                     self.streamTask = nil
                 }
+                self.restoreInputMethodPreselectionIfNeeded(reason: "audio_recording_failed")
                 self.stopAmplitudeMonitoring()
                 if announce {
                     self.present(.error("The audio capture stream failed."))
@@ -5855,6 +6119,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     self.isProcessing = false
                     self.processingTask = nil
                 }
+                self.restoreInputMethodPreselectionIfNeeded(reason: reason)
                 traceLogger.log("Processing task finished reason=\(reason) state_reset=true")
                 if let spokenText {
                     speaker.speak(spokenText)
@@ -6189,6 +6454,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 self.isProcessing = false
                 self.processingTask = nil
             }
+            restoreInputMethodPreselectionIfNeeded(reason: "process_captured_command_finished")
         }
 
         do {

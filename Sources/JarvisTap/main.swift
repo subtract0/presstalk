@@ -4193,7 +4193,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "Trackpad hold pending location=\(formattedPoint(location)) delay_seconds=\(String(format: "%.2f", trackpadHoldDelaySeconds)) pressure=\(String(format: "%.2f", pressure))"
         )
         startTrackpadPreview()
-        beginTrackpadPrearmCaptureIfPossible()
         DispatchQueue.main.asyncAfter(deadline: .now() + trackpadHoldDelaySeconds, execute: workItem)
     }
 
@@ -4311,11 +4310,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
             stopTrackpadPreview(hideLight: true)
         }
-    }
-
-    private func beginTrackpadPrearmCaptureIfPossible() {
-        guard currentWhisperReadinessMessage() == nil else { return }
-        handlePress(.trackpadHold, source: .trackpadHold, announce: false)
     }
 
     private func cancelTrackpadPrearmCaptureSilently() {

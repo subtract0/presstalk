@@ -117,10 +117,22 @@ Studio1 warmed-cache results:
 | Parakeet EOU 120M true streaming, 1280ms | English | `0.516 s` | `0.006 s` | `33.3x` | Faster but unacceptable transcription degradation |
 | Nemotron 0.6B English true streaming, 560ms | English | `0.828 s` | `0.013 s` | `20.8x` | Accurate fixture text; CoreML emitted slice-by-index warning |
 
+Mba1 warmed-cache results on a base M4 MacBook Air / macOS 26.3:
+
+| Backend | Fixture | Median Processing | Finalize | RTFx | Notes |
+| --- | --- | ---: | ---: | ---: | --- |
+| Parakeet v3 0.6B, CPU+ANE encoder | English | `0.180 s` | `0.180 s` | `95.6x` | Accurate on fixture |
+| Parakeet v3 0.6B, CPU+ANE encoder | German | `0.182 s` | `0.182 s` | `97.1x` | Same synthetic-TTS payment-term errors as studio1 |
+| Parakeet v3 0.6B, CPU+GPU encoder | English | `0.435 s` | `0.435 s` | `39.5x` | Much slower than ANE on base M4 |
+| Parakeet EOU 120M true streaming, 320ms | English | `0.716 s` | `0.006 s` | `24.0x` | Same correct words/no casing-punctuation behavior as studio1 |
+| Nemotron 0.6B English true streaming, 560ms | English | `0.913 s` | `0.015 s` | `18.8x` | Accurate fixture text; no CoreML warning observed on mba1 run |
+
 First-load timings include one-time Hugging Face download and CoreML compile,
 so they are not included in the warmed-cache table. The largest first loads
 observed here were about `61 s` for current Parakeet v3, `48 s` for each EOU
-tier, and `70 s` for Nemotron 560ms.
+tier, and `70 s` for Nemotron 560ms on studio1. On mba1, first-load timings
+were much longer because it was a fresh checkout and fresh model cache: about
+`251 s` for Parakeet v3, `247 s` for EOU 320ms, and `230 s` for Nemotron 560ms.
 
 Current interpretation:
 
@@ -134,8 +146,9 @@ Current interpretation:
   warning makes it a higher-risk production dependency until reproduced and
   understood.
 - On this M4 Max, FluidAudio's GPU encoder placement for Parakeet v3 was slower
-  than ANE on the PressTalk fixture. This reinforces the ANE-first target for
-  base M-series Macs such as M4 MacBook Air.
+  than ANE on the PressTalk fixture. On the base M4 MacBook Air, GPU placement
+  was slower still (`0.435 s` vs `0.180 s` warmed median), reinforcing the
+  ANE-first target for base M-series Macs.
 
 ## Wispr Flow Snapshot
 

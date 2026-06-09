@@ -142,6 +142,31 @@ Mba1 warmed-cache results on a base M4 MacBook Air / macOS 26.3:
 | Parakeet v3 0.6B, CPU+ANE encoder | German | `0.169 s` | `0.169 s` | `104.69x` | `13.51%` | `3.25%` | Same normalized German WER as stock; higher CER on payment terms |
 | Parakeet v3 0.6B, CPU+GPU encoder | German | `0.427 s` | `0.427 s` | `41.50x` | `13.51%` | `3.25%` | Much slower than ANE on base M4 |
 
+User-supplied real fixture:
+
+- File: `/Users/am/Downloads/chirp.wav`, copied to mba1 as
+  `/tmp/presstalk-asr-bench/chirp.wav`
+- Duration: `21.23 s`
+- Content: mixed English title plus German marketing text for "Chirp 3"
+- Reference text used Alex's expected transcript, including `zehn Sekunden`
+  rather than numeric `10 Sekunden`
+
+Studio1 real-fixture results:
+
+| Backend | Language Mode | Median Processing | Finalize | RTFx | WER | CER | Transcript Notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | `auto` | `3.498 s` | `3.498 s` | `6.07x` | `5.13%` | `1.79%` | Output `10 Sekunden`; wrote `Medias Studio` |
+| Parakeet v3 0.6B, CPU+ANE encoder | `auto` | `0.214 s` | `0.214 s` | `99.39x` | `12.82%` | `2.15%` | Output `Chirp3`, `10 Sekunden`, `Mediastudio` |
+| Parakeet v3 0.6B, CPU+GPU encoder | `auto` | `0.334 s` | `0.334 s` | `63.56x` | `12.82%` | `2.15%` | Same transcript as ANE auto; slower than ANE |
+
+Mba1 real-fixture results:
+
+| Backend | Language Mode | Median Processing | Finalize | RTFx | WER | CER | Transcript Notes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Stock v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE | `auto` | `7.181 s` | `7.181 s` | `2.96x` | `5.13%` | `1.79%` | Same transcript as studio1 stock |
+| Parakeet v3 0.6B, CPU+ANE encoder | `auto` | `0.236 s` | `0.236 s` | `90.14x` | `12.82%` | `2.15%` | Same transcript as studio1 Parakeet auto |
+| Parakeet v3 0.6B, CPU+GPU encoder | `auto` | `0.506 s` | `0.506 s` | `42.00x` | `12.82%` | `2.15%` | Much slower than ANE on base M4 |
+
 First-load timings include one-time Hugging Face download and CoreML compile,
 so they are not included in the warmed-cache table. The largest first loads
 observed here were about `61 s` for current Parakeet v3, `48 s` for each EOU
@@ -163,7 +188,10 @@ Current interpretation:
   WhisperKit and Parakeet v3 tied on normalized WER, but stock had lower CER
   because Parakeet misheard parts of the payment-term phrase. Real recorded
   user fixtures should decide whether Parakeet needs a cleanup pass, domain
-  dictionary, or fallback language route.
+  dictionary, or fallback language route. The first real user fixture,
+  `chirp.wav`, confirms this caution: Parakeet v3 ANE is about `30x` faster
+  than stock on mba1, but stock WhisperKit has lower WER/CER on the mixed
+  English/German marketing copy.
 - For live partial text, Parakeet EOU 320ms is the most promising true
   streaming candidate tested so far. It needs capitalization, punctuation, and
   quality validation before it can replace final text.

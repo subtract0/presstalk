@@ -32,6 +32,7 @@ let package = Package(
         .executableTarget(
             name: "JarvisTap",
             dependencies: [
+                .product(name: "FluidAudio", package: "FluidAudio"),
                 "WhisperKit",
             ]
         ),

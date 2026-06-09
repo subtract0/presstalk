@@ -34,7 +34,7 @@ rm -rf "$APP_BUNDLE"
 
 pushd "$PKG_DIR" >/dev/null
 swift package clean
-swift build -c release
+swift build -c release --product jarvistap
 BINARY_DIR="$(swift build -c release --show-bin-path)"
 popd >/dev/null
 

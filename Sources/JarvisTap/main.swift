@@ -3,6 +3,7 @@ import ApplicationServices
 import AVFoundation
 import Carbon.HIToolbox
 import CoreAudio
+import FluidAudio
 import CoreML
 import Darwin
 import Foundation
@@ -35,6 +36,7 @@ struct JarvisTapConfig {
     let whisperModel: String
     let whisperLanguage: String?
     let whisperComputePreset: String
+    let asrBackend: String
     let streamingTranscriptionEnabled: Bool
     let sayVoice: String?
     let printPartials: Bool
@@ -119,6 +121,15 @@ struct JarvisTapConfig {
             .nonEmpty ??
             "cpu-gpu-no-ane"
 
+        let asrBackend =
+            (env["PRESSTALK_ASR_BACKEND"] ??
+            env["JARVISTAP_ASR_BACKEND"] ??
+            "whisperkit")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .nonEmpty ??
+            "whisperkit"
+
         let streamingTranscriptionEnabled =
             (env["PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"] ??
             env["JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION"])
@@ -173,6 +184,7 @@ struct JarvisTapConfig {
             whisperModel: whisperModel,
             whisperLanguage: (whisperLanguage?.isEmpty == false) ? whisperLanguage : nil,
             whisperComputePreset: whisperComputePreset,
+            asrBackend: asrBackend,
             streamingTranscriptionEnabled: streamingTranscriptionEnabled,
             sayVoice: env["JARVISTAP_SAY_VOICE"],
             printPartials: env["JARVISTAP_PRINT_PARTIALS"].map { $0 != "0" } ?? true,
@@ -1254,6 +1266,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var registeredHotKeyEventHandler: EventHandlerRef?
     private var specialKeyMonitor: Any?
     private var whisperKit: WhisperKit?
+    private var parakeetAsrManager: AsrManager?
+    private var parakeetDecoderLayerCount = 2
     private var streamTranscriber: AudioStreamTranscriber?
     private var decodingOptions = DecodingOptions(
         verbose: false,
@@ -2048,6 +2062,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             whisperWarmupTask?.cancel()
             whisperWarmupTask = nil
             whisperKit = nil
+            parakeetAsrManager = nil
+            parakeetDecoderLayerCount = 2
             streamTranscriber = nil
             whisperLoadState = .idle
         }
@@ -3311,6 +3327,64 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         self.whisperKit = whisperKit
         self.streamTranscriber = transcriber
+    }
+
+    private var usesParakeetFinalBackend: Bool {
+        switch config.asrBackend {
+        case "parakeet", "parakeet-v3", "parakeet-v3-ane", "ane", "npu":
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func loadParakeetV3ANE() async throws {
+        traceLogger.log("Loading Parakeet v3 ASR backend compute=cpuAndNeuralEngine")
+        let loadStart = Date()
+        let configuration = AsrModels.defaultConfiguration()
+        let models = try await AsrModels.downloadAndLoad(
+            configuration: configuration,
+            version: .v3,
+            encoderComputeUnits: nil
+        )
+        let manager = AsrManager(config: .default)
+        try await manager.loadModels(models)
+        let decoderLayerCount = await manager.decoderLayerCount
+        parakeetAsrManager = manager
+        parakeetDecoderLayerCount = decoderLayerCount
+        traceLogger.log(
+            "Parakeet v3 ASR ready load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart))) decoder_layers=\(decoderLayerCount)"
+        )
+    }
+
+    private func parakeetLanguageHint() -> Language? {
+        switch settingsStore.preferredLanguage {
+        case .auto:
+            return nil
+        case .german:
+            return .german
+        case .english:
+            return .english
+        }
+    }
+
+    private func transcribeParakeetV3ANE(samples: [Float]) async throws -> String {
+        guard let parakeetAsrManager else {
+            throw JarvisTapError.whisperUnavailable
+        }
+
+        var decoderState = TdtDecoderState.make(decoderLayers: parakeetDecoderLayerCount)
+        let language = parakeetLanguageHint()
+        let startedAt = Date()
+        let result = try await parakeetAsrManager.transcribe(
+            samples,
+            decoderState: &decoderState,
+            language: language
+        )
+        traceLogger.log(
+            "Parakeet v3 ASR pass completed samples=\(samples.count) inference_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt))) confidence=\(String(format: "%.3f", Double(result.confidence))) language=\(settingsStore.preferredLanguage.rawValue)"
+        )
+        return cleanedTranscriptText(result.text)
     }
 
     private func makeStreamTranscriber(using whisperKit: WhisperKit) throws -> AudioStreamTranscriber {
@@ -5152,12 +5226,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let task = Task(priority: .userInitiated) { [self] in
             do {
+                traceLogger.log("ASR backend=\(config.asrBackend)")
                 traceLogger.log("Loading WhisperKit model=\(config.whisperModel)")
                 traceLogger.log("Whisper decode language=\(settingsStore.preferredLanguage.whisperLanguageCode ?? "auto")")
                 try await loadWhisperKit()
                 traceLogger.log("WhisperKit ready")
                 print("WhisperKit ready.")
                 fflush(stdout)
+
+                if usesParakeetFinalBackend {
+                    try await loadParakeetV3ANE()
+                    print("Parakeet v3 ANE ready.")
+                    fflush(stdout)
+                }
 
                 withStateLock {
                     whisperLoadState = .ready
@@ -6390,8 +6471,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     await runRealtimeWhisperLoop(whisperKit: whisperKit)
                 } else {
                     while !Task.isCancelled {
+                        let stillRecording = withStateLock { isRecording }
+                        if !stillRecording { break }
                         try? await Task.sleep(nanoseconds: 200_000_000)
                     }
+                    traceLogger.log("Audio recording wait loop stopped mode=direct streaming=0")
                 }
             } catch {
                 traceLogger.log("Audio recording failed mode=direct error=\(error)")
@@ -6492,10 +6576,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let frozenAudioDurationSeconds: Double
             await captureSilenceAwareReleaseTail(whisperKit: whisperKit)
             if let streamTaskToStop {
-                streamShutdownCompleted = await awaitStreamShutdown(for: streamTaskToStop)
-                traceLogger.log("Realtime stream shutdown completed=\(streamShutdownCompleted ? 1 : 0)")
-                if !streamShutdownCompleted {
+                if config.streamingTranscriptionEnabled {
+                    streamShutdownCompleted = await awaitStreamShutdown(for: streamTaskToStop)
+                    traceLogger.log("Realtime stream shutdown completed=\(streamShutdownCompleted ? 1 : 0)")
+                    if !streamShutdownCompleted {
+                        streamTaskToStop.cancel()
+                    }
+                } else {
                     streamTaskToStop.cancel()
+                    streamShutdownCompleted = true
+                    traceLogger.log("Capture task cancelled without realtime stream")
                 }
             }
             processingSnapshot = withStateLock { latestStreamingState }
@@ -6533,10 +6623,31 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "streaming_fallback"
                 )
-                if let acceptedStreamingTranscript,
+                if !usesParakeetFinalBackend,
+                   let acceptedStreamingTranscript,
                    streamingSnapshotFreshEnoughForFinal(processingSnapshot, frozenAudioDurationSeconds: frozenAudioDurationSeconds) {
                     traceLogger.log("Using realtime Whisper streaming transcript as final transcript revision=\(processingSnapshot.revision)")
                     return acceptedStreamingTranscript
+                }
+
+                if usesParakeetFinalBackend, !capturedAudioSamples.isEmpty {
+                    traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedAudioSamples.count)")
+                    do {
+                        let parakeetTranscript = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                        traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetTranscript)
+                        if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
+                            parakeetTranscript,
+                            signalStats: capturedSignalStats,
+                            captureDurationSeconds: effectiveCaptureDurationSeconds,
+                            context: "parakeet_v3_ane"
+                        ) {
+                            traceLogger.log("Using Parakeet v3 ANE transcript as final transcript")
+                            return acceptedParakeetTranscript
+                        }
+                        traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
+                    } catch {
+                        traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
+                    }
                 }
 
                 guard let whisperKit else {
@@ -6762,19 +6873,26 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func awaitStreamShutdown(for task: Task<Void, Never>) async -> Bool {
         let timeoutNanoseconds = UInt64(streamShutdownTimeoutSeconds * 1_000_000_000)
 
-        return await withTaskGroup(of: Bool.self) { group in
-            group.addTask {
-                _ = await task.result
-                return true
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
-                return false
+        return await withCheckedContinuation { continuation in
+            let lock = NSLock()
+            var didResume = false
+
+            func resumeOnce(_ completed: Bool) {
+                lock.lock()
+                defer { lock.unlock() }
+                guard !didResume else { return }
+                didResume = true
+                continuation.resume(returning: completed)
             }
 
-            let finished = await group.next() ?? true
-            group.cancelAll()
-            return finished
+            Task {
+                _ = await task.result
+                resumeOnce(true)
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                resumeOnce(false)
+            }
         }
     }
 
@@ -6910,6 +7028,26 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Audio normalization gain=\(String(format: "%.2f", normalizedResult.1)) normalized_rms=\(String(format: "%.5f", normalizedStats.rms)) normalized_peak=\(String(format: "%.5f", normalizedStats.peak))"
         )
+
+        if usesParakeetFinalBackend {
+            traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedSamples.count)")
+            do {
+                let parakeetTranscript = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetTranscript)
+                if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
+                    parakeetTranscript,
+                    signalStats: signalStats,
+                    captureDurationSeconds: captureDurationSeconds,
+                    context: "parakeet_v3_ane"
+                ) {
+                    traceLogger.log("Using Parakeet v3 ANE transcript as final transcript")
+                    return acceptedParakeetTranscript
+                }
+                traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
+            } catch {
+                traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
+            }
+        }
 
         let primaryResults = try await whisperKit.transcribe(audioArray: normalizedSamples, decodeOptions: decodingOptions)
         let primaryTranscript = cleanedTranscriptText(

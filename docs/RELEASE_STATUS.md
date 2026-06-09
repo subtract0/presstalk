@@ -42,16 +42,22 @@ Latest local evidence:
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc102`
-- Commit: `be2088c0623e5b0c5ba0342a1907924b77f013bd`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc102`
-- Asset: `PressTalk-0.1.5-rc102-macos-arm64.zip`
-- SHA-256: `1112931886fc9c167fed623b1827c1e09c47773da4c10d55f49d2fe6fef3d514`
-- Note: rc102 predates the `ax_menu_paste` real-field fix. The next public
-  prerelease must be rc103 or newer before cross-machine retesting.
+- Tag: `v0.1.5-rc103`
+- Commit: `d35e662dcf79e91d361b8e8b247e02ea128d6443`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc103`
+- Asset: `PressTalk-0.1.5-rc103-macos-arm64.zip`
+- SHA-256: `5cd91a560997a482359778bdf717d79166fb87e9204ffc045493b9cc99749d2b`
 
 Verified on `studio1` during 2026-06-06 through 2026-06-09:
 
+- `v0.1.5-rc103` is the current public prerelease smoke artifact. It includes
+  the `ax_menu_paste` trusted insertion path proven by the 2026-06-09 real-field
+  Option+Space test on `studio1`, plus isolated release packaging so publishing
+  no longer overwrites the live local app in `~/Applications/PressTalk.app`.
+  GitHub reports asset digest
+  `sha256:5cd91a560997a482359778bdf717d79166fb87e9204ffc045493b9cc99749d2b`,
+  matching the local `dist/PressTalk-0.1.5-rc103-macos-arm64.zip`, and the tag
+  points at `d35e662dcf79e91d361b8e8b247e02ea128d6443`.
 - Local source commit `3d95bb7` uses Accessibility to press the focused app's
   Paste menu item for trusted insertion, with targeted Cmd+V and direct AX text
   writes only as backups. The latest local readiness report at
@@ -61,7 +67,7 @@ Verified on `studio1` during 2026-06-06 through 2026-06-09:
   `~/Desktop/presstalk-readiness-matrix-after-ax-menu-paste.json` reports local
   ready, `s1` / `s1.local` unresolved, `mbp1-tb` reachable but
   `active=false`, and `studio2` excluded until a microphone is attached.
-- `v0.1.5-rc102` is the current public prerelease smoke artifact. It handles the
+- `v0.1.5-rc102` is the previous public prerelease smoke artifact. It handles the
   terminal/text-field blue input-source badge failure by making the input-method
   helper write an acknowledgement failure reason (`no_active_controller` or
   `no_current_client`) and making the main app record recent real insertion

@@ -41,6 +41,7 @@ struct JarvisTapConfig {
     let sayVoice: String?
     let printPartials: Bool
     let traceLogPath: String
+    let launchdLabel: String
     let requestTimeoutSeconds: TimeInterval
     let releaseTailPaddingSeconds: TimeInterval
     let triggerKey: JarvisTapSettingsStore.TriggerKeyOption
@@ -140,7 +141,13 @@ struct JarvisTapConfig {
 
         let traceLogPath =
             env["JARVISTAP_TRACE_LOG"] ??
-            "\(homeDirectory)/Library/Logs/jarvistap_trace.log"
+            "\(homeDirectory)/Library/Logs/presstalk_trace.log"
+
+        let launchdLabel =
+            env["PRESSTALK_LAUNCHD_LABEL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nonEmpty ??
+            "com.am.presstalk"
 
         let requestTimeoutSeconds =
             env["JARVISTAP_REQUEST_TIMEOUT_SECONDS"].flatMap(TimeInterval.init) ??
@@ -189,6 +196,7 @@ struct JarvisTapConfig {
             sayVoice: env["JARVISTAP_SAY_VOICE"],
             printPartials: env["JARVISTAP_PRINT_PARTIALS"].map { $0 != "0" } ?? true,
             traceLogPath: traceLogPath,
+            launchdLabel: launchdLabel,
             requestTimeoutSeconds: requestTimeoutSeconds,
             releaseTailPaddingSeconds: releaseTailPaddingSeconds,
             triggerKey: triggerKey,
@@ -2286,7 +2294,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Executable path: \(Bundle.main.executableURL?.path ?? "unknown")
             Bundle identifier: \(runtimeStatus.bundleIdentifier)
             Process ID: \(ProcessInfo.processInfo.processIdentifier)
-            Launch label (internal): com.am.jarvistap
+            Launch label: \(config.launchdLabel)
 
             Permissions
             - Input Monitoring preflight: \(runtimeStatus.inputMonitoringGranted ? "granted" : "unavailable")
@@ -2432,7 +2440,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         present(.setupRequired("Restarting PressTalk to refresh runtime status."))
 
         let bundlePath = shellQuoted(Bundle.main.bundleURL.path)
-        let launchLabel = "gui/\(getuid())/com.am.jarvistap"
+        let launchLabel = "gui/\(getuid())/\(config.launchdLabel)"
         let script = """
         sleep 0.4
         /bin/launchctl kickstart -k \(launchLabel) >/dev/null 2>&1 || /usr/bin/open -g \(bundlePath) >/dev/null 2>&1

@@ -16,11 +16,13 @@ fi
 if [[ ! -x "$APP_BINARY" && -x "$LEGACY_SYSTEM_APP_BINARY" ]]; then
   APP_BINARY="$LEGACY_SYSTEM_APP_BINARY"
 fi
-PLIST="$HOME/Library/LaunchAgents/com.am.jarvistap.plist"
-WORKDIR="$HOME/Library/Application Support/JarvisTap"
-LOG_OUT="$HOME/Library/Logs/jarvistap.out.log"
-LOG_ERR="$HOME/Library/Logs/jarvistap.err.log"
-TRACE_LOG="$HOME/Library/Logs/jarvistap_trace.log"
+PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-com.am.presstalk}"
+LEGACY_LAUNCHD_LABELS="${PRESSTALK_LEGACY_LAUNCHD_LABELS:-com.am.jarvistap}"
+PLIST="$HOME/Library/LaunchAgents/$PRESSTALK_LAUNCHD_LABEL.plist"
+WORKDIR="$HOME/Library/Application Support/PressTalk"
+LOG_OUT="$HOME/Library/Logs/presstalk.out.log"
+LOG_ERR="$HOME/Library/Logs/presstalk.err.log"
+TRACE_LOG="$HOME/Library/Logs/presstalk_trace.log"
 
 if [[ ! -x "$APP_BINARY" ]]; then
   echo "PressTalk.app is missing. Build it first:"
@@ -75,6 +77,18 @@ terminate_existing_presstalk() {
 
   for pid in $pids; do
     kill -KILL "$pid" >/dev/null 2>&1 || true
+  done
+}
+
+remove_legacy_launch_agents() {
+  local domain="gui/$(id -u)"
+  for label in $LEGACY_LAUNCHD_LABELS; do
+    [[ -n "$label" && "$label" != "$PRESSTALK_LAUNCHD_LABEL" ]] || continue
+    local legacy_plist="$HOME/Library/LaunchAgents/$label.plist"
+    launchctl bootout "$domain" "$legacy_plist" >/dev/null 2>&1 || true
+    launchctl bootout "$domain/$label" >/dev/null 2>&1 || true
+    launchctl disable "$domain/$label" >/dev/null 2>&1 || true
+    rm -f "$legacy_plist"
   done
 }
 
@@ -142,6 +156,8 @@ ENV_BLOCK="  <key>EnvironmentVariables</key>
     <string>${PRESSTALK_OPEN_PERMISSION_PANES}</string>
     <key>PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE</key>
     <string>${PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE}</string>
+    <key>PRESSTALK_LAUNCHD_LABEL</key>
+    <string>${PRESSTALK_LAUNCHD_LABEL}</string>
     <key>JARVISTAP_TRACE_LOG</key>
     <string>${JARVISTAP_TRACE_LOG}</string>
     <key>JARVISTAP_WHISPERKIT_MODEL</key>
@@ -188,6 +204,7 @@ OPEN_ENV_ARGS="$(
   open_env_arg PRESSTALK_AUTO_SHOW_SETUP_WINDOW "$PRESSTALK_AUTO_SHOW_SETUP_WINDOW"
   open_env_arg PRESSTALK_OPEN_PERMISSION_PANES "$PRESSTALK_OPEN_PERMISSION_PANES"
   open_env_arg PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE "$PRESSTALK_ENABLE_PRODUCTION_INSERTION_PROBE"
+  open_env_arg PRESSTALK_LAUNCHD_LABEL "$PRESSTALK_LAUNCHD_LABEL"
   open_env_arg JARVISTAP_TRACE_LOG "$JARVISTAP_TRACE_LOG"
   open_env_arg JARVISTAP_WHISPERKIT_MODEL "$JARVISTAP_WHISPERKIT_MODEL"
   open_env_arg JARVISTAP_WHISPER_LANGUAGE "$JARVISTAP_WHISPER_LANGUAGE"
@@ -211,7 +228,7 @@ cat >"$PLIST" <<PLIST
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.am.jarvistap</string>
+  <string>$PRESSTALK_LAUNCHD_LABEL</string>
   <key>ProgramArguments</key>
   <array>
     <string>/usr/bin/open</string>
@@ -247,19 +264,20 @@ PLIST
 chmod 644 "$PLIST"
 plutil -lint "$PLIST" >/dev/null
 
+remove_legacy_launch_agents
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
 terminate_existing_presstalk
 LAUNCHD_DOMAIN="gui/$(id -u)"
-LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/com.am.jarvistap"
+LAUNCHD_SERVICE="$LAUNCHD_DOMAIN/$PRESSTALK_LAUNCHD_LABEL"
 launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
 if ! launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"; then
-  echo "LaunchAgent bootstrap failed; enabling com.am.jarvistap and retrying." >&2
+  echo "LaunchAgent bootstrap failed; enabling $PRESSTALK_LAUNCHD_LABEL and retrying." >&2
   launchctl enable "$LAUNCHD_SERVICE" >/dev/null 2>&1 || true
   launchctl bootstrap "$LAUNCHD_DOMAIN" "$PLIST"
 fi
 launchctl kickstart -k "$LAUNCHD_SERVICE"
 
-echo "Installed and started: com.am.jarvistap"
+echo "Installed and started: $PRESSTALK_LAUNCHD_LABEL"
 echo "Mode: $JARVISTAP_AGENT_MODE"
 echo "ASR backend: $PRESSTALK_ASR_BACKEND"
 echo "Streaming transcription: $PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"

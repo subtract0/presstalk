@@ -1,29 +1,35 @@
 # Release Status
 
-Current status: public rc101 prerelease smoke artifact published with direct
-disabled-Accessibility-row guidance for the mbp1 post-repair blocker; full
-cross-machine release not yet proven.
+Current status: public rc102 prerelease smoke artifact published with
+input-method client-failure handling for the terminal/text-field blue input-source
+badge failure; full cross-machine release not yet proven.
 
 Public prerelease:
 
-- Tag: `v0.1.5-rc101`
-- Commit: `1fd04bcac4c943affd7a62fc0bc3f055505b8f1f`
-- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc101`
-- Asset: `PressTalk-0.1.5-rc101-macos-arm64.zip`
-- SHA-256: `74d8d41c100a969b0e56478be81c6ea16ef9cbb22f29ead21df721164ea2ecd8`
+- Tag: `v0.1.5-rc102`
+- Commit: `be2088c0623e5b0c5ba0342a1907924b77f013bd`
+- URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc102`
+- Asset: `PressTalk-0.1.5-rc102-macos-arm64.zip`
+- SHA-256: `1112931886fc9c167fed623b1827c1e09c47773da4c10d55f49d2fe6fef3d514`
 
-Verified on `studio1` during 2026-06-06 through 2026-06-08:
+Verified on `studio1` during 2026-06-06 through 2026-06-09:
 
-- Post-rc101 local fix candidate on 2026-06-09 handles the terminal/text-field
-  blue input-source badge failure. The input-method helper now writes an
-  acknowledgement failure reason (`no_active_controller` or `no_current_client`),
-  and the main app records recent real insertion failures as
-  `inputMethodFallbackStatus=client_unavailable` or `ack_timeout` instead of
-  continuing to report `ready_input_method`. Normal dictation copies during the
-  cooldown instead of repeatedly selecting the input source; production insertion
-  probes can still force a retry and clear the degraded state on success. The
-  rebuilt local app reports
-  `CodeSignatureCDHash=4b9beee715576f9fcb43412a997e84685d6c555a`,
+- `v0.1.5-rc102` is the current public prerelease smoke artifact. It handles the
+  terminal/text-field blue input-source badge failure by making the input-method
+  helper write an acknowledgement failure reason (`no_active_controller` or
+  `no_current_client`) and making the main app record recent real insertion
+  failures as `inputMethodFallbackStatus=client_unavailable` or `ack_timeout`
+  instead of continuing to report `ready_input_method`. Normal dictation copies
+  during the cooldown instead of repeatedly selecting the input source;
+  production insertion probes can still force a retry and clear the degraded
+  state on success. The `v0.1.5-rc102` GitHub release is a prerelease; GitHub
+  reports asset digest
+  `sha256:1112931886fc9c167fed623b1827c1e09c47773da4c10d55f49d2fe6fef3d514`,
+  matching the local `dist/PressTalk-0.1.5-rc102-macos-arm64.zip`, and the tag
+  points at `be2088c0623e5b0c5ba0342a1907924b77f013bd`. After rc102 packaging,
+  `studio1` was restored to stable local signing and no-pane launch. The current
+  installed app reports
+  `CodeSignatureCDHash=06aa6b30c8386937189bb69bbe29f28d2515bd9b`,
   `inputListener=carbon:registered`, `triggerPath=Option + Space ready`,
   `speechModel=Ready`, and `inputMethodFallbackStatus=ready` before a new real
   failure. The fresh production insertion probe at
@@ -42,9 +48,9 @@ Verified on `studio1` during 2026-06-06 through 2026-06-08:
   writable event-tap blocker on studio1. The current direct portability route is
   `Option + Space`, backed by a registered macOS hotkey; keep bare Option/Fn as
   advanced modifier-only triggers and F5/Mic as a legacy fallback.
-- `v0.1.5-rc101` is the current public prerelease smoke artifact. It keeps the
+- `v0.1.5-rc101` is the previous public prerelease smoke artifact. It kept the
   `Option + Space` registered-hotkey route and the Accessibility handoff helper,
-  and now detects a disabled Accessibility TCC row for PressTalk. For the
+  and detected a disabled Accessibility TCC row for PressTalk. For the
   current mbp1 state, machine readiness and smoke-status diagnostics report
   `AccessibilityTCCAuthValue=0` / `accessibilityTCC=listed_disabled` and say
   that PressTalk is already listed in Accessibility but disabled. The refreshed

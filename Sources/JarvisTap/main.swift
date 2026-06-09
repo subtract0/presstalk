@@ -160,10 +160,10 @@ struct JarvisTapConfig {
         let triggerKeyValue =
             env["PRESSTALK_TRIGGER_KEY"] ??
             env["JARVISTAP_TRIGGER_KEY"] ??
-            "option_space"
+            "fn"
         let triggerKey =
             JarvisTapSettingsStore.TriggerKeyOption(rawValue: triggerKeyValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()) ??
-            .optionSpace
+            .fn
 
         let enableNativeMicrophoneKey =
             env["PRESSTALK_ENABLE_NATIVE_MICROPHONE_KEY"] == "1" ||

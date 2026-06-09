@@ -177,9 +177,10 @@ Input Monitoring/Accessibility row labels, the ready hint says no permission
 pane changes are needed, and permission-pane buttons are hidden once the
 selected trigger, microphone, and insertion path are already working.
 
-The default Option + Space trigger uses a registered macOS hotkey. Modifier-only
-Fn/Option triggers remain available as advanced choices and still report whether
-the required writable event-tap path armed successfully.
+The default Fn / Globe trigger uses PressTalk's writable event-tap path.
+Option + Space remains available as a registered macOS hotkey choice, and all
+modifier-only choices still report whether the required writable event-tap path
+armed successfully.
 
 PressTalk also recognizes the actual WhisperKit local cache layout under
 ~/Library/Application Support/JarvisTap/Models/models/... and prefetches the

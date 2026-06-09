@@ -470,7 +470,7 @@ final class JarvisTapSettingsStore {
 
     var triggerKey: TriggerKeyOption {
         get {
-            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .optionSpace
+            TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .fn
         }
         set {
             defaults.set(newValue.rawValue, forKey: Key.triggerKey)

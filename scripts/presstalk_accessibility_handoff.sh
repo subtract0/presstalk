@@ -24,7 +24,7 @@ Options:
   --app-bundle PATH   PressTalk.app path. Defaults to the bundled app or
                       $DEFAULT_APP_BUNDLE.
   --trigger-key KEY   Trigger to preserve for probes. Default: runtime status,
-                      then option_space.
+                      then fn.
   --preflight         Report current Accessibility and insertion status without
                       prompting or opening System Settings.
   --prompt            Run the exact installed app in Accessibility prompt mode.
@@ -109,7 +109,7 @@ fi
 if [[ -z "$TRIGGER_KEY" && -f "$STATUS_JSON" ]]; then
   TRIGGER_KEY="$(plutil -extract runtime.triggerKey raw -o - "$STATUS_JSON" 2>/dev/null || true)"
 fi
-TRIGGER_KEY="${TRIGGER_KEY:-option_space}"
+TRIGGER_KEY="${TRIGGER_KEY:-fn}"
 
 json_value() {
   local path="$1"

@@ -163,7 +163,7 @@ mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=option_space \
+  PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -353,11 +353,12 @@ them:
 - Accessibility is required for real active-field auto-insert. Without it,
   PressTalk should still transcribe and copy, but helper-window or production
   input-method probes are not release proof for arbitrary focused fields.
-- Input Monitoring is not required for the default `Option + Space` registered
-  hotkey path. It is only relevant for modifier-only, trackpad, or legacy
-  trigger paths that report it as required.
+- Input Monitoring is required for the default `Fn / Globe` modifier trigger
+  because it needs a writable event tap. It is also relevant for bare
+  `Option`, trackpad, or legacy trigger paths that report it as required.
+  `Option + Space` remains supported as a registered hotkey path.
 
-Karabiner is not required for the default `Option` path. Do not install or
+Karabiner is not required for the default `Fn / Globe` path. Do not install or
 approve Karabiner during the core smoke unless you are explicitly testing the
 optional legacy `F5` fallback.
 
@@ -383,16 +384,16 @@ PRESSTALK_TRIGGER_KEY=option_space \
 ```
 
 Karabiner is only needed when testing the optional `F5` fallback path. The
-default trigger is `Option + Space`, which uses a registered macOS hotkey rather
-than a modifier-only event tap. `Fn / Globe` remains supported where the
-keyboard emits a normal Fn modifier event, but do not treat an inert Fn key as a
-permission problem.
+default trigger is `Fn / Globe`, which works when the keyboard emits a normal
+Fn modifier event and PressTalk can install a writable event tap. Do not treat
+an inert Fn key as a generic permission problem; inspect runtime status and
+fall back to `Option + Space` if the hardware path is unavailable.
 
 For a fresh machine, keep bootstrap quiet and inspect diagnostics before opening
 any macOS privacy panes manually:
 
 ```bash
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=option_space \
+PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
@@ -401,16 +402,16 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 PRESSTALK_T
 The default LaunchAgent value is:
 
 ```bash
-PRESSTALK_TRIGGER_KEY=option_space
+PRESSTALK_TRIGGER_KEY=fn
 ```
 
 Supported values:
 
+- `fn`
 - `option_space`
 - `option`
 - `left_option`
 - `right_option`
-- `fn`
 - `trackpad_hold`
 - `f5`
 
@@ -488,7 +489,7 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 swift "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-automated-f5-smoke.swift"
 PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=option_space \
+  PRESSTALK_TRIGGER_KEY=fn \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 

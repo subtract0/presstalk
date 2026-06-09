@@ -10,13 +10,12 @@ Production naming:
 - shipped app bundle: `PressTalk.app`
 - app bundle identifier: `com.am.presstalk`
 - product name: `PressTalk`
-- internal launchd/helper identifiers such as `com.am.jarvistap` and
-  `JARVISTAP_*` stay stable for now
+- some legacy helper names such as `JARVISTAP_*` stay stable for now
 - for machines with older working TCC grants, the bootstrap helper can preserve
   the legacy app identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`
 
 Current packaged behavior:
-- hold `Option + Space` by default to bring up the light and start recording
+- hold `Fn / Globe` by default to bring up the light and start recording
 - release the trigger key to finalize transcription with silence-aware tail capture
 - choose `Option + Space`, `Option`, left/right `Option`, `Fn`, `F5`, or trackpad hold from settings
 - moving too far while using the trackpad trigger cancels the capture instead of pasting garbage
@@ -46,7 +45,7 @@ The Homebrew cask runs the bundled bootstrap helper so a fresh Mac lands closer 
 
 - install
 - approve only any fresh macOS prompts that have not already been granted
-- hold `Option + Space` to dictate
+- hold `Fn / Globe` to dictate
 
 Legacy F5 compatibility still ships as an optional helper, but it is no longer the default path:
 
@@ -98,20 +97,20 @@ The launchd installer prefers:
 - `~/Applications/PressTalk.app` if you built locally from source
 - legacy `JarvisTap.app` paths only as migration fallback
 
-That installs `com.am.jarvistap` with these defaults:
+That installs `com.am.presstalk` with these defaults:
 - `JARVISTAP_AGENT_MODE=dictation`
 - `JARVISTAP_WHISPERKIT_MODEL=openai_whisper-large-v3-v20240930_turbo_632MB`
 - `JARVISTAP_WHISPER_LANGUAGE=de`
 - `JARVISTAP_SAY_VOICE=Samantha`
 - `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.35`
-- `PRESSTALK_TRIGGER_KEY=option_space`
+- `PRESSTALK_TRIGGER_KEY=fn`
 
 Supported trigger values:
+- `fn`
 - `option_space`
 - `option`
 - `left_option`
 - `right_option`
-- `fn`
 - `trackpad_hold`
 - `f5`
 
@@ -152,12 +151,15 @@ Product / pricing plan:
 
 ## Logs
 ```bash
-tail -f ~/Library/Logs/jarvistap_trace.log
+tail -f ~/Library/Logs/presstalk_trace.log
 ```
 
 Other runtime logs:
-- `~/Library/Logs/jarvistap.out.log`
-- `~/Library/Logs/jarvistap.err.log`
+- `~/Library/Logs/presstalk.out.log`
+- `~/Library/Logs/presstalk.err.log`
+
+Legacy local bootstrap paths may still write `jarvistap_*` logs when preserving
+an older `com.am.jarvistap` privacy identity.
 
 ## Permissions
 Grant `PressTalk.app`:

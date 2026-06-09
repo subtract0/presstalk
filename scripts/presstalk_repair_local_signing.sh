@@ -25,7 +25,7 @@ Options:
   --app-bundle PATH   PressTalk.app path. Defaults to the bundled app or
                       $DEFAULT_APP_BUNDLE.
   --trigger-key KEY   Trigger to preserve while restarting. Default: current
-                      runtime status, then option_space.
+                      runtime status, then fn.
   --preflight         Report whether repair is needed and whether a signing
                       trust password prompt would be required. Does not repair,
                       create, sign, bootstrap, probe, or open any panes.
@@ -116,7 +116,7 @@ fi
 if [[ -z "$TRIGGER_KEY" && -f "$STATUS_JSON" ]]; then
   TRIGGER_KEY="$(plutil -extract runtime.triggerKey raw -o - "$STATUS_JSON" 2>/dev/null || true)"
 fi
-TRIGGER_KEY="${TRIGGER_KEY:-option_space}"
+TRIGGER_KEY="${TRIGGER_KEY:-fn}"
 
 status_value() {
   local key_path="$1"

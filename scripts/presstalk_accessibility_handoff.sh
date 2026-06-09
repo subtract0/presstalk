@@ -213,9 +213,10 @@ open_accessibility_settings_once() {
 }
 
 write_desktop_command() {
-  local command_path command_dir helper_path tcc_summary next_action
+  local command_path command_dir helper_name helper_path tcc_summary next_action
   command_path="${DESKTOP_COMMAND_PATH:-$HOME/Desktop/Grant PressTalk Accessibility.command}"
   command_dir="$(dirname "$command_path")"
+  helper_name="$(basename "$0")"
   helper_path="$SCRIPT_DIR/$(basename "$0")"
   tcc_summary="$(accessibility_tcc_summary)"
   if [[ "$tcc_summary" == "listed_disabled" ]]; then
@@ -241,7 +242,26 @@ echo "If it is not listed yet, add or enable only PressTalk.app."
 echo "Then return here."
 echo
 
-/bin/bash $(shell_quote "$helper_path") --app-bundle $(shell_quote "$APP_BUNDLE") --trigger-key $(shell_quote "$TRIGGER_KEY") --prompt
+APP_BUNDLE=$(shell_quote "$APP_BUNDLE")
+HELPER_PATH=$(shell_quote "$helper_path")
+HELPER_NAME=$(shell_quote "$helper_name")
+CANONICAL_HELPER_NAME="presstalk-accessibility-handoff.sh"
+if [[ ! -d "\$APP_BUNDLE" && -d "\$HOME/Applications/PressTalk.app" ]]; then
+  APP_BUNDLE="\$HOME/Applications/PressTalk.app"
+fi
+if [[ ! -x "\$HELPER_PATH" && -x "\$APP_BUNDLE/Contents/Resources/\$HELPER_NAME" ]]; then
+  HELPER_PATH="\$APP_BUNDLE/Contents/Resources/\$HELPER_NAME"
+fi
+if [[ ! -x "\$HELPER_PATH" && -x "\$APP_BUNDLE/Contents/Resources/\$CANONICAL_HELPER_NAME" ]]; then
+  HELPER_PATH="\$APP_BUNDLE/Contents/Resources/\$CANONICAL_HELPER_NAME"
+fi
+if [[ ! -x "\$HELPER_PATH" ]]; then
+  echo "Missing PressTalk Accessibility helper: \$HELPER_PATH" >&2
+  echo "Resolved app bundle: \$APP_BUNDLE" >&2
+  exit 127
+fi
+
+/bin/bash "\$HELPER_PATH" --app-bundle "\$APP_BUNDLE" --trigger-key $(shell_quote "$TRIGGER_KEY") --prompt
 
 echo
 echo "After enabling PressTalk in Accessibility, press Return to run"
@@ -249,7 +269,7 @@ echo "the insertion probe and verifier. If you did not change anything,"
 echo "press Return anyway; the result will say what is still missing."
 read -r _
 
-/bin/bash $(shell_quote "$helper_path") --app-bundle $(shell_quote "$APP_BUNDLE") --trigger-key $(shell_quote "$TRIGGER_KEY") --probe
+/bin/bash "\$HELPER_PATH" --app-bundle "\$APP_BUNDLE" --trigger-key $(shell_quote "$TRIGGER_KEY") --probe
 status=\$?
 
 echo

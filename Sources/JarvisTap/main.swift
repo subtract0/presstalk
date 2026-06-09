@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import AVFoundation
 import Carbon.HIToolbox
+import CoreAudio
 import CoreML
 import Darwin
 import Foundation
@@ -1135,6 +1136,57 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private struct AudioInputDeviceCandidate {
+        let id: AudioDeviceID
+        let name: String
+        let inputChannels: UInt32
+        let isDefault: Bool
+        let transportType: UInt32?
+
+        var transportDescription: String {
+            guard let transportType else { return "unknown" }
+            switch transportType {
+            case kAudioDeviceTransportTypeUSB:
+                return "usb"
+            case kAudioDeviceTransportTypeBluetooth:
+                return "bluetooth"
+            case kAudioDeviceTransportTypeBluetoothLE:
+                return "bluetooth_le"
+            case kAudioDeviceTransportTypeBuiltIn:
+                return "built_in"
+            case kAudioDeviceTransportTypeVirtual:
+                return "virtual"
+            default:
+                return "\(transportType)"
+            }
+        }
+
+        var isBluetoothLike: Bool {
+            let lowercasedName = name.lowercased()
+            return transportType == kAudioDeviceTransportTypeBluetooth ||
+                transportType == kAudioDeviceTransportTypeBluetoothLE ||
+                lowercasedName.contains("airpods") ||
+                lowercasedName.contains("bluetooth")
+        }
+
+        var selectionScore: Int {
+            let lowercasedName = name.lowercased()
+            var score = 0
+            if lowercasedName.contains("shure") { score += 120 }
+            if lowercasedName.contains("mv7") { score += 80 }
+            if transportType == kAudioDeviceTransportTypeUSB { score += 55 }
+            if transportType == kAudioDeviceTransportTypeBuiltIn { score += 20 }
+            if transportType == kAudioDeviceTransportTypeVirtual { score -= 15 }
+            if lowercasedName.contains("camo") { score -= 20 }
+            if lowercasedName.contains("zoom") { score -= 35 }
+            if lowercasedName.contains("iphone") { score -= 25 }
+            if isBluetoothLike { score -= 140 }
+            if isDefault { score += isBluetoothLike ? -40 : 20 }
+            score += min(Int(inputChannels), 4)
+            return score
+        }
+    }
+
     private let config = JarvisTapConfig.load()
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
@@ -1219,6 +1271,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
+    private var activeAudioInputDeviceDescription = "unknown"
 
     private var statusItem: NSStatusItem?
     private var statusSummaryMenuItem: NSMenuItem?
@@ -4600,6 +4653,152 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return (sqrt(sumSquares / Double(samples.count)), peak)
     }
 
+    private func coreAudioStringProperty(
+        objectID: AudioObjectID,
+        selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal
+    ) -> String? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: scope,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: CFString = "" as CFString
+        var size = UInt32(MemoryLayout<CFString>.size)
+        let status = withUnsafeMutablePointer(to: &value) { pointer in
+            AudioObjectGetPropertyData(objectID, &address, 0, nil, &size, pointer)
+        }
+        guard status == noErr else { return nil }
+        return value as String
+    }
+
+    private func coreAudioUInt32Property(
+        objectID: AudioObjectID,
+        selector: AudioObjectPropertySelector,
+        scope: AudioObjectPropertyScope = kAudioObjectPropertyScopeGlobal
+    ) -> UInt32? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: scope,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var value: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        let status = AudioObjectGetPropertyData(objectID, &address, 0, nil, &size, &value)
+        guard status == noErr else { return nil }
+        return value
+    }
+
+    private func defaultCoreAudioInputDeviceID() -> AudioDeviceID? {
+        coreAudioUInt32Property(
+            objectID: AudioObjectID(kAudioObjectSystemObject),
+            selector: kAudioHardwarePropertyDefaultInputDevice
+        ).map { AudioDeviceID($0) }
+    }
+
+    private func coreAudioInputChannelCount(for deviceID: AudioDeviceID) -> UInt32 {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyStreamConfiguration,
+            mScope: kAudioDevicePropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var propertySize: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(deviceID, &address, 0, nil, &propertySize) == noErr,
+              propertySize > 0
+        else {
+            return 0
+        }
+
+        let bufferListPointer = UnsafeMutableRawPointer.allocate(
+            byteCount: Int(propertySize),
+            alignment: MemoryLayout<AudioBufferList>.alignment
+        )
+        defer { bufferListPointer.deallocate() }
+
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &propertySize, bufferListPointer) == noErr else {
+            return 0
+        }
+
+        let bufferList = UnsafeMutableAudioBufferListPointer(
+            bufferListPointer.assumingMemoryBound(to: AudioBufferList.self)
+        )
+        return bufferList.reduce(UInt32(0)) { total, buffer in
+            total + buffer.mNumberChannels
+        }
+    }
+
+    private func coreAudioInputDevices() -> [AudioInputDeviceCandidate] {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDevices,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var propertySize: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize
+        ) == noErr, propertySize > 0 else {
+            return []
+        }
+
+        let deviceCount = Int(propertySize) / MemoryLayout<AudioDeviceID>.size
+        var deviceIDs = [AudioDeviceID](repeating: 0, count: deviceCount)
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            &propertySize,
+            &deviceIDs
+        ) == noErr else {
+            return []
+        }
+
+        let defaultInputID = defaultCoreAudioInputDeviceID()
+        return deviceIDs.compactMap { deviceID -> AudioInputDeviceCandidate? in
+            let inputChannels = coreAudioInputChannelCount(for: deviceID)
+            guard inputChannels > 0 else { return nil }
+            let name = coreAudioStringProperty(objectID: deviceID, selector: kAudioObjectPropertyName) ?? "Audio Device \(deviceID)"
+            let transportType = coreAudioUInt32Property(
+                objectID: deviceID,
+                selector: kAudioDevicePropertyTransportType
+            )
+            return AudioInputDeviceCandidate(
+                id: deviceID,
+                name: name,
+                inputChannels: inputChannels,
+                isDefault: defaultInputID == deviceID,
+                transportType: transportType
+            )
+        }
+    }
+
+    private func preferredAudioInputDevice() -> AudioInputDeviceCandidate? {
+        let candidates = coreAudioInputDevices()
+        guard !candidates.isEmpty else {
+            traceLogger.log("Audio input selection unavailable reason=no_input_devices")
+            return nil
+        }
+
+        let rankedCandidates = candidates.sorted {
+            if $0.selectionScore == $1.selectionScore {
+                return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+            }
+            return $0.selectionScore > $1.selectionScore
+        }
+        let selected = rankedCandidates[0]
+        let summary = rankedCandidates.map { candidate in
+            "\(candidate.name.replacingOccurrences(of: " ", with: "_")):score=\(candidate.selectionScore):channels=\(candidate.inputChannels):transport=\(candidate.transportDescription):default=\(candidate.isDefault ? 1 : 0)"
+        }.joined(separator: ",")
+        traceLogger.log(
+            "Audio input selected id=\(selected.id) name=\(selected.name) transport=\(selected.transportDescription) channels=\(selected.inputChannels) default=\(selected.isDefault ? 1 : 0) score=\(selected.selectionScore) candidates=\(summary)"
+        )
+        return selected
+    }
+
     private func normalizedAudioSamples(_ samples: [Float]) -> ([Float], Double) {
         let stats = audioLevelStats(for: samples)
         guard stats.peak > 0 else { return (samples, 1.0) }
@@ -4846,9 +5045,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         pasteboard.setString(preparedTranscript, forType: .string)
     }
 
+    private func runTISOperationOnMainThread<T>(_ operation: () -> T) -> T {
+        if Thread.isMainThread {
+            return operation()
+        }
+
+        var result: T?
+        DispatchQueue.main.sync {
+            result = operation()
+        }
+        return result!
+    }
+
     private func inputSourceProperty(_ source: TISInputSource, _ key: CFString) -> Any? {
-        guard let unmanaged = TISGetInputSourceProperty(source, key) else { return nil }
-        return Unmanaged<AnyObject>.fromOpaque(unmanaged).takeUnretainedValue()
+        runTISOperationOnMainThread {
+            guard let unmanaged = TISGetInputSourceProperty(source, key) else { return nil }
+            return Unmanaged<AnyObject>.fromOpaque(unmanaged).takeUnretainedValue()
+        }
     }
 
     private func inputSourceStringProperty(_ source: TISInputSource, _ key: CFString) -> String? {
@@ -4875,12 +5088,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func inputSourceList(properties: CFDictionary?, includeAllInstalled: Bool) -> [TISInputSource] {
-        guard let list = TISCreateInputSourceList(properties, includeAllInstalled) else {
-            return []
-        }
-        return (list.takeRetainedValue() as NSArray as Array).compactMap { object in
-            guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { return nil }
-            return (object as! TISInputSource)
+        runTISOperationOnMainThread {
+            guard let list = TISCreateInputSourceList(properties, includeAllInstalled) else {
+                return []
+            }
+            return (list.takeRetainedValue() as NSArray as Array).compactMap { object in
+                guard CFGetTypeID(object as CFTypeRef) == TISInputSourceGetTypeID() else { return nil }
+                return (object as! TISInputSource)
+            }
         }
     }
 
@@ -5101,18 +5316,26 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func insertPreparedTranscriptUsingInputMethod(_ preparedTranscript: String) -> String? {
+    private func insertPreparedTranscriptUsingInputMethod(
+        _ preparedTranscript: String,
+        maxAttempts: Int = 3
+    ) -> String? {
         guard let bundleURL = ensureInputMethodInstalledForInsertion() else {
             return nil
         }
 
-        let registerStatus = TISRegisterInputSource(bundleURL as CFURL)
+        let clampedMaxAttempts = min(max(maxAttempts, 1), 3)
+        let registerStatus = runTISOperationOnMainThread {
+            TISRegisterInputSource(bundleURL as CFURL)
+        }
         guard registerStatus == 0 else {
             traceLogger.log("Input method insertion unavailable reason=register_failed status=\(registerStatus)")
             return nil
         }
 
-        let originalSource = TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        let originalSource = runTISOperationOnMainThread {
+            TISCopyCurrentKeyboardInputSource().takeRetainedValue()
+        }
         let enabledBeforeKeys = Set(pressTalkInputMethodSources(includeAllInstalled: false).map(inputSourceIdentityKey))
         var allSources = pressTalkInputMethodSources(includeAllInstalled: true)
         guard let candidate = preferredPressTalkInputMethodSource(from: allSources) else {
@@ -5126,7 +5349,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 let key = inputSourceIdentityKey(source)
                 guard !enabledBeforeKeys.contains(key), !disabled.contains(key) else { continue }
                 disabled.insert(key)
-                let disableStatus = TISDisableInputSource(source)
+                let disableStatus = runTISOperationOnMainThread {
+                    TISDisableInputSource(source)
+                }
                 if disableStatus != 0 {
                     traceLogger.log("Input method insertion disable failed status=\(disableStatus)")
                 }
@@ -5135,7 +5360,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let candidateWasEnabledBefore = enabledBeforeKeys.contains(inputSourceIdentityKey(candidate))
         if !candidateWasEnabledBefore {
-            let enableStatus = TISEnableInputSource(candidate)
+            let enableStatus = runTISOperationOnMainThread {
+                TISEnableInputSource(candidate)
+            }
             guard enableStatus == 0 else {
                 traceLogger.log("Input method insertion unavailable reason=enable_failed status=\(enableStatus)")
                 return nil
@@ -5157,7 +5384,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "Input method insertion source state enabled_count=\(allSources.count) all_installed_count=\(allInstalledCountAfterEnable) selected_candidate=\(selectableSourceID)"
         )
 
-        let selectStatus = TISSelectInputSource(enabledSource)
+        let selectStatus = runTISOperationOnMainThread {
+            TISSelectInputSource(enabledSource)
+        }
         guard selectStatus == 0 else {
             let reason = enableNoEffect ? "enable_no_effect" : "select_failed"
             traceLogger.log("Input method insertion unavailable reason=\(reason) status=\(selectStatus)")
@@ -5165,7 +5394,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
         defer {
-            let restoreStatus = TISSelectInputSource(originalSource)
+            let restoreStatus = runTISOperationOnMainThread {
+                TISSelectInputSource(originalSource)
+            }
             if restoreStatus != 0 {
                 traceLogger.log("Input method insertion restore failed status=\(restoreStatus)")
             }
@@ -5212,7 +5443,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        for attempt in 1...3 {
+        for attempt in 1...clampedMaxAttempts {
             Thread.sleep(forTimeInterval: attempt == 1 ? 0.75 : 0.35)
             postInsertionNotification(attempt: attempt)
             Thread.sleep(forTimeInterval: 0.25)
@@ -5229,14 +5460,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 return nil
             }
 
-            guard attempt < 3 else { break }
+            guard attempt < clampedMaxAttempts else { break }
             traceLogger.log("Input method insertion acknowledgement retrying reason=input_method_ack_timeout attempt=\(attempt)")
-            let restoreStatus = TISSelectInputSource(originalSource)
+            let restoreStatus = runTISOperationOnMainThread {
+                TISSelectInputSource(originalSource)
+            }
             if restoreStatus != 0 {
                 traceLogger.log("Input method insertion retry restore failed status=\(restoreStatus)")
             }
             Thread.sleep(forTimeInterval: 0.2)
-            let reselectStatus = TISSelectInputSource(enabledSource)
+            let reselectStatus = runTISOperationOnMainThread {
+                TISSelectInputSource(enabledSource)
+            }
             if reselectStatus != 0 {
                 traceLogger.log("Input method insertion unavailable reason=retry_select_failed status=\(reselectStatus)")
                 return nil
@@ -5355,19 +5590,33 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         guard AXIsProcessTrusted() else {
+            let copiedBeforeFallback = context == .dictation
+            if copiedBeforeFallback {
+                copyPreparedTranscriptToPasteboard(preparedTranscript)
+                traceLogger.log("Accessibility preflight unavailable; copied transcript before input method fallback")
+            }
+
             if context == .dictation, let recentFailure = recentInputMethodInsertionFailure() {
                 let fallbackReason = copiedFallbackReason(for: recentFailure)
                 traceLogger.log(
                     "Accessibility preflight unavailable and input method insertion skipped reason=recent_\(recentFailure.reason); copying transcript"
                 )
-                copyPreparedTranscriptToPasteboard(preparedTranscript)
+                if !copiedBeforeFallback {
+                    copyPreparedTranscriptToPasteboard(preparedTranscript)
+                }
                 return .copiedFallback(reason: fallbackReason)
             }
-            if let method = insertPreparedTranscriptUsingInputMethod(preparedTranscript) {
+            let maxInputMethodAttempts = context == .productionProbe ? 3 : 1
+            if let method = insertPreparedTranscriptUsingInputMethod(
+                preparedTranscript,
+                maxAttempts: maxInputMethodAttempts
+            ) {
                 return .inserted(method: method)
             }
             traceLogger.log("Accessibility preflight unavailable and input method insertion unavailable; copying transcript")
-            copyPreparedTranscriptToPasteboard(preparedTranscript)
+            if !copiedBeforeFallback {
+                copyPreparedTranscriptToPasteboard(preparedTranscript)
+            }
             return .copiedFallback(reason: "accessibility_preflight_unavailable")
         }
 
@@ -5514,17 +5763,27 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Trackpad prearm capture started")
         }
 
-        let transcriber = streamTranscriber
+        let selectedAudioInput = preferredAudioInputDevice()
+        let selectedAudioInputDescription = selectedAudioInput.map {
+            "\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)]"
+        } ?? "system default"
+        withStateLock {
+            activeAudioInputDeviceDescription = selectedAudioInputDescription
+        }
+        let whisperKit = self.whisperKit
         let traceLogger = self.traceLogger
         let task = Task(priority: .userInitiated) { [self] in
-            guard let transcriber else { return }
+            guard let whisperKit else { return }
             do {
-                traceLogger.log(announce ? "Audio recording started" : "Audio recording started (prearm)")
-                traceLogger.log("Live stream task started")
-                try await transcriber.startStreamTranscription()
-                traceLogger.log("Live stream task finished")
+                traceLogger.log(
+                    announce
+                        ? "Audio recording started mode=direct input_device=\(selectedAudioInputDescription)"
+                        : "Audio recording started mode=direct input_device=\(selectedAudioInputDescription) (prearm)"
+                )
+                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id, callback: nil)
+                traceLogger.log("Audio recording engine started mode=direct")
             } catch {
-                traceLogger.log("Streaming transcription failed error=\(error)")
+                traceLogger.log("Audio recording failed mode=direct error=\(error)")
                 self.withStateLock {
                     self.isRecording = false
                     self.activeTrigger = nil
@@ -5534,8 +5793,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
                 self.stopAmplitudeMonitoring()
                 if announce {
-                    self.present(.error("The live capture stream failed."))
-                    fputs("[PressTalk] Streaming transcription failed: \(error)\n", stderr)
+                    self.present(.error("The audio capture stream failed."))
+                    fputs("[PressTalk] Audio recording failed: \(error)\n", stderr)
                 }
             }
         }
@@ -5624,9 +5883,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 let normalizedResult = normalizedAudioSamples(capturedAudioSamples)
                 normalizedSamples = normalizedResult.0
                 let normalizedStats = audioLevelStats(for: normalizedSamples)
+                let audioInputDescription = withStateLock { activeAudioInputDeviceDescription }
                 traceLogger.log(
-                    "Audio capture frozen samples=\(capturedAudioSamples.count) duration_seconds=\(String(format: "%.2f", frozenAudioDurationSeconds)) rms=\(String(format: "%.5f", capturedSignalStats.rms)) peak=\(String(format: "%.5f", capturedSignalStats.peak))"
+                    "Audio capture frozen samples=\(capturedAudioSamples.count) duration_seconds=\(String(format: "%.2f", frozenAudioDurationSeconds)) rms=\(String(format: "%.5f", capturedSignalStats.rms)) peak=\(String(format: "%.5f", capturedSignalStats.peak)) input_device=\(audioInputDescription)"
                 )
+                if capturedAudioSamples.isEmpty {
+                    traceLogger.log("Audio capture unavailable reason=no_buffers input_device=\(audioInputDescription)")
+                }
                 traceLogger.log(
                     "Audio normalization gain=\(String(format: "%.2f", normalizedResult.1)) normalized_rms=\(String(format: "%.5f", normalizedStats.rms)) normalized_peak=\(String(format: "%.5f", normalizedStats.peak))"
                 )

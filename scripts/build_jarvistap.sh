@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="$ROOT"
 OUT_DIR="$PKG_DIR/bin"
 OUT_BIN="$OUT_DIR/jarvistap"
-APP_BUNDLE="$HOME/Applications/PressTalk.app"
+DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk.app"
+APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-$DEFAULT_APP_BUNDLE}"
 LEGACY_APP_BUNDLE="$HOME/Applications/JarvisTap.app"
 APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
 APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
@@ -176,7 +177,7 @@ fi
 codesign "${codesign_args[@]}" --identifier "$APP_BUNDLE_IDENTIFIER" "$APP_MACOS_DIR/jarvistap"
 codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
-if [[ -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
+if [[ "$APP_BUNDLE" == "$DEFAULT_APP_BUNDLE" && -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
   rm -rf "$LEGACY_APP_BUNDLE"
 fi
 

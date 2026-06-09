@@ -1,8 +1,8 @@
 # Release Status
 
-Current status: local `main` has downgraded the input-method insertion route to
-probe-only for normal dictation after the 2026-06-09 real-field Option+Space
-test; full cross-machine release not yet proven.
+Current status: local `main` has proven real-field Option+Space dictation
+auto-insert on `studio1` through the Accessibility menu-paste path; full
+cross-machine release is not yet proven.
 
 Latest local evidence:
 
@@ -19,6 +19,13 @@ Latest local evidence:
   reports `success=true`, `targetCaptureSuccess=true`, and
   `traceProductionMethod=ax_menu_paste`. The verifier exits `0` with
   `Result: proven` for this menu-paste path.
+- On 2026-06-09 at 12:45 local time, Alex focused a real text field on
+  `studio1`, held Option+Space, said "A short phrase", released, and reported
+  that it auto-inserted correctly without Cmd+V. The trace confirms the same
+  run: `Primary offline Whisper transcript: A short phrase.`,
+  `Paste menu pressed target_pid=39451`, and
+  `Dictation inserted method=ax_menu_paste`. This closes the local insertion
+  transport blocker for the current signed app.
 - On 2026-06-09, Alex focused a real text field on `studio1`, held
   Option+Space, said "Does it work now?" three times, and released each time.
   PressTalk heard the trigger, selected the Shure/MV7 audio input, transcribed
@@ -40,9 +47,20 @@ Public prerelease:
 - URL: `https://github.com/subtract0/presstalk/releases/tag/v0.1.5-rc102`
 - Asset: `PressTalk-0.1.5-rc102-macos-arm64.zip`
 - SHA-256: `1112931886fc9c167fed623b1827c1e09c47773da4c10d55f49d2fe6fef3d514`
+- Note: rc102 predates the `ax_menu_paste` real-field fix. The next public
+  prerelease must be rc103 or newer before cross-machine retesting.
 
 Verified on `studio1` during 2026-06-06 through 2026-06-09:
 
+- Local source commit `3d95bb7` uses Accessibility to press the focused app's
+  Paste menu item for trusted insertion, with targeted Cmd+V and direct AX text
+  writes only as backups. The latest local readiness report at
+  `~/Desktop/presstalk-readiness-local-after-ax-menu-paste.json` reports
+  `PhysicalSTTSmokeReady=true` and `ActiveFieldSmokeReady=true`. The matching
+  readiness matrix at
+  `~/Desktop/presstalk-readiness-matrix-after-ax-menu-paste.json` reports local
+  ready, `s1` / `s1.local` unresolved, `mbp1-tb` reachable but
+  `active=false`, and `studio2` excluded until a microphone is attached.
 - `v0.1.5-rc102` is the current public prerelease smoke artifact. It handles the
   terminal/text-field blue input-source badge failure by making the input-method
   helper write an acknowledgement failure reason (`no_active_controller` or
@@ -2035,7 +2053,12 @@ Known current proof gaps:
 
 Do not claim full release coverage until these are recorded:
 
-- `studio1`: physical Fn dictation and paste smoke.
-- `s1`: install plus Fn dictation smoke.
-- `s2`: install plus Fn dictation smoke after a microphone is available.
+- `studio1`: local Option+Space dictation and real-field paste smoke is proven
+  on 2026-06-09 through `ax_menu_paste`; rerun the bundled physical smoke helper
+  only if a fresh machine-readable JSON artifact is required for the final
+  release gate.
+- `s1`: host resolution or SSH alias setup, install, then Option+Space
+  dictation and paste smoke.
+- `s2`: install plus Option+Space dictation smoke after a microphone is
+  available.
 - `mbp1`: M1 Max physical Fn or Option dictation and paste smoke.

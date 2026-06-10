@@ -121,6 +121,11 @@ Current tooling update after that run:
   combined release-readiness JSON. It does not install PressTalk, open System
   Settings, upload assets, or SSH into any machine except hosts explicitly
   passed with `--host` / `--hosts`.
+- `scripts/presstalk_release_proof_gate.sh` now treats missing or `unknown`
+  ASR backend/mode evidence as not proven. A stale installed app can still be
+  physically usable, but it cannot count as release proof until its
+  `runtime-status.json` records the active ASR backend, ASR mode, and realtime
+  partial-transcription state.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

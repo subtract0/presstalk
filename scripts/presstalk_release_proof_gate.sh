@@ -12,7 +12,7 @@ Usage: presstalk-release-proof-gate.sh --matrix PATH --require TARGET [options]
 
 Checks a presstalk-readiness-matrix JSON file and exits 0 only when every
 required target is reachable, reports readiness, has physical STT smoke ready,
-and has active-field smoke ready.
+has active-field smoke ready, and records current ASR backend/mode evidence.
 
 Options:
   --matrix PATH        Matrix JSON from presstalk-readiness-matrix.sh.
@@ -231,6 +231,21 @@ for required in "${REQUIRED_TARGETS[@]}"; do
       echo "  nextAction: $next_action"
     fi
     /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string active_field_not_ready" "$RESULT_PLIST" >/dev/null
+    target_failures=$((target_failures + 1))
+  fi
+  if [[ -z "$asr_backend" || "$asr_backend" == "unknown" ]]; then
+    echo "FAIL $required: asrBackend=${asr_backend:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string asr_backend_missing" "$RESULT_PLIST" >/dev/null
+    target_failures=$((target_failures + 1))
+  fi
+  if [[ -z "$asr_mode" || "$asr_mode" == "unknown" ]]; then
+    echo "FAIL $required: asrMode=${asr_mode:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string asr_mode_missing" "$RESULT_PLIST" >/dev/null
+    target_failures=$((target_failures + 1))
+  fi
+  if [[ -z "$realtime_partial_transcription_enabled" || "$realtime_partial_transcription_enabled" == "unknown" ]]; then
+    echo "FAIL $required: realtimePartialTranscriptionEnabled=${realtime_partial_transcription_enabled:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string realtime_partial_transcription_state_missing" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
 

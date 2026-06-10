@@ -125,6 +125,42 @@ if [[ "$(plutil -extract targets.1.failures.0 raw -o - "$blocked_json")" != "act
   exit 1
 fi
 
+unknown_asr_matrix="$TEST_TMPDIR/unknown-asr.json"
+cat >"$unknown_asr_matrix" <<'JSON'
+{
+  "schemaVersion": 1,
+  "targets": [
+    {
+      "target": "local",
+      "status": "ready_reported",
+      "reachable": true,
+      "summary": {
+        "machineHost": "studio1",
+        "asrBackend": "unknown",
+        "asrMode": "unknown",
+        "realtimePartialTranscriptionEnabled": "unknown",
+        "physicalSTTSmokeReady": true,
+        "activeFieldSmokeReady": true,
+        "nextAction": "Install or restart a current PressTalk build that writes ASR mode evidence."
+      }
+    }
+  ]
+}
+JSON
+unknown_asr_output="$TEST_TMPDIR/unknown-asr.txt"
+unknown_asr_json="$TEST_TMPDIR/unknown-asr-result.json"
+if "$GATE" --matrix "$unknown_asr_matrix" --require studio1 --json-output "$unknown_asr_json" >"$unknown_asr_output"; then
+  echo "FAIL: unknown ASR matrix unexpectedly passed"
+  cat "$unknown_asr_output"
+  exit 1
+fi
+grep -Fq "asrBackend=unknown" "$unknown_asr_output"
+grep -Fq "asrMode=unknown" "$unknown_asr_output"
+grep -Fq "realtimePartialTranscriptionEnabled=unknown" "$unknown_asr_output"
+grep -Fq "asr_backend_missing" "$unknown_asr_json"
+grep -Fq "asr_mode_missing" "$unknown_asr_json"
+grep -Fq "realtime_partial_transcription_state_missing" "$unknown_asr_json"
+
 missing_output="$TEST_TMPDIR/missing.txt"
 if "$GATE" --matrix "$pass_matrix" --require s1 >"$missing_output"; then
   echo "FAIL: missing required target unexpectedly passed"

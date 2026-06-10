@@ -157,6 +157,10 @@ install PressTalk, open System Settings, upload a release, or SSH anywhere
 except hosts supplied with `--host` / `--hosts`. Passing and failing runs both
 write `PressTalk-<version>-candidate-preflight.json`; failed runs include the
 failed step and exit status so target-machine blockers remain machine-readable.
+When explicit hosts are supplied, it also writes
+`PressTalk-<version>-host-discovery.json` with read-only SSH config, Bonjour,
+Tailscale, and strict BatchMode SSH probe evidence for those hosts. ARP scanning
+is disabled in that wrapper path by default.
 
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.

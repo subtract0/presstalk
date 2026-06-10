@@ -16,11 +16,14 @@ EXCLUDED_HOSTS=()
 EXCLUDED_HOST_COUNT=0
 JSON_OUTPUT_PATH=""
 REQUIRE_PRODUCTION=0
+RUN_HOST_DISCOVERY=1
+HOST_DISCOVERY_TIMEOUT="${PRESSTALK_CANDIDATE_HOST_DISCOVERY_TIMEOUT:-3}"
 
 PUBLISH_SCRIPT="${PRESSTALK_PUBLISH_HOMEBREW_SCRIPT:-$SCRIPT_DIR/publish_presstalk_homebrew.sh}"
 MATRIX_SCRIPT="${PRESSTALK_READINESS_MATRIX_SCRIPT:-$SCRIPT_DIR/presstalk_readiness_matrix.sh}"
 PROOF_GATE_SCRIPT="${PRESSTALK_RELEASE_PROOF_GATE_SCRIPT:-$SCRIPT_DIR/presstalk_release_proof_gate.sh}"
 READINESS_PREFLIGHT_SCRIPT="${PRESSTALK_RELEASE_READINESS_PREFLIGHT_SCRIPT:-$SCRIPT_DIR/presstalk_release_readiness_preflight.sh}"
+HOST_DISCOVERY_SCRIPT="${PRESSTALK_HOST_DISCOVERY_SCRIPT:-$SCRIPT_DIR/presstalk_host_discovery.sh}"
 
 usage() {
   cat <<'EOF'
@@ -44,6 +47,9 @@ Options:
   --exclude-host HOST=WHY Record an intentionally excluded host.
   --require TARGET        Required target alias, host, or machineHost for proof.
                           May be repeated. Defaults to selected targets.
+  --skip-host-discovery   Skip read-only host discovery before matrix collection.
+  --host-discovery-timeout SECONDS
+                          Timeout for host discovery SSH/Bonjour checks.
   --require-production    Require production signing/notarization in final
                           readiness preflight.
   --json-output PATH      Write machine-readable wrapper summary.
@@ -113,6 +119,18 @@ while [[ $# -gt 0 ]]; do
       fi
       REQUIRED_TARGETS+=("$2")
       REQUIRED_TARGET_COUNT=$((REQUIRED_TARGET_COUNT + 1))
+      shift 2
+      ;;
+    --skip-host-discovery)
+      RUN_HOST_DISCOVERY=0
+      shift
+      ;;
+    --host-discovery-timeout)
+      HOST_DISCOVERY_TIMEOUT="${2:-}"
+      if [[ -z "$HOST_DISCOVERY_TIMEOUT" || ! "$HOST_DISCOVERY_TIMEOUT" =~ ^[0-9]+$ || "$HOST_DISCOVERY_TIMEOUT" -eq 0 ]]; then
+        echo "Invalid value for --host-discovery-timeout" >&2
+        exit 2
+      fi
       shift 2
       ;;
     --require-production)
@@ -188,6 +206,19 @@ required_targets_csv() {
   printf '%s\n' "$joined"
 }
 
+hosts_csv() {
+  local joined="" host
+  if [[ "$HOST_COUNT" -gt 0 ]]; then
+    for host in "${HOSTS[@]}"; do
+      if [[ -n "$joined" ]]; then
+        joined+=","
+      fi
+      joined+="$host"
+    done
+  fi
+  printf '%s\n' "$joined"
+}
+
 write_wrapper_summary() {
   local passed="$1"
   local failure_step="${2:-}"
@@ -199,6 +230,7 @@ write_wrapper_summary() {
   plutil -insert schemaVersion -string "1" "$result_plist" >/dev/null
   plutil -insert version -string "$VERSION" "$result_plist" >/dev/null
   plutil -insert distDir -string "$DIST_DIR" "$result_plist" >/dev/null
+  plutil -insert hostDiscoveryJSON -string "$HOST_DISCOVERY_JSON" "$result_plist" >/dev/null
   plutil -insert readinessMatrixJSON -string "$MATRIX_JSON" "$result_plist" >/dev/null
   plutil -insert proofGateJSON -string "$PROOF_GATE_JSON" "$result_plist" >/dev/null
   plutil -insert artifactAuditJSON -string "$ARTIFACT_AUDIT_JSON" "$result_plist" >/dev/null
@@ -225,6 +257,7 @@ write_wrapper_summary() {
 mkdir -p "$DIST_DIR"
 
 MATRIX_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-readiness-matrix.json"
+HOST_DISCOVERY_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-host-discovery.json"
 PROOF_GATE_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-proof-gate.json"
 ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
@@ -249,6 +282,27 @@ echo "PressTalk release candidate preflight"
 echo "Version: $VERSION"
 echo "DistDir: $DIST_DIR"
 echo
+
+if [[ "$HOST_COUNT" -gt 0 && "$RUN_HOST_DISCOVERY" -eq 1 ]]; then
+  echo "Collecting host discovery..."
+  set +e
+  "/bin/bash" "$HOST_DISCOVERY_SCRIPT" \
+    --targets "$(hosts_csv)" \
+    --probe-ssh \
+    --timeout "$HOST_DISCOVERY_TIMEOUT" \
+    --no-arp \
+    --json-output "$HOST_DISCOVERY_JSON"
+  host_discovery_status=$?
+  set -e
+  if [[ "$host_discovery_status" -ne 0 ]]; then
+    write_wrapper_summary false "host_discovery" "$host_discovery_status"
+    echo
+    echo "CandidatePreflightJSON: $WRAPPER_JSON"
+    echo "Result: fail"
+    exit "$host_discovery_status"
+  fi
+  echo
+fi
 
 echo "Collecting readiness matrix..."
 set +e

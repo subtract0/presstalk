@@ -8,6 +8,7 @@ trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 fake_matrix="$TEST_TMPDIR/fake-readiness-matrix.sh"
 fake_publish="$TEST_TMPDIR/fake-publish-homebrew.sh"
+fake_host_discovery="$TEST_TMPDIR/fake-host-discovery.sh"
 
 cat >"$fake_matrix" <<'SH'
 #!/usr/bin/env bash
@@ -137,6 +138,71 @@ echo "ReadinessJSON: $dist_dir/${public_name}-${version}-macos-${arch}-release-r
 SH
 chmod +x "$fake_publish"
 
+cat >"$fake_host_discovery" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+
+targets=""
+json_output=""
+probe_ssh=0
+no_arp=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --targets)
+      targets="${2:-}"
+      shift 2
+      ;;
+    --probe-ssh)
+      probe_ssh=1
+      shift
+      ;;
+    --timeout)
+      shift 2
+      ;;
+    --no-arp)
+      no_arp=1
+      shift
+      ;;
+    --json-output)
+      json_output="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "Unexpected fake host discovery argument: $1" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$targets" || -z "$json_output" ]]; then
+  echo "Fake host discovery expected targets and JSON output" >&2
+  exit 2
+fi
+if [[ "$probe_ssh" -ne 1 || "$no_arp" -ne 1 ]]; then
+  echo "Fake host discovery expected probe SSH with ARP disabled" >&2
+  exit 2
+fi
+
+mkdir -p "$(dirname "$json_output")"
+cat >"$json_output" <<JSON
+{
+  "schemaVersion": "1",
+  "targets": [
+    {
+      "target": "$targets",
+      "sshProbe": {
+        "enabled": true,
+        "success": true
+      }
+    }
+  ],
+  "arpEnabled": false
+}
+JSON
+echo "Fake host discovery wrote $json_output"
+SH
+chmod +x "$fake_host_discovery"
+
 pass_dist="$TEST_TMPDIR/pass-dist"
 pass_summary="$TEST_TMPDIR/pass-summary.json"
 pass_output="$TEST_TMPDIR/pass-output.txt"
@@ -152,6 +218,10 @@ test -f "$pass_dist/PressTalk-0.0-candidate-proof-gate.json"
 test -f "$pass_dist/PressTalk-0.0-candidate-macos-arm64-artifact-audit.json"
 test -f "$pass_dist/PressTalk-0.0-candidate-macos-arm64-release-readiness.json"
 test -f "$pass_dist/fake-publish-ran.txt"
+if [[ -f "$pass_dist/PressTalk-0.0-candidate-host-discovery.json" ]]; then
+  echo "FAIL: host discovery should not run when no hosts are supplied"
+  exit 1
+fi
 if [[ "$(plutil -extract passed raw -o - "$pass_summary")" != "true" ||
       "$(plutil -extract version raw -o - "$pass_summary")" != "0.0-candidate" ]]; then
   echo "FAIL: candidate preflight summary mismatch"
@@ -161,6 +231,26 @@ fi
 if [[ "$(plutil -extract proven raw -o - "$pass_dist/PressTalk-0.0-candidate-proof-gate.json")" != "true" ]]; then
   echo "FAIL: proof gate should be proven"
   plutil -p "$pass_dist/PressTalk-0.0-candidate-proof-gate.json"
+  exit 1
+fi
+
+host_dist="$TEST_TMPDIR/host-dist"
+host_summary="$TEST_TMPDIR/host-summary.json"
+host_output="$TEST_TMPDIR/host-output.txt"
+PRESSTALK_HOST_DISCOVERY_SCRIPT="$fake_host_discovery" \
+PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
+PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
+  "$WRAPPER" --version 0.0-host --dist-dir "$host_dist" --local \
+    --host mbp1-tb --exclude-host "studio2=no attached microphone" \
+    --require local --json-output "$host_summary" >"$host_output"
+grep -Fq "Collecting host discovery..." "$host_output"
+test -f "$host_dist/PressTalk-0.0-host-host-discovery.json"
+if [[ "$(plutil -extract hostDiscoveryJSON raw -o - "$host_summary")" != "$host_dist/PressTalk-0.0-host-host-discovery.json" ||
+      "$(plutil -extract targets.0.target raw -o - "$host_dist/PressTalk-0.0-host-host-discovery.json")" != "mbp1-tb" ||
+      "$(plutil -extract arpEnabled raw -o - "$host_dist/PressTalk-0.0-host-host-discovery.json")" != "false" ]]; then
+  echo "FAIL: host discovery evidence mismatch"
+  plutil -p "$host_summary"
+  plutil -p "$host_dist/PressTalk-0.0-host-host-discovery.json"
   exit 1
 fi
 

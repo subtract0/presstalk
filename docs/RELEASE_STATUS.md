@@ -122,6 +122,9 @@ Current tooling update after that run:
   Settings, upload assets, or SSH into any machine except hosts explicitly
   passed with `--host` / `--hosts`. Passing and failing attempts both write the
   wrapper summary JSON; failed attempts record the failed step and exit status.
+  When explicit hosts are supplied, it also writes a host-discovery JSON with
+  read-only SSH config, Bonjour, Tailscale, and strict BatchMode SSH probe
+  evidence for those hosts. ARP scanning is disabled in the wrapper path.
 - `scripts/presstalk_release_proof_gate.sh` now treats missing or `unknown`
   ASR backend/mode evidence as not proven. A stale installed app can still be
   physically usable, but it cannot count as release proof until its

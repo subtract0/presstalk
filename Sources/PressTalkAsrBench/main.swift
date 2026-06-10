@@ -39,6 +39,12 @@ struct PressTalkAsrBench {
                 report = try await runParakeetV3(inputURL: inputURL, options: options, runIndex: runIndex)
             case .streaming:
                 report = try await runStreaming(inputURL: inputURL, options: options, runIndex: runIndex)
+            case .qwen3:
+                report = try await runQwen3(inputURL: inputURL, options: options, runIndex: runIndex)
+            case .senseVoice:
+                report = try await runSenseVoice(inputURL: inputURL, options: options, runIndex: runIndex)
+            case .cohere:
+                report = try await runCohere(inputURL: inputURL, options: options, runIndex: runIndex)
             case .whisperKit:
                 report = try await runWhisperKit(inputURL: inputURL, options: options, runIndex: runIndex)
             }
@@ -247,6 +253,215 @@ struct PressTalkAsrBench {
             notes: options.backend.note
         )
     }
+
+    private static func runQwen3(
+        inputURL: URL,
+        options: BenchOptions,
+        runIndex: Int
+    ) async throws -> BenchReport {
+        guard #available(macOS 15, *) else {
+            throw BenchError.backendUnavailable("Qwen3-ASR CoreML requires macOS 15 or newer")
+        }
+
+        let variant: Qwen3AsrVariant = options.backend == .qwen3F32ANE ? .f32 : .int8
+        let computeUnits = options.backend.qwenComputeUnits
+
+        let loadStart = Date()
+        let modelDirectory = try await Qwen3AsrModels.download(
+            variant: variant,
+            progressHandler: options.progressHandler
+        )
+        let manager = Qwen3AsrManager()
+        try await manager.loadModels(from: modelDirectory, computeUnits: computeUnits)
+        let loadSeconds = Date().timeIntervalSince(loadStart)
+
+        let converter = AudioConverter(sampleRate: Double(Qwen3AsrConfig.sampleRate))
+        let samples = try converter.resampleAudioFile(inputURL)
+        let audioDurationSeconds = Double(samples.count) / Double(Qwen3AsrConfig.sampleRate)
+        let language = options.language.qwen3Language
+
+        let transcribeStart = Date()
+        let transcript = try await manager.transcribe(
+            audioSamples: samples,
+            language: language,
+            maxNewTokens: 512
+        ).cleanedTranscript
+        let totalSeconds = Date().timeIntervalSince(transcribeStart)
+        let accuracy = options.accuracy(for: transcript)
+
+        return BenchReport(
+            backend: options.backend.rawValue,
+            runIndex: runIndex,
+            inputPath: inputURL.path,
+            audioDurationSeconds: audioDurationSeconds,
+            loadSeconds: loadSeconds,
+            totalProcessingSeconds: totalSeconds,
+            finalizationSeconds: totalSeconds,
+            maxProcessSliceSeconds: nil,
+            rtfx: audioDurationSeconds / max(totalSeconds, 0.000_001),
+            partialUpdates: 0,
+            transcript: transcript,
+            confidence: nil,
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
+            notes: options.backend.note
+        )
+    }
+
+    private static func runSenseVoice(
+        inputURL: URL,
+        options: BenchOptions,
+        runIndex: Int
+    ) async throws -> BenchReport {
+        let precision: SenseVoiceEncoderPrecision = options.backend == .senseVoiceInt8ANE ? .int8 : .fp16
+
+        let loadStart = Date()
+        let manager = try await SenseVoiceManager.load(
+            precision: precision,
+            progressHandler: options.progressHandler
+        )
+        let loadSeconds = Date().timeIntervalSince(loadStart)
+
+        let transcribeStart = Date()
+        let transcript = try await manager.transcribe(audioURL: inputURL).cleanedTranscript
+        let totalSeconds = Date().timeIntervalSince(transcribeStart)
+        let audioDurationSeconds = try inputURL.audioDurationSeconds()
+        let accuracy = options.accuracy(for: transcript)
+
+        return BenchReport(
+            backend: options.backend.rawValue,
+            runIndex: runIndex,
+            inputPath: inputURL.path,
+            audioDurationSeconds: audioDurationSeconds,
+            loadSeconds: loadSeconds,
+            totalProcessingSeconds: totalSeconds,
+            finalizationSeconds: totalSeconds,
+            maxProcessSliceSeconds: nil,
+            rtfx: audioDurationSeconds / max(totalSeconds, 0.000_001),
+            partialUpdates: 0,
+            transcript: transcript,
+            confidence: nil,
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
+            notes: options.backend.note
+        )
+    }
+
+    private static func runCohere(
+        inputURL: URL,
+        options: BenchOptions,
+        runIndex: Int
+    ) async throws -> BenchReport {
+        guard #available(macOS 14, *) else {
+            throw BenchError.backendUnavailable("Cohere Transcribe CoreML requires macOS 14 or newer")
+        }
+
+        let loadStart = Date()
+        let modelPaths = try await resolveCohereModelPaths(progressHandler: options.progressHandler)
+        let models = try await CoherePipeline.loadModels(
+            encoderDir: modelPaths.modelDirectory,
+            decoderDir: modelPaths.modelDirectory,
+            vocabDir: modelPaths.vocabDirectory,
+            decoderVariant: .v2,
+            computeUnits: options.backend.cohereComputeUnits
+        )
+        let loadSeconds = Date().timeIntervalSince(loadStart)
+
+        let converter = AudioConverter(sampleRate: Double(CohereAsrConfig.sampleRate))
+        let samples = try converter.resampleAudioFile(inputURL)
+        let audioDurationSeconds = Double(samples.count) / Double(CohereAsrConfig.sampleRate)
+        let pipeline = CoherePipeline()
+
+        let transcribeStart = Date()
+        let result = try await pipeline.transcribeLong(
+            audio: samples,
+            models: models,
+            language: options.language.cohereLanguage,
+            maxNewTokens: 108,
+            repetitionPenalty: 1.1,
+            noRepeatNgram: 3
+        )
+        let totalSeconds = Date().timeIntervalSince(transcribeStart)
+        let transcript = result.text.cleanedTranscript
+        let accuracy = options.accuracy(for: transcript)
+
+        return BenchReport(
+            backend: options.backend.rawValue,
+            runIndex: runIndex,
+            inputPath: inputURL.path,
+            audioDurationSeconds: audioDurationSeconds,
+            loadSeconds: loadSeconds,
+            totalProcessingSeconds: totalSeconds,
+            finalizationSeconds: totalSeconds,
+            maxProcessSliceSeconds: nil,
+            rtfx: audioDurationSeconds / max(totalSeconds, 0.000_001),
+            partialUpdates: 0,
+            transcript: transcript,
+            confidence: nil,
+            wordErrorRate: accuracy?.wordErrorRate,
+            characterErrorRate: accuracy?.characterErrorRate,
+            referenceText: accuracy?.reference,
+            notes: options.backend.note
+        )
+    }
+
+    private static func resolveCohereModelPaths(
+        progressHandler: DownloadUtils.ProgressHandler?
+    ) async throws -> (modelDirectory: URL, vocabDirectory: URL) {
+        let appSupport = try FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: true
+        )
+        let modelsBase = appSupport.appendingPathComponent("FluidAudio/Models", isDirectory: true)
+        let modelDirectory = modelsBase.appendingPathComponent(Repo.cohereTranscribeCoreml.folderName, isDirectory: true)
+        let repoRoot = modelDirectory.deletingLastPathComponent()
+        let expectedInModelDir = [
+            ModelNames.CohereTranscribe.encoderCompiledFile,
+            ModelNames.CohereTranscribe.decoderCacheExternalV2CompiledFile,
+        ]
+
+        func vocabDirectory() -> URL? {
+            let modelVocab = modelDirectory.appendingPathComponent(ModelNames.CohereTranscribe.vocab)
+            if FileManager.default.fileExists(atPath: modelVocab.path) {
+                return modelDirectory
+            }
+            let rootVocab = repoRoot.appendingPathComponent(ModelNames.CohereTranscribe.vocab)
+            if FileManager.default.fileExists(atPath: rootVocab.path) {
+                return repoRoot
+            }
+            return nil
+        }
+
+        func missingFiles() -> [String] {
+            var missing = expectedInModelDir.filter { name in
+                !FileManager.default.fileExists(atPath: modelDirectory.appendingPathComponent(name).path)
+            }
+            if vocabDirectory() == nil {
+                missing.append(ModelNames.CohereTranscribe.vocab)
+            }
+            return missing
+        }
+
+        if !missingFiles().isEmpty {
+            try await DownloadUtils.downloadRepo(
+                .cohereTranscribeCoreml,
+                to: modelsBase,
+                progressHandler: progressHandler
+            )
+        }
+
+        let missing = missingFiles()
+        guard missing.isEmpty, let vocabDir = vocabDirectory() else {
+            throw BenchError.backendUnavailable(
+                "Cohere model cache incomplete at \(modelDirectory.path). Missing: \(missing.joined(separator: ", "))"
+            )
+        }
+        return (modelDirectory, vocabDir)
+    }
 }
 
 private struct BenchOptions {
@@ -282,6 +497,14 @@ private struct BenchOptions {
       nemotron-560          Nemotron English streaming 0.6B, 560ms tier
       nemotron-1120         Nemotron English streaming 0.6B, 1120ms tier
       nemotron-2240         Nemotron English streaming 0.6B, 2240ms tier
+      qwen3-f32-ane         Qwen3-ASR 0.6B CoreML FP16, CPU+ANE, macOS 15+
+      qwen3-int8-ane        Qwen3-ASR 0.6B CoreML INT8, CPU+ANE, macOS 15+
+      qwen3-int8-gpu        Qwen3-ASR 0.6B CoreML INT8, CPU+GPU quality probe, macOS 15+
+      sensevoice-fp16-ane   SenseVoiceSmall CoreML FP16 encoder, CPU+ANE
+      sensevoice-int8-ane   SenseVoiceSmall CoreML INT8 encoder, CPU+ANE
+      cohere-q8-all         Cohere Transcribe q8 CoreML, CoreML default routing, macOS 14+
+      cohere-q8-ane         Cohere Transcribe q8 CoreML, CPU+ANE strict probe, macOS 14+
+      cohere-q8-gpu         Cohere Transcribe q8 CoreML, CPU+GPU quality probe, macOS 14+
       stock-v1-gpu          PressTalk v1 WhisperKit large-v3-turbo, CPU+GPU, no ANE
 
     Options:
@@ -374,11 +597,22 @@ private enum BenchBackend: String {
     case nemotron560 = "nemotron-560"
     case nemotron1120 = "nemotron-1120"
     case nemotron2240 = "nemotron-2240"
+    case qwen3F32ANE = "qwen3-f32-ane"
+    case qwen3Int8ANE = "qwen3-int8-ane"
+    case qwen3Int8GPU = "qwen3-int8-gpu"
+    case senseVoiceFP16ANE = "sensevoice-fp16-ane"
+    case senseVoiceInt8ANE = "sensevoice-int8-ane"
+    case cohereQ8All = "cohere-q8-all"
+    case cohereQ8ANE = "cohere-q8-ane"
+    case cohereQ8GPU = "cohere-q8-gpu"
     case stockV1GPU = "stock-v1-gpu"
 
     enum Kind {
         case parakeetV3
         case streaming
+        case qwen3
+        case senseVoice
+        case cohere
         case whisperKit
     }
 
@@ -388,6 +622,12 @@ private enum BenchBackend: String {
             return .parakeetV3
         case .parakeetEOU160, .parakeetEOU320, .parakeetEOU1280, .nemotron560, .nemotron1120, .nemotron2240:
             return .streaming
+        case .qwen3F32ANE, .qwen3Int8ANE, .qwen3Int8GPU:
+            return .qwen3
+        case .senseVoiceFP16ANE, .senseVoiceInt8ANE:
+            return .senseVoice
+        case .cohereQ8All, .cohereQ8ANE, .cohereQ8GPU:
+            return .cohere
         case .stockV1GPU:
             return .whisperKit
         }
@@ -402,13 +642,37 @@ private enum BenchBackend: String {
         }
     }
 
+    var qwenComputeUnits: MLComputeUnits {
+        switch self {
+        case .qwen3Int8GPU:
+            return .cpuAndGPU
+        case .qwen3F32ANE, .qwen3Int8ANE:
+            return .cpuAndNeuralEngine
+        default:
+            return .cpuAndNeuralEngine
+        }
+    }
+
+    var cohereComputeUnits: MLComputeUnits {
+        switch self {
+        case .cohereQ8All:
+            return .all
+        case .cohereQ8ANE:
+            return .cpuAndNeuralEngine
+        case .cohereQ8GPU:
+            return .cpuAndGPU
+        default:
+            return .all
+        }
+    }
+
     var streamingComputeUnits: MLComputeUnits {
         switch self {
         case .parakeetEOU160, .parakeetEOU320, .parakeetEOU1280:
             return .cpuAndNeuralEngine
         case .nemotron560, .nemotron1120, .nemotron2240:
             return .cpuAndNeuralEngine
-        case .parakeetV3ANE, .parakeetV3GPU, .stockV1GPU:
+        case .parakeetV3ANE, .parakeetV3GPU, .qwen3F32ANE, .qwen3Int8ANE, .qwen3Int8GPU, .senseVoiceFP16ANE, .senseVoiceInt8ANE, .cohereQ8All, .cohereQ8ANE, .cohereQ8GPU, .stockV1GPU:
             return .cpuAndNeuralEngine
         }
     }
@@ -427,7 +691,7 @@ private enum BenchBackend: String {
             return .nemotron1120ms
         case .nemotron2240:
             return .nemotron2240ms
-        case .parakeetV3ANE, .parakeetV3GPU, .stockV1GPU:
+        case .parakeetV3ANE, .parakeetV3GPU, .qwen3F32ANE, .qwen3Int8ANE, .qwen3Int8GPU, .senseVoiceFP16ANE, .senseVoiceInt8ANE, .cohereQ8All, .cohereQ8ANE, .cohereQ8GPU, .stockV1GPU:
             return .parakeetEou160ms
         }
     }
@@ -450,6 +714,22 @@ private enum BenchBackend: String {
             return "True streaming Nemotron 0.6B English, balanced tier."
         case .nemotron2240:
             return "True streaming Nemotron 0.6B English, highest-throughput tier."
+        case .qwen3F32ANE:
+            return "Qwen3-ASR 0.6B CoreML FP16 path. Encoder and decoder requested on CPU+ANE. Requires macOS 15+."
+        case .qwen3Int8ANE:
+            return "Qwen3-ASR 0.6B CoreML INT8 path. Encoder and decoder requested on CPU+ANE. Requires macOS 15+."
+        case .qwen3Int8GPU:
+            return "Qwen3-ASR 0.6B CoreML INT8 quality probe. Encoder and decoder requested on CPU+GPU, not ANE. Requires macOS 15+."
+        case .senseVoiceFP16ANE:
+            return "SenseVoiceSmall CoreML path. CPU preprocessor, FP16 encoder requested on ANE."
+        case .senseVoiceInt8ANE:
+            return "SenseVoiceSmall CoreML path. CPU preprocessor, INT8 encoder requested on ANE."
+        case .cohereQ8All:
+            return "Cohere Transcribe q8 CoreML path. CoreML decides compute placement, including ANE where available."
+        case .cohereQ8ANE:
+            return "Cohere Transcribe q8 CoreML path. Encoder and decoder requested on CPU+ANE."
+        case .cohereQ8GPU:
+            return "Cohere Transcribe q8 CoreML path. Encoder and decoder requested on CPU+GPU, not ANE."
         case .stockV1GPU:
             return "Frozen PressTalk v1 route: WhisperKit large-v3-turbo with cpu-gpu-no-ane compute placement."
         }
@@ -517,6 +797,64 @@ private enum BenchLanguage: String {
             return nil
         default:
             return rawValue
+        }
+    }
+
+    var qwen3Language: Qwen3AsrConfig.Language? {
+        switch self {
+        case .auto:
+            return nil
+        case .english:
+            return .english
+        case .german:
+            return .german
+        case .french:
+            return .french
+        case .spanish:
+            return .spanish
+        case .italian:
+            return .italian
+        case .portuguese:
+            return .portuguese
+        case .dutch:
+            return .dutch
+        case .polish:
+            return .polish
+        case .czech:
+            return .czech
+        case .russian:
+            return .russian
+        case .greek:
+            return .greek
+        case .slovak, .slovenian, .croatian, .ukrainian:
+            return nil
+        }
+    }
+
+    var cohereLanguage: CohereAsrConfig.Language {
+        switch self {
+        case .auto:
+            return .english
+        case .english:
+            return .english
+        case .german:
+            return .german
+        case .french:
+            return .french
+        case .spanish:
+            return .spanish
+        case .italian:
+            return .italian
+        case .portuguese:
+            return .portuguese
+        case .dutch:
+            return .dutch
+        case .polish:
+            return .polish
+        case .greek:
+            return .greek
+        case .czech, .slovak, .slovenian, .croatian, .russian, .ukrainian:
+            return .english
         }
     }
 }
@@ -661,6 +999,7 @@ private enum BenchError: Error, CustomStringConvertible {
     case missingValue(String)
     case unknownArgument(String)
     case bufferAllocationFailed
+    case backendUnavailable(String)
 
     var description: String {
         switch self {
@@ -680,6 +1019,8 @@ private enum BenchError: Error, CustomStringConvertible {
             return "Unknown argument: \(argument)"
         case .bufferAllocationFailed:
             return "Failed to allocate audio buffer"
+        case .backendUnavailable(let message):
+            return message
         }
     }
 }

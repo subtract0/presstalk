@@ -508,7 +508,11 @@ write_json_report() {
   plutil -insert "audio" -dictionary "$tmp_plist" >/dev/null
   plist_insert_bool_or_string "$tmp_plist" "audio.microphoneHardwareDetected" "$microphone_detected"
   plist_insert_string "$tmp_plist" "audio.reason" "$audio_reason"
-  plist_insert_array "$tmp_plist" "audio.inputDevices" "${input_devices[@]}"
+  if [[ "${#input_devices[@]}" -gt 0 ]]; then
+    plist_insert_array "$tmp_plist" "audio.inputDevices" "${input_devices[@]}"
+  else
+    plist_insert_array "$tmp_plist" "audio.inputDevices"
+  fi
 
   plutil -insert "pressTalk" -dictionary "$tmp_plist" >/dev/null
   plist_insert_bool_or_string "$tmp_plist" "pressTalk.installed" "$press_talk_installed"

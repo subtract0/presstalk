@@ -181,6 +181,18 @@ For a production distribution artifact, use an explicit Developer ID signing
 identity, hardened runtime, secure timestamping, and notarization:
 
 ```bash
+bash scripts/presstalk_distribution_signing_preflight.sh \
+  --require-notarization \
+  --json-output dist/PressTalk-0.1.6-distribution-signing-preflight.json
+```
+
+This preflight is read-only. It checks whether a Developer ID Application
+identity is available and whether notarytool credentials are configured through
+`PRESSTALK_NOTARYTOOL_PROFILE` or the Apple ID/team/password environment
+variables. It does not build, sign, notarize, upload, open System Settings, or
+print secrets.
+
+```bash
 PRESSTALK_DISTRIBUTION_SIGNING=1 \
 PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 PRESSTALK_NOTARIZE=1 \

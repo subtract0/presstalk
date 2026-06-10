@@ -67,6 +67,12 @@ Current tooling update after that run:
   `PRESSTALK_NOTARIZE=1` submits and staples a notarization ticket before the
   final zip is written. Without that flag, package output remains a
   test/prerelease artifact.
+- `scripts/presstalk_distribution_signing_preflight.sh` checks production
+  signing readiness before packaging. It is read-only and records whether a
+  Developer ID Application identity is available and whether notarytool
+  credentials are configured through a keychain profile or complete
+  Apple-ID/team/password environment variables; it does not build, sign,
+  notarize, upload, or print secrets.
 - `scripts/presstalk_release_artifact_audit.sh` audits an existing zip without
   installing it and records bundle metadata, SHA-256, codesign verification,
   Developer ID status, hardened runtime, and stapler validation. Use

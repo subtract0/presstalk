@@ -52,19 +52,60 @@ resolve_signing_identity() {
     printf '%s' "$CODESIGN_IDENTITY"
     return
   fi
-  if [[ "${PRESSTALK_BUILD_STABLE_SIGNING:-1}" == "1" && -x "$LOCAL_CODESIGN_HELPER" ]]; then
-    local output identity_hash
-    if output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
-      identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
-      if [[ -n "$identity_hash" ]]; then
-        printf '%s' "$identity_hash"
-        return
+
+  local stable_mode require_stable output identity_hash
+  stable_mode="${PRESSTALK_BUILD_STABLE_SIGNING:-1}"
+  require_stable="${PRESSTALK_BUILD_REQUIRE_STABLE_SIGNING:-0}"
+  case "$stable_mode" in
+    1|true|TRUE|yes|YES)
+      if [[ -x "$LOCAL_CODESIGN_HELPER" ]]; then
+        if output="$("$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+          identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
+          if [[ -n "$identity_hash" ]]; then
+            printf '%s' "$identity_hash"
+            return
+          fi
+          printf '%s\n' "$output" >&2
+          printf '%s\n' "Input method stable local signing skipped: helper did not report an identity hash." >&2
+        else
+          printf '%s\n' "$output" >&2
+          printf '%s\n' "Input method stable local signing skipped: could not prepare local code-signing identity." >&2
+        fi
+      else
+        printf '%s\n' "Input method stable local signing skipped: helper missing at $LOCAL_CODESIGN_HELPER." >&2
       fi
-    else
-      printf '%s\n' "$output" >&2
-      printf '%s\n' "Input method stable local signing skipped: could not prepare local code-signing identity." >&2
-    fi
-  fi
+      if [[ "$require_stable" == "1" || "$require_stable" == "true" || "$require_stable" == "TRUE" ||
+            "$require_stable" == "yes" || "$require_stable" == "YES" ]]; then
+        printf '%s\n' "Stable local signing is required; refusing to build an ad-hoc PressTalk input method." >&2
+        return 1
+      fi
+      ;;
+    existing)
+      if [[ ! -x "$LOCAL_CODESIGN_HELPER" ]]; then
+        printf '%s\n' "Input method stable local signing required: helper missing at $LOCAL_CODESIGN_HELPER." >&2
+        return 1
+      fi
+      if output="$(PRESSTALK_LOCAL_CODESIGN_EXISTING_ONLY=1 "$LOCAL_CODESIGN_HELPER" 2>&1)"; then
+        identity_hash="$(printf '%s\n' "$output" | awk '/^Hash: / { print $2; exit }')"
+        if [[ -n "$identity_hash" ]]; then
+          printf '%s' "$identity_hash"
+          return
+        fi
+        printf '%s\n' "$output" >&2
+        printf '%s\n' "Input method stable local signing required: existing identity check did not report an identity hash." >&2
+      else
+        printf '%s\n' "$output" >&2
+        printf '%s\n' "Input method stable local signing required: no existing trusted PressTalk identity is available without a trust prompt." >&2
+      fi
+      return 1
+      ;;
+    0|false|FALSE|no|NO|none|NONE)
+      ;;
+    *)
+      printf '%s\n' "Invalid PRESSTALK_BUILD_STABLE_SIGNING=$stable_mode; expected 1, 0, or existing." >&2
+      return 2
+      ;;
+  esac
   printf '%s' "-"
 }
 

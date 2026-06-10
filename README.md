@@ -79,6 +79,24 @@ development code-signing identity by default; set
 `PRESSTALK_BUILD_STABLE_SIGNING=0` only when you deliberately want an ad-hoc
 debug build.
 
+For a no-surprise local update that must not create a signing trust prompt or
+fall back to ad-hoc signing, reuse only an existing trusted PressTalk identity:
+
+```bash
+PRESSTALK_BUILD_STABLE_SIGNING=existing \
+  PRESSTALK_BUILD_REQUIRE_STABLE_SIGNING=1 \
+  bash scripts/build_jarvistap.sh
+
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing \
+  PRESSTALK_OPEN_PERMISSION_PANES=0 \
+  PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
+
+If the trusted identity is missing or untrusted, the build fails before
+installing an ad-hoc replacement. Run the signing repair from the logged-in
+desktop session only when you are deliberately ready for the macOS trust prompt.
+
 That produces:
 - `bin/jarvistap`
 - `~/Applications/PressTalk.app`

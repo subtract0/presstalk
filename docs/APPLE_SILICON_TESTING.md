@@ -195,6 +195,22 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
   /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
 ```
 
+For a source-tree update on a Mac that already has a working PressTalk local
+signing identity, use the no-surprise path. It does not create or trust a new
+certificate and refuses to replace the app with an ad-hoc-signed bundle:
+
+```bash
+PRESSTALK_BUILD_STABLE_SIGNING=existing \
+  PRESSTALK_BUILD_REQUIRE_STABLE_SIGNING=1 \
+  bash scripts/build_jarvistap.sh
+
+PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing \
+  PRESSTALK_OPEN_PERMISSION_PANES=0 \
+  PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
+  PRESSTALK_TRIGGER_KEY=fn \
+  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+```
+
 Expected SHA-256:
 
 ```text

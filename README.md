@@ -120,13 +120,27 @@ Supported trigger values:
 - `f5`
 
 ## Public Packaging
-Package a Homebrew release zip:
+Package a Homebrew test/prerelease zip:
 ```bash
 bash scripts/package_presstalk_release.sh 0.1.6-test4
 ```
 
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.
+
+For a production distribution artifact, use an explicit Developer ID signing
+identity, hardened runtime, secure timestamping, and notarization:
+
+```bash
+PRESSTALK_DISTRIBUTION_SIGNING=1 \
+PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
+PRESSTALK_NOTARIZE=1 \
+PRESSTALK_NOTARYTOOL_PROFILE=presstalk-notary \
+  bash scripts/package_presstalk_release.sh 0.1.6
+```
+
+Without `PRESSTALK_DISTRIBUTION_SIGNING=1`, the packaged zip is a test artifact
+and should not be described as a production-grade notarized Mac release.
 
 Publish a public prerelease artifact for machine smoke testing:
 ```bash

@@ -181,9 +181,25 @@ else
   fi
 fi
 
-codesign_args=(--force --sign "$SIGN_IDENTITY" --timestamp=none)
+codesign_args=(--force --sign "$SIGN_IDENTITY")
 if [[ -n "$SIGN_KEYCHAIN" ]]; then
   codesign_args+=(--keychain "$SIGN_KEYCHAIN")
+fi
+TIMESTAMP_MODE="${PRESSTALK_CODESIGN_TIMESTAMP:-none}"
+TIMESTAMP_MODE_NORMALIZED="$(printf '%s' "$TIMESTAMP_MODE" | tr '[:upper:]' '[:lower:]')"
+case "$TIMESTAMP_MODE_NORMALIZED" in
+  1|true|yes)
+    codesign_args+=(--timestamp)
+    ;;
+  ""|0|false|no|none)
+    codesign_args+=(--timestamp=none)
+    ;;
+  *)
+    codesign_args+=(--timestamp="$TIMESTAMP_MODE")
+    ;;
+esac
+if [[ "${PRESSTALK_CODESIGN_HARDENED_RUNTIME:-0}" == "1" ]]; then
+  codesign_args+=(--options runtime)
 fi
 
 codesign "${codesign_args[@]}" --identifier "$APP_BUNDLE_IDENTIFIER" "$APP_MACOS_DIR/jarvistap"

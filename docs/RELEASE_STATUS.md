@@ -61,6 +61,12 @@ Current tooling update after that run:
   `status=excluded` and does not SSH into it. Use this for machines that are
   intentionally out of microphone/STT scope, such as `studio2` until Alex opts
   it back in with an attached microphone.
+- `scripts/package_presstalk_release.sh` now has an explicit production
+  distribution path: `PRESSTALK_DISTRIBUTION_SIGNING=1` requires a Developer ID
+  identity, enables hardened runtime and secure timestamping, and
+  `PRESSTALK_NOTARIZE=1` submits and staples a notarization ticket before the
+  final zip is written. Without that flag, package output remains a
+  test/prerelease artifact.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

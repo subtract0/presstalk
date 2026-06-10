@@ -2,7 +2,8 @@
 
 These numbers were measured locally on `mbaM4`, a MacBook Air with Apple Silicon M4 and `16 GB` RAM, on `2026-03-13`.
 
-They are not marketing numbers. They are point-in-time measurements from the current `0.1.5` build of PressTalk running as a LaunchAgent with:
+They are not marketing numbers. They are point-in-time measurements from an
+older `0.1.5` PressTalk baseline running as a LaunchAgent with:
 
 - `JARVISTAP_AGENT_MODE=dictation`
 - `JARVISTAP_WHISPERKIT_MODEL=openai_whisper-large-v3-v20240930_turbo_632MB`
@@ -20,7 +21,20 @@ The measurements below came from:
 
 macOS does not expose per-process ANE wattage from an unprivileged shell. `powermetrics` is the correct tool for that, but it requires `sudo`.
 
-## PressTalk 0.1.5
+## Current Fallback Release
+
+The current fallback release is `v0.1.6-test4`. It keeps local compute only and
+uses Parakeet v3 on ANE as the fast first-pass final-text backend, with local
+WhisperKit large-v3-turbo retained as quality fallback when Parakeet confidence
+or punctuation looks weak.
+
+This is not yet true streaming partial text in the Monologue/Wispr Flow sense:
+the release baseline still captures while the trigger is held, finalizes on
+release, then pastes. The ANE backend makes that finalization feel close to
+instant on tested M4-class machines, while the fallback path protects quality
+when the fast pass is not good enough.
+
+## PressTalk 0.1.5 Baseline
 
 ### Install Footprint
 

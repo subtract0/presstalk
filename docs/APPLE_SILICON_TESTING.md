@@ -11,8 +11,11 @@ Verify that a fresh machine can install PressTalk with minimal thinking:
 
 1. install
 2. approve permissions if the machine has not already granted PressTalk
-3. hold `Option + Space`
+3. hold `Fn / Globe`
 4. dictate
+
+`Option + Space` remains a supported fallback trigger and is still useful on
+machines where the Fn hardware path is unavailable.
 
 ## Machine Readiness Preflight
 
@@ -151,14 +154,26 @@ STT smoke matrix while it has no attached microphone.
 
 ## Install
 
-For the current prerelease smoke artifact:
+For the current fallback release, prefer Homebrew:
+
+```bash
+brew tap subtract0/presstalk
+brew reinstall --cask presstalk
+```
+
+The cask points at `v0.1.6-test4` in `subtract0/presstalk-releases`:
+
+- Asset: `PressTalk-0.1.6-test4-macos-arm64.zip`
+- SHA-256: `5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161`
+
+For a direct `~/Applications` smoke install without Homebrew:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.5-rc104-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk/releases/download/v0.1.5-rc104/PressTalk-0.1.5-rc104-macos-arm64.zip
-echo "69d246492b7d38f4adb358021b547f49d8fadda34e365e605bb494b5f888f6b9  $tmpdir/PressTalk-0.1.5-rc104-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.5-rc104-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk-releases/releases/download/v0.1.6-test4/PressTalk-0.1.6-test4-macos-arm64.zip
+echo "5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161  $tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -170,11 +185,10 @@ PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
 Expected SHA-256:
 
 ```text
-69d246492b7d38f4adb358021b547f49d8fadda34e365e605bb494b5f888f6b9
+5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161
 ```
 
-Homebrew install is the intended stable path after the smoke artifact is
-promoted:
+Homebrew install path:
 
 ```bash
 brew tap subtract0/presstalk
@@ -185,7 +199,7 @@ If an older build is already installed:
 
 ```bash
 brew update
-brew upgrade --cask presstalk
+brew reinstall --cask presstalk
 ```
 
 ## Expected Install Side Effects

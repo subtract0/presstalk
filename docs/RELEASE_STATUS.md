@@ -1,9 +1,43 @@
 # Release Status
 
-Current status: local `main` has proven Option+Space real-field dictation and
-active-field insertion on the currently eligible machines: `studio1` / `s1`
-and `mbp1`. Both use the Accessibility menu-paste path. `studio2` / `s2`
-remains excluded until a microphone is attached.
+Current fallback release: `v0.1.6-test4`.
+
+- Release commit: `31bc4f6` (`Improve Parakeet quality fallback arbitration`)
+- Release repo: `subtract0/presstalk-releases`
+- Asset: `PressTalk-0.1.6-test4-macos-arm64.zip`
+- SHA-256: `5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161`
+- Homebrew tap: `subtract0/presstalk`, cask `presstalk`, tap commit `413da5c`
+- Default trigger: `Fn / Globe`
+- Default ASR path: Parakeet v3 ANE, streaming disabled, WhisperKit
+  large-v3-turbo quality fallback enabled at min confidence `0.96`
+
+Current proof status:
+
+- `studio1` / `s1`: ready locally with `com.am.presstalk`, Fn/Globe trigger,
+  microphone authorized, Accessibility trusted, speech model ready, and
+  active-field insertion ready through the Accessibility menu-paste path.
+- `mbp1`: upgraded to `0.1.6-test4` under `~/Applications`, signed with its
+  trusted local PressTalk development identity, bootstrapped to Fn/Globe, and
+  readiness reports microphone authorized, Accessibility trusted, speech model
+  ready, and active-field insertion ready.
+- `mba1`: Alex reported that PressTalk works after restarting its existing
+  `0.1.5` install; this is useful user proof but not a current-release install
+  proof.
+- `studio2` / `s2`: excluded from microphone/STT validation until a microphone
+  is attached and Alex explicitly asks for local permission/signing work there.
+  It is reachable and has `0.1.6-test4` installed under `~/Applications`, but
+  readiness correctly reports no input microphone, ad-hoc signing, missing
+  Accessibility trust, and not-determined microphone permission.
+
+The current fallback build is useful and fast, but it is not the final
+distribution product yet. True live streaming partial text, notarized signing,
+polished first-run permission UX, and a final cross-machine proof gate remain
+open productization work.
+
+Historical status: local `main` previously proved Option+Space real-field
+dictation and active-field insertion on the eligible machines `studio1` / `s1`
+and `mbp1` using the Accessibility menu-paste path. Older notes below preserve
+that evidence trail.
 
 Streaming feature branch:
 
@@ -65,7 +99,7 @@ Latest local evidence:
   `input_method_notification` success is no longer release proof for arbitrary
   focused text fields.
 
-Public prerelease:
+Previous direct prerelease smoke artifact:
 
 - Tag: `v0.1.5-rc104`
 - Commit: `827f274c6a464c3bc073b4f7c63217974a3f98e6`
@@ -75,7 +109,7 @@ Public prerelease:
 
 Verified during 2026-06-06 through 2026-06-09:
 
-- `v0.1.5-rc104` is the current public prerelease smoke artifact. It includes
+- `v0.1.5-rc104` is the previous direct prerelease smoke artifact. It includes
   the `ax_menu_paste` trusted insertion path proven by the 2026-06-09 real-field
   Option+Space test on `studio1`, isolated release packaging so publishing no
   longer overwrites the live local app in `~/Applications/PressTalk.app`, and a

@@ -2,7 +2,7 @@
 
 Native macOS push-to-talk dictation for Apple Silicon.
 
-Current repo version: `0.1.5`
+Current fallback release: `0.1.6-test4` (`v0.1.6-test4`, commit `31bc4f6`)
 
 Homebrew cask name: `presstalk`
 
@@ -25,6 +25,11 @@ Current packaged behavior:
 - small runtime settings window for HUD, auto-paste, language, and release tail
 
 The current default runtime uses the local Parakeet v3 ANE backend for final dictation. Parakeet quality fallback is enabled by default: low-confidence or weakly punctuated Parakeet output is retried through local WhisperKit large-v3-turbo before paste, while high-confidence ANE output stays fast.
+
+The current public fallback release is intentionally conservative: it is
+hold-trigger, record locally, run a fast local ASR final pass, then paste on
+release. True live streaming partial text remains a benchmark/product track,
+not the release baseline.
 
 ## Release Status
 
@@ -117,7 +122,7 @@ Supported trigger values:
 ## Public Packaging
 Package a Homebrew release zip:
 ```bash
-bash scripts/package_presstalk_release.sh 0.1.5
+bash scripts/package_presstalk_release.sh 0.1.6-test4
 ```
 
 Release packaging explicitly builds the public `com.am.presstalk` identity even
@@ -125,12 +130,12 @@ when your local development install is preserving `com.am.jarvistap`.
 
 Publish a public prerelease artifact for machine smoke testing:
 ```bash
-bash scripts/publish_presstalk_prerelease.sh 0.1.5-rc1
+bash scripts/publish_presstalk_prerelease.sh 0.1.6-test5
 ```
 
 Publish the public binary release plus Homebrew tap:
 ```bash
-bash scripts/publish_presstalk_homebrew.sh 0.1.5
+bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
 ```
 
 That makes this install path work:

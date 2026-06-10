@@ -491,6 +491,7 @@ enum JarvisTapError: Error, CustomStringConvertible {
     case httpFailure(Int, String)
     case whisperUnavailable
     case tokenizerUnavailable(String)
+    case audioBufferUnavailable
     case accessibilityPermissionMissing
     case eventSynthesisUnavailable
 
@@ -506,6 +507,8 @@ enum JarvisTapError: Error, CustomStringConvertible {
             return "WhisperKit was not initialized"
         case .tokenizerUnavailable(let message):
             return "Whisper tokenizer unavailable: \(message)"
+        case .audioBufferUnavailable:
+            return "Failed to allocate an audio buffer"
         case .accessibilityPermissionMissing:
             return "Paste permission preflight is unavailable"
         case .eventSynthesisUnavailable:
@@ -1306,6 +1309,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var whisperKit: WhisperKit?
     private var parakeetAsrManager: AsrManager?
     private var parakeetDecoderLayerCount = 2
+    private var fluidStreamingAsrManager: (any StreamingAsrManager)?
+    private var fluidStreamingFedSampleCount = 0
     private var streamTranscriber: AudioStreamTranscriber?
     private var decodingOptions = DecodingOptions(
         verbose: false,
@@ -3466,7 +3471,37 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private var fluidTrueStreamingVariant: StreamingModelVariant? {
+        switch config.asrBackend {
+        case "parakeet-eou-160", "parakeet-eou-160ms":
+            return .parakeetEou160ms
+        case "parakeet-eou-320", "parakeet-eou-320ms":
+            return .parakeetEou320ms
+        case "parakeet-eou-1280", "parakeet-eou-1280ms":
+            return .parakeetEou1280ms
+        case "nemotron-560", "nemotron-560ms":
+            return .nemotron560ms
+        case "nemotron-1120", "nemotron-1120ms":
+            return .nemotron1120ms
+        case "nemotron-2240", "nemotron-2240ms", "nemotron":
+            return .nemotron2240ms
+        default:
+            return nil
+        }
+    }
+
+    private var usesFluidTrueStreamingBackend: Bool {
+        fluidTrueStreamingVariant != nil
+    }
+
     private func currentASRModeDescription() -> String {
+        if let fluidTrueStreamingVariant {
+            let baseMode = fluidTrueStreamingVariant.rawValue.replacingOccurrences(of: "-", with: "_")
+            return config.streamingTranscriptionEnabled
+                ? "\(baseMode)_true_streaming"
+                : "\(baseMode)_final_pass"
+        }
+
         if usesParakeetFinalBackend {
             return config.streamingTranscriptionEnabled
                 ? "parakeet_v3_ane_final_pass_with_realtime_whisper_partials"
@@ -3494,6 +3529,21 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         parakeetDecoderLayerCount = decoderLayerCount
         traceLogger.log(
             "Parakeet v3 ASR ready load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart))) decoder_layers=\(decoderLayerCount)"
+        )
+    }
+
+    private func loadFluidTrueStreamingASR() async throws {
+        guard let variant = fluidTrueStreamingVariant else { return }
+        traceLogger.log("Loading FluidAudio true streaming ASR backend=\(variant.rawValue) compute=cpuAndNeuralEngine")
+        let loadStart = Date()
+        let configuration = MLModelConfiguration()
+        configuration.computeUnits = .cpuAndNeuralEngine
+        let manager = variant.createManager(configuration: configuration)
+        try await manager.loadModels()
+        let displayName = await manager.displayName
+        fluidStreamingAsrManager = manager
+        traceLogger.log(
+            "FluidAudio true streaming ASR ready backend=\(variant.rawValue) display_name=\(displayName) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))"
         )
     }
 
@@ -3549,6 +3599,36 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func makeMonoPCMBuffer(samples: ArraySlice<Float>) throws -> AVAudioPCMBuffer {
+        guard !samples.isEmpty else {
+            throw JarvisTapError.audioBufferUnavailable
+        }
+        guard let format = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: Double(WhisperKit.sampleRate),
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw JarvisTapError.audioBufferUnavailable
+        }
+        guard let buffer = AVAudioPCMBuffer(
+            pcmFormat: format,
+            frameCapacity: AVAudioFrameCount(samples.count)
+        ) else {
+            throw JarvisTapError.audioBufferUnavailable
+        }
+        buffer.frameLength = AVAudioFrameCount(samples.count)
+        guard let channel = buffer.floatChannelData?[0] else {
+            throw JarvisTapError.audioBufferUnavailable
+        }
+        samples.withUnsafeBufferPointer { sampleBuffer in
+            if let baseAddress = sampleBuffer.baseAddress {
+                channel.update(from: baseAddress, count: sampleBuffer.count)
+            }
+        }
+        return buffer
+    }
+
     private func resetStreamingSession() throws {
         guard let whisperKit else {
             throw JarvisTapError.whisperUnavailable
@@ -3557,6 +3637,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Resetting Whisper streaming session")
         whisperKit.clearState()
         whisperKit.audioProcessor.purgeAudioSamples(keepingLast: 0)
+        fluidStreamingFedSampleCount = 0
         streamTranscriber = try makeStreamTranscriber(using: whisperKit)
     }
 
@@ -5294,6 +5375,130 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Realtime Whisper streaming loop stopped")
     }
 
+    private func appendNewSamplesToFluidStreamingManager(
+        _ samples: [Float],
+        manager: any StreamingAsrManager
+    ) async throws -> Int {
+        let startIndex = withStateLock { fluidStreamingFedSampleCount }
+        guard samples.count > startIndex else { return 0 }
+        let newSamples = samples[startIndex..<samples.count]
+        let buffer = try makeMonoPCMBuffer(samples: newSamples)
+        try await manager.appendAudio(buffer)
+        withStateLock {
+            fluidStreamingFedSampleCount = samples.count
+        }
+        return newSamples.count
+    }
+
+    private func runFluidTrueStreamingLoop(whisperKit: WhisperKit) async {
+        guard let manager = fluidStreamingAsrManager else {
+            traceLogger.log("FluidAudio true streaming loop unavailable reason=manager_not_loaded")
+            return
+        }
+
+        do {
+            try await manager.reset()
+        } catch {
+            traceLogger.log("FluidAudio true streaming reset failed error=\(error)")
+            return
+        }
+        withStateLock {
+            fluidStreamingFedSampleCount = 0
+        }
+
+        let pollNanoseconds = UInt64(realtimeStreamPollSeconds * 1_000_000_000)
+        var revision = 0
+        var previousTranscript = ""
+        traceLogger.log("FluidAudio true streaming loop started backend=\(config.asrBackend) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))")
+
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: pollNanoseconds)
+            if Task.isCancelled { break }
+
+            let capturedSamples = Array(whisperKit.audioProcessor.audioSamples)
+            let sampleCount = capturedSamples.count
+            let audioDurationSeconds = Double(sampleCount) / Double(WhisperKit.sampleRate)
+            let releaseFinalizeRequested = withStateLock { isProcessing && !isRecording }
+
+            do {
+                let appendedSamples = try await appendNewSamplesToFluidStreamingManager(capturedSamples, manager: manager)
+                let sliceStart = Date()
+                try await manager.processBufferedAudio()
+                let processSeconds = Date().timeIntervalSince(sliceStart)
+                let partialTranscript = cleanedTranscriptText(await manager.getPartialTranscript())
+                if isPlausibleTranscript(partialTranscript), partialTranscript != previousTranscript {
+                    revision += 1
+                    let stablePrefix = commonStableWordPrefix(previousTranscript, partialTranscript)
+                    traceLogger.log(
+                        "FluidAudio true streaming pass completed revision=\(revision) samples=\(sampleCount) appended_samples=\(appendedSamples) duration_seconds=\(String(format: "%.2f", audioDurationSeconds)) process_seconds=\(String(format: "%.3f", processSeconds)) transcript_chars=\(partialTranscript.count) stable_chars=\(stablePrefix.count)"
+                    )
+                    updateRealtimeStreamingSnapshot(
+                        currentText: partialTranscript,
+                        confirmedText: stablePrefix,
+                        audioDurationSeconds: audioDurationSeconds,
+                        revision: revision
+                    )
+                    previousTranscript = partialTranscript
+                } else if appendedSamples > 0 {
+                    traceLogger.log(
+                        "FluidAudio true streaming buffered samples=\(sampleCount) appended_samples=\(appendedSamples) duration_seconds=\(String(format: "%.2f", audioDurationSeconds)) process_seconds=\(String(format: "%.3f", processSeconds))"
+                    )
+                }
+            } catch is CancellationError {
+                break
+            } catch {
+                traceLogger.log("FluidAudio true streaming pass failed samples=\(sampleCount) error=\(error)")
+                if releaseFinalizeRequested {
+                    break
+                }
+            }
+
+            if releaseFinalizeRequested {
+                break
+            }
+        }
+
+        traceLogger.log("FluidAudio true streaming loop stopped")
+    }
+
+    private func resetFluidTrueStreamingTranscriptState() async throws {
+        guard let manager = fluidStreamingAsrManager else {
+            traceLogger.log("FluidAudio true streaming reset unavailable reason=manager_not_loaded")
+            return
+        }
+        try await manager.reset()
+        withStateLock {
+            fluidStreamingFedSampleCount = 0
+        }
+    }
+
+    private func finishFluidTrueStreamingTranscript(
+        samples: [Float],
+        signalStats: (rms: Double, peak: Double),
+        captureDurationSeconds: Double
+    ) async throws -> String? {
+        guard let manager = fluidStreamingAsrManager else {
+            traceLogger.log("FluidAudio true streaming finalize unavailable reason=manager_not_loaded")
+            return nil
+        }
+
+        let startedAt = Date()
+        let appendedSamples = try await appendNewSamplesToFluidStreamingManager(samples, manager: manager)
+        try await manager.processBufferedAudio()
+        let transcript = cleanedTranscriptText(try await manager.finish())
+        traceTranscriptCandidate("FluidAudio true streaming transcript", text: transcript)
+        traceLogger.log(
+            "FluidAudio true streaming finalize completed backend=\(config.asrBackend) samples=\(samples.count) appended_samples=\(appendedSamples) finalize_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
+        )
+
+        return validatedFinalTranscriptCandidate(
+            transcript,
+            signalStats: signalStats,
+            captureDurationSeconds: captureDurationSeconds,
+            context: "fluid_true_streaming"
+        )
+    }
+
     private func streamingSnapshotFreshEnoughForFinal(
         _ snapshot: StreamingSnapshot,
         frozenAudioDurationSeconds: Double
@@ -5437,6 +5642,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if usesParakeetFinalBackend {
                     try await loadParakeetV3ANE()
                     print("Parakeet v3 ANE ready.")
+                    fflush(stdout)
+                }
+                if usesFluidTrueStreamingBackend {
+                    try await loadFluidTrueStreamingASR()
+                    print("FluidAudio true streaming ASR ready.")
                     fflush(stdout)
                 }
 
@@ -6665,9 +6875,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                         ? "Audio recording started mode=direct input_device=\(selectedAudioInputDescription)"
                         : "Audio recording started mode=direct input_device=\(selectedAudioInputDescription) (prearm)"
                 )
+                if usesFluidTrueStreamingBackend {
+                    try await resetFluidTrueStreamingTranscriptState()
+                    traceLogger.log("FluidAudio true streaming state reset for capture")
+                }
                 try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id, callback: nil)
                 traceLogger.log("Audio recording engine started mode=direct")
-                if config.streamingTranscriptionEnabled {
+                if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
+                    await runFluidTrueStreamingLoop(whisperKit: whisperKit)
+                } else if config.streamingTranscriptionEnabled {
                     await runRealtimeWhisperLoop(whisperKit: whisperKit)
                 } else {
                     while !Task.isCancelled {
@@ -6823,8 +7039,25 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "streaming_fallback"
                 )
+                if usesFluidTrueStreamingBackend, !capturedAudioSamples.isEmpty {
+                    traceLogger.log("Finalizing FluidAudio true streaming transcript samples=\(capturedAudioSamples.count)")
+                    do {
+                        if let acceptedFluidStreamingTranscript = try await finishFluidTrueStreamingTranscript(
+                            samples: capturedAudioSamples,
+                            signalStats: capturedSignalStats,
+                            captureDurationSeconds: effectiveCaptureDurationSeconds
+                        ) {
+                            traceLogger.log("Using FluidAudio true streaming transcript as final transcript")
+                            return acceptedFluidStreamingTranscript
+                        }
+                        traceLogger.log("FluidAudio true streaming transcript rejected; falling back to WhisperKit")
+                    } catch {
+                        traceLogger.log("FluidAudio true streaming transcript failed; falling back to WhisperKit error=\(error)")
+                    }
+                }
                 if !usesParakeetFinalBackend,
                    let acceptedStreamingTranscript,
+                   !usesFluidTrueStreamingBackend,
                    streamingSnapshotFreshEnoughForFinal(processingSnapshot, frozenAudioDurationSeconds: frozenAudioDurationSeconds) {
                     traceLogger.log("Using realtime Whisper streaming transcript as final transcript revision=\(processingSnapshot.revision)")
                     return acceptedStreamingTranscript
@@ -7289,6 +7522,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Audio normalization gain=\(String(format: "%.2f", normalizedResult.1)) normalized_rms=\(String(format: "%.5f", normalizedStats.rms)) normalized_peak=\(String(format: "%.5f", normalizedStats.peak))"
         )
+
+        if usesFluidTrueStreamingBackend {
+            traceLogger.log("Finalizing FluidAudio true streaming transcript samples=\(capturedSamples.count)")
+            do {
+                if let acceptedFluidStreamingTranscript = try await finishFluidTrueStreamingTranscript(
+                    samples: capturedSamples,
+                    signalStats: signalStats,
+                    captureDurationSeconds: captureDurationSeconds
+                ) {
+                    traceLogger.log("Using FluidAudio true streaming transcript as final transcript")
+                    return acceptedFluidStreamingTranscript
+                }
+                traceLogger.log("FluidAudio true streaming transcript rejected; falling back to WhisperKit")
+            } catch {
+                traceLogger.log("FluidAudio true streaming transcript failed; falling back to WhisperKit error=\(error)")
+            }
+        }
 
         var acceptedParakeetTranscriptForFallback: String?
         if usesParakeetFinalBackend {

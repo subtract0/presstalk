@@ -75,6 +75,16 @@ Current tooling update after that run:
   carry `asrBackend`, `asrMode`, and `realtimePartialTranscriptionEnabled` so
   release evidence can distinguish the current Parakeet ANE final-pass path from
   future realtime partial or true-streaming ASR backends.
+- The app contains opt-in FluidAudio true-streaming backends for
+  `PRESSTALK_ASR_BACKEND=parakeet-eou-320` and
+  `PRESSTALK_ASR_BACKEND=nemotron-560`. These feed live chunks into the
+  streaming manager, update the existing partial transcript path, finalize on
+  release, and fall back to local WhisperKit if the streaming candidate is not
+  acceptable. They are not the default release path yet.
+- A local offline `chirp.wav` check keeps that line firm: `parakeet-eou-320`
+  streamed quickly but produced an unusable mixed German transcript. The current
+  default `parakeet-v3-ane` produced the accepted transcript in `0.226s` total
+  processing, versus `3.508s` for the stock v1 GPU WhisperKit route.
 - `scripts/publish_presstalk_homebrew.sh` refuses stable, non-hyphenated
   versions unless both production distribution signing and notarization are
   explicitly enabled. Hyphenated `test` / prerelease versions keep the existing

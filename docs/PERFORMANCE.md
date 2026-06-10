@@ -219,6 +219,21 @@ Current interpretation:
 - For live partial text, Parakeet EOU 320ms is the most promising true
   streaming candidate tested so far. It needs capitalization, punctuation, and
   quality validation before it can replace final text.
+- The app now has an opt-in FluidAudio true-streaming path behind
+  `PRESSTALK_ASR_BACKEND=parakeet-eou-320` or
+  `PRESSTALK_ASR_BACKEND=nemotron-560`. It feeds live captured chunks through
+  the streaming manager, surfaces partials through the existing HUD/snapshot
+  path, finalizes the streaming transcript on release, and falls back to local
+  WhisperKit if the streaming result is weak. The default remains
+  `parakeet-v3-ane`, which is the current measured fallback release path.
+- A local offline check on `/Users/am/Downloads/chirp.wav` confirmed why this
+  stays experimental: `parakeet-eou-320` loaded and streamed quickly
+  (`0.897s` total processing for `21.232s` audio, `25` partial updates), but
+  its mixed German transcript was unusable. On the same fixture,
+  `parakeet-v3-ane` produced the accepted transcript in `0.226s` total
+  processing (`RTFx 93.76`, confidence `0.988`), while `stock-v1-gpu` produced
+  a good transcript in `3.508s` total processing (`RTFx 6.05`). Keep the true
+  streaming backend for partial/HUD experiments only until quality improves.
 - Nemotron remains a benchmark contender. It matched the normalized English
   score on the synthetic fixture, but it is English-only in the tested
   configuration and has higher production risk until model availability,

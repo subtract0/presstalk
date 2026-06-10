@@ -42,6 +42,12 @@ require_contains "$SOURCE" '"asrBackend": status.asrBackend' "runtime status JSO
 require_contains "$SOURCE" '"asrMode": status.asrMode' "runtime status JSON must record whether this is final-pass or realtime partial mode"
 require_contains "$SOURCE" '"realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled' "runtime status JSON must record realtime partial transcription state"
 require_contains "$SOURCE" 'parakeet_v3_ane_final_pass' "runtime must expose the current Parakeet ANE final-pass mode"
+require_contains "$SOURCE" 'case "parakeet-eou-320", "parakeet-eou-320ms"' "runtime must recognize the balanced Parakeet EOU true-streaming backend"
+require_contains "$SOURCE" 'case "nemotron-560", "nemotron-560ms"' "runtime must recognize the low-latency Nemotron true-streaming backend"
+require_contains "$SOURCE" 'runFluidTrueStreamingLoop' "runtime must wire FluidAudio true-streaming loop"
+require_contains "$SOURCE" 'finishFluidTrueStreamingTranscript' "runtime must finalize FluidAudio true-streaming transcripts"
+require_contains "$SOURCE" 'FluidAudio true streaming state reset for capture' "runtime must reset true-streaming state for each capture"
+require_contains "$SOURCE" 'FluidAudio true streaming transcript failed; falling back to WhisperKit' "runtime must preserve local Whisper fallback for true-streaming candidates"
 
 require_contains "$BOOTSTRAP" 'PRESSTALK_ASR_BACKEND="${PRESSTALK_ASR_BACKEND:-${JARVISTAP_ASR_BACKEND:-parakeet-v3-ane}}"' "bootstrap must default to Parakeet v3 ANE"
 require_contains "$BOOTSTRAP" 'JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-auto}"' "bootstrap must default language detection to auto"

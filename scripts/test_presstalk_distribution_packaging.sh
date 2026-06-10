@@ -4,6 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_SCRIPT="$SCRIPT_DIR/package_presstalk_release.sh"
 PUBLISH_HOMEBREW_SCRIPT="$SCRIPT_DIR/publish_presstalk_homebrew.sh"
+PUBLISH_PRERELEASE_SCRIPT="$SCRIPT_DIR/publish_presstalk_prerelease.sh"
 TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-distribution-package-test.XXXXXX")"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
@@ -65,5 +66,18 @@ if [[ "$stable_publish_without_notary_status" -ne 2 ]]; then
   exit 1
 fi
 grep -Fq "Refusing to publish a stable PressTalk Homebrew release without notarization" "$stable_publish_without_notary_output"
+
+stable_prerelease_tag_output="$TEST_TMPDIR/stable-prerelease-tag.txt"
+set +e
+PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG=0 \
+  "$PUBLISH_PRERELEASE_SCRIPT" 0.1.6 >"$stable_prerelease_tag_output" 2>&1
+stable_prerelease_tag_status=$?
+set -e
+if [[ "$stable_prerelease_tag_status" -ne 2 ]]; then
+  echo "FAIL: expected stable-looking prerelease tag to exit 2, got $stable_prerelease_tag_status"
+  cat "$stable_prerelease_tag_output"
+  exit 1
+fi
+grep -Fq "Refusing to publish a prerelease smoke artifact with a stable-looking version" "$stable_prerelease_tag_output"
 
 echo "PASS distribution_packaging"

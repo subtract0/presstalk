@@ -71,6 +71,10 @@ Current tooling update after that run:
   versions unless both production distribution signing and notarization are
   explicitly enabled. Hyphenated `test` / prerelease versions keep the existing
   smoke-test publishing path.
+- `scripts/publish_presstalk_prerelease.sh` also refuses stable-looking,
+  non-hyphenated versions unless `PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG=1` is
+  deliberately set, so smoke artifacts cannot accidentally occupy stable
+  version tags.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

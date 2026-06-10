@@ -147,6 +147,9 @@ Publish a public prerelease artifact for machine smoke testing:
 bash scripts/publish_presstalk_prerelease.sh 0.1.6-test5
 ```
 
+`publish_presstalk_prerelease.sh` also requires a hyphenated version by default
+so smoke artifacts do not look like stable production tags.
+
 Publish the public binary release plus Homebrew tap:
 ```bash
 bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5

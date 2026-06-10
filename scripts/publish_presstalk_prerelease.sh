@@ -11,6 +11,15 @@ ASSET_PATH="$ROOT/dist/$ASSET_NAME"
 SHA_PATH="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 RELEASE_TAG="v$VERSION"
 
+if [[ "$VERSION" != *-* && "${PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG:-0}" != "1" ]]; then
+  cat >&2 <<'EOF'
+Refusing to publish a prerelease smoke artifact with a stable-looking version.
+Use a hyphenated version such as 0.1.6-test5, or set
+PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG=1 deliberately.
+EOF
+  exit 2
+fi
+
 if ! command -v gh >/dev/null 2>&1; then
   echo "Missing required command: gh" >&2
   exit 1

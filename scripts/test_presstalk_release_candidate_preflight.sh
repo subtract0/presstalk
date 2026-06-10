@@ -289,6 +289,12 @@ if [[ "$(plutil -extract passed raw -o - "$fail_summary")" != "false" ||
   plutil -p "$fail_summary"
   exit 1
 fi
+if plutil -extract artifactAuditJSON raw -o - "$fail_summary" >/dev/null 2>&1 ||
+   plutil -extract releaseReadinessJSON raw -o - "$fail_summary" >/dev/null 2>&1; then
+  echo "FAIL: failed proof gate should not report later-stage evidence paths"
+  plutil -p "$fail_summary"
+  exit 1
+fi
 if [[ -f "$fail_dist/fake-publish-ran.txt" ]]; then
   echo "FAIL: publish dry-run ran after failed proof gate"
   cat "$fail_output"

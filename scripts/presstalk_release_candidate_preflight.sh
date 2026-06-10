@@ -230,11 +230,21 @@ write_wrapper_summary() {
   plutil -insert schemaVersion -string "1" "$result_plist" >/dev/null
   plutil -insert version -string "$VERSION" "$result_plist" >/dev/null
   plutil -insert distDir -string "$DIST_DIR" "$result_plist" >/dev/null
-  plutil -insert hostDiscoveryJSON -string "$HOST_DISCOVERY_JSON" "$result_plist" >/dev/null
-  plutil -insert readinessMatrixJSON -string "$MATRIX_JSON" "$result_plist" >/dev/null
-  plutil -insert proofGateJSON -string "$PROOF_GATE_JSON" "$result_plist" >/dev/null
-  plutil -insert artifactAuditJSON -string "$ARTIFACT_AUDIT_JSON" "$result_plist" >/dev/null
-  plutil -insert releaseReadinessJSON -string "$RELEASE_READINESS_JSON" "$result_plist" >/dev/null
+  if [[ -f "$HOST_DISCOVERY_JSON" ]]; then
+    plutil -insert hostDiscoveryJSON -string "$HOST_DISCOVERY_JSON" "$result_plist" >/dev/null
+  fi
+  if [[ -f "$MATRIX_JSON" ]]; then
+    plutil -insert readinessMatrixJSON -string "$MATRIX_JSON" "$result_plist" >/dev/null
+  fi
+  if [[ -f "$PROOF_GATE_JSON" ]]; then
+    plutil -insert proofGateJSON -string "$PROOF_GATE_JSON" "$result_plist" >/dev/null
+  fi
+  if [[ -f "$ARTIFACT_AUDIT_JSON" ]]; then
+    plutil -insert artifactAuditJSON -string "$ARTIFACT_AUDIT_JSON" "$result_plist" >/dev/null
+  fi
+  if [[ -f "$RELEASE_READINESS_JSON" ]]; then
+    plutil -insert releaseReadinessJSON -string "$RELEASE_READINESS_JSON" "$result_plist" >/dev/null
+  fi
   plutil -insert requiredTargets -array "$result_plist" >/dev/null
   if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
     for required in "${REQUIRED_TARGETS[@]}"; do
@@ -262,6 +272,14 @@ PROOF_GATE_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-proof-gate.json"
 ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 WRAPPER_JSON="${JSON_OUTPUT_PATH:-$DIST_DIR/${PUBLIC_NAME}-${VERSION}-candidate-preflight.json}"
+
+rm -f \
+  "$HOST_DISCOVERY_JSON" \
+  "$MATRIX_JSON" \
+  "$PROOF_GATE_JSON" \
+  "$ARTIFACT_AUDIT_JSON" \
+  "$RELEASE_READINESS_JSON" \
+  "$WRAPPER_JSON"
 
 matrix_args=(--json-output "$MATRIX_JSON")
 if [[ "$RUN_LOCAL" -eq 1 ]]; then

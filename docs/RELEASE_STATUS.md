@@ -125,6 +125,11 @@ Current tooling update after that run:
   When explicit hosts are supplied, it also writes a host-discovery JSON with
   read-only SSH config, Bonjour, Tailscale, and strict BatchMode SSH probe
   evidence for those hosts. ARP scanning is disabled in the wrapper path.
+- `scripts/presstalk_release_target_handoff.sh` reads an existing failed
+  candidate-preflight JSON and prints the manual target actions needed before
+  rerunning proof. It is read-only: it does not SSH, install PressTalk, open
+  System Settings, or contact excluded hosts such as `studio2` while they are
+  intentionally out of microphone/STT scope.
 - `scripts/presstalk_release_proof_gate.sh` now treats missing or `unknown`
   ASR backend/mode evidence as not proven. A stale installed app can still be
   physically usable, but it cannot count as release proof until its

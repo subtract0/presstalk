@@ -162,6 +162,18 @@ When explicit hosts are supplied, it also writes
 Tailscale, and strict BatchMode SSH probe evidence for those hosts. ARP scanning
 is disabled in that wrapper path by default.
 
+If the candidate fails because a target Mac is unreachable or not ready, turn
+the receipts into a manual target handoff without probing anything again:
+```bash
+bash scripts/presstalk_release_target_handoff.sh \
+  --candidate-preflight dist/release-candidate-0.1.6-test5/PressTalk-0.1.6-test5-candidate-preflight.json \
+  --json-output dist/release-candidate-0.1.6-test5/PressTalk-0.1.6-test5-target-handoff.json
+```
+
+The handoff report is read-only. It does not SSH, install PressTalk, open
+System Settings, or touch excluded machines such as `studio2` while it is out of
+microphone/STT scope.
+
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.
 

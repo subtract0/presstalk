@@ -71,6 +71,10 @@ Current tooling update after that run:
   installing it and records bundle metadata, SHA-256, codesign verification,
   Developer ID status, hardened runtime, and stapler validation. Use
   `--require-distribution --require-notarized` for stable production artifacts.
+- Runtime status, machine readiness, matrix summaries, and proof-gate JSON now
+  carry `asrBackend`, `asrMode`, and `realtimePartialTranscriptionEnabled` so
+  release evidence can distinguish the current Parakeet ANE final-pass path from
+  future realtime partial or true-streaming ASR backends.
 - `scripts/publish_presstalk_homebrew.sh` refuses stable, non-hyphenated
   versions unless both production distribution signing and notarization are
   explicitly enabled. Hyphenated `test` / prerelease versions keep the existing

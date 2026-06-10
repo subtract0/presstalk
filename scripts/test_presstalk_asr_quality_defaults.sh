@@ -38,6 +38,10 @@ require_contains "$SOURCE" '0.96' "runtime must keep the default Parakeet confid
 require_contains "$SOURCE" "Parakeet v3 ANE transcript accepted but quality fallback requested" "runtime must log accepted Parakeet quality fallback"
 require_contains "$SOURCE" "Using accepted Parakeet v3 ANE transcript fallback after Whisper candidates were empty, implausible, or too short" "runtime must preserve accepted Parakeet transcript when Whisper fallback is unusable or truncated"
 require_contains "$SOURCE" "Whisper candidate deferred because it is much shorter than accepted Parakeet recall candidate" "runtime must detect truncated Whisper fallback candidates"
+require_contains "$SOURCE" '"asrBackend": status.asrBackend' "runtime status JSON must record the active ASR backend"
+require_contains "$SOURCE" '"asrMode": status.asrMode' "runtime status JSON must record whether this is final-pass or realtime partial mode"
+require_contains "$SOURCE" '"realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled' "runtime status JSON must record realtime partial transcription state"
+require_contains "$SOURCE" 'parakeet_v3_ane_final_pass' "runtime must expose the current Parakeet ANE final-pass mode"
 
 require_contains "$BOOTSTRAP" 'PRESSTALK_ASR_BACKEND="${PRESSTALK_ASR_BACKEND:-${JARVISTAP_ASR_BACKEND:-parakeet-v3-ane}}"' "bootstrap must default to Parakeet v3 ANE"
 require_contains "$BOOTSTRAP" 'JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-auto}"' "bootstrap must default language detection to auto"

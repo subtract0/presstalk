@@ -157,8 +157,10 @@ require an unresolved SSH alias for the same Mac.
 
 It does not open System Settings or start signing repair. It reports Apple
 Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
-speech readiness, active-field insertion readiness, latest production insertion
-probe, and the next action. If it reports
+speech readiness, ASR backend/mode, active-field insertion readiness, latest
+production insertion probe, and the next action. The ASR fields distinguish the
+current `parakeet_v3_ane_final_pass` fallback release from future realtime
+partial or true-streaming backends. If it reports
 `MicrophoneHardwareDetected: false`, skip microphone/STT smoke for that machine
 until a microphone is attached. Do not include `studio2` / `s2` in the current
 STT smoke matrix while it has no attached microphone.

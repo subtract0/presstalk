@@ -25,6 +25,9 @@ struct PressTalkRuntimeStatus {
     let adHocSigned: Bool
     let permissionPaneOpeningAllowed: Bool
     let speechModelStatus: String
+    let asrBackend: String
+    let realtimePartialTranscriptionEnabled: Bool
+    let asrMode: String
     let f5BridgeStatus: String
     let codeSignatureIdentifier: String
     let codeSignatureCDHash: String
@@ -232,6 +235,9 @@ struct PressTalkRuntimeStatus {
         adHocSigned: false,
         permissionPaneOpeningAllowed: false,
         speechModelStatus: "Checking...",
+        asrBackend: "unknown",
+        realtimePartialTranscriptionEnabled: false,
+        asrMode: "unknown",
         f5BridgeStatus: "Checking...",
         codeSignatureIdentifier: "unknown",
         codeSignatureCDHash: "unknown",

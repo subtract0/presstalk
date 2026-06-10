@@ -200,6 +200,9 @@ for required in "${REQUIRED_TARGETS[@]}"; do
 
   target="$(json_value "targets.$index.target")"
   machine_host="$(json_value "targets.$index.summary.machineHost")"
+  asr_backend="$(json_value "targets.$index.summary.asrBackend")"
+  asr_mode="$(json_value "targets.$index.summary.asrMode")"
+  realtime_partial_transcription_enabled="$(json_value "targets.$index.summary.realtimePartialTranscriptionEnabled")"
   status="$(json_value "targets.$index.status")"
   reachable="$(json_value "targets.$index.reachable")"
   physical="$(json_value "targets.$index.summary.physicalSTTSmokeReady")"
@@ -233,6 +236,9 @@ for required in "${REQUIRED_TARGETS[@]}"; do
 
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:target" "${target:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:machineHost" "${machine_host:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:asrBackend" "${asr_backend:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:asrMode" "${asr_mode:-unknown}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:realtimePartialTranscriptionEnabled" "${realtime_partial_transcription_enabled:-false}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:status" "${status:-unknown}"
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:reachable" "${reachable:-false}"
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:physicalSTTSmokeReady" "${physical:-false}"
@@ -240,7 +246,7 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:nextAction" "${next_action:-unknown}"
 
   if [[ "$target_failures" -eq 0 ]]; then
-    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown}"
+    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown} asrMode=${asr_mode:-unknown}"
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "true"
   else
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "false"

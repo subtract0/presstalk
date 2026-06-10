@@ -41,6 +41,9 @@ if [[ "$local_status" != "ready_reported" ]]; then
   exit 1
 fi
 extract_required "$local_json" targets.0.readiness.schemaVersion >/dev/null
+extract_required "$local_json" targets.0.summary.asrBackend >/dev/null
+extract_required "$local_json" targets.0.summary.asrMode >/dev/null
+extract_required "$local_json" targets.0.summary.realtimePartialTranscriptionEnabled >/dev/null
 extract_required "$local_json" targets.0.summary.activeFieldSmokeReady >/dev/null
 
 "$MATRIX_HELPER" --host presstalk-invalid-host.invalid --timeout 1 --json >"$blocked_json"

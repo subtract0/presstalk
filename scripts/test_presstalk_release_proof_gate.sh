@@ -19,6 +19,9 @@ cat >"$pass_matrix" <<'JSON'
       "reachable": true,
       "summary": {
         "machineHost": "studio1",
+        "asrBackend": "parakeet-v3-ane",
+        "asrMode": "parakeet_v3_ane_final_pass",
+        "realtimePartialTranscriptionEnabled": false,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -30,6 +33,9 @@ cat >"$pass_matrix" <<'JSON'
       "reachable": true,
       "summary": {
         "machineHost": "mbp1",
+        "asrBackend": "parakeet-v3-ane",
+        "asrMode": "parakeet_v3_ane_final_pass",
+        "realtimePartialTranscriptionEnabled": false,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -49,6 +55,9 @@ cat >"$blocked_matrix" <<'JSON'
       "reachable": true,
       "summary": {
         "machineHost": "studio1",
+        "asrBackend": "parakeet-v3-ane",
+        "asrMode": "parakeet_v3_ane_final_pass",
+        "realtimePartialTranscriptionEnabled": false,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -60,6 +69,9 @@ cat >"$blocked_matrix" <<'JSON'
       "reachable": true,
       "summary": {
         "machineHost": "mbp1",
+        "asrBackend": "parakeet-v3-ane",
+        "asrMode": "parakeet_v3_ane_final_pass",
+        "realtimePartialTranscriptionEnabled": false,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": false,
         "nextAction": "Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
@@ -74,6 +86,7 @@ pass_json="$TEST_TMPDIR/pass-result.json"
 "$GATE" --matrix "$pass_matrix" --require studio1 --require mbp1 --json-output "$pass_json" >"$pass_output"
 grep -Fq "Result: proven" "$pass_output"
 grep -Fq "PASS mbp1" "$pass_output"
+grep -Fq "asrMode=parakeet_v3_ane_final_pass" "$pass_output"
 if [[ "$(plutil -extract proven raw -o - "$pass_json")" != "true" ]]; then
   echo "FAIL: pass JSON did not report proven=true"
   plutil -p "$pass_json"
@@ -81,6 +94,12 @@ if [[ "$(plutil -extract proven raw -o - "$pass_json")" != "true" ]]; then
 fi
 if [[ "$(plutil -extract failureCount raw -o - "$pass_json")" != "0" ]]; then
   echo "FAIL: pass JSON did not report failureCount=0"
+  plutil -p "$pass_json"
+  exit 1
+fi
+if [[ "$(plutil -extract targets.0.asrMode raw -o - "$pass_json")" != "parakeet_v3_ane_final_pass" ||
+      "$(plutil -extract targets.0.realtimePartialTranscriptionEnabled raw -o - "$pass_json")" != "false" ]]; then
+  echo "FAIL: pass JSON did not preserve ASR mode evidence"
   plutil -p "$pass_json"
   exit 1
 fi

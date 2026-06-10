@@ -33,6 +33,9 @@ extract_required machine.architecture >/dev/null
 extract_required audio.microphoneHardwareDetected >/dev/null
 extract_required pressTalk.installed >/dev/null
 extract_required runtime.statusAvailable >/dev/null
+extract_required runtime.asrBackend >/dev/null
+extract_required runtime.asrMode >/dev/null
+extract_required runtime.realtimePartialTranscriptionEnabled >/dev/null
 extract_required eligibility.installSmokeEligible >/dev/null
 extract_required eligibility.physicalSTTSmokeReady >/dev/null
 extract_required eligibility.activeFieldSmokeReady >/dev/null
@@ -113,8 +116,11 @@ cat >"$fixture_status" <<'JSON'
   "runtime": {
     "activeFieldInsertionReady": false,
     "activeFieldInsertionStatus": "blocked_recognized_disabled",
+    "asrBackend": "parakeet-v3-ane",
+    "asrMode": "parakeet_v3_ane_final_pass",
     "inputListener": "carbon:registered",
-    "inputPipelineReady": true
+    "inputPipelineReady": true,
+    "realtimePartialTranscriptionEnabled": false
   },
   "permissions": {
     "accessibilityStatus": "ax_false_input_method_recognized_disabled",
@@ -165,6 +171,13 @@ if [[ "$with_command_next_action" == *"Repair Signing"* || "$with_command_next_a
 fi
 if [[ "$(plutil -extract runtime.accessibilityTCCAuthValue raw -o - "$fixture_with_command_json")" != "0" ]]; then
   echo "FAIL: denied-row fixture did not record runtime.accessibilityTCCAuthValue=0"
+  plutil -p "$fixture_with_command_json"
+  exit 1
+fi
+if [[ "$(plutil -extract runtime.asrBackend raw -o - "$fixture_with_command_json")" != "parakeet-v3-ane" ||
+      "$(plutil -extract runtime.asrMode raw -o - "$fixture_with_command_json")" != "parakeet_v3_ane_final_pass" ||
+      "$(plutil -extract runtime.realtimePartialTranscriptionEnabled raw -o - "$fixture_with_command_json")" != "false" ]]; then
+  echo "FAIL: fixture did not preserve runtime ASR mode evidence"
   plutil -p "$fixture_with_command_json"
   exit 1
 fi

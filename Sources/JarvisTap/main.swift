@@ -2269,6 +2269,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
             speechModelStatus: whisperStatus,
+            asrBackend: config.asrBackend,
+            realtimePartialTranscriptionEnabled: config.streamingTranscriptionEnabled,
+            asrMode: currentASRModeDescription(),
             f5BridgeStatus: bridgeStatus,
             codeSignatureIdentifier: codeSignatureIdentifier,
             codeSignatureCDHash: codeSignatureCDHash,
@@ -2300,6 +2303,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "agentMode": config.agentMode,
                 "triggerKey": settingsStore.triggerKey.rawValue,
                 "selectedTriggerObserved": status.selectedTriggerObserved,
+                "asrBackend": status.asrBackend,
+                "asrMode": status.asrMode,
+                "realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled,
                 "whisperModel": config.whisperModel,
                 "whisperLanguage": config.whisperLanguage ?? "auto",
                 "traceLogPath": config.traceLogPath,
@@ -2424,6 +2430,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             Runtime
             - Speech model: \(runtimeStatus.speechModelStatus)
+            - ASR backend: \(runtimeStatus.asrBackend)
+            - ASR mode: \(runtimeStatus.asrMode)
+            - Realtime partial transcription: \(runtimeStatus.realtimePartialTranscriptionEnabled ? "enabled" : "disabled")
             - Trigger path: \(runtimeStatus.f5BridgeStatus)
             - Input listener: \(eventTapInstallSummary)
             - Native calibration: \(currentNativeCalibrationSummary())
@@ -3455,6 +3464,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         default:
             return false
         }
+    }
+
+    private func currentASRModeDescription() -> String {
+        if usesParakeetFinalBackend {
+            return config.streamingTranscriptionEnabled
+                ? "parakeet_v3_ane_final_pass_with_realtime_whisper_partials"
+                : "parakeet_v3_ane_final_pass"
+        }
+
+        return config.streamingTranscriptionEnabled
+            ? "realtime_whisper_partials_with_offline_finalize"
+            : "offline_whisper_final_pass"
     }
 
     private func loadParakeetV3ANE() async throws {

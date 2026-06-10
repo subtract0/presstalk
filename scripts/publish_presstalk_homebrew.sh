@@ -19,6 +19,8 @@ REQUIRED_PROOF_TARGETS="${PRESSTALK_REQUIRED_PROOF_TARGETS:-}"
 RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 REQUIRE_STREAMING_RELEASE="${PRESSTALK_REQUIRE_STREAMING_RELEASE:-}"
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
+STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
+REQUIRE_STREAMING_BENCH_QUALITY="${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-}"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-publish.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -62,6 +64,9 @@ if [[ "$IS_PRERELEASE" == "0" ]]; then
   if truthy "$REQUIRE_STREAMING_RELEASE" && [[ -z "${PRESSTALK_EXPECTED_ASR_MODE:-}" ]]; then
     EXPECTED_ASR_MODE="any"
   fi
+  if [[ -z "$REQUIRE_STREAMING_BENCH_QUALITY" ]]; then
+    REQUIRE_STREAMING_BENCH_QUALITY=1
+  fi
   if [[ -z "$REQUIRED_PROOF_TARGETS" ]]; then
     REQUIRED_PROOF_TARGETS="studio1,mbp1"
   fi
@@ -92,6 +97,21 @@ EOF
   if [[ ! -f "$PROOF_GATE_JSON" ]]; then
     echo "Missing release proof gate JSON: $PROOF_GATE_JSON" >&2
     exit 2
+  fi
+  if truthy "$REQUIRE_STREAMING_BENCH_QUALITY"; then
+    if [[ -z "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+      cat >&2 <<'EOF'
+Refusing to publish a stable PressTalk streaming release without streaming ASR
+quality evidence. Set PRESSTALK_STREAMING_BENCH_QUALITY_JSON to JSON produced
+by presstalk_streaming_bench_quality_gate.sh after benchmarking the selected
+streaming backend against a reference transcript.
+EOF
+      exit 2
+    fi
+    if [[ ! -f "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+      echo "Missing streaming bench quality JSON: $STREAMING_BENCH_QUALITY_JSON" >&2
+      exit 2
+    fi
   fi
 fi
 
@@ -150,6 +170,12 @@ if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_RELEASE_READINES
   fi
   if truthy "$REQUIRE_STREAMING_RELEASE"; then
     readiness_args+=(--require-streaming)
+  fi
+  if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    readiness_args+=(--streaming-bench-quality "$STREAMING_BENCH_QUALITY_JSON")
+  fi
+  if truthy "$REQUIRE_STREAMING_BENCH_QUALITY"; then
+    readiness_args+=(--require-streaming-bench-quality)
   fi
   "$READINESS_PREFLIGHT_SCRIPT" "${readiness_args[@]}"
 fi

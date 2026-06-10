@@ -1,0 +1,2 @@
+Chirp 3: Instant-Custom Voice
+Erstellen Sie personalisierte Sprachmodelle mit Audioeingaben von nur zehn Sekunden Länge. Perfekt für Videospiele, Hörbücher, Podcasts und mehr. In über 30 Sprachen verfügbar. Weitere Informationen finden Sie im Media Studio oder in unserer Dokumentation.

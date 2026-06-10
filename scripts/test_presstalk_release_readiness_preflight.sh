@@ -11,6 +11,7 @@ production_artifact_audit="$TEST_TMPDIR/production-artifact-audit.json"
 proof_gate="$TEST_TMPDIR/proof-gate.json"
 asr_mismatch_proof_gate="$TEST_TMPDIR/asr-mismatch-proof-gate.json"
 streaming_proof_gate="$TEST_TMPDIR/streaming-proof-gate.json"
+streaming_bench_quality="$TEST_TMPDIR/streaming-bench-quality.json"
 
 cat >"$test_artifact_audit" <<'JSON'
 {
@@ -144,6 +145,18 @@ cat >"$streaming_proof_gate" <<'JSON'
 }
 JSON
 
+cat >"$streaming_bench_quality" <<'JSON'
+{
+  "schemaVersion": "1",
+  "passed": true,
+  "streamingQualityReady": true,
+  "reportCount": 1,
+  "reportBackends": ["parakeet-eou-320"],
+  "failureCount": 0,
+  "failures": []
+}
+JSON
+
 test_pass_output="$TEST_TMPDIR/test-pass.txt"
 test_pass_json="$TEST_TMPDIR/test-pass.json"
 "$PREFLIGHT" \
@@ -214,6 +227,40 @@ streaming_any_mode_output="$TEST_TMPDIR/streaming-any-mode.txt"
   --expected-asr-mode any \
   --require-streaming >"$streaming_any_mode_output"
 grep -Fq "Result: pass" "$streaming_any_mode_output"
+
+streaming_quality_missing_output="$TEST_TMPDIR/streaming-quality-missing.txt"
+if "$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode any \
+  --require-streaming \
+  --require-streaming-bench-quality >"$streaming_quality_missing_output"; then
+  echo "FAIL: streaming quality requirement unexpectedly passed without quality JSON"
+  cat "$streaming_quality_missing_output"
+  exit 1
+fi
+grep -Fq "streaming_bench_quality_json_missing" "$streaming_quality_missing_output"
+
+streaming_quality_pass_output="$TEST_TMPDIR/streaming-quality-pass.txt"
+streaming_quality_pass_json="$TEST_TMPDIR/streaming-quality-pass.json"
+"$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode any \
+  --require-streaming \
+  --streaming-bench-quality "$streaming_bench_quality" \
+  --require-streaming-bench-quality \
+  --json-output "$streaming_quality_pass_json" >"$streaming_quality_pass_output"
+grep -Fq "StreamingBenchQualityReady: true" "$streaming_quality_pass_output"
+grep -Fq "RequireStreamingBenchQuality: true" "$streaming_quality_pass_output"
+grep -Fq "Result: pass" "$streaming_quality_pass_output"
+if [[ "$(plutil -extract streamingBenchQualityReady raw -o - "$streaming_quality_pass_json")" != "true" ||
+      "$(plutil -extract requireStreamingBenchQuality raw -o - "$streaming_quality_pass_json")" != "true" ||
+      "$(plutil -extract streamingBenchQuality raw -o - "$streaming_quality_pass_json")" != "$streaming_bench_quality" ]]; then
+  echo "FAIL: streaming quality readiness JSON mismatch"
+  plutil -p "$streaming_quality_pass_json"
+  exit 1
+fi
 
 production_required_output="$TEST_TMPDIR/production-required.txt"
 production_required_json="$TEST_TMPDIR/production-required.json"

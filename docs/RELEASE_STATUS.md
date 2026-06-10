@@ -122,8 +122,26 @@ Current tooling update after that run:
   When streaming is required and `PRESSTALK_EXPECTED_ASR_MODE` is unset, publish
   paths pass `--expected-asr-mode any`, accepting any non-missing streaming ASR
   mode while still requiring `realtimePartialTranscriptionEnabled=true`.
-  Hyphenated test/prerelease builds can opt into the same gate by setting
-  `PRESSTALK_REQUIRE_STREAMING_RELEASE=1`.
+  Stable streaming publish also requires
+  `PRESSTALK_STREAMING_BENCH_QUALITY_JSON` from
+  `scripts/presstalk_streaming_bench_quality_gate.sh`, so live partials alone
+  are not enough when WER/CER or per-slice latency are unacceptable. Hyphenated
+  test/prerelease builds can opt into the same gates by setting
+  `PRESSTALK_REQUIRE_STREAMING_RELEASE=1` and
+  `PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY=1`.
+- `scripts/presstalk_streaming_bench_quality_gate.sh` reads JSON lines emitted
+  by `presstalk-asr-bench --json` and fails unless the selected streaming
+  backend emits partial updates, finalizes quickly, stays under per-slice
+  latency thresholds, and meets configured WER/CER limits against a reference
+  transcript. `docs/fixtures/chirp-reference.txt` preserves Alex's mixed
+  English/German `chirp.wav` reference for repeatable quality checks.
+- Current `parakeet-eou-320` streaming quality evidence on
+  `/Users/am/Downloads/chirp.wav` correctly fails the new gate: it produced
+  `25` partial updates and fast finalization, but WER/CER were too high on the
+  mixed English/German fixture. The combined
+  `PressTalk-0.1.6-test5-streaming-quality-readiness.json` receipt therefore
+  fails on `streaming_bench_quality_not_passed` in addition to the existing
+  target-proof and final-pass runtime gaps.
 - Stable `scripts/publish_presstalk_homebrew.sh` now refuses to publish unless
   `PRESSTALK_RELEASE_PROOF_GATE_JSON` points at a proof-gate JSON, then runs the
   readiness preflight with `--require-production` before any GitHub release or

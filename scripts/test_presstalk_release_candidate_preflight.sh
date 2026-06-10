@@ -96,6 +96,11 @@ if [[ "${PRESSTALK_REQUIRED_PROOF_TARGETS:-}" != "local" ]]; then
   echo "Fake publish expected PRESSTALK_REQUIRED_PROOF_TARGETS=local, got ${PRESSTALK_REQUIRED_PROOF_TARGETS:-unset}" >&2
   exit 2
 fi
+if [[ "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-0}" == "1" &&
+      ! -f "${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}" ]]; then
+  echo "Fake publish expected streaming bench quality JSON" >&2
+  exit 2
+fi
 
 dist_dir="${PRESSTALK_DIST_DIR:?}"
 public_name="${PUBLIC_NAME:-PressTalk}"
@@ -105,6 +110,8 @@ printf 'fake zip\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip"
 printf 'fake sha\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip.sha256"
 printf 'ran\n' >"$dist_dir/fake-publish-ran.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-unset}" >"$dist_dir/fake-publish-streaming-env.txt"
+printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-unset}" >"$dist_dir/fake-publish-streaming-bench-env.txt"
+printf '%s\n' "${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-unset}" >"$dist_dir/fake-publish-streaming-bench-json.txt"
 cat >"$dist_dir/${public_name}-${version}-macos-${arch}-artifact-audit.json" <<JSON
 {
   "schemaVersion": "1",
@@ -271,14 +278,31 @@ test -f "$default_dist/PressTalk-0.0-default-candidate-preflight.json"
 
 streaming_dist="$TEST_TMPDIR/streaming-dist"
 streaming_output="$TEST_TMPDIR/streaming-output.txt"
+streaming_quality_json="$TEST_TMPDIR/streaming-quality.json"
+cat >"$streaming_quality_json" <<'JSON'
+{
+  "schemaVersion": "1",
+  "passed": true,
+  "streamingQualityReady": true
+}
+JSON
 PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
 PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
   "$WRAPPER" --version 0.0-streaming --dist-dir "$streaming_dist" --local \
-    --require local --require-streaming >"$streaming_output"
+    --require local --require-streaming \
+    --streaming-bench-quality "$streaming_quality_json" \
+    --require-streaming-bench-quality >"$streaming_output"
 grep -Fq "Result: pass" "$streaming_output"
 if [[ "$(cat "$streaming_dist/fake-publish-streaming-env.txt")" != "1" ]]; then
   echo "FAIL: --require-streaming did not reach publish dry-run"
   cat "$streaming_dist/fake-publish-streaming-env.txt"
+  exit 1
+fi
+if [[ "$(cat "$streaming_dist/fake-publish-streaming-bench-env.txt")" != "1" ||
+      "$(cat "$streaming_dist/fake-publish-streaming-bench-json.txt")" != "$streaming_quality_json" ]]; then
+  echo "FAIL: streaming bench quality args did not reach publish dry-run"
+  cat "$streaming_dist/fake-publish-streaming-bench-env.txt"
+  cat "$streaming_dist/fake-publish-streaming-bench-json.txt"
   exit 1
 fi
 

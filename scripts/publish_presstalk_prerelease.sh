@@ -17,6 +17,7 @@ PROOF_GATE_JSON="${PRESSTALK_RELEASE_PROOF_GATE_JSON:-${PRESSTALK_PROOF_GATE_JSO
 REQUIRED_PROOF_TARGETS="${PRESSTALK_REQUIRED_PROOF_TARGETS:-}"
 RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
+STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
 RELEASE_TAG="v$VERSION"
 
 truthy() {
@@ -107,6 +108,12 @@ if truthy "${PRESSTALK_REQUIRE_RELEASE_READINESS:-0}"; then
   fi
   if truthy "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-0}"; then
     readiness_args+=(--require-streaming)
+  fi
+  if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    readiness_args+=(--streaming-bench-quality "$STREAMING_BENCH_QUALITY_JSON")
+  fi
+  if truthy "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-0}"; then
+    readiness_args+=(--require-streaming-bench-quality)
   fi
   "$READINESS_PREFLIGHT_SCRIPT" "${readiness_args[@]}"
 fi

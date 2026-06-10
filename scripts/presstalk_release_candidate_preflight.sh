@@ -17,6 +17,8 @@ EXCLUDED_HOST_COUNT=0
 JSON_OUTPUT_PATH=""
 REQUIRE_PRODUCTION=0
 REQUIRE_STREAMING=0
+REQUIRE_STREAMING_BENCH_QUALITY=0
+STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
 RUN_HOST_DISCOVERY=1
 HOST_DISCOVERY_TIMEOUT="${PRESSTALK_CANDIDATE_HOST_DISCOVERY_TIMEOUT:-3}"
 
@@ -55,6 +57,10 @@ Options:
                           readiness preflight.
   --require-streaming     Require realtime partial/streaming evidence in final
                           readiness preflight and publish dry-run.
+  --streaming-bench-quality PATH
+                          JSON from presstalk_streaming_bench_quality_gate.sh.
+  --require-streaming-bench-quality
+                          Require passing streaming bench quality JSON.
   --json-output PATH      Write machine-readable wrapper summary.
   -h, --help              Show this help.
 EOF
@@ -142,6 +148,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-streaming)
       REQUIRE_STREAMING=1
+      shift
+      ;;
+    --streaming-bench-quality)
+      STREAMING_BENCH_QUALITY_JSON="${2:-}"
+      if [[ -z "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+        echo "Missing value for --streaming-bench-quality" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --require-streaming-bench-quality)
+      REQUIRE_STREAMING_BENCH_QUALITY=1
       shift
       ;;
     --json-output)
@@ -382,6 +400,12 @@ publish_env=(
 if [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
   publish_env+=(PRESSTALK_REQUIRE_STREAMING_RELEASE=1)
 fi
+if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+  publish_env+=(PRESSTALK_STREAMING_BENCH_QUALITY_JSON="$STREAMING_BENCH_QUALITY_JSON")
+fi
+if [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
+  publish_env+=(PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY=1)
+fi
 set +e
 env "${publish_env[@]}" "/bin/bash" "$PUBLISH_SCRIPT" "$VERSION"
 publish_status=$?
@@ -410,6 +434,12 @@ if [[ "$REQUIRE_PRODUCTION" -eq 1 ]]; then
   )
   if [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
     readiness_args+=(--require-streaming)
+  fi
+  if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    readiness_args+=(--streaming-bench-quality "$STREAMING_BENCH_QUALITY_JSON")
+  fi
+  if [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
+    readiness_args+=(--require-streaming-bench-quality)
   fi
   if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
     for required in "${REQUIRED_TARGETS[@]}"; do

@@ -180,6 +180,27 @@ bash scripts/presstalk_release_candidate_preflight.sh 0.1.6-test5 \
   --exclude-host "studio2=no attached microphone"
 ```
 
+Streaming candidates also need ASR quality evidence. Capture benchmark JSON
+from `presstalk-asr-bench`, then gate it before using it in release readiness:
+
+```bash
+swift run -c release presstalk-asr-bench \
+  --input /Users/am/Downloads/chirp.wav \
+  --backend parakeet-eou-320 \
+  --reference docs/fixtures/chirp-reference.txt \
+  --json | tee dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt
+
+bash scripts/presstalk_streaming_bench_quality_gate.sh \
+  --bench-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt \
+  --expected-backend parakeet-eou-320 \
+  --json-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-quality.json
+```
+
+The gate requires live partial updates, fast finalization, bounded per-slice
+latency, and WER/CER under the configured thresholds. Stable Homebrew publishing
+requires `PRESSTALK_STREAMING_BENCH_QUALITY_JSON=/path/to/quality.json` once the
+streaming release gate is active.
+
 If the candidate fails because a target Mac is unreachable or not ready, turn
 the receipts into a manual target handoff without probing anything again:
 ```bash

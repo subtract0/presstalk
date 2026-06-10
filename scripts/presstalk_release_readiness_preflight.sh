@@ -3,10 +3,12 @@ set -euo pipefail
 
 ARTIFACT_AUDIT_JSON=""
 PROOF_GATE_JSON=""
+STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
 JSON_OUTPUT_PATH=""
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
 REQUIRE_PRODUCTION=0
 REQUIRE_STREAMING=0
+REQUIRE_STREAMING_BENCH_QUALITY=0
 REQUIRED_PROOF_TARGETS=()
 REQUIRED_PROOF_TARGET_COUNT=0
 
@@ -32,6 +34,11 @@ Options:
                           ready and notarized.
   --require-streaming     Fail unless every proof target reports realtime
                           partial transcription enabled.
+  --streaming-bench-quality PATH
+                          JSON from presstalk_streaming_bench_quality_gate.sh.
+  --require-streaming-bench-quality
+                          Fail unless streaming bench quality JSON is present
+                          and passed.
   --json-output PATH      Write machine-readable readiness JSON.
   -h, --help              Show this help.
 EOF
@@ -80,6 +87,18 @@ while [[ $# -gt 0 ]]; do
       REQUIRE_STREAMING=1
       shift
       ;;
+    --streaming-bench-quality)
+      STREAMING_BENCH_QUALITY_JSON="${2:-}"
+      if [[ -z "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+        echo "Missing value for --streaming-bench-quality" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --require-streaming-bench-quality)
+      REQUIRE_STREAMING_BENCH_QUALITY=1
+      shift
+      ;;
     --json-output)
       JSON_OUTPUT_PATH="${2:-}"
       if [[ -z "$JSON_OUTPUT_PATH" ]]; then
@@ -126,6 +145,9 @@ fi
 
 case "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-}" in
   1|true|TRUE|yes|YES) REQUIRE_STREAMING=1 ;;
+esac
+case "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-}" in
+  1|true|TRUE|yes|YES) REQUIRE_STREAMING_BENCH_QUALITY=1 ;;
 esac
 
 json_value() {
@@ -184,6 +206,17 @@ zip_sha256="$(json_value "$ARTIFACT_AUDIT_JSON" zipSHA256)"
 proof_proven="$(json_value "$PROOF_GATE_JSON" proven)"
 proof_failures="$(json_value "$PROOF_GATE_JSON" failureCount)"
 target_count="$(json_value "$PROOF_GATE_JSON" targets)"
+streaming_bench_quality_ready=true
+streaming_bench_quality_passed=""
+if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+  if [[ -f "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    streaming_bench_quality_passed="$(json_value "$STREAMING_BENCH_QUALITY_JSON" passed)"
+  else
+    streaming_bench_quality_ready=false
+  fi
+elif [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
+  streaming_bench_quality_ready=false
+fi
 
 failures=()
 if ! bool_ready "$artifact_passed"; then
@@ -204,6 +237,24 @@ fi
 if [[ -z "$target_count" || ! "$target_count" =~ ^[0-9]+$ || "$target_count" -eq 0 ]]; then
   append_failure "proof_targets_missing"
   target_count=0
+fi
+if [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
+  if [[ -z "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    append_failure "streaming_bench_quality_json_missing"
+  elif [[ ! -f "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    append_failure "streaming_bench_quality_json_not_found"
+  elif ! bool_ready "$streaming_bench_quality_passed"; then
+    append_failure "streaming_bench_quality_not_passed"
+    streaming_bench_quality_ready=false
+  fi
+elif [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+  if [[ ! -f "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+    append_failure "streaming_bench_quality_json_not_found"
+    streaming_bench_quality_ready=false
+  elif ! bool_ready "$streaming_bench_quality_passed"; then
+    append_failure "streaming_bench_quality_not_passed"
+    streaming_bench_quality_ready=false
+  fi
 fi
 
 asr_mode_ready=true
@@ -265,6 +316,7 @@ if bool_ready "$artifact_passed" &&
    bool_ready "$proof_proven" &&
    [[ "$asr_mode_ready" == "true" ]] &&
    [[ "$streaming_ready" == "true" ]] &&
+   [[ "$streaming_bench_quality_ready" == "true" ]] &&
    [[ "$required_targets_ready" == "true" ]]; then
   production_ready=true
 fi
@@ -274,6 +326,7 @@ if bool_ready "$artifact_passed" &&
    bool_ready "$proof_proven" &&
    [[ "$asr_mode_ready" == "true" ]] &&
    [[ "$streaming_ready" == "true" ]] &&
+   [[ "$streaming_bench_quality_ready" == "true" ]] &&
    [[ "$required_targets_ready" == "true" ]]; then
   test_artifact_ready=true
 fi
@@ -292,6 +345,9 @@ fi
 plist_insert_string "$RESULT_PLIST" schemaVersion "1"
 plist_insert_string "$RESULT_PLIST" artifactAudit "$ARTIFACT_AUDIT_JSON"
 plist_insert_string "$RESULT_PLIST" proofGate "$PROOF_GATE_JSON"
+if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+  plist_insert_string "$RESULT_PLIST" streamingBenchQuality "$STREAMING_BENCH_QUALITY_JSON"
+fi
 plist_insert_string "$RESULT_PLIST" expectedASRMode "$EXPECTED_ASR_MODE"
 plist_insert_string "$RESULT_PLIST" bundleVersion "$bundle_version"
 plist_insert_string "$RESULT_PLIST" zipSHA256 "$zip_sha256"
@@ -314,10 +370,12 @@ plutil -insert requiredProofTargetCount -integer "$REQUIRED_PROOF_TARGET_COUNT" 
 plist_insert_bool "$RESULT_PLIST" requiredProofTargetsReady "$required_targets_ready"
 plist_insert_bool "$RESULT_PLIST" asrModeReady "$asr_mode_ready"
 plist_insert_bool "$RESULT_PLIST" streamingReady "$streaming_ready"
+plist_insert_bool "$RESULT_PLIST" streamingBenchQualityReady "$streaming_bench_quality_ready"
 plist_insert_bool "$RESULT_PLIST" testArtifactReady "$test_artifact_ready"
 plist_insert_bool "$RESULT_PLIST" productionReady "$production_ready"
 plist_insert_bool "$RESULT_PLIST" requireProduction "$([[ "$REQUIRE_PRODUCTION" -eq 1 ]] && echo true || echo false)"
 plist_insert_bool "$RESULT_PLIST" requireStreaming "$([[ "$REQUIRE_STREAMING" -eq 1 ]] && echo true || echo false)"
+plist_insert_bool "$RESULT_PLIST" requireStreamingBenchQuality "$([[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]] && echo true || echo false)"
 plist_insert_bool "$RESULT_PLIST" passed "$passed"
 failure_count="${#failures[@]}"
 plutil -insert failureCount -integer "$failure_count" "$RESULT_PLIST" >/dev/null
@@ -342,6 +400,8 @@ echo "ProofProven: ${proof_proven:-unknown}"
 echo "ASRModeReady: $asr_mode_ready"
 echo "StreamingReady: $streaming_ready"
 echo "RequireStreaming: $([[ "$REQUIRE_STREAMING" -eq 1 ]] && echo true || echo false)"
+echo "StreamingBenchQualityReady: $streaming_bench_quality_ready"
+echo "RequireStreamingBenchQuality: $([[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]] && echo true || echo false)"
 echo "RequiredProofTargetsReady: $required_targets_ready"
 echo "TestArtifactReady: $test_artifact_ready"
 echo "ProductionReady: $production_ready"

@@ -117,6 +117,8 @@ grep -Fq -- "--require-notarized" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'REQUIRED_PROOF_TARGETS="studio1,mbp1"' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'REQUIRE_STREAMING_RELEASE=1' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'EXPECTED_ASR_MODE="any"' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq 'PRESSTALK_STREAMING_BENCH_QUALITY_JSON' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq -- "--require-streaming-bench-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-streaming" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-proof-target" "$PUBLISH_HOMEBREW_SCRIPT"
 
@@ -135,6 +137,23 @@ if [[ "$stable_publish_without_proof_status" -ne 2 ]]; then
 fi
 grep -Fq "without machine proof" "$stable_publish_without_proof_output"
 grep -Fq "PRESSTALK_RELEASE_PROOF_GATE_JSON" "$stable_publish_without_proof_output"
+
+stable_publish_without_streaming_quality_output="$TEST_TMPDIR/stable-publish-without-streaming-quality.txt"
+set +e
+env -u PRESSTALK_CODESIGN_IDENTITY -u CODESIGN_IDENTITY \
+  PRESSTALK_DISTRIBUTION_SIGNING=1 \
+  PRESSTALK_NOTARIZE=1 \
+  PRESSTALK_RELEASE_PROOF_GATE_JSON="$proof_gate_json" \
+  "$PUBLISH_HOMEBREW_SCRIPT" 0.1.6 >"$stable_publish_without_streaming_quality_output" 2>&1
+stable_publish_without_streaming_quality_status=$?
+set -e
+if [[ "$stable_publish_without_streaming_quality_status" -ne 2 ]]; then
+  echo "FAIL: expected stable Homebrew publish without streaming quality JSON to exit 2, got $stable_publish_without_streaming_quality_status"
+  cat "$stable_publish_without_streaming_quality_output"
+  exit 1
+fi
+grep -Fq "without streaming ASR" "$stable_publish_without_streaming_quality_output"
+grep -Fq "PRESSTALK_STREAMING_BENCH_QUALITY_JSON" "$stable_publish_without_streaming_quality_output"
 
 stable_prerelease_tag_output="$TEST_TMPDIR/stable-prerelease-tag.txt"
 set +e

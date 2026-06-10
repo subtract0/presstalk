@@ -5,8 +5,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PACKAGE_SCRIPT="$SCRIPT_DIR/package_presstalk_release.sh"
 PUBLISH_HOMEBREW_SCRIPT="$SCRIPT_DIR/publish_presstalk_homebrew.sh"
 PUBLISH_PRERELEASE_SCRIPT="$SCRIPT_DIR/publish_presstalk_prerelease.sh"
+ARTIFACT_AUDIT_SCRIPT="$SCRIPT_DIR/presstalk_release_artifact_audit.sh"
 TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-distribution-package-test.XXXXXX")"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
+
+build_ad_hoc_test_zip() {
+  local app="$TEST_TMPDIR/PressTalk.app"
+  local zip="$TEST_TMPDIR/PressTalk-0.0-test-macos-arm64.zip"
+  mkdir -p "$app/Contents/MacOS"
+
+  plutil -create xml1 "$app/Contents/Info.plist"
+  plutil -insert CFBundleIdentifier -string com.am.presstalk "$app/Contents/Info.plist"
+  plutil -insert CFBundleShortVersionString -string 0.0-test "$app/Contents/Info.plist"
+  plutil -insert CFBundleVersion -string 1 "$app/Contents/Info.plist"
+  plutil -insert CFBundleExecutable -string PressTalk "$app/Contents/Info.plist"
+
+  printf '#!/usr/bin/env bash\necho fake PressTalk\n' >"$app/Contents/MacOS/PressTalk"
+  chmod +x "$app/Contents/MacOS/PressTalk"
+  codesign --force --sign - "$app" >/dev/null
+  ditto -c -k --sequesterRsrc --keepParent "$app" "$zip"
+  printf '%s\n' "$zip"
+}
 
 missing_identity_output="$TEST_TMPDIR/missing-identity.txt"
 set +e
@@ -79,5 +98,34 @@ if [[ "$stable_prerelease_tag_status" -ne 2 ]]; then
   exit 1
 fi
 grep -Fq "Refusing to publish a prerelease smoke artifact with a stable-looking version" "$stable_prerelease_tag_output"
+
+artifact_zip="$(build_ad_hoc_test_zip)"
+artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"
+artifact_audit_output="$TEST_TMPDIR/artifact-audit.txt"
+"$ARTIFACT_AUDIT_SCRIPT" \
+  --zip "$artifact_zip" \
+  --expected-bundle-id com.am.presstalk \
+  --expected-version 0.0-test \
+  --json-output "$artifact_audit_json" >"$artifact_audit_output" 2>&1
+grep -Fq "Result: pass" "$artifact_audit_output"
+grep -Fq '"bundleIdentifier"' "$artifact_audit_json"
+grep -Fq '"com.am.presstalk"' "$artifact_audit_json"
+grep -Fq '"passed"' "$artifact_audit_json"
+
+artifact_distribution_output="$TEST_TMPDIR/artifact-distribution-required.txt"
+set +e
+"$ARTIFACT_AUDIT_SCRIPT" \
+  --zip "$artifact_zip" \
+  --expected-bundle-id com.am.presstalk \
+  --expected-version 0.0-test \
+  --require-distribution >"$artifact_distribution_output" 2>&1
+artifact_distribution_status=$?
+set -e
+if [[ "$artifact_distribution_status" -ne 1 ]]; then
+  echo "FAIL: expected ad-hoc artifact with distribution requirement to exit 1, got $artifact_distribution_status"
+  cat "$artifact_distribution_output"
+  exit 1
+fi
+grep -Fq "distribution_signature_required" "$artifact_distribution_output"
 
 echo "PASS distribution_packaging"

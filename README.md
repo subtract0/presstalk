@@ -125,6 +125,14 @@ Package a Homebrew test/prerelease zip:
 bash scripts/package_presstalk_release.sh 0.1.6-test4
 ```
 
+Audit an existing zip before handing it to testers:
+```bash
+bash scripts/presstalk_release_artifact_audit.sh \
+  --zip dist/PressTalk-0.1.6-test4-macos-arm64.zip \
+  --expected-version 0.1.6-test4 \
+  --json-output dist/PressTalk-0.1.6-test4-artifact-audit.json
+```
+
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.
 
@@ -137,6 +145,15 @@ PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
 PRESSTALK_NOTARIZE=1 \
 PRESSTALK_NOTARYTOOL_PROFILE=presstalk-notary \
   bash scripts/package_presstalk_release.sh 0.1.6
+```
+
+Then require the production signature and stapled notarization ticket:
+```bash
+bash scripts/presstalk_release_artifact_audit.sh \
+  --zip dist/PressTalk-0.1.6-macos-arm64.zip \
+  --expected-version 0.1.6 \
+  --require-distribution \
+  --require-notarized
 ```
 
 Without `PRESSTALK_DISTRIBUTION_SIGNING=1`, the packaged zip is a test artifact

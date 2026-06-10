@@ -67,6 +67,10 @@ Current tooling update after that run:
   `PRESSTALK_NOTARIZE=1` submits and staples a notarization ticket before the
   final zip is written. Without that flag, package output remains a
   test/prerelease artifact.
+- `scripts/presstalk_release_artifact_audit.sh` audits an existing zip without
+  installing it and records bundle metadata, SHA-256, codesign verification,
+  Developer ID status, hardened runtime, and stapler validation. Use
+  `--require-distribution --require-notarized` for stable production artifacts.
 - `scripts/publish_presstalk_homebrew.sh` refuses stable, non-hyphenated
   versions unless both production distribution signing and notarization are
   explicitly enabled. Hyphenated `test` / prerelease versions keep the existing

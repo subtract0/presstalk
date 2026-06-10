@@ -36,18 +36,23 @@ open productization work.
 
 Latest proof-gate run:
 
-- Time: `2026-06-10T09:44:51Z`
+- Time: `2026-06-10T09:56:15Z`
+- Host discovery:
+  `~/Library/Application Support/JarvisTap/Diagnostics/host-discovery-v0.1.6-test4-proof-refresh-20260610T095615Z.json`
 - Matrix:
-  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-v0.1.6-test4-local-mbp1-20260610T094451Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-v0.1.6-test4-proof-refresh-20260610T095615Z.json`
 - Gate:
-  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-v0.1.6-test4-local-mbp1-20260610T094451Z.json`
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-v0.1.6-test4-proof-refresh-20260610T095615Z.json`
 - Required targets: `local`, `mbp1-tb`
-- Excluded targets: `studio2=no attached microphone`
-- Result: not proven. `local` passed; `mbp1-tb` failed before readiness
-  collection because SSH to `10.77.77.3:22` timed out. The fallback Tailscale
-  alias `mbp1` / `100.106.125.111` also timed out during the follow-up network
-  probe. Treat this as a current network proof gap, not evidence of an app
-  regression on mbp1.
+- Matrix-level excluded targets: `studio2=no attached microphone`
+- Result: not proven. `local` / `studio1` passed with Fn/Globe trigger,
+  Microphone authorized, Accessibility trusted, speech model ready, and
+  active-field insertion ready. `mbp1-tb` failed before readiness collection
+  because SSH to `10.77.77.3:22` timed out. The fallback `mbp1` alias at
+  `100.106.125.111:22` also timed out; `mba1.local` did not resolve from this
+  Mac during the same matrix run. Bonjour still advertised `mbp1` for SSH, and
+  the Tailscale CLI failed to start, so treat this as a current network proof
+  gap, not evidence of an app regression on mbp1 or mba1.
 
 Current tooling update after that run:
 

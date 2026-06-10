@@ -49,6 +49,14 @@ Latest proof-gate run:
   probe. Treat this as a current network proof gap, not evidence of an app
   regression on mbp1.
 
+Current tooling update after that run:
+
+- `scripts/presstalk_readiness_matrix.sh` accepts `--exclude-host HOST=WHY`.
+  When an excluded host appears in a broad target list, the matrix records it as
+  `status=excluded` and does not SSH into it. Use this for machines that are
+  intentionally out of microphone/STT scope, such as `studio2` until Alex opts
+  it back in with an attached microphone.
+
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`
 and `mbp1` using the Accessibility menu-paste path. Older notes below preserve

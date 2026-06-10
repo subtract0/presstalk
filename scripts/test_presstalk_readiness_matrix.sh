@@ -8,6 +8,7 @@ trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 local_json="$TEST_TMPDIR/local-matrix.json"
 blocked_json="$TEST_TMPDIR/blocked-matrix.json"
+excluded_json="$TEST_TMPDIR/excluded-matrix.json"
 bundle_json="$TEST_TMPDIR/bundle-matrix.json"
 
 "$MATRIX_HELPER" --local --json >"$local_json"
@@ -48,6 +49,20 @@ blocked_reachable="$(extract_required "$blocked_json" targets.0.reachable)"
 if [[ "$blocked_status" != "failed" || "$blocked_reachable" != "false" ]]; then
   echo "FAIL: expected blocked host to be recorded as failed/reachable=false"
   plutil -convert json -r -o - "$blocked_json"
+  exit 1
+fi
+
+"$MATRIX_HELPER" \
+  --host presstalk-invalid-host.invalid \
+  --exclude-host presstalk-invalid-host.invalid=no-attached-microphone \
+  --timeout 1 \
+  --json >"$excluded_json"
+excluded_status="$(extract_required "$excluded_json" targets.0.status)"
+excluded_kind="$(extract_required "$excluded_json" targets.0.kind)"
+excluded_reason="$(extract_required "$excluded_json" targets.0.error)"
+if [[ "$excluded_status" != "excluded" || "$excluded_kind" != "excluded" || "$excluded_reason" != "no-attached-microphone" ]]; then
+  echo "FAIL: expected excluded host to be recorded without SSH probing"
+  plutil -convert json -r -o - "$excluded_json"
   exit 1
 fi
 

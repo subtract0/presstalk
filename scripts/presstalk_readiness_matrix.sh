@@ -12,10 +12,12 @@ JSON_OUTPUT_PATH=""
 SSH_CONNECT_TIMEOUT="${PRESSTALK_SSH_CONNECT_TIMEOUT:-5}"
 RUN_LOCAL=0
 HOSTS=()
+EXCLUDED_HOSTS=()
+EXCLUDED_HOST_COUNT=0
 
 usage() {
   cat <<'EOF'
-Usage: presstalk-readiness-matrix.sh [--local] [--host HOST] [--hosts a,b,c] [--json] [--json-output PATH]
+Usage: presstalk-readiness-matrix.sh [--local] [--host HOST] [--hosts a,b,c] [--exclude-host HOST=WHY] [--json] [--json-output PATH]
 
 Collects PressTalk machine-readiness reports locally and/or over SSH. Remote
 collection is read-only: the script pipes presstalk-machine-readiness.sh to the
@@ -26,6 +28,10 @@ Options:
   --local             Include this Mac.
   --host HOST         Include one SSH host. May be repeated.
   --hosts LIST        Include comma-separated SSH hosts.
+  --exclude-host HOST=WHY
+                      Record a host as intentionally excluded and do not SSH
+                      into it, even if it is also listed with --host/--hosts.
+                      May be repeated. The reason is written into the matrix.
   --timeout SECONDS   SSH ConnectTimeout. Default: 5.
   --json              Write only machine-readable JSON to stdout.
   --json-output PATH  Also write the machine-readable JSON matrix to PATH.
@@ -69,6 +75,15 @@ while [[ $# -gt 0 ]]; do
         exit 2
       fi
       SSH_CONNECT_TIMEOUT="$1"
+      ;;
+    --exclude-host)
+      shift
+      if [[ $# -eq 0 || -z "$1" ]]; then
+        echo "Missing value for --exclude-host" >&2
+        exit 2
+      fi
+      EXCLUDED_HOSTS+=("$1")
+      EXCLUDED_HOST_COUNT=$((EXCLUDED_HOST_COUNT + 1))
       ;;
     --json)
       OUTPUT_FORMAT="json"
@@ -240,6 +255,58 @@ append_target_result() {
   fi
 }
 
+excluded_host_reason() {
+  local host="$1"
+  local excluded excluded_host excluded_reason
+  if [[ "$EXCLUDED_HOST_COUNT" -eq 0 ]]; then
+    return 1
+  fi
+  for excluded in "${EXCLUDED_HOSTS[@]}"; do
+    excluded_host="${excluded%%=*}"
+    excluded_reason=""
+    if [[ "$excluded" == *"="* ]]; then
+      excluded_reason="${excluded#*=}"
+    fi
+    excluded_host="${excluded_host#"${excluded_host%%[![:space:]]*}"}"
+    excluded_host="${excluded_host%"${excluded_host##*[![:space:]]}"}"
+    excluded_reason="${excluded_reason#"${excluded_reason%%[![:space:]]*}"}"
+    excluded_reason="${excluded_reason%"${excluded_reason##*[![:space:]]}"}"
+    if [[ "$excluded_host" == "$host" ]]; then
+      printf '%s\n' "${excluded_reason:-intentionally excluded}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+append_excluded_host() {
+  local host="$1"
+  local reason="$2"
+  local target_plist target_json
+  target_plist="$RUN_TMPDIR/target-excluded-$RANDOM.plist"
+  plutil -create xml1 "$target_plist" >/dev/null
+
+  plist_insert_string "$target_plist" "target" "$host"
+  plist_insert_string "$target_plist" "kind" "excluded"
+  plist_insert_int "$target_plist" "exitStatus" "0"
+  plist_insert_string "$target_plist" "status" "excluded"
+  plist_insert_bool_or_string "$target_plist" "reachable" "false"
+  plist_insert_string "$target_plist" "error" "$reason"
+
+  plutil -insert summary -dictionary "$target_plist" >/dev/null
+  plist_insert_string "$target_plist" "summary.machineHost" "$host"
+  plist_insert_bool_or_string "$target_plist" "summary.microphoneHardwareDetected" "false"
+  plist_insert_bool_or_string "$target_plist" "summary.physicalSTTSmokeReady" "false"
+  plist_insert_bool_or_string "$target_plist" "summary.activeFieldSmokeReady" "false"
+  plist_insert_string "$target_plist" "summary.nextAction" "Excluded from readiness collection: $reason"
+
+  target_json="$(plutil -convert json -r -o - "$target_plist")"
+  plutil -insert targets -json "$target_json" -append "$MATRIX_PLIST" >/dev/null
+  rm -f "$target_plist"
+
+  TEXT_SUMMARY+=("$host [excluded]: skipped reason=${reason:-intentionally excluded}")
+}
+
 collect_local() {
   local stdout_file="$RUN_TMPDIR/local.stdout"
   local stderr_file="$RUN_TMPDIR/local.stderr"
@@ -272,7 +339,11 @@ fi
 
 if [[ "${#HOSTS[@]}" -gt 0 ]]; then
   for host in "${HOSTS[@]}"; do
-    collect_remote "$host"
+    if reason="$(excluded_host_reason "$host")"; then
+      append_excluded_host "$host" "$reason"
+    else
+      collect_remote "$host"
+    fi
   done
 fi
 

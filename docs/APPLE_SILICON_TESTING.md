@@ -131,6 +131,17 @@ To collect a matrix that includes local readiness plus SSH host blockers, run:
 plutil -extract targets raw -o - "$HOME/Desktop/presstalk-readiness-matrix.json"
 ```
 
+If a broad target list contains a machine that must not be touched, add a
+matrix-level exclusion. Excluded hosts are written into the JSON as
+`status=excluded` and are not contacted over SSH:
+
+```bash
+/bin/bash scripts/presstalk_readiness_matrix.sh \
+  --local --host mbp1-tb --host studio2 \
+  --exclude-host "studio2=no attached microphone" \
+  --json-output "$HOME/Desktop/presstalk-readiness-matrix.json"
+```
+
 Then run the release proof gate against the required machines. It exits nonzero
 until every required target is reachable, physical-STT ready, and active-field
 ready. If `s1` means the local `studio1` machine, require `local`; do not also

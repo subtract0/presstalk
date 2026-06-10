@@ -164,6 +164,16 @@ bash scripts/presstalk_release_artifact_audit.sh \
   --require-notarized
 ```
 
+After collecting a proof-gate JSON for the target machines, combine artifact
+and machine evidence into one release-readiness verdict:
+```bash
+bash scripts/presstalk_release_readiness_preflight.sh \
+  --artifact-audit dist/PressTalk-0.1.6-macos-arm64-artifact-audit.json \
+  --proof-gate "$HOME/Library/Application Support/JarvisTap/Diagnostics/proof-gate-0.1.6.json" \
+  --require-production \
+  --json-output dist/PressTalk-0.1.6-release-readiness.json
+```
+
 Without `PRESSTALK_DISTRIBUTION_SIGNING=1`, the packaged zip is a test artifact
 and should not be described as a production-grade notarized Mac release.
 

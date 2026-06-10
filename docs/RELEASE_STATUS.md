@@ -101,6 +101,12 @@ Current tooling update after that run:
   and audits the artifact but exits before any GitHub release or Homebrew tap
   write. `PRESSTALK_DIST_DIR=/path/to/dist` can isolate generated zips,
   checksums, and audit JSON for local preflight tests.
+- `scripts/presstalk_release_readiness_preflight.sh` combines an artifact audit
+  JSON and proof-gate JSON into one readiness verdict. Default mode can pass for
+  an audited test artifact with proven machine smoke coverage; `--require-production`
+  requires Developer ID, hardened runtime, stapled notarization, proven machine
+  coverage, and the expected `parakeet_v3_ane_final_pass` ASR mode on every
+  proof target.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

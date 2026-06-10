@@ -118,7 +118,9 @@ grep -Fq 'REQUIRED_PROOF_TARGETS="studio1,mbp1"' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'REQUIRE_STREAMING_RELEASE=1' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'EXPECTED_ASR_MODE="any"' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq 'PRESSTALK_STREAMING_BENCH_QUALITY_JSON' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq 'PRESSTALK_HYBRID_STREAMING_QUALITY_JSON' "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-streaming-bench-quality" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq -- "--require-hybrid-streaming-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-streaming" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-proof-target" "$PUBLISH_HOMEBREW_SCRIPT"
 
@@ -154,6 +156,7 @@ if [[ "$stable_publish_without_streaming_quality_status" -ne 2 ]]; then
 fi
 grep -Fq "without streaming ASR" "$stable_publish_without_streaming_quality_output"
 grep -Fq "PRESSTALK_STREAMING_BENCH_QUALITY_JSON" "$stable_publish_without_streaming_quality_output"
+grep -Fq "PRESSTALK_HYBRID_STREAMING_QUALITY_JSON" "$stable_publish_without_streaming_quality_output"
 
 stable_prerelease_tag_output="$TEST_TMPDIR/stable-prerelease-tag.txt"
 set +e

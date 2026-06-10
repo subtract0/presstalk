@@ -19,6 +19,8 @@ REQUIRE_PRODUCTION=0
 REQUIRE_STREAMING=0
 REQUIRE_STREAMING_BENCH_QUALITY=0
 STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
+REQUIRE_HYBRID_STREAMING_QUALITY=0
+HYBRID_STREAMING_QUALITY_JSON="${PRESSTALK_HYBRID_STREAMING_QUALITY_JSON:-}"
 RUN_HOST_DISCOVERY=1
 HOST_DISCOVERY_TIMEOUT="${PRESSTALK_CANDIDATE_HOST_DISCOVERY_TIMEOUT:-3}"
 
@@ -61,6 +63,11 @@ Options:
                           JSON from presstalk_streaming_bench_quality_gate.sh.
   --require-streaming-bench-quality
                           Require passing streaming bench quality JSON.
+  --hybrid-streaming-quality PATH
+                          JSON from presstalk_hybrid_streaming_quality_gate.sh.
+  --require-hybrid-streaming-quality
+                          Require passing hybrid streaming/finalizer quality
+                          JSON.
   --json-output PATH      Write machine-readable wrapper summary.
   -h, --help              Show this help.
 EOF
@@ -160,6 +167,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-streaming-bench-quality)
       REQUIRE_STREAMING_BENCH_QUALITY=1
+      shift
+      ;;
+    --hybrid-streaming-quality)
+      HYBRID_STREAMING_QUALITY_JSON="${2:-}"
+      if [[ -z "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+        echo "Missing value for --hybrid-streaming-quality" >&2
+        exit 2
+      fi
+      shift 2
+      ;;
+    --require-hybrid-streaming-quality)
+      REQUIRE_HYBRID_STREAMING_QUALITY=1
       shift
       ;;
     --json-output)
@@ -406,6 +425,12 @@ fi
 if [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
   publish_env+=(PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY=1)
 fi
+if [[ -n "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+  publish_env+=(PRESSTALK_HYBRID_STREAMING_QUALITY_JSON="$HYBRID_STREAMING_QUALITY_JSON")
+fi
+if [[ "$REQUIRE_HYBRID_STREAMING_QUALITY" -eq 1 ]]; then
+  publish_env+=(PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY=1)
+fi
 set +e
 env "${publish_env[@]}" "/bin/bash" "$PUBLISH_SCRIPT" "$VERSION"
 publish_status=$?
@@ -440,6 +465,12 @@ if [[ "$REQUIRE_PRODUCTION" -eq 1 ]]; then
   fi
   if [[ "$REQUIRE_STREAMING_BENCH_QUALITY" -eq 1 ]]; then
     readiness_args+=(--require-streaming-bench-quality)
+  fi
+  if [[ -n "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+    readiness_args+=(--hybrid-streaming-quality "$HYBRID_STREAMING_QUALITY_JSON")
+  fi
+  if [[ "$REQUIRE_HYBRID_STREAMING_QUALITY" -eq 1 ]]; then
+    readiness_args+=(--require-hybrid-streaming-quality)
   fi
   if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
     for required in "${REQUIRED_TARGETS[@]}"; do

@@ -201,6 +201,33 @@ latency, and WER/CER under the configured thresholds. Stable Homebrew publishing
 requires `PRESSTALK_STREAMING_BENCH_QUALITY_JSON=/path/to/quality.json` once the
 streaming release gate is active.
 
+If the shipping architecture uses a streaming model only for the live listening
+HUD and a separate ANE finalizer for the pasted text, gate the two pieces
+separately instead of weakening the strict streaming gate:
+
+```bash
+swift run -c release presstalk-asr-bench \
+  --input /Users/am/Downloads/chirp.wav \
+  --backend parakeet-v3-ane \
+  --reference docs/fixtures/chirp-reference.txt \
+  --offline \
+  --json | tee dist/release-candidate-0.1.6-test5/parakeet-v3-ane-chirp-bench.txt
+
+bash scripts/presstalk_hybrid_streaming_quality_gate.sh \
+  --streaming-bench-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt \
+  --expected-streaming-backend parakeet-eou-320 \
+  --finalizer-bench-output dist/release-candidate-0.1.6-test5/parakeet-v3-ane-chirp-bench.txt \
+  --expected-finalizer-backend parakeet-v3-ane \
+  --json-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-plus-parakeet-v3-ane-chirp-hybrid-quality.json
+```
+
+Use `--hybrid-streaming-quality` plus
+`--require-hybrid-streaming-quality` in candidate/readiness preflights, or set
+`PRESSTALK_HYBRID_STREAMING_QUALITY_JSON=/path/to/hybrid-quality.json` and
+`PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY=1` before stable Homebrew
+publishing. The streaming side must prove partials and latency; the finalizer
+side must prove paste-quality WER/CER and release speed.
+
 If the candidate fails because a target Mac is unreachable or not ready, turn
 the receipts into a manual target handoff without probing anything again:
 ```bash

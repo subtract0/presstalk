@@ -125,10 +125,15 @@ Current tooling update after that run:
   Stable streaming publish also requires
   `PRESSTALK_STREAMING_BENCH_QUALITY_JSON` from
   `scripts/presstalk_streaming_bench_quality_gate.sh`, so live partials alone
-  are not enough when WER/CER or per-slice latency are unacceptable. Hyphenated
-  test/prerelease builds can opt into the same gates by setting
-  `PRESSTALK_REQUIRE_STREAMING_RELEASE=1` and
-  `PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY=1`.
+  are not enough when WER/CER or per-slice latency are unacceptable. Stable
+  publish can alternatively require
+  `PRESSTALK_HYBRID_STREAMING_QUALITY_JSON` from
+  `scripts/presstalk_hybrid_streaming_quality_gate.sh` when the product uses a
+  live streaming backend only for HUD partials and a separate ANE finalizer for
+  pasted text. Hyphenated test/prerelease builds can opt into the same gates by
+  setting `PRESSTALK_REQUIRE_STREAMING_RELEASE=1` plus either
+  `PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY=1` or
+  `PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY=1`.
 - `scripts/presstalk_streaming_bench_quality_gate.sh` reads JSON lines emitted
   by `presstalk-asr-bench --json` and fails unless the selected streaming
   backend emits partial updates, finalizes quickly, stays under per-slice
@@ -142,6 +147,13 @@ Current tooling update after that run:
   `PressTalk-0.1.6-test5-streaming-quality-readiness.json` receipt therefore
   fails on `streaming_bench_quality_not_passed` in addition to the existing
   target-proof and final-pass runtime gaps.
+- `scripts/presstalk_hybrid_streaming_quality_gate.sh` keeps that failure
+  honest while allowing the practical architecture: the streaming backend must
+  prove partial updates, finalization, per-slice latency, and RTFx, while the
+  finalizer backend must prove reference-backed WER/CER and total release
+  processing time. This is the correct evidence shape for a Parakeet EOU HUD
+  plus Parakeet v3 ANE paste path until a single true streaming backend also
+  meets final-text quality.
 - Stable `scripts/publish_presstalk_homebrew.sh` now refuses to publish unless
   `PRESSTALK_RELEASE_PROOF_GATE_JSON` points at a proof-gate JSON, then runs the
   readiness preflight with `--require-production` before any GitHub release or

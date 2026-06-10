@@ -21,6 +21,8 @@ REQUIRE_STREAMING_RELEASE="${PRESSTALK_REQUIRE_STREAMING_RELEASE:-}"
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
 STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
 REQUIRE_STREAMING_BENCH_QUALITY="${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-}"
+HYBRID_STREAMING_QUALITY_JSON="${PRESSTALK_HYBRID_STREAMING_QUALITY_JSON:-}"
+REQUIRE_HYBRID_STREAMING_QUALITY="${PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY:-}"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-publish.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -64,8 +66,12 @@ if [[ "$IS_PRERELEASE" == "0" ]]; then
   if truthy "$REQUIRE_STREAMING_RELEASE" && [[ -z "${PRESSTALK_EXPECTED_ASR_MODE:-}" ]]; then
     EXPECTED_ASR_MODE="any"
   fi
-  if [[ -z "$REQUIRE_STREAMING_BENCH_QUALITY" ]]; then
-    REQUIRE_STREAMING_BENCH_QUALITY=1
+  if [[ -z "$REQUIRE_STREAMING_BENCH_QUALITY" && -z "$REQUIRE_HYBRID_STREAMING_QUALITY" ]]; then
+    if [[ -n "$HYBRID_STREAMING_QUALITY_JSON" && -z "$STREAMING_BENCH_QUALITY_JSON" ]]; then
+      REQUIRE_HYBRID_STREAMING_QUALITY=1
+    else
+      REQUIRE_STREAMING_BENCH_QUALITY=1
+    fi
   fi
   if [[ -z "$REQUIRED_PROOF_TARGETS" ]]; then
     REQUIRED_PROOF_TARGETS="studio1,mbp1"
@@ -104,12 +110,30 @@ EOF
 Refusing to publish a stable PressTalk streaming release without streaming ASR
 quality evidence. Set PRESSTALK_STREAMING_BENCH_QUALITY_JSON to JSON produced
 by presstalk_streaming_bench_quality_gate.sh after benchmarking the selected
-streaming backend against a reference transcript.
+streaming backend against a reference transcript, or set
+PRESSTALK_HYBRID_STREAMING_QUALITY_JSON plus
+PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY=1 for the hybrid streaming HUD plus
+finalizer paste architecture.
 EOF
       exit 2
     fi
     if [[ ! -f "$STREAMING_BENCH_QUALITY_JSON" ]]; then
       echo "Missing streaming bench quality JSON: $STREAMING_BENCH_QUALITY_JSON" >&2
+      exit 2
+    fi
+  fi
+  if truthy "$REQUIRE_HYBRID_STREAMING_QUALITY"; then
+    if [[ -z "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+      cat >&2 <<'EOF'
+Refusing to publish a stable PressTalk streaming release without hybrid
+streaming quality evidence. Set PRESSTALK_HYBRID_STREAMING_QUALITY_JSON to JSON
+produced by presstalk_hybrid_streaming_quality_gate.sh after benchmarking the
+live partial backend and the final paste backend against reference audio.
+EOF
+      exit 2
+    fi
+    if [[ ! -f "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+      echo "Missing hybrid streaming quality JSON: $HYBRID_STREAMING_QUALITY_JSON" >&2
       exit 2
     fi
   fi
@@ -176,6 +200,12 @@ if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_RELEASE_READINES
   fi
   if truthy "$REQUIRE_STREAMING_BENCH_QUALITY"; then
     readiness_args+=(--require-streaming-bench-quality)
+  fi
+  if [[ -n "$HYBRID_STREAMING_QUALITY_JSON" ]]; then
+    readiness_args+=(--hybrid-streaming-quality "$HYBRID_STREAMING_QUALITY_JSON")
+  fi
+  if truthy "$REQUIRE_HYBRID_STREAMING_QUALITY"; then
+    readiness_args+=(--require-hybrid-streaming-quality)
   fi
   "$READINESS_PREFLIGHT_SCRIPT" "${readiness_args[@]}"
 fi

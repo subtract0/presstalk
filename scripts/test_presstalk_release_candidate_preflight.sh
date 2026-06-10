@@ -101,6 +101,11 @@ if [[ "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-0}" == "1" &&
   echo "Fake publish expected streaming bench quality JSON" >&2
   exit 2
 fi
+if [[ "${PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY:-0}" == "1" &&
+      ! -f "${PRESSTALK_HYBRID_STREAMING_QUALITY_JSON:-}" ]]; then
+  echo "Fake publish expected hybrid streaming quality JSON" >&2
+  exit 2
+fi
 
 dist_dir="${PRESSTALK_DIST_DIR:?}"
 public_name="${PUBLIC_NAME:-PressTalk}"
@@ -112,6 +117,8 @@ printf 'ran\n' >"$dist_dir/fake-publish-ran.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-unset}" >"$dist_dir/fake-publish-streaming-env.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-unset}" >"$dist_dir/fake-publish-streaming-bench-env.txt"
 printf '%s\n' "${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-unset}" >"$dist_dir/fake-publish-streaming-bench-json.txt"
+printf '%s\n' "${PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY:-unset}" >"$dist_dir/fake-publish-hybrid-streaming-env.txt"
+printf '%s\n' "${PRESSTALK_HYBRID_STREAMING_QUALITY_JSON:-unset}" >"$dist_dir/fake-publish-hybrid-streaming-json.txt"
 cat >"$dist_dir/${public_name}-${version}-macos-${arch}-artifact-audit.json" <<JSON
 {
   "schemaVersion": "1",
@@ -303,6 +310,38 @@ if [[ "$(cat "$streaming_dist/fake-publish-streaming-bench-env.txt")" != "1" ||
   echo "FAIL: streaming bench quality args did not reach publish dry-run"
   cat "$streaming_dist/fake-publish-streaming-bench-env.txt"
   cat "$streaming_dist/fake-publish-streaming-bench-json.txt"
+  exit 1
+fi
+
+hybrid_dist="$TEST_TMPDIR/hybrid-dist"
+hybrid_output="$TEST_TMPDIR/hybrid-output.txt"
+hybrid_quality_json="$TEST_TMPDIR/hybrid-quality.json"
+cat >"$hybrid_quality_json" <<'JSON'
+{
+  "schemaVersion": "1",
+  "passed": true,
+  "hybridQualityReady": true,
+  "streamingPartialReady": true,
+  "finalizerQualityReady": true
+}
+JSON
+PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
+PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
+  "$WRAPPER" --version 0.0-hybrid --dist-dir "$hybrid_dist" --local \
+    --require local --require-streaming \
+    --hybrid-streaming-quality "$hybrid_quality_json" \
+    --require-hybrid-streaming-quality >"$hybrid_output"
+grep -Fq "Result: pass" "$hybrid_output"
+if [[ "$(cat "$hybrid_dist/fake-publish-streaming-env.txt")" != "1" ]]; then
+  echo "FAIL: hybrid --require-streaming did not reach publish dry-run"
+  cat "$hybrid_dist/fake-publish-streaming-env.txt"
+  exit 1
+fi
+if [[ "$(cat "$hybrid_dist/fake-publish-hybrid-streaming-env.txt")" != "1" ||
+      "$(cat "$hybrid_dist/fake-publish-hybrid-streaming-json.txt")" != "$hybrid_quality_json" ]]; then
+  echo "FAIL: hybrid streaming quality args did not reach publish dry-run"
+  cat "$hybrid_dist/fake-publish-hybrid-streaming-env.txt"
+  cat "$hybrid_dist/fake-publish-hybrid-streaming-json.txt"
   exit 1
 fi
 

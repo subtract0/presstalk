@@ -12,6 +12,7 @@ proof_gate="$TEST_TMPDIR/proof-gate.json"
 asr_mismatch_proof_gate="$TEST_TMPDIR/asr-mismatch-proof-gate.json"
 streaming_proof_gate="$TEST_TMPDIR/streaming-proof-gate.json"
 streaming_bench_quality="$TEST_TMPDIR/streaming-bench-quality.json"
+hybrid_streaming_quality="$TEST_TMPDIR/hybrid-streaming-quality.json"
 
 cat >"$test_artifact_audit" <<'JSON'
 {
@@ -157,6 +158,22 @@ cat >"$streaming_bench_quality" <<'JSON'
 }
 JSON
 
+cat >"$hybrid_streaming_quality" <<'JSON'
+{
+  "schemaVersion": "1",
+  "passed": true,
+  "hybridQualityReady": true,
+  "streamingPartialReady": true,
+  "finalizerQualityReady": true,
+  "streamingReportCount": 1,
+  "finalizerReportCount": 1,
+  "streamingBackends": ["parakeet-eou-320"],
+  "finalizerBackends": ["parakeet-v3-ane"],
+  "failureCount": 0,
+  "failures": []
+}
+JSON
+
 test_pass_output="$TEST_TMPDIR/test-pass.txt"
 test_pass_json="$TEST_TMPDIR/test-pass.json"
 "$PREFLIGHT" \
@@ -173,6 +190,7 @@ if [[ "$(plutil -extract testArtifactReady raw -o - "$test_pass_json")" != "true
       "$(plutil -extract productionReady raw -o - "$test_pass_json")" != "false" ||
       "$(plutil -extract requiredProofTargetsReady raw -o - "$test_pass_json")" != "true" ||
       "$(plutil -extract streamingReady raw -o - "$test_pass_json")" != "true" ||
+      "$(plutil -extract hybridStreamingQualityReady raw -o - "$test_pass_json")" != "true" ||
       "$(plutil -extract requireStreaming raw -o - "$test_pass_json")" != "false" ||
       "$(plutil -extract requiredProofTargetCount raw -o - "$test_pass_json")" != "2" ]]; then
   echo "FAIL: test artifact JSON readiness mismatch"
@@ -259,6 +277,40 @@ if [[ "$(plutil -extract streamingBenchQualityReady raw -o - "$streaming_quality
       "$(plutil -extract streamingBenchQuality raw -o - "$streaming_quality_pass_json")" != "$streaming_bench_quality" ]]; then
   echo "FAIL: streaming quality readiness JSON mismatch"
   plutil -p "$streaming_quality_pass_json"
+  exit 1
+fi
+
+hybrid_quality_missing_output="$TEST_TMPDIR/hybrid-quality-missing.txt"
+if "$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode any \
+  --require-streaming \
+  --require-hybrid-streaming-quality >"$hybrid_quality_missing_output"; then
+  echo "FAIL: hybrid streaming quality requirement unexpectedly passed without quality JSON"
+  cat "$hybrid_quality_missing_output"
+  exit 1
+fi
+grep -Fq "hybrid_streaming_quality_json_missing" "$hybrid_quality_missing_output"
+
+hybrid_quality_pass_output="$TEST_TMPDIR/hybrid-quality-pass.txt"
+hybrid_quality_pass_json="$TEST_TMPDIR/hybrid-quality-pass.json"
+"$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode any \
+  --require-streaming \
+  --hybrid-streaming-quality "$hybrid_streaming_quality" \
+  --require-hybrid-streaming-quality \
+  --json-output "$hybrid_quality_pass_json" >"$hybrid_quality_pass_output"
+grep -Fq "HybridStreamingQualityReady: true" "$hybrid_quality_pass_output"
+grep -Fq "RequireHybridStreamingQuality: true" "$hybrid_quality_pass_output"
+grep -Fq "Result: pass" "$hybrid_quality_pass_output"
+if [[ "$(plutil -extract hybridStreamingQualityReady raw -o - "$hybrid_quality_pass_json")" != "true" ||
+      "$(plutil -extract requireHybridStreamingQuality raw -o - "$hybrid_quality_pass_json")" != "true" ||
+      "$(plutil -extract hybridStreamingQuality raw -o - "$hybrid_quality_pass_json")" != "$hybrid_streaming_quality" ]]; then
+  echo "FAIL: hybrid quality readiness JSON mismatch"
+  plutil -p "$hybrid_quality_pass_json"
   exit 1
 fi
 

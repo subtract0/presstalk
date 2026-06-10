@@ -24,7 +24,7 @@ Current packaged behavior:
 - compact HUD and menu bar control surface
 - small runtime settings window for HUD, auto-paste, language, and release tail
 
-The current default runtime uses the local Parakeet v3 ANE backend for final dictation, with local WhisperKit still available for warmup, streaming experiments, and fallback paths.
+The current default runtime uses the local Parakeet v3 ANE backend for final dictation. Parakeet quality fallback is enabled by default: low-confidence or weakly punctuated Parakeet output is retried through local WhisperKit large-v3-turbo before paste, while high-confidence ANE output stays fast.
 
 ## Release Status
 
@@ -100,7 +100,7 @@ The launchd installer prefers:
 That installs `com.am.presstalk` with these defaults:
 - `JARVISTAP_AGENT_MODE=dictation`
 - `JARVISTAP_WHISPERKIT_MODEL=openai_whisper-large-v3-v20240930_turbo_632MB`
-- `JARVISTAP_WHISPER_LANGUAGE=de`
+- `JARVISTAP_WHISPER_LANGUAGE=auto`
 - `JARVISTAP_SAY_VOICE=Samantha`
 - `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.35`
 - `PRESSTALK_TRIGGER_KEY=fn`

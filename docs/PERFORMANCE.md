@@ -192,6 +192,16 @@ Current interpretation:
   `chirp.wav`, confirms this caution: Parakeet v3 ANE is about `30x` faster
   than stock on mba1, but stock WhisperKit has lower WER/CER on the mixed
   English/German marketing copy.
+- The packaged ANE path now treats Parakeet v3 as the fast first pass and keeps
+  WhisperKit large-v3-turbo as a quality fallback. By default,
+  `PRESSTALK_PARAKEET_QUALITY_FALLBACK=1` and
+  `PRESSTALK_PARAKEET_MIN_CONFIDENCE=0.96`; accepted Parakeet output below
+  that confidence floor, or long output with weak punctuation, is retried
+  through WhisperKit before paste.
+- Fallback arbitration is recall-protecting: when a WhisperKit fallback
+  candidate is plausible but much shorter than the accepted Parakeet candidate
+  on a long capture, PressTalk tries the relaxed/auto Whisper passes and then
+  keeps the Parakeet candidate if all Whisper candidates appear truncated.
 - For live partial text, Parakeet EOU 320ms is the most promising true
   streaming candidate tested so far. It needs capitalization, punctuation, and
   quality validation before it can replace final text.

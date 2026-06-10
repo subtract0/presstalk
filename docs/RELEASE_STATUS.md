@@ -97,6 +97,10 @@ Current tooling update after that run:
   version tags. It now runs the artifact audit before upload too, without
   production signing requirements, to catch wrong bundle id, wrong version, or
   broken code-signing artifacts.
+- Both publish scripts support `PRESSTALK_PUBLISH_DRY_RUN=1`, which packages
+  and audits the artifact but exits before any GitHub release or Homebrew tap
+  write. `PRESSTALK_DIST_DIR=/path/to/dist` can isolate generated zips,
+  checksums, and audit JSON for local preflight tests.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

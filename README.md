@@ -133,6 +133,14 @@ bash scripts/presstalk_release_artifact_audit.sh \
   --json-output dist/PressTalk-0.1.6-test4-artifact-audit.json
 ```
 
+To exercise packaging and publish-time audit checks without uploading anything:
+```bash
+PRESSTALK_PUBLISH_DRY_RUN=1 bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
+```
+
+Set `PRESSTALK_DIST_DIR=/path/to/dist` when you want generated zips, checksums,
+and audit JSON written outside the repo `dist/` directory.
+
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.
 

@@ -6,12 +6,20 @@ VERSION="${1:-0.1.5-rc1}"
 PUBLIC_NAME="${PUBLIC_NAME:-PressTalk}"
 RELEASE_REPO="${RELEASE_REPO:-subtract0/presstalk}"
 ARCH="${ARCH:-$(uname -m)}"
+DIST_DIR="${PRESSTALK_DIST_DIR:-$ROOT/dist}"
 ASSET_NAME="${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.zip"
-ASSET_PATH="$ROOT/dist/$ASSET_NAME"
-SHA_PATH="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
+ASSET_PATH="$DIST_DIR/$ASSET_NAME"
+SHA_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
-ARTIFACT_AUDIT_JSON="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
+ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 RELEASE_TAG="v$VERSION"
+
+truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 if [[ "$VERSION" != *-* && "${PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG:-0}" != "1" ]]; then
   cat >&2 <<'EOF'
@@ -22,32 +30,37 @@ EOF
   exit 2
 fi
 
-if ! command -v gh >/dev/null 2>&1; then
+if ! truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}" && ! command -v gh >/dev/null 2>&1; then
   echo "Missing required command: gh" >&2
   exit 1
 fi
 
-GIT_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
-if ! git -C "$ROOT" diff --quiet || ! git -C "$ROOT" diff --cached --quiet; then
-  echo "Refusing to publish from a dirty working tree. Commit or stash changes first." >&2
-  exit 1
-fi
+if ! truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
+  GIT_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+  if ! git -C "$ROOT" diff --quiet || ! git -C "$ROOT" diff --cached --quiet; then
+    echo "Refusing to publish from a dirty working tree. Commit or stash changes first." >&2
+    exit 1
+  fi
 
-BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD || true)"
-if [[ -n "$BRANCH" ]]; then
-  REMOTE="$(git -C "$ROOT" config "branch.${BRANCH}.remote" || true)"
-  MERGE_REF="$(git -C "$ROOT" config "branch.${BRANCH}.merge" || true)"
-  if [[ -n "$REMOTE" && -n "$MERGE_REF" ]]; then
-    REMOTE_HEAD="$(git -C "$ROOT" ls-remote "$REMOTE" "$MERGE_REF" | awk 'NR == 1 { print $1 }')"
-    if [[ -n "$REMOTE_HEAD" && "$REMOTE_HEAD" != "$GIT_HEAD" ]]; then
-      echo "Refusing to publish: $REMOTE/$BRANCH is not at local HEAD $GIT_HEAD." >&2
-      echo "Push the tested commit first, then rerun this script." >&2
-      exit 1
+  BRANCH="$(git -C "$ROOT" symbolic-ref --quiet --short HEAD || true)"
+  if [[ -n "$BRANCH" ]]; then
+    REMOTE="$(git -C "$ROOT" config "branch.${BRANCH}.remote" || true)"
+    MERGE_REF="$(git -C "$ROOT" config "branch.${BRANCH}.merge" || true)"
+    if [[ -n "$REMOTE" && -n "$MERGE_REF" ]]; then
+      REMOTE_HEAD="$(git -C "$ROOT" ls-remote "$REMOTE" "$MERGE_REF" | awk 'NR == 1 { print $1 }')"
+      if [[ -n "$REMOTE_HEAD" && "$REMOTE_HEAD" != "$GIT_HEAD" ]]; then
+        echo "Refusing to publish: $REMOTE/$BRANCH is not at local HEAD $GIT_HEAD." >&2
+        echo "Push the tested commit first, then rerun this script." >&2
+        exit 1
+      fi
     fi
   fi
 fi
 
-bash "$ROOT/scripts/package_presstalk_release.sh" "$VERSION" >/dev/null
+ARCH="$ARCH" \
+PUBLIC_NAME="$PUBLIC_NAME" \
+PRESSTALK_DIST_DIR="$DIST_DIR" \
+  bash "$ROOT/scripts/package_presstalk_release.sh" "$VERSION" >/dev/null
 
 if [[ ! -f "$ASSET_PATH" || ! -f "$SHA_PATH" ]]; then
   echo "Missing packaged artifact for $VERSION" >&2
@@ -59,6 +72,13 @@ fi
   --expected-bundle-id "${PRESSTALK_EXPECTED_BUNDLE_ID:-com.am.presstalk}" \
   --expected-version "$VERSION" \
   --json-output "$ARTIFACT_AUDIT_JSON"
+
+if truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
+  echo "PressTalk prerelease publish dry run complete"
+  echo "Asset: $ASSET_PATH"
+  echo "AuditJSON: $ARTIFACT_AUDIT_JSON"
+  exit 0
+fi
 
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
 NOTES_TEMPLATE_PATH="$(mktemp "${TMPDIR:-/tmp}/presstalk-release-notes.XXXXXX")"

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIST_DIR="$ROOT/dist"
+DIST_DIR="${PRESSTALK_DIST_DIR:-$ROOT/dist}"
 PUBLIC_NAME="${PUBLIC_NAME:-PressTalk}"
 VERSION="${1:-0.1.5}"
 ARCH="${ARCH:-$(uname -m)}"

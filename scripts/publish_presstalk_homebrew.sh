@@ -7,11 +7,12 @@ PUBLIC_NAME="${PUBLIC_NAME:-PressTalk}"
 RELEASE_REPO="${RELEASE_REPO:-subtract0/presstalk-releases}"
 TAP_REPO="${TAP_REPO:-subtract0/homebrew-presstalk}"
 ARCH="${ARCH:-arm64}"
+DIST_DIR="${PRESSTALK_DIST_DIR:-$ROOT/dist}"
 ASSET_NAME="${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.zip"
-ASSET_PATH="$ROOT/dist/$ASSET_NAME"
-SHA_PATH="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
+ASSET_PATH="$DIST_DIR/$ASSET_NAME"
+SHA_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
-ARTIFACT_AUDIT_JSON="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
+ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-publish.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -67,10 +68,15 @@ EOF
   fi
 fi
 
-require_cmd gh
 require_cmd git
+if ! truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
+  require_cmd gh
+fi
 
-bash "$ROOT/scripts/package_presstalk_release.sh" "$VERSION" >/dev/null
+ARCH="$ARCH" \
+PUBLIC_NAME="$PUBLIC_NAME" \
+PRESSTALK_DIST_DIR="$DIST_DIR" \
+  bash "$ROOT/scripts/package_presstalk_release.sh" "$VERSION" >/dev/null
 
 if [[ ! -f "$ASSET_PATH" ]]; then
   echo "Missing packaged asset: $ASSET_PATH" >&2
@@ -87,6 +93,13 @@ if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_DISTRIBUTION_AUD
   audit_args+=(--require-distribution --require-notarized)
 fi
 "$ARTIFACT_AUDIT_SCRIPT" "${audit_args[@]}"
+
+if truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
+  echo "PressTalk publish dry run complete"
+  echo "Asset: $ASSET_PATH"
+  echo "AuditJSON: $ARTIFACT_AUDIT_JSON"
+  exit 0
+fi
 
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
 RELEASE_TAG="v$VERSION"

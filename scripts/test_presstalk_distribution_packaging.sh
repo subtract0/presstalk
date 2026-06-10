@@ -111,6 +111,26 @@ grep -Fq "is excluded from microphone/STT smoke" "$PUBLISH_PRERELEASE_SCRIPT"
 grep -Fq "presstalk_release_artifact_audit.sh" "$PUBLISH_PRERELEASE_SCRIPT"
 grep -Fq "artifact-audit.json" "$PUBLISH_PRERELEASE_SCRIPT"
 
+homebrew_dry_run_dist="$TEST_TMPDIR/homebrew-dry-run-dist"
+homebrew_dry_run_output="$TEST_TMPDIR/homebrew-dry-run.txt"
+PRESSTALK_PUBLISH_DRY_RUN=1 \
+PRESSTALK_DIST_DIR="$homebrew_dry_run_dist" \
+  "$PUBLISH_HOMEBREW_SCRIPT" 0.0-homebrew-dryrun >"$homebrew_dry_run_output" 2>&1
+grep -Fq "PressTalk publish dry run complete" "$homebrew_dry_run_output"
+test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64.zip"
+test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifact-audit.json"
+grep -Fq '"bundleIdentifier"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifact-audit.json"
+
+prerelease_dry_run_dist="$TEST_TMPDIR/prerelease-dry-run-dist"
+prerelease_dry_run_output="$TEST_TMPDIR/prerelease-dry-run.txt"
+PRESSTALK_PUBLISH_DRY_RUN=1 \
+PRESSTALK_DIST_DIR="$prerelease_dry_run_dist" \
+  "$PUBLISH_PRERELEASE_SCRIPT" 0.0-prerelease-dryrun >"$prerelease_dry_run_output" 2>&1
+grep -Fq "PressTalk prerelease publish dry run complete" "$prerelease_dry_run_output"
+test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m).zip"
+test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-artifact-audit.json"
+grep -Fq '"bundleIdentifier"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-artifact-audit.json"
+
 artifact_zip="$(build_ad_hoc_test_zip)"
 artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"
 artifact_audit_output="$TEST_TMPDIR/artifact-audit.txt"

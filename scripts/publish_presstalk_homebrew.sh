@@ -15,6 +15,7 @@ ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
 ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 READINESS_PREFLIGHT_SCRIPT="$ROOT/scripts/presstalk_release_readiness_preflight.sh"
 PROOF_GATE_JSON="${PRESSTALK_RELEASE_PROOF_GATE_JSON:-${PRESSTALK_PROOF_GATE_JSON:-}}"
+REQUIRED_PROOF_TARGETS="${PRESSTALK_REQUIRED_PROOF_TARGETS:-}"
 RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-publish.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
@@ -53,6 +54,9 @@ if [[ "${PRESSTALK_RELEASE_PRERELEASE:-0}" == "1" || "$VERSION" == *-* ]]; then
 fi
 
 if [[ "$IS_PRERELEASE" == "0" ]]; then
+  if [[ -z "$REQUIRED_PROOF_TARGETS" ]]; then
+    REQUIRED_PROOF_TARGETS="studio1,mbp1"
+  fi
   if ! truthy "${PRESSTALK_DISTRIBUTION_SIGNING:-0}"; then
     cat >&2 <<'EOF'
 Refusing to publish a stable PressTalk Homebrew release without production
@@ -124,6 +128,15 @@ if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_RELEASE_READINES
     --expected-asr-mode "${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
     --json-output "$RELEASE_READINESS_JSON"
   )
+  if [[ -n "$REQUIRED_PROOF_TARGETS" ]]; then
+    IFS=',' read -r -a parsed_required_targets <<<"$REQUIRED_PROOF_TARGETS"
+    for parsed_required_target in "${parsed_required_targets[@]}"; do
+      parsed_required_target="${parsed_required_target#"${parsed_required_target%%[![:space:]]*}"}"
+      parsed_required_target="${parsed_required_target%"${parsed_required_target##*[![:space:]]}"}"
+      [[ -z "$parsed_required_target" ]] && continue
+      readiness_args+=(--require-proof-target "$parsed_required_target")
+    done
+  fi
   if [[ "$IS_PRERELEASE" == "0" ]]; then
     readiness_args+=(--require-production)
   fi

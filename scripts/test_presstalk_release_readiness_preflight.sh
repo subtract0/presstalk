@@ -122,12 +122,17 @@ test_pass_json="$TEST_TMPDIR/test-pass.json"
 "$PREFLIGHT" \
   --artifact-audit "$test_artifact_audit" \
   --proof-gate "$proof_gate" \
+  --require-proof-target studio1 \
+  --require-proof-target mbp1 \
   --json-output "$test_pass_json" >"$test_pass_output"
 grep -Fq "TestArtifactReady: true" "$test_pass_output"
 grep -Fq "ProductionReady: false" "$test_pass_output"
+grep -Fq "RequiredProofTargetsReady: true" "$test_pass_output"
 grep -Fq "Result: pass" "$test_pass_output"
 if [[ "$(plutil -extract testArtifactReady raw -o - "$test_pass_json")" != "true" ||
-      "$(plutil -extract productionReady raw -o - "$test_pass_json")" != "false" ]]; then
+      "$(plutil -extract productionReady raw -o - "$test_pass_json")" != "false" ||
+      "$(plutil -extract requiredProofTargetsReady raw -o - "$test_pass_json")" != "true" ||
+      "$(plutil -extract requiredProofTargetCount raw -o - "$test_pass_json")" != "2" ]]; then
   echo "FAIL: test artifact JSON readiness mismatch"
   plutil -p "$test_pass_json"
   exit 1
@@ -156,6 +161,8 @@ production_pass_json="$TEST_TMPDIR/production-pass.json"
 "$PREFLIGHT" \
   --artifact-audit "$production_artifact_audit" \
   --proof-gate "$proof_gate" \
+  --require-proof-target studio1 \
+  --require-proof-target mbp1 \
   --require-production \
   --json-output "$production_pass_json" >"$production_pass_output"
 grep -Fq "ProductionReady: true" "$production_pass_output"
@@ -177,5 +184,17 @@ if "$PREFLIGHT" \
 fi
 grep -Fq "proof_target_0_asr_mode_mismatch" "$asr_mismatch_output"
 grep -Fq "proof_target_0_realtime_partials_enabled" "$asr_mismatch_output"
+
+missing_required_target_output="$TEST_TMPDIR/missing-required-target.txt"
+if "$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$proof_gate" \
+  --require-proof-target studio2 >"$missing_required_target_output"; then
+  echo "FAIL: missing required target preflight unexpectedly passed"
+  cat "$missing_required_target_output"
+  exit 1
+fi
+grep -Fq "RequiredProofTargetsReady: false" "$missing_required_target_output"
+grep -Fq "required_proof_target_studio2_missing" "$missing_required_target_output"
 
 echo "PASS release_readiness_preflight"

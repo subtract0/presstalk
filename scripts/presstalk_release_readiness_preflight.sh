@@ -6,6 +6,8 @@ PROOF_GATE_JSON=""
 JSON_OUTPUT_PATH=""
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
 REQUIRE_PRODUCTION=0
+REQUIRED_PROOF_TARGETS=()
+REQUIRED_PROOF_TARGET_COUNT=0
 
 usage() {
   cat <<'EOF'
@@ -21,6 +23,9 @@ Options:
   --proof-gate PATH       JSON from presstalk_release_proof_gate.sh.
   --expected-asr-mode M   Required ASR mode for every proof target.
                           Default: parakeet_v3_ane_final_pass.
+  --require-proof-target T
+                          Require proof coverage for target alias, host, or
+                          machineHost. May be repeated.
   --require-production    Fail unless the artifact is production distribution
                           ready and notarized.
   --json-output PATH      Write machine-readable readiness JSON.
@@ -52,6 +57,15 @@ while [[ $# -gt 0 ]]; do
         echo "Missing value for --expected-asr-mode" >&2
         exit 2
       fi
+      shift 2
+      ;;
+    --require-proof-target)
+      if [[ -z "${2:-}" ]]; then
+        echo "Missing value for --require-proof-target" >&2
+        exit 2
+      fi
+      REQUIRED_PROOF_TARGETS+=("$2")
+      REQUIRED_PROOF_TARGET_COUNT=$((REQUIRED_PROOF_TARGET_COUNT + 1))
       shift 2
       ;;
     --require-production)
@@ -91,6 +105,17 @@ if [[ ! -f "$PROOF_GATE_JSON" ]]; then
   exit 1
 fi
 
+if [[ "$REQUIRED_PROOF_TARGET_COUNT" -eq 0 && -n "${PRESSTALK_REQUIRED_PROOF_TARGETS:-}" ]]; then
+  IFS=',' read -r -a parsed_required_targets <<<"$PRESSTALK_REQUIRED_PROOF_TARGETS"
+  for parsed_required_target in "${parsed_required_targets[@]}"; do
+    parsed_required_target="${parsed_required_target#"${parsed_required_target%%[![:space:]]*}"}"
+    parsed_required_target="${parsed_required_target%"${parsed_required_target##*[![:space:]]}"}"
+    [[ -z "$parsed_required_target" ]] && continue
+    REQUIRED_PROOF_TARGETS+=("$parsed_required_target")
+    REQUIRED_PROOF_TARGET_COUNT=$((REQUIRED_PROOF_TARGET_COUNT + 1))
+  done
+fi
+
 json_value() {
   local file="$1"
   local key_path="$2"
@@ -124,6 +149,10 @@ plist_insert_bool() {
 append_failure() {
   local failure="$1"
   failures+=("$failure")
+}
+
+safe_failure_suffix() {
+  printf '%s' "$1" | tr -c 'A-Za-z0-9_' '_'
 }
 
 RUN_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-release-readiness.XXXXXX")"
@@ -183,19 +212,43 @@ for ((i = 0; i < target_count; i++)); do
   fi
 done
 
+required_targets_ready=true
+if [[ "$REQUIRED_PROOF_TARGET_COUNT" -gt 0 ]]; then
+  for required_target in "${REQUIRED_PROOF_TARGETS[@]}"; do
+    required_target_found=false
+    for ((i = 0; i < target_count; i++)); do
+      proof_required="$(json_value "$PROOF_GATE_JSON" "targets.$i.required")"
+      proof_target="$(json_value "$PROOF_GATE_JSON" "targets.$i.target")"
+      proof_machine_host="$(json_value "$PROOF_GATE_JSON" "targets.$i.machineHost")"
+      if [[ "$proof_required" == "$required_target" ||
+            "$proof_target" == "$required_target" ||
+            "$proof_machine_host" == "$required_target" ]]; then
+        required_target_found=true
+        break
+      fi
+    done
+    if [[ "$required_target_found" != "true" ]]; then
+      append_failure "required_proof_target_$(safe_failure_suffix "$required_target")_missing"
+      required_targets_ready=false
+    fi
+  done
+fi
+
 production_ready=false
 if bool_ready "$artifact_passed" &&
    bool_ready "$distribution_ready" &&
    bool_ready "$notarized" &&
    bool_ready "$proof_proven" &&
-   [[ "$asr_mode_ready" == "true" ]]; then
+   [[ "$asr_mode_ready" == "true" ]] &&
+   [[ "$required_targets_ready" == "true" ]]; then
   production_ready=true
 fi
 
 test_artifact_ready=false
 if bool_ready "$artifact_passed" &&
    bool_ready "$proof_proven" &&
-   [[ "$asr_mode_ready" == "true" ]]; then
+   [[ "$asr_mode_ready" == "true" ]] &&
+   [[ "$required_targets_ready" == "true" ]]; then
   test_artifact_ready=true
 fi
 
@@ -225,6 +278,14 @@ plist_insert_bool "$RESULT_PLIST" notarized "$notarized"
 plist_insert_bool "$RESULT_PLIST" proofProven "$proof_proven"
 plutil -insert proofFailureCount -integer "${proof_failures:-0}" "$RESULT_PLIST" >/dev/null
 plutil -insert proofTargetCount -integer "$target_count" "$RESULT_PLIST" >/dev/null
+plutil -insert requiredProofTargets -array "$RESULT_PLIST" >/dev/null
+if [[ "$REQUIRED_PROOF_TARGET_COUNT" -gt 0 ]]; then
+  for required_target in "${REQUIRED_PROOF_TARGETS[@]}"; do
+    plutil -insert requiredProofTargets -string "$required_target" -append "$RESULT_PLIST" >/dev/null
+  done
+fi
+plutil -insert requiredProofTargetCount -integer "$REQUIRED_PROOF_TARGET_COUNT" "$RESULT_PLIST" >/dev/null
+plist_insert_bool "$RESULT_PLIST" requiredProofTargetsReady "$required_targets_ready"
 plist_insert_bool "$RESULT_PLIST" asrModeReady "$asr_mode_ready"
 plist_insert_bool "$RESULT_PLIST" testArtifactReady "$test_artifact_ready"
 plist_insert_bool "$RESULT_PLIST" productionReady "$production_ready"
@@ -251,6 +312,7 @@ echo "ExpectedASRMode: $EXPECTED_ASR_MODE"
 echo "ArtifactPassed: ${artifact_passed:-unknown}"
 echo "ProofProven: ${proof_proven:-unknown}"
 echo "ASRModeReady: $asr_mode_ready"
+echo "RequiredProofTargetsReady: $required_targets_ready"
 echo "TestArtifactReady: $test_artifact_ready"
 echo "ProductionReady: $production_ready"
 if [[ -n "$JSON_OUTPUT_PATH" ]]; then

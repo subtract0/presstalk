@@ -114,6 +114,8 @@ grep -Fq "presstalk_release_artifact_audit.sh" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq "artifact-audit.json" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-distribution" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-notarized" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq 'REQUIRED_PROOF_TARGETS="studio1,mbp1"' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq -- "--require-proof-target" "$PUBLISH_HOMEBREW_SCRIPT"
 
 stable_publish_without_proof_output="$TEST_TMPDIR/stable-publish-without-proof.txt"
 set +e
@@ -157,6 +159,7 @@ homebrew_dry_run_output="$TEST_TMPDIR/homebrew-dry-run.txt"
 PRESSTALK_PUBLISH_DRY_RUN=1 \
 PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
 PRESSTALK_RELEASE_PROOF_GATE_JSON="$proof_gate_json" \
+PRESSTALK_REQUIRED_PROOF_TARGETS=studio1 \
 PRESSTALK_DIST_DIR="$homebrew_dry_run_dist" \
   "$PUBLISH_HOMEBREW_SCRIPT" 0.0-homebrew-dryrun >"$homebrew_dry_run_output" 2>&1
 grep -Fq "PressTalk publish dry run complete" "$homebrew_dry_run_output"
@@ -166,12 +169,14 @@ test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifa
 test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-release-readiness.json"
 grep -Fq '"bundleIdentifier"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifact-audit.json"
 grep -Fq '"testArtifactReady"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-release-readiness.json"
+grep -Fq '"requiredProofTargetsReady"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-release-readiness.json"
 
 prerelease_dry_run_dist="$TEST_TMPDIR/prerelease-dry-run-dist"
 prerelease_dry_run_output="$TEST_TMPDIR/prerelease-dry-run.txt"
 PRESSTALK_PUBLISH_DRY_RUN=1 \
 PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
 PRESSTALK_RELEASE_PROOF_GATE_JSON="$proof_gate_json" \
+PRESSTALK_REQUIRED_PROOF_TARGETS=studio1 \
 PRESSTALK_DIST_DIR="$prerelease_dry_run_dist" \
   "$PUBLISH_PRERELEASE_SCRIPT" 0.0-prerelease-dryrun >"$prerelease_dry_run_output" 2>&1
 grep -Fq "PressTalk prerelease publish dry run complete" "$prerelease_dry_run_output"
@@ -181,6 +186,7 @@ test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname 
 test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-release-readiness.json"
 grep -Fq '"bundleIdentifier"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-artifact-audit.json"
 grep -Fq '"testArtifactReady"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-release-readiness.json"
+grep -Fq '"requiredProofTargetsReady"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-release-readiness.json"
 
 artifact_zip="$(build_ad_hoc_test_zip)"
 artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"

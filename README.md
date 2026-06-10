@@ -200,7 +200,10 @@ so a weakly signed or unstapled zip cannot be published just because the
 environment variables were set. Stable releases also require
 `PRESSTALK_RELEASE_PROOF_GATE_JSON=/path/to/proof-gate.json`; the publish script
 runs `presstalk_release_readiness_preflight.sh --require-production` before any
-GitHub release or Homebrew tap write.
+GitHub release or Homebrew tap write. By default stable publishing requires
+proof targets for `studio1` and `mbp1`; override or extend that with
+`PRESSTALK_REQUIRED_PROOF_TARGETS=studio1,mbp1,studio2` once `studio2` is back
+in microphone/STT scope.
 
 That makes this install path work:
 ```bash

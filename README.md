@@ -141,6 +141,21 @@ PRESSTALK_PUBLISH_DRY_RUN=1 bash scripts/publish_presstalk_homebrew.sh 0.1.6-tes
 Set `PRESSTALK_DIST_DIR=/path/to/dist` when you want generated zips, checksums,
 and audit JSON written outside the repo `dist/` directory.
 
+To collect the current no-publish release-candidate evidence in one pass:
+```bash
+bash scripts/presstalk_release_candidate_preflight.sh 0.1.6-test5 \
+  --local \
+  --host mbp1-tb \
+  --require studio1 \
+  --require mbp1 \
+  --exclude-host "studio2=no attached microphone"
+```
+
+This wrapper collects the readiness matrix, runs the proof gate, performs the
+Homebrew publish dry-run, and records the combined readiness JSON. It does not
+install PressTalk, open System Settings, upload a release, or SSH anywhere
+except hosts supplied with `--host` / `--hosts`.
+
 Release packaging explicitly builds the public `com.am.presstalk` identity even
 when your local development install is preserving `com.am.jarvistap`.
 

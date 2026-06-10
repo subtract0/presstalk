@@ -115,6 +115,12 @@ Current tooling update after that run:
   only after Alex explicitly opts it back into microphone/STT coverage.
   Prerelease publishers can opt into the same combined check with
   `PRESSTALK_REQUIRE_RELEASE_READINESS=1`.
+- `scripts/presstalk_release_candidate_preflight.sh` is the no-publish wrapper
+  for closing a release candidate locally: it collects a readiness matrix, runs
+  the proof gate, performs the Homebrew publish dry-run, and records the
+  combined release-readiness JSON. It does not install PressTalk, open System
+  Settings, upload assets, or SSH into any machine except hosts explicitly
+  passed with `--host` / `--hosts`.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

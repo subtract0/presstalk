@@ -67,6 +67,10 @@ Current tooling update after that run:
   `PRESSTALK_NOTARIZE=1` submits and staples a notarization ticket before the
   final zip is written. Without that flag, package output remains a
   test/prerelease artifact.
+- `scripts/publish_presstalk_homebrew.sh` refuses stable, non-hyphenated
+  versions unless both production distribution signing and notarization are
+  explicitly enabled. Hyphenated `test` / prerelease versions keep the existing
+  smoke-test publishing path.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

@@ -152,6 +152,10 @@ Publish the public binary release plus Homebrew tap:
 bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
 ```
 
+For a stable version without a hyphen, `publish_presstalk_homebrew.sh` refuses
+to continue unless `PRESSTALK_DISTRIBUTION_SIGNING=1` and
+`PRESSTALK_NOTARIZE=1` are both set.
+
 That makes this install path work:
 ```bash
 brew tap subtract0/presstalk

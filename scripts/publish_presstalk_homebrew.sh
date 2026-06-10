@@ -20,6 +20,13 @@ require_cmd() {
   fi
 }
 
+truthy() {
+  case "${1:-}" in
+    1|true|TRUE|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 ensure_repo() {
   local repo="$1"
   if gh repo view "$repo" >/dev/null 2>&1; then
@@ -34,6 +41,30 @@ configure_git_identity() {
   git -C "$repo_dir" config user.email "${PRESSTALK_RELEASE_GIT_EMAIL:-presstalk-release-bot@users.noreply.github.com}"
 }
 
+IS_PRERELEASE=0
+if [[ "${PRESSTALK_RELEASE_PRERELEASE:-0}" == "1" || "$VERSION" == *-* ]]; then
+  IS_PRERELEASE=1
+fi
+
+if [[ "$IS_PRERELEASE" == "0" ]]; then
+  if ! truthy "${PRESSTALK_DISTRIBUTION_SIGNING:-0}"; then
+    cat >&2 <<'EOF'
+Refusing to publish a stable PressTalk Homebrew release without production
+distribution signing. Set PRESSTALK_DISTRIBUTION_SIGNING=1 plus a Developer ID
+identity, or publish a hyphenated prerelease version such as 0.1.6-test5.
+EOF
+    exit 2
+  fi
+  if ! truthy "${PRESSTALK_NOTARIZE:-0}"; then
+    cat >&2 <<'EOF'
+Refusing to publish a stable PressTalk Homebrew release without notarization.
+Set PRESSTALK_NOTARIZE=1 with notarytool credentials, or publish a hyphenated
+prerelease version such as 0.1.6-test5.
+EOF
+    exit 2
+  fi
+fi
+
 require_cmd gh
 require_cmd git
 
@@ -47,10 +78,6 @@ fi
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
 RELEASE_TAG="v$VERSION"
 RELEASE_URL="https://github.com/${RELEASE_REPO}/releases/download/${RELEASE_TAG}/${ASSET_NAME}"
-IS_PRERELEASE=0
-if [[ "${PRESSTALK_RELEASE_PRERELEASE:-0}" == "1" || "$VERSION" == *-* ]]; then
-  IS_PRERELEASE=1
-fi
 
 ensure_repo "$RELEASE_REPO"
 ensure_repo "$TAP_REPO"

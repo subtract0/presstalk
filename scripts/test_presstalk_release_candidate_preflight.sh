@@ -62,6 +62,11 @@ cat >"$json_output" <<'JSON'
         "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
+        "realFieldSmokeSuccess": true,
+        "realFieldTargetCaptureSuccess": true,
+        "realFieldReleaseToInsertMs": "1345",
+        "realFieldFinalizer": "offline_whisper",
+        "realFieldInsertionMethod": "ax_menu_paste",
         "nextAction": "ready"
       }
     }
@@ -116,6 +121,7 @@ printf 'fake zip\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip"
 printf 'fake sha\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip.sha256"
 printf 'ran\n' >"$dist_dir/fake-publish-ran.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-unset}" >"$dist_dir/fake-publish-streaming-env.txt"
+printf '%s\n' "${PRESSTALK_EXPECTED_ASR_MODE:-unset}" >"$dist_dir/fake-publish-expected-asr-mode.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_BENCH_QUALITY:-unset}" >"$dist_dir/fake-publish-streaming-bench-env.txt"
 printf '%s\n' "${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-unset}" >"$dist_dir/fake-publish-streaming-bench-json.txt"
 printf '%s\n' "${PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY:-unset}" >"$dist_dir/fake-publish-hybrid-streaming-env.txt"
@@ -255,6 +261,25 @@ if [[ "$(plutil -extract proven raw -o - "$pass_dist/PressTalk-0.0-candidate-pro
   exit 1
 fi
 
+real_field_dist="$TEST_TMPDIR/real-field-dist"
+real_field_summary="$TEST_TMPDIR/real-field-summary.json"
+real_field_output="$TEST_TMPDIR/real-field-output.txt"
+PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
+PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
+  "$WRAPPER" --version 0.0-realfield --dist-dir "$real_field_dist" --local \
+    --require local --require-real-field-smoke \
+    --json-output "$real_field_summary" >"$real_field_output"
+grep -Fq "Result: pass" "$real_field_output"
+if [[ "$(plutil -extract requireRealFieldSmoke raw -o - "$real_field_summary")" != "true" ||
+      "$(plutil -extract requireRealFieldSmoke raw -o - "$real_field_dist/PressTalk-0.0-realfield-proof-gate.json")" != "true" ||
+      "$(plutil -extract targets.0.realFieldSmokeSuccess raw -o - "$real_field_dist/PressTalk-0.0-realfield-proof-gate.json")" != "true" ||
+      "$(plutil -extract targets.0.realFieldReleaseToInsertMs raw -o - "$real_field_dist/PressTalk-0.0-realfield-proof-gate.json")" != "1345" ]]; then
+  echo "FAIL: strict real-field candidate preflight evidence mismatch"
+  plutil -p "$real_field_summary"
+  plutil -p "$real_field_dist/PressTalk-0.0-realfield-proof-gate.json"
+  exit 1
+fi
+
 host_dist="$TEST_TMPDIR/host-dist"
 host_summary="$TEST_TMPDIR/host-summary.json"
 host_output="$TEST_TMPDIR/host-output.txt"
@@ -304,6 +329,11 @@ grep -Fq "Result: pass" "$streaming_output"
 if [[ "$(cat "$streaming_dist/fake-publish-streaming-env.txt")" != "1" ]]; then
   echo "FAIL: --require-streaming did not reach publish dry-run"
   cat "$streaming_dist/fake-publish-streaming-env.txt"
+  exit 1
+fi
+if [[ "$(cat "$streaming_dist/fake-publish-expected-asr-mode.txt")" != "any" ]]; then
+  echo "FAIL: --require-streaming did not relax expected ASR mode for prerelease dry-run"
+  cat "$streaming_dist/fake-publish-expected-asr-mode.txt"
   exit 1
 fi
 if [[ "$(cat "$streaming_dist/fake-publish-streaming-bench-env.txt")" != "1" ||

@@ -5,6 +5,7 @@ MATRIX_JSON=""
 JSON_OUTPUT_PATH=""
 REQUIRED_TARGETS=()
 EXCLUDED_TARGETS=()
+REQUIRE_REAL_FIELD_SMOKE=0
 
 usage() {
   cat <<EOF
@@ -19,6 +20,9 @@ Options:
   --require TARGET     Required target alias or machine host. Repeatable.
   --exclude TARGET=WHY Record an intentionally excluded target and reason.
                        This is informational and does not make release proof.
+  --require-real-field-smoke
+                       Also require the latest real focused-field trigger smoke
+                       to report success and target capture.
   --json-output PATH   Also write a machine-readable proof-gate result.
   -h, --help           Show this help.
 EOF
@@ -49,6 +53,10 @@ while [[ $# -gt 0 ]]; do
       fi
       EXCLUDED_TARGETS+=("$2")
       shift 2
+      ;;
+    --require-real-field-smoke)
+      REQUIRE_REAL_FIELD_SMOKE=1
+      shift
       ;;
     --json-output)
       JSON_OUTPUT_PATH="${2:-}"
@@ -182,6 +190,7 @@ echo
 
 plist_insert_integer "$RESULT_PLIST" "schemaVersion" "1"
 plist_insert_string "$RESULT_PLIST" "matrix" "$MATRIX_JSON"
+plist_insert_bool "$RESULT_PLIST" "requireRealFieldSmoke" "$REQUIRE_REAL_FIELD_SMOKE"
 /usr/libexec/PlistBuddy -c "Add :requiredTargets array" "$RESULT_PLIST" >/dev/null
 for required in "${REQUIRED_TARGETS[@]}"; do
   /usr/libexec/PlistBuddy -c "Add :requiredTargets: string $required" "$RESULT_PLIST" >/dev/null
@@ -230,6 +239,11 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   reachable="$(json_value "targets.$index.reachable")"
   physical="$(json_value "targets.$index.summary.physicalSTTSmokeReady")"
   active="$(json_value "targets.$index.summary.activeFieldSmokeReady")"
+  real_field_success="$(json_value "targets.$index.summary.realFieldSmokeSuccess")"
+  real_field_target_capture_success="$(json_value "targets.$index.summary.realFieldTargetCaptureSuccess")"
+  real_field_release_to_insert_ms="$(json_value "targets.$index.summary.realFieldReleaseToInsertMs")"
+  real_field_finalizer="$(json_value "targets.$index.summary.realFieldFinalizer")"
+  real_field_insertion_method="$(json_value "targets.$index.summary.realFieldInsertionMethod")"
   next_action="$(json_value "targets.$index.summary.nextAction")"
 
   target_failures=0
@@ -276,6 +290,18 @@ for required in "${REQUIRED_TARGETS[@]}"; do
     /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string realtime_partial_transcription_state_missing" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
+  if [[ "$REQUIRE_REAL_FIELD_SMOKE" == "1" ]]; then
+    if ! bool_ready "$real_field_success"; then
+      echo "FAIL $required: realFieldSmokeSuccess=${real_field_success:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+      /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string real_field_smoke_not_successful" "$RESULT_PLIST" >/dev/null
+      target_failures=$((target_failures + 1))
+    fi
+    if ! bool_ready "$real_field_target_capture_success"; then
+      echo "FAIL $required: realFieldTargetCaptureSuccess=${real_field_target_capture_success:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+      /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string real_field_target_capture_not_successful" "$RESULT_PLIST" >/dev/null
+      target_failures=$((target_failures + 1))
+    fi
+  fi
 
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:target" "${target:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:machineHost" "${machine_host:-unknown}"
@@ -287,10 +313,15 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:reachable" "${reachable:-false}"
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:physicalSTTSmokeReady" "${physical:-false}"
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:activeFieldSmokeReady" "${active:-false}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:realFieldSmokeSuccess" "${real_field_success:-false}"
+  plist_insert_bool "$RESULT_PLIST" "targets:$result_index:realFieldTargetCaptureSuccess" "${real_field_target_capture_success:-false}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:realFieldReleaseToInsertMs" "${real_field_release_to_insert_ms:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:realFieldFinalizer" "${real_field_finalizer:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:realFieldInsertionMethod" "${real_field_insertion_method:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:nextAction" "${next_action:-unknown}"
 
   if [[ "$target_failures" -eq 0 ]]; then
-    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown}"
+    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown} realFieldSmoke=${real_field_success:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown}"
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "true"
   else
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "false"

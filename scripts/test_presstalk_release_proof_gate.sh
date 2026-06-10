@@ -26,6 +26,11 @@ cat >"$pass_matrix" <<'JSON'
         "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
+        "realFieldSmokeSuccess": true,
+        "realFieldTargetCaptureSuccess": true,
+        "realFieldReleaseToInsertMs": "1345",
+        "realFieldFinalizer": "offline_whisper",
+        "realFieldInsertionMethod": "ax_menu_paste",
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
       }
     },
@@ -41,6 +46,11 @@ cat >"$pass_matrix" <<'JSON'
         "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
+        "realFieldSmokeSuccess": true,
+        "realFieldTargetCaptureSuccess": true,
+        "realFieldReleaseToInsertMs": "900",
+        "realFieldFinalizer": "parakeet_v3_ane",
+        "realFieldInsertionMethod": "ax_menu_paste",
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
       }
     }
@@ -144,9 +154,24 @@ if [[ "$(plutil -extract failureCount raw -o - "$pass_json")" != "0" ]]; then
 fi
 if [[ "$(plutil -extract targets.0.streamingASRBackend raw -o - "$pass_json")" != "parakeet-eou-320" ||
       "$(plutil -extract targets.0.asrMode raw -o - "$pass_json")" != "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials" ||
-      "$(plutil -extract targets.0.realtimePartialTranscriptionEnabled raw -o - "$pass_json")" != "true" ]]; then
+      "$(plutil -extract targets.0.realtimePartialTranscriptionEnabled raw -o - "$pass_json")" != "true" ||
+      "$(plutil -extract targets.0.realFieldSmokeSuccess raw -o - "$pass_json")" != "true" ||
+      "$(plutil -extract targets.0.realFieldReleaseToInsertMs raw -o - "$pass_json")" != "1345" ||
+      "$(plutil -extract targets.0.realFieldFinalizer raw -o - "$pass_json")" != "offline_whisper" ]]; then
   echo "FAIL: pass JSON did not preserve ASR mode evidence"
   plutil -p "$pass_json"
+  exit 1
+fi
+
+real_field_output="$TEST_TMPDIR/real-field-pass.txt"
+real_field_json="$TEST_TMPDIR/real-field-pass-result.json"
+"$GATE" --matrix "$pass_matrix" --require studio1 --require mbp1 --require-real-field-smoke --json-output "$real_field_json" >"$real_field_output"
+grep -Fq "Result: proven" "$real_field_output"
+grep -Fq "realFieldSmoke=true" "$real_field_output"
+if [[ "$(plutil -extract requireRealFieldSmoke raw -o - "$real_field_json")" != "true" ||
+      "$(plutil -extract targets.1.realFieldTargetCaptureSuccess raw -o - "$real_field_json")" != "true" ]]; then
+  echo "FAIL: real-field proof JSON mismatch"
+  plutil -p "$real_field_json"
   exit 1
 fi
 
@@ -170,6 +195,40 @@ if [[ "$(plutil -extract targets.1.failures.0 raw -o - "$blocked_json")" != "act
   plutil -p "$blocked_json"
   exit 1
 fi
+
+missing_real_field_matrix="$TEST_TMPDIR/missing-real-field.json"
+cat >"$missing_real_field_matrix" <<'JSON'
+{
+  "schemaVersion": 1,
+  "targets": [
+    {
+      "target": "local",
+      "status": "ready_reported",
+      "reachable": true,
+      "summary": {
+        "machineHost": "studio1",
+        "asrBackend": "parakeet-v3-ane",
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
+        "physicalSTTSmokeReady": true,
+        "activeFieldSmokeReady": true,
+        "nextAction": "Ready for physical dictation smoke."
+      }
+    }
+  ]
+}
+JSON
+missing_real_field_output="$TEST_TMPDIR/missing-real-field.txt"
+missing_real_field_json="$TEST_TMPDIR/missing-real-field-result.json"
+if "$GATE" --matrix "$missing_real_field_matrix" --require local --require-real-field-smoke --json-output "$missing_real_field_json" >"$missing_real_field_output"; then
+  echo "FAIL: missing real-field matrix unexpectedly passed strict proof"
+  cat "$missing_real_field_output"
+  exit 1
+fi
+grep -Fq "realFieldSmokeSuccess=unknown" "$missing_real_field_output"
+grep -Fq "real_field_smoke_not_successful" "$missing_real_field_json"
+grep -Fq "real_field_target_capture_not_successful" "$missing_real_field_json"
 
 failed_alias_output="$TEST_TMPDIR/failed-alias.txt"
 failed_alias_json="$TEST_TMPDIR/failed-alias-result.json"

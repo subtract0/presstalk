@@ -196,6 +196,7 @@ append_target_result() {
 
   local target_plist target_json readiness_json schema_version status error_text reachable
   local microphone physical active next_action machine_host asr_backend streaming_asr_backend asr_mode realtime_partial_transcription_enabled
+  local real_field_success real_field_target_capture_success real_field_release_to_insert_ms real_field_finalizer real_field_insertion_method
   target_plist="$RUN_TMPDIR/target-$RANDOM.plist"
   plutil -create xml1 "$target_plist" >/dev/null
 
@@ -219,6 +220,11 @@ append_target_result() {
     microphone="$(json_file_value "$stdout_file" audio.microphoneHardwareDetected)"
     physical="$(json_file_value "$stdout_file" eligibility.physicalSTTSmokeReady)"
     active="$(json_file_value "$stdout_file" eligibility.activeFieldSmokeReady)"
+    real_field_success="$(json_file_value "$stdout_file" latestRealFieldTriggerSmoke.success)"
+    real_field_target_capture_success="$(json_file_value "$stdout_file" latestRealFieldTriggerSmoke.targetCaptureSuccess)"
+    real_field_release_to_insert_ms="$(json_file_value "$stdout_file" latestRealFieldTriggerSmoke.releaseToInsertMs)"
+    real_field_finalizer="$(json_file_value "$stdout_file" latestRealFieldTriggerSmoke.finalizer)"
+    real_field_insertion_method="$(json_file_value "$stdout_file" latestRealFieldTriggerSmoke.insertionMethod)"
     next_action="$(json_file_value "$stdout_file" nextAction)"
   else
     status="failed"
@@ -238,6 +244,11 @@ append_target_result() {
     microphone=""
     physical=""
     active=""
+    real_field_success=""
+    real_field_target_capture_success=""
+    real_field_release_to_insert_ms=""
+    real_field_finalizer=""
+    real_field_insertion_method=""
     next_action="Fix host/readiness collection error, then rerun matrix."
   fi
 
@@ -254,6 +265,11 @@ append_target_result() {
   plist_insert_bool_or_string "$target_plist" "summary.microphoneHardwareDetected" "$microphone"
   plist_insert_bool_or_string "$target_plist" "summary.physicalSTTSmokeReady" "$physical"
   plist_insert_bool_or_string "$target_plist" "summary.activeFieldSmokeReady" "$active"
+  plist_insert_bool_or_string "$target_plist" "summary.realFieldSmokeSuccess" "$real_field_success"
+  plist_insert_bool_or_string "$target_plist" "summary.realFieldTargetCaptureSuccess" "$real_field_target_capture_success"
+  plist_insert_string "$target_plist" "summary.realFieldReleaseToInsertMs" "$real_field_release_to_insert_ms"
+  plist_insert_string "$target_plist" "summary.realFieldFinalizer" "$real_field_finalizer"
+  plist_insert_string "$target_plist" "summary.realFieldInsertionMethod" "$real_field_insertion_method"
   plist_insert_string "$target_plist" "summary.nextAction" "$next_action"
 
   target_json="$(plutil -convert json -r -o - "$target_plist")"
@@ -261,7 +277,7 @@ append_target_result() {
   rm -f "$target_plist"
 
   if [[ "$status" == "ready_reported" ]]; then
-    TEXT_SUMMARY+=("$target [$kind]: microphone=${microphone:-unknown} physical=${physical:-unknown} active=${active:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown} next=${next_action:-unknown}")
+    TEXT_SUMMARY+=("$target [$kind]: microphone=${microphone:-unknown} physical=${physical:-unknown} active=${active:-unknown} realField=${real_field_success:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown} next=${next_action:-unknown}")
   else
     TEXT_SUMMARY+=("$target [$kind]: failed exit=$exit_status error=${error_text:-unknown}")
   fi

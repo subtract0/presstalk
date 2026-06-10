@@ -155,6 +155,17 @@ require an unresolved SSH alias for the same Mac.
   --json-output "$HOME/Desktop/presstalk-proof-gate.json"
 ```
 
+For strict release evidence that a real focused field was actually exercised,
+add `--require-real-field-smoke` after collecting a `real-field-smoke-*.json`
+receipt:
+
+```bash
+/bin/bash scripts/presstalk_release_proof_gate.sh \
+  --matrix "$HOME/Desktop/presstalk-readiness-matrix.json" \
+  --require local --require-real-field-smoke \
+  --json-output "$HOME/Desktop/presstalk-proof-gate-real-field.json"
+```
+
 It does not open System Settings or start signing repair. It reports Apple
 Silicon eligibility, audio input hardware, installed PressTalk identity, runtime
 speech readiness, ASR backend/mode, active-field insertion readiness, latest
@@ -522,6 +533,20 @@ Expected:
 - the helper result JSON has `"targetCaptureSuccess": true`
 - the helper result JSON has the expected `expectedTriggerKey` and readiness
   fields for the tested machine
+
+For a real focused-field smoke in the app you actually care about, focus the
+target text field, hold the configured trigger, speak, and release. Then collect
+a read-only trace receipt:
+
+```bash
+"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-real-field-smoke.sh" \
+  --user-report "passed real focused-field smoke"
+```
+
+This does not record audio, press keys, paste text, start PressTalk, or open
+System Settings. It parses the latest PressTalk trace session and writes
+`real-field-smoke-*.json` with trigger timing, partial-update count, finalizer,
+release-to-insert timing, final transcript, and insertion method.
 
 For a synthetic pipeline check that does not prove the physical trigger, first
 bootstrap with the F5 trigger and no panes:

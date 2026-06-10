@@ -338,6 +338,32 @@ if [[ -n "$latest_manual_json" ]]; then
   manual_trace_final_transcript="$(json_file_value "$latest_manual_json" traceFinalTranscript)"
 fi
 
+latest_real_field_json="$(latest_diagnostic_file 'real-field-smoke-*.json')"
+real_field_generated_at=""
+real_field_success=""
+real_field_reason=""
+real_field_target_capture_success=""
+real_field_trigger_key=""
+real_field_streaming_asr_backend=""
+real_field_partial_update_count=""
+real_field_release_to_insert_ms=""
+real_field_finalizer=""
+real_field_insertion_method=""
+real_field_final_transcript=""
+if [[ -n "$latest_real_field_json" ]]; then
+  real_field_generated_at="$(json_file_value "$latest_real_field_json" generatedAt)"
+  real_field_success="$(json_file_value "$latest_real_field_json" success)"
+  real_field_reason="$(json_file_value "$latest_real_field_json" reason)"
+  real_field_target_capture_success="$(json_file_value "$latest_real_field_json" targetCaptureSuccess)"
+  real_field_trigger_key="$(json_file_value "$latest_real_field_json" runtime.triggerKey)"
+  real_field_streaming_asr_backend="$(json_file_value "$latest_real_field_json" runtime.streamingASRBackend)"
+  real_field_partial_update_count="$(json_file_value "$latest_real_field_json" observed.partialUpdateCount)"
+  real_field_release_to_insert_ms="$(json_file_value "$latest_real_field_json" observed.releaseToInsertMs)"
+  real_field_finalizer="$(json_file_value "$latest_real_field_json" observed.finalizer)"
+  real_field_insertion_method="$(json_file_value "$latest_real_field_json" observed.insertionMethod)"
+  real_field_final_transcript="$(json_file_value "$latest_real_field_json" observed.finalTranscript)"
+fi
+
 install_smoke_eligible="false"
 if [[ "$apple_silicon" == "true" && "$microphone_detected" != "false" ]]; then
   install_smoke_eligible="true"
@@ -483,6 +509,25 @@ print_text_report() {
   fi
 
   echo
+  echo "Latest real-field trigger smoke"
+  if [[ -n "$latest_real_field_json" ]]; then
+    print_field "RealFieldSmokePath" "$latest_real_field_json"
+    print_field "RealFieldSmokeGeneratedAt" "$real_field_generated_at"
+    print_field "RealFieldSmokeSuccess" "$real_field_success"
+    print_field "RealFieldSmokeReason" "$real_field_reason"
+    print_field "RealFieldSmokeTargetCaptureSuccess" "$real_field_target_capture_success"
+    print_field "RealFieldSmokeTriggerKey" "$real_field_trigger_key"
+    print_field "RealFieldSmokeStreamingASRBackend" "$real_field_streaming_asr_backend"
+    print_field "RealFieldSmokePartialUpdateCount" "$real_field_partial_update_count"
+    print_field "RealFieldSmokeReleaseToInsertMs" "$real_field_release_to_insert_ms"
+    print_field "RealFieldSmokeFinalizer" "$real_field_finalizer"
+    print_field "RealFieldSmokeInsertionMethod" "$real_field_insertion_method"
+    print_field "RealFieldSmokeFinalTranscript" "$real_field_final_transcript"
+  else
+    echo "RealFieldSmokePath: none found"
+  fi
+
+  echo
   echo "Eligibility"
   print_field "InstallSmokeEligible" "$install_smoke_eligible"
   print_field "PhysicalSTTSmokeReady" "$physical_stt_smoke_ready"
@@ -569,6 +614,20 @@ write_json_report() {
   plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.targetCaptureSuccess" "$manual_target_capture_success"
   plist_insert_bool_or_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.traceRegisteredHotKeyObserved" "$manual_trace_registered_hotkey_observed"
   plist_insert_string "$tmp_plist" "latestManualPhysicalTriggerSmoke.traceFinalTranscript" "$manual_trace_final_transcript"
+
+  plutil -insert "latestRealFieldTriggerSmoke" -dictionary "$tmp_plist" >/dev/null
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.path" "${latest_real_field_json:-none}"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.generatedAt" "$real_field_generated_at"
+  plist_insert_bool_or_string "$tmp_plist" "latestRealFieldTriggerSmoke.success" "$real_field_success"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.reason" "$real_field_reason"
+  plist_insert_bool_or_string "$tmp_plist" "latestRealFieldTriggerSmoke.targetCaptureSuccess" "$real_field_target_capture_success"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.triggerKey" "$real_field_trigger_key"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.streamingASRBackend" "$real_field_streaming_asr_backend"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.partialUpdateCount" "$real_field_partial_update_count"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.releaseToInsertMs" "$real_field_release_to_insert_ms"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.finalizer" "$real_field_finalizer"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.insertionMethod" "$real_field_insertion_method"
+  plist_insert_string "$tmp_plist" "latestRealFieldTriggerSmoke.finalTranscript" "$real_field_final_transcript"
 
   plutil -insert "eligibility" -dictionary "$tmp_plist" >/dev/null
   plist_insert_bool_or_string "$tmp_plist" "eligibility.installSmokeEligible" "$install_smoke_eligible"

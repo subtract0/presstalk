@@ -46,6 +46,7 @@ extract_required "$local_json" targets.0.summary.streamingASRBackend >/dev/null
 extract_required "$local_json" targets.0.summary.asrMode >/dev/null
 extract_required "$local_json" targets.0.summary.realtimePartialTranscriptionEnabled >/dev/null
 extract_required "$local_json" targets.0.summary.activeFieldSmokeReady >/dev/null
+extract_required "$local_json" targets.0.summary.realFieldSmokeSuccess >/dev/null
 
 "$MATRIX_HELPER" --host presstalk-invalid-host.invalid --timeout 1 --json >"$blocked_json"
 blocked_status="$(extract_required "$blocked_json" targets.0.status)"

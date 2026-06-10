@@ -71,6 +71,8 @@ cp "$PKG_DIR/scripts/presstalk_accessibility_handoff.sh" "$APP_RESOURCES_DIR/pre
 chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-handoff.sh"
 cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+cp "$PKG_DIR/scripts/presstalk_collect_real_field_smoke.sh" "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
+chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
 cp "$PKG_DIR/scripts/presstalk_machine_readiness.sh" "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"
 cp "$PKG_DIR/scripts/presstalk_readiness_matrix.sh" "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"

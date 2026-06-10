@@ -21,6 +21,7 @@ REQUIRE_STREAMING_BENCH_QUALITY=0
 STREAMING_BENCH_QUALITY_JSON="${PRESSTALK_STREAMING_BENCH_QUALITY_JSON:-}"
 REQUIRE_HYBRID_STREAMING_QUALITY=0
 HYBRID_STREAMING_QUALITY_JSON="${PRESSTALK_HYBRID_STREAMING_QUALITY_JSON:-}"
+REQUIRE_REAL_FIELD_SMOKE=0
 RUN_HOST_DISCOVERY=1
 HOST_DISCOVERY_TIMEOUT="${PRESSTALK_CANDIDATE_HOST_DISCOVERY_TIMEOUT:-3}"
 
@@ -68,6 +69,9 @@ Options:
   --require-hybrid-streaming-quality
                           Require passing hybrid streaming/finalizer quality
                           JSON.
+  --require-real-field-smoke
+                          Require proof-gate targets to include a successful
+                          real focused-field trigger smoke receipt.
   --json-output PATH      Write machine-readable wrapper summary.
   -h, --help              Show this help.
 EOF
@@ -181,6 +185,10 @@ while [[ $# -gt 0 ]]; do
       REQUIRE_HYBRID_STREAMING_QUALITY=1
       shift
       ;;
+    --require-real-field-smoke)
+      REQUIRE_REAL_FIELD_SMOKE=1
+      shift
+      ;;
     --json-output)
       JSON_OUTPUT_PATH="${2:-}"
       if [[ -z "$JSON_OUTPUT_PATH" ]]; then
@@ -289,6 +297,11 @@ write_wrapper_summary() {
   if [[ -f "$RELEASE_READINESS_JSON" ]]; then
     plutil -insert releaseReadinessJSON -string "$RELEASE_READINESS_JSON" "$result_plist" >/dev/null
   fi
+  if [[ "$REQUIRE_REAL_FIELD_SMOKE" == "1" ]]; then
+    plutil -insert requireRealFieldSmoke -bool true "$result_plist" >/dev/null
+  else
+    plutil -insert requireRealFieldSmoke -bool false "$result_plist" >/dev/null
+  fi
   plutil -insert requiredTargets -array "$result_plist" >/dev/null
   if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
     for required in "${REQUIRED_TARGETS[@]}"; do
@@ -390,6 +403,9 @@ if [[ "$EXCLUDED_HOST_COUNT" -gt 0 ]]; then
     proof_args+=(--exclude "$excluded")
   done
 fi
+if [[ "$REQUIRE_REAL_FIELD_SMOKE" == "1" ]]; then
+  proof_args+=(--require-real-field-smoke)
+fi
 
 echo
 echo "Running proof gate..."
@@ -418,6 +434,9 @@ publish_env=(
 )
 if [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
   publish_env+=(PRESSTALK_REQUIRE_STREAMING_RELEASE=1)
+  if [[ -z "${PRESSTALK_EXPECTED_ASR_MODE:-}" ]]; then
+    publish_env+=(PRESSTALK_EXPECTED_ASR_MODE=any)
+  fi
 fi
 if [[ -n "$STREAMING_BENCH_QUALITY_JSON" ]]; then
   publish_env+=(PRESSTALK_STREAMING_BENCH_QUALITY_JSON="$STREAMING_BENCH_QUALITY_JSON")

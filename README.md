@@ -162,6 +162,24 @@ When explicit hosts are supplied, it also writes
 Tailscale, and strict BatchMode SSH probe evidence for those hosts. ARP scanning
 is disabled in that wrapper path by default.
 
+To close a candidate against the actual streaming product promise, add
+`--require-streaming`. The current fallback `parakeet_v3_ane_final_pass` build
+is useful, but it should fail this streaming gate until realtime
+partial/streaming evidence is proven on the required target Macs. Set
+`PRESSTALK_EXPECTED_ASR_MODE=<mode>` only when you want to pin one exact
+streaming backend; otherwise streaming-required publish paths accept any
+non-missing streaming ASR mode.
+
+```bash
+bash scripts/presstalk_release_candidate_preflight.sh 0.1.6-test5 \
+  --local \
+  --host mbp1-tb \
+  --require studio1 \
+  --require mbp1 \
+  --require-streaming \
+  --exclude-host "studio2=no attached microphone"
+```
+
 If the candidate fails because a target Mac is unreachable or not ready, turn
 the receipts into a manual target handoff without probing anything again:
 ```bash
@@ -248,7 +266,13 @@ runs `presstalk_release_readiness_preflight.sh --require-production` before any
 GitHub release or Homebrew tap write. By default stable publishing requires
 proof targets for `studio1` and `mbp1`; override or extend that with
 `PRESSTALK_REQUIRED_PROOF_TARGETS=studio1,mbp1,studio2` once `studio2` is back
-in microphone/STT scope.
+in microphone/STT scope. Stable publishing also requires streaming proof by
+default, using proof-gate JSON whose targets report
+`realtimePartialTranscriptionEnabled=true`. Set
+`PRESSTALK_EXPECTED_ASR_MODE=<streaming-mode>` when a stable release must pin
+one exact backend; otherwise the stable gate accepts any non-missing streaming
+ASR mode. Hyphenated test versions keep the current final-pass fallback path
+unless `PRESSTALK_REQUIRE_STREAMING_RELEASE=1` is set.
 
 That makes this install path work:
 ```bash

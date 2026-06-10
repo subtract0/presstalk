@@ -10,6 +10,7 @@ test_artifact_audit="$TEST_TMPDIR/test-artifact-audit.json"
 production_artifact_audit="$TEST_TMPDIR/production-artifact-audit.json"
 proof_gate="$TEST_TMPDIR/proof-gate.json"
 asr_mismatch_proof_gate="$TEST_TMPDIR/asr-mismatch-proof-gate.json"
+streaming_proof_gate="$TEST_TMPDIR/streaming-proof-gate.json"
 
 cat >"$test_artifact_audit" <<'JSON'
 {
@@ -117,6 +118,32 @@ cat >"$asr_mismatch_proof_gate" <<'JSON'
 }
 JSON
 
+cat >"$streaming_proof_gate" <<'JSON'
+{
+  "schemaVersion": "1",
+  "matrix": "/tmp/matrix.json",
+  "proven": true,
+  "failureCount": 0,
+  "requiredTargets": ["local"],
+  "targets": [
+    {
+      "required": "local",
+      "target": "local",
+      "machineHost": "studio1",
+      "asrBackend": "parakeet-eou-320",
+      "asrMode": "parakeet_eou_320_true_streaming",
+      "realtimePartialTranscriptionEnabled": true,
+      "status": "ready_reported",
+      "reachable": true,
+      "physicalSTTSmokeReady": true,
+      "activeFieldSmokeReady": true,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}
+JSON
+
 test_pass_output="$TEST_TMPDIR/test-pass.txt"
 test_pass_json="$TEST_TMPDIR/test-pass.json"
 "$PREFLIGHT" \
@@ -132,11 +159,61 @@ grep -Fq "Result: pass" "$test_pass_output"
 if [[ "$(plutil -extract testArtifactReady raw -o - "$test_pass_json")" != "true" ||
       "$(plutil -extract productionReady raw -o - "$test_pass_json")" != "false" ||
       "$(plutil -extract requiredProofTargetsReady raw -o - "$test_pass_json")" != "true" ||
+      "$(plutil -extract streamingReady raw -o - "$test_pass_json")" != "true" ||
+      "$(plutil -extract requireStreaming raw -o - "$test_pass_json")" != "false" ||
       "$(plutil -extract requiredProofTargetCount raw -o - "$test_pass_json")" != "2" ]]; then
   echo "FAIL: test artifact JSON readiness mismatch"
   plutil -p "$test_pass_json"
   exit 1
 fi
+
+final_pass_streaming_required_output="$TEST_TMPDIR/final-pass-streaming-required.txt"
+final_pass_streaming_required_json="$TEST_TMPDIR/final-pass-streaming-required.json"
+if "$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$proof_gate" \
+  --require-streaming \
+  --json-output "$final_pass_streaming_required_json" >"$final_pass_streaming_required_output"; then
+  echo "FAIL: final-pass proof unexpectedly passed with --require-streaming"
+  cat "$final_pass_streaming_required_output"
+  exit 1
+fi
+grep -Fq "RequireStreaming: true" "$final_pass_streaming_required_output"
+grep -Fq "StreamingReady: false" "$final_pass_streaming_required_output"
+grep -Fq "proof_target_0_realtime_partials_disabled" "$final_pass_streaming_required_output"
+if [[ "$(plutil -extract streamingReady raw -o - "$final_pass_streaming_required_json")" != "false" ||
+      "$(plutil -extract requireStreaming raw -o - "$final_pass_streaming_required_json")" != "true" ]]; then
+  echo "FAIL: final-pass streaming-required JSON mismatch"
+  plutil -p "$final_pass_streaming_required_json"
+  exit 1
+fi
+
+streaming_pass_output="$TEST_TMPDIR/streaming-pass.txt"
+streaming_pass_json="$TEST_TMPDIR/streaming-pass.json"
+"$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode parakeet_eou_320_true_streaming \
+  --require-streaming \
+  --json-output "$streaming_pass_json" >"$streaming_pass_output"
+grep -Fq "RequireStreaming: true" "$streaming_pass_output"
+grep -Fq "StreamingReady: true" "$streaming_pass_output"
+grep -Fq "Result: pass" "$streaming_pass_output"
+if [[ "$(plutil -extract testArtifactReady raw -o - "$streaming_pass_json")" != "true" ||
+      "$(plutil -extract streamingReady raw -o - "$streaming_pass_json")" != "true" ||
+      "$(plutil -extract requireStreaming raw -o - "$streaming_pass_json")" != "true" ]]; then
+  echo "FAIL: streaming pass JSON mismatch"
+  plutil -p "$streaming_pass_json"
+  exit 1
+fi
+
+streaming_any_mode_output="$TEST_TMPDIR/streaming-any-mode.txt"
+"$PREFLIGHT" \
+  --artifact-audit "$test_artifact_audit" \
+  --proof-gate "$streaming_proof_gate" \
+  --expected-asr-mode any \
+  --require-streaming >"$streaming_any_mode_output"
+grep -Fq "Result: pass" "$streaming_any_mode_output"
 
 production_required_output="$TEST_TMPDIR/production-required.txt"
 production_required_json="$TEST_TMPDIR/production-required.json"

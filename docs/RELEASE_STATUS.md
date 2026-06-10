@@ -111,8 +111,19 @@ Current tooling update after that run:
   JSON and proof-gate JSON into one readiness verdict. Default mode can pass for
   an audited test artifact with proven machine smoke coverage; `--require-production`
   requires Developer ID, hardened runtime, stapled notarization, proven machine
-  coverage, and the expected `parakeet_v3_ane_final_pass` ASR mode on every
-  proof target.
+  coverage, and the expected ASR mode on every proof target. Add
+  `--require-streaming` to require realtime partial/streaming evidence instead
+  of accepting the current fast final-pass path. `--expected-asr-mode any`
+  allows any non-missing ASR mode when the streaming flag is the main gate.
+- Stable `scripts/publish_presstalk_homebrew.sh` now treats
+  `PRESSTALK_REQUIRE_STREAMING_RELEASE` as enabled by default for stable
+  non-prerelease versions, so production Homebrew publishing cannot silently
+  promote the current final-pass fallback as the completed streaming product.
+  When streaming is required and `PRESSTALK_EXPECTED_ASR_MODE` is unset, publish
+  paths pass `--expected-asr-mode any`, accepting any non-missing streaming ASR
+  mode while still requiring `realtimePartialTranscriptionEnabled=true`.
+  Hyphenated test/prerelease builds can opt into the same gate by setting
+  `PRESSTALK_REQUIRE_STREAMING_RELEASE=1`.
 - Stable `scripts/publish_presstalk_homebrew.sh` now refuses to publish unless
   `PRESSTALK_RELEASE_PROOF_GATE_JSON` points at a proof-gate JSON, then runs the
   readiness preflight with `--require-production` before any GitHub release or

@@ -6,6 +6,7 @@ PROOF_GATE_JSON=""
 JSON_OUTPUT_PATH=""
 EXPECTED_ASR_MODE="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
 REQUIRE_PRODUCTION=0
+REQUIRE_STREAMING=0
 REQUIRED_PROOF_TARGETS=()
 REQUIRED_PROOF_TARGET_COUNT=0
 
@@ -22,12 +23,15 @@ Options:
   --artifact-audit PATH   JSON from presstalk_release_artifact_audit.sh.
   --proof-gate PATH       JSON from presstalk_release_proof_gate.sh.
   --expected-asr-mode M   Required ASR mode for every proof target.
+                          Use "any" to allow any non-missing ASR mode.
                           Default: parakeet_v3_ane_final_pass.
   --require-proof-target T
                           Require proof coverage for target alias, host, or
                           machineHost. May be repeated.
   --require-production    Fail unless the artifact is production distribution
                           ready and notarized.
+  --require-streaming     Fail unless every proof target reports realtime
+                          partial transcription enabled.
   --json-output PATH      Write machine-readable readiness JSON.
   -h, --help              Show this help.
 EOF
@@ -70,6 +74,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-production)
       REQUIRE_PRODUCTION=1
+      shift
+      ;;
+    --require-streaming)
+      REQUIRE_STREAMING=1
       shift
       ;;
     --json-output)
@@ -115,6 +123,10 @@ if [[ "$REQUIRED_PROOF_TARGET_COUNT" -eq 0 && -n "${PRESSTALK_REQUIRED_PROOF_TAR
     REQUIRED_PROOF_TARGET_COUNT=$((REQUIRED_PROOF_TARGET_COUNT + 1))
   done
 fi
+
+case "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-}" in
+  1|true|TRUE|yes|YES) REQUIRE_STREAMING=1 ;;
+esac
 
 json_value() {
   local file="$1"
@@ -195,6 +207,7 @@ if [[ -z "$target_count" || ! "$target_count" =~ ^[0-9]+$ || "$target_count" -eq
 fi
 
 asr_mode_ready=true
+streaming_ready=true
 for ((i = 0; i < target_count; i++)); do
   target_passed="$(json_value "$PROOF_GATE_JSON" "targets.$i.passed")"
   target_asr_mode="$(json_value "$PROOF_GATE_JSON" "targets.$i.asrMode")"
@@ -202,11 +215,22 @@ for ((i = 0; i < target_count; i++)); do
   if ! bool_ready "$target_passed"; then
     append_failure "proof_target_${i}_not_passed"
   fi
-  if [[ "$target_asr_mode" != "$EXPECTED_ASR_MODE" ]]; then
+  if [[ -z "$target_asr_mode" || "$target_asr_mode" == "unknown" ]]; then
+    append_failure "proof_target_${i}_asr_mode_missing"
+    asr_mode_ready=false
+  elif [[ "$EXPECTED_ASR_MODE" != "any" && "$target_asr_mode" != "$EXPECTED_ASR_MODE" ]]; then
     append_failure "proof_target_${i}_asr_mode_mismatch"
     asr_mode_ready=false
   fi
-  if bool_ready "$target_realtime_partials"; then
+  if [[ -z "$target_realtime_partials" || "$target_realtime_partials" == "unknown" ]]; then
+    append_failure "proof_target_${i}_realtime_partials_state_missing"
+    streaming_ready=false
+  elif [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
+    if ! bool_ready "$target_realtime_partials"; then
+      append_failure "proof_target_${i}_realtime_partials_disabled"
+      streaming_ready=false
+    fi
+  elif bool_ready "$target_realtime_partials"; then
     append_failure "proof_target_${i}_realtime_partials_enabled"
     asr_mode_ready=false
   fi
@@ -240,6 +264,7 @@ if bool_ready "$artifact_passed" &&
    bool_ready "$notarized" &&
    bool_ready "$proof_proven" &&
    [[ "$asr_mode_ready" == "true" ]] &&
+   [[ "$streaming_ready" == "true" ]] &&
    [[ "$required_targets_ready" == "true" ]]; then
   production_ready=true
 fi
@@ -248,6 +273,7 @@ test_artifact_ready=false
 if bool_ready "$artifact_passed" &&
    bool_ready "$proof_proven" &&
    [[ "$asr_mode_ready" == "true" ]] &&
+   [[ "$streaming_ready" == "true" ]] &&
    [[ "$required_targets_ready" == "true" ]]; then
   test_artifact_ready=true
 fi
@@ -287,9 +313,11 @@ fi
 plutil -insert requiredProofTargetCount -integer "$REQUIRED_PROOF_TARGET_COUNT" "$RESULT_PLIST" >/dev/null
 plist_insert_bool "$RESULT_PLIST" requiredProofTargetsReady "$required_targets_ready"
 plist_insert_bool "$RESULT_PLIST" asrModeReady "$asr_mode_ready"
+plist_insert_bool "$RESULT_PLIST" streamingReady "$streaming_ready"
 plist_insert_bool "$RESULT_PLIST" testArtifactReady "$test_artifact_ready"
 plist_insert_bool "$RESULT_PLIST" productionReady "$production_ready"
 plist_insert_bool "$RESULT_PLIST" requireProduction "$([[ "$REQUIRE_PRODUCTION" -eq 1 ]] && echo true || echo false)"
+plist_insert_bool "$RESULT_PLIST" requireStreaming "$([[ "$REQUIRE_STREAMING" -eq 1 ]] && echo true || echo false)"
 plist_insert_bool "$RESULT_PLIST" passed "$passed"
 failure_count="${#failures[@]}"
 plutil -insert failureCount -integer "$failure_count" "$RESULT_PLIST" >/dev/null
@@ -312,6 +340,8 @@ echo "ExpectedASRMode: $EXPECTED_ASR_MODE"
 echo "ArtifactPassed: ${artifact_passed:-unknown}"
 echo "ProofProven: ${proof_proven:-unknown}"
 echo "ASRModeReady: $asr_mode_ready"
+echo "StreamingReady: $streaming_ready"
+echo "RequireStreaming: $([[ "$REQUIRE_STREAMING" -eq 1 ]] && echo true || echo false)"
 echo "RequiredProofTargetsReady: $required_targets_ready"
 echo "TestArtifactReady: $test_artifact_ready"
 echo "ProductionReady: $production_ready"

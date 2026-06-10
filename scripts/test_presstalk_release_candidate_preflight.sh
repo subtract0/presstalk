@@ -104,6 +104,7 @@ mkdir -p "$dist_dir"
 printf 'fake zip\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip"
 printf 'fake sha\n' >"$dist_dir/${public_name}-${version}-macos-${arch}.zip.sha256"
 printf 'ran\n' >"$dist_dir/fake-publish-ran.txt"
+printf '%s\n' "${PRESSTALK_REQUIRE_STREAMING_RELEASE:-unset}" >"$dist_dir/fake-publish-streaming-env.txt"
 cat >"$dist_dir/${public_name}-${version}-macos-${arch}-artifact-audit.json" <<JSON
 {
   "schemaVersion": "1",
@@ -218,6 +219,11 @@ test -f "$pass_dist/PressTalk-0.0-candidate-proof-gate.json"
 test -f "$pass_dist/PressTalk-0.0-candidate-macos-arm64-artifact-audit.json"
 test -f "$pass_dist/PressTalk-0.0-candidate-macos-arm64-release-readiness.json"
 test -f "$pass_dist/fake-publish-ran.txt"
+if [[ "$(cat "$pass_dist/fake-publish-streaming-env.txt")" != "unset" ]]; then
+  echo "FAIL: candidate preflight should not force streaming env by default"
+  cat "$pass_dist/fake-publish-streaming-env.txt"
+  exit 1
+fi
 if [[ -f "$pass_dist/PressTalk-0.0-candidate-host-discovery.json" ]]; then
   echo "FAIL: host discovery should not run when no hosts are supplied"
   exit 1
@@ -262,6 +268,19 @@ PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
   "$WRAPPER" --dist-dir "$default_dist" --local --require local >"$default_output"
 grep -Fq "Version: 0.0-default" "$default_output"
 test -f "$default_dist/PressTalk-0.0-default-candidate-preflight.json"
+
+streaming_dist="$TEST_TMPDIR/streaming-dist"
+streaming_output="$TEST_TMPDIR/streaming-output.txt"
+PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
+PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
+  "$WRAPPER" --version 0.0-streaming --dist-dir "$streaming_dist" --local \
+    --require local --require-streaming >"$streaming_output"
+grep -Fq "Result: pass" "$streaming_output"
+if [[ "$(cat "$streaming_dist/fake-publish-streaming-env.txt")" != "1" ]]; then
+  echo "FAIL: --require-streaming did not reach publish dry-run"
+  cat "$streaming_dist/fake-publish-streaming-env.txt"
+  exit 1
+fi
 
 fail_dist="$TEST_TMPDIR/fail-dist"
 fail_output="$TEST_TMPDIR/fail-output.txt"

@@ -16,6 +16,7 @@ EXCLUDED_HOSTS=()
 EXCLUDED_HOST_COUNT=0
 JSON_OUTPUT_PATH=""
 REQUIRE_PRODUCTION=0
+REQUIRE_STREAMING=0
 RUN_HOST_DISCOVERY=1
 HOST_DISCOVERY_TIMEOUT="${PRESSTALK_CANDIDATE_HOST_DISCOVERY_TIMEOUT:-3}"
 
@@ -52,6 +53,8 @@ Options:
                           Timeout for host discovery SSH/Bonjour checks.
   --require-production    Require production signing/notarization in final
                           readiness preflight.
+  --require-streaming     Require realtime partial/streaming evidence in final
+                          readiness preflight and publish dry-run.
   --json-output PATH      Write machine-readable wrapper summary.
   -h, --help              Show this help.
 EOF
@@ -135,6 +138,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-production)
       REQUIRE_PRODUCTION=1
+      shift
+      ;;
+    --require-streaming)
+      REQUIRE_STREAMING=1
       shift
       ;;
     --json-output)
@@ -363,15 +370,20 @@ fi
 
 echo
 echo "Packaging and auditing with publish dry-run..."
+publish_env=(
+  PRESSTALK_PUBLISH_DRY_RUN=1
+  PRESSTALK_REQUIRE_RELEASE_READINESS=1
+  PRESSTALK_RELEASE_PROOF_GATE_JSON="$PROOF_GATE_JSON"
+  PRESSTALK_REQUIRED_PROOF_TARGETS="$(required_targets_csv)"
+  PRESSTALK_DIST_DIR="$DIST_DIR"
+  ARCH="$ARCH"
+  PUBLIC_NAME="$PUBLIC_NAME"
+)
+if [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
+  publish_env+=(PRESSTALK_REQUIRE_STREAMING_RELEASE=1)
+fi
 set +e
-PRESSTALK_PUBLISH_DRY_RUN=1 \
-PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
-PRESSTALK_RELEASE_PROOF_GATE_JSON="$PROOF_GATE_JSON" \
-PRESSTALK_REQUIRED_PROOF_TARGETS="$(required_targets_csv)" \
-PRESSTALK_DIST_DIR="$DIST_DIR" \
-ARCH="$ARCH" \
-PUBLIC_NAME="$PUBLIC_NAME" \
-  "/bin/bash" "$PUBLISH_SCRIPT" "$VERSION"
+env "${publish_env[@]}" "/bin/bash" "$PUBLISH_SCRIPT" "$VERSION"
 publish_status=$?
 set -e
 if [[ "$publish_status" -ne 0 ]]; then
@@ -385,13 +397,20 @@ fi
 if [[ "$REQUIRE_PRODUCTION" -eq 1 ]]; then
   echo
   echo "Requiring production release readiness..."
+  expected_asr_mode="${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
+  if [[ "$REQUIRE_STREAMING" -eq 1 && -z "${PRESSTALK_EXPECTED_ASR_MODE:-}" ]]; then
+    expected_asr_mode="any"
+  fi
   readiness_args=(
     --artifact-audit "$ARTIFACT_AUDIT_JSON"
     --proof-gate "$PROOF_GATE_JSON"
-    --expected-asr-mode "${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
+    --expected-asr-mode "$expected_asr_mode"
     --require-production
     --json-output "$RELEASE_READINESS_JSON"
   )
+  if [[ "$REQUIRE_STREAMING" -eq 1 ]]; then
+    readiness_args+=(--require-streaming)
+  fi
   if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
     for required in "${REQUIRED_TARGETS[@]}"; do
       readiness_args+=(--require-proof-target "$required")

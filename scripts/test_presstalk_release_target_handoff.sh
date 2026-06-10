@@ -27,7 +27,8 @@ cat >"$proof_json" <<'JSON'
       "status": "ready_reported",
       "passed": true,
       "reachable": true,
-      "asrMode": "parakeet_v3_ane_final_pass"
+      "streamingASRBackend": "parakeet-eou-320",
+      "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials"
     },
     {
       "required": "mbp1",
@@ -36,6 +37,7 @@ cat >"$proof_json" <<'JSON'
       "status": "failed",
       "passed": false,
       "reachable": false,
+      "streamingASRBackend": "unknown",
       "asrMode": "unknown",
       "nextAction": "Fix host/readiness collection error, then rerun matrix."
     }
@@ -86,7 +88,7 @@ if [[ "$handoff_status" -eq 0 ]]; then
 fi
 
 grep -Fq "PressTalk release target handoff" "$handoff_output"
-grep -Fq "READY studio1: target=local machine=studio1 asrMode=parakeet_v3_ane_final_pass" "$handoff_output"
+grep -Fq "READY studio1: target=local machine=studio1 streamingASRBackend=parakeet-eou-320 asrMode=parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials" "$handoff_output"
 grep -Fq "BLOCKED mbp1: target=mbp1-tb machine=unknown status=failed reachable=false" "$handoff_output"
 grep -Fq "ssh error: ssh: connect to host 10.77.77.3 port 22: Operation timed out" "$handoff_output"
 grep -Fq "studio2=no attached microphone" "$handoff_output"
@@ -118,7 +120,8 @@ cat >"$ready_proof_json" <<'JSON'
       "status": "ready_reported",
       "passed": true,
       "reachable": true,
-      "asrMode": "parakeet_v3_ane_final_pass"
+      "streamingASRBackend": "parakeet-eou-320",
+      "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials"
     }
   ]
 }
@@ -137,6 +140,6 @@ JSON
 
 "$HANDOFF" --candidate-preflight "$ready_candidate_json" >"$ready_output"
 grep -Fq "Proof proven: true" "$ready_output"
-grep -Fq "READY studio1: target=local machine=studio1 asrMode=parakeet_v3_ane_final_pass" "$ready_output"
+grep -Fq "READY studio1: target=local machine=studio1 streamingASRBackend=parakeet-eou-320 asrMode=parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials" "$ready_output"
 
 echo "PASS release_target_handoff"

@@ -21,6 +21,7 @@ cat >"$proof_gate_json" <<'JSON'
       "target": "local",
       "machineHost": "studio1",
       "asrBackend": "parakeet-v3-ane",
+      "streamingASRBackend": "none",
       "asrMode": "parakeet_v3_ane_final_pass",
       "realtimePartialTranscriptionEnabled": false,
       "status": "ready_reported",

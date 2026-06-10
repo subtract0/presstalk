@@ -312,10 +312,15 @@ asr_mode_ready=true
 streaming_ready=true
 for ((i = 0; i < target_count; i++)); do
   target_passed="$(json_value "$PROOF_GATE_JSON" "targets.$i.passed")"
+  target_streaming_asr_backend="$(json_value "$PROOF_GATE_JSON" "targets.$i.streamingASRBackend")"
   target_asr_mode="$(json_value "$PROOF_GATE_JSON" "targets.$i.asrMode")"
   target_realtime_partials="$(json_value "$PROOF_GATE_JSON" "targets.$i.realtimePartialTranscriptionEnabled")"
   if ! bool_ready "$target_passed"; then
     append_failure "proof_target_${i}_not_passed"
+  fi
+  if [[ -z "$target_streaming_asr_backend" || "$target_streaming_asr_backend" == "unknown" ]]; then
+    append_failure "proof_target_${i}_streaming_asr_backend_missing"
+    asr_mode_ready=false
   fi
   if [[ -z "$target_asr_mode" || "$target_asr_mode" == "unknown" ]]; then
     append_failure "proof_target_${i}_asr_mode_missing"

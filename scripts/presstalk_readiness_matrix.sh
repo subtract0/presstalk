@@ -195,7 +195,7 @@ append_target_result() {
   local stderr_file="$5"
 
   local target_plist target_json readiness_json schema_version status error_text reachable
-  local microphone physical active next_action machine_host asr_backend asr_mode realtime_partial_transcription_enabled
+  local microphone physical active next_action machine_host asr_backend streaming_asr_backend asr_mode realtime_partial_transcription_enabled
   target_plist="$RUN_TMPDIR/target-$RANDOM.plist"
   plutil -create xml1 "$target_plist" >/dev/null
 
@@ -213,6 +213,7 @@ append_target_result() {
 
     machine_host="$(json_file_value "$stdout_file" machine.host)"
     asr_backend="$(json_file_value "$stdout_file" runtime.asrBackend)"
+    streaming_asr_backend="$(json_file_value "$stdout_file" runtime.streamingASRBackend)"
     asr_mode="$(json_file_value "$stdout_file" runtime.asrMode)"
     realtime_partial_transcription_enabled="$(json_file_value "$stdout_file" runtime.realtimePartialTranscriptionEnabled)"
     microphone="$(json_file_value "$stdout_file" audio.microphoneHardwareDetected)"
@@ -231,6 +232,7 @@ append_target_result() {
     fi
     machine_host=""
     asr_backend=""
+    streaming_asr_backend=""
     asr_mode=""
     realtime_partial_transcription_enabled=""
     microphone=""
@@ -246,6 +248,7 @@ append_target_result() {
   plutil -insert summary -dictionary "$target_plist" >/dev/null
   plist_insert_string "$target_plist" "summary.machineHost" "$machine_host"
   plist_insert_string "$target_plist" "summary.asrBackend" "$asr_backend"
+  plist_insert_string "$target_plist" "summary.streamingASRBackend" "$streaming_asr_backend"
   plist_insert_string "$target_plist" "summary.asrMode" "$asr_mode"
   plist_insert_bool_or_string "$target_plist" "summary.realtimePartialTranscriptionEnabled" "$realtime_partial_transcription_enabled"
   plist_insert_bool_or_string "$target_plist" "summary.microphoneHardwareDetected" "$microphone"
@@ -258,7 +261,7 @@ append_target_result() {
   rm -f "$target_plist"
 
   if [[ "$status" == "ready_reported" ]]; then
-    TEXT_SUMMARY+=("$target [$kind]: microphone=${microphone:-unknown} physical=${physical:-unknown} active=${active:-unknown} asrMode=${asr_mode:-unknown} next=${next_action:-unknown}")
+    TEXT_SUMMARY+=("$target [$kind]: microphone=${microphone:-unknown} physical=${physical:-unknown} active=${active:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown} next=${next_action:-unknown}")
   else
     TEXT_SUMMARY+=("$target [$kind]: failed exit=$exit_status error=${error_text:-unknown}")
   fi

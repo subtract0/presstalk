@@ -21,8 +21,9 @@ cat >"$pass_matrix" <<'JSON'
       "summary": {
         "machineHost": "studio1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -35,8 +36,9 @@ cat >"$pass_matrix" <<'JSON'
       "summary": {
         "machineHost": "mbp1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -57,8 +59,9 @@ cat >"$blocked_matrix" <<'JSON'
       "summary": {
         "machineHost": "studio1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical Option + Space dictation smoke with active-field insertion proof."
@@ -71,8 +74,9 @@ cat >"$blocked_matrix" <<'JSON'
       "summary": {
         "machineHost": "mbp1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": false,
         "nextAction": "Run logged-in desktop Repair Signing; do not reopen privacy panes for this state."
@@ -93,8 +97,9 @@ cat >"$failed_alias_matrix" <<'JSON'
       "summary": {
         "machineHost": "studio1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "Ready for physical dictation smoke."
@@ -108,6 +113,7 @@ cat >"$failed_alias_matrix" <<'JSON'
       "summary": {
         "machineHost": "unknown",
         "asrBackend": "unknown",
+        "streamingASRBackend": "unknown",
         "asrMode": "unknown",
         "realtimePartialTranscriptionEnabled": "unknown",
         "physicalSTTSmokeReady": "unknown",
@@ -124,7 +130,8 @@ pass_json="$TEST_TMPDIR/pass-result.json"
 "$GATE" --matrix "$pass_matrix" --require studio1 --require mbp1 --json-output "$pass_json" >"$pass_output"
 grep -Fq "Result: proven" "$pass_output"
 grep -Fq "PASS mbp1" "$pass_output"
-grep -Fq "asrMode=parakeet_v3_ane_final_pass" "$pass_output"
+grep -Fq "streamingASRBackend=parakeet-eou-320" "$pass_output"
+grep -Fq "asrMode=parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials" "$pass_output"
 if [[ "$(plutil -extract proven raw -o - "$pass_json")" != "true" ]]; then
   echo "FAIL: pass JSON did not report proven=true"
   plutil -p "$pass_json"
@@ -135,8 +142,9 @@ if [[ "$(plutil -extract failureCount raw -o - "$pass_json")" != "0" ]]; then
   plutil -p "$pass_json"
   exit 1
 fi
-if [[ "$(plutil -extract targets.0.asrMode raw -o - "$pass_json")" != "parakeet_v3_ane_final_pass" ||
-      "$(plutil -extract targets.0.realtimePartialTranscriptionEnabled raw -o - "$pass_json")" != "false" ]]; then
+if [[ "$(plutil -extract targets.0.streamingASRBackend raw -o - "$pass_json")" != "parakeet-eou-320" ||
+      "$(plutil -extract targets.0.asrMode raw -o - "$pass_json")" != "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials" ||
+      "$(plutil -extract targets.0.realtimePartialTranscriptionEnabled raw -o - "$pass_json")" != "true" ]]; then
   echo "FAIL: pass JSON did not preserve ASR mode evidence"
   plutil -p "$pass_json"
   exit 1
@@ -197,6 +205,7 @@ cat >"$unknown_asr_matrix" <<'JSON'
       "summary": {
         "machineHost": "studio1",
         "asrBackend": "unknown",
+        "streamingASRBackend": "unknown",
         "asrMode": "unknown",
         "realtimePartialTranscriptionEnabled": "unknown",
         "physicalSTTSmokeReady": true,
@@ -215,9 +224,11 @@ if "$GATE" --matrix "$unknown_asr_matrix" --require studio1 --json-output "$unkn
   exit 1
 fi
 grep -Fq "asrBackend=unknown" "$unknown_asr_output"
+grep -Fq "streamingASRBackend=unknown" "$unknown_asr_output"
 grep -Fq "asrMode=unknown" "$unknown_asr_output"
 grep -Fq "realtimePartialTranscriptionEnabled=unknown" "$unknown_asr_output"
 grep -Fq "asr_backend_missing" "$unknown_asr_json"
+grep -Fq "streaming_asr_backend_missing" "$unknown_asr_json"
 grep -Fq "asr_mode_missing" "$unknown_asr_json"
 grep -Fq "realtime_partial_transcription_state_missing" "$unknown_asr_json"
 

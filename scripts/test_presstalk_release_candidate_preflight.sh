@@ -57,8 +57,9 @@ cat >"$json_output" <<'JSON'
       "summary": {
         "machineHost": "studio1",
         "asrBackend": "parakeet-v3-ane",
-        "asrMode": "parakeet_v3_ane_final_pass",
-        "realtimePartialTranscriptionEnabled": false,
+        "streamingASRBackend": "parakeet-eou-320",
+        "asrMode": "parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials",
+        "realtimePartialTranscriptionEnabled": true,
         "physicalSTTSmokeReady": true,
         "activeFieldSmokeReady": true,
         "nextAction": "ready"

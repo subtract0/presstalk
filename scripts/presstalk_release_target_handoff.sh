@@ -227,6 +227,7 @@ while target_value="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.target
   status_value="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.status")"
   passed_value="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.passed")"
   reachable_value="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.reachable")"
+  streaming_asr_backend="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.streamingASRBackend")"
   asr_mode="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.asrMode")"
   next_action="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.nextAction")"
   ssh_error="$(find_host_probe_error "$target_value")"
@@ -240,7 +241,7 @@ while target_value="$(extract_raw "$PROOF_GATE_JSON" "targets.$target_idx.target
 
   if [[ "$passed_value" == "true" ]]; then
     READY_COUNT=$((READY_COUNT + 1))
-    echo "- READY ${required_value:-$target_value}: target=$target_value machine=${machine_value:-unknown} asrMode=${asr_mode:-unknown}"
+    echo "- READY ${required_value:-$target_value}: target=$target_value machine=${machine_value:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown}"
   else
     BLOCKED_COUNT=$((BLOCKED_COUNT + 1))
     append_blocked_target "${required_value:-$target_value}: target=$target_value status=${status_value:-unknown} reachable=${reachable_value:-unknown}"

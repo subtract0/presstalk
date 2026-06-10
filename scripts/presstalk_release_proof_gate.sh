@@ -223,6 +223,7 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   target="$(json_value "targets.$index.target")"
   machine_host="$(json_value "targets.$index.summary.machineHost")"
   asr_backend="$(json_value "targets.$index.summary.asrBackend")"
+  streaming_asr_backend="$(json_value "targets.$index.summary.streamingASRBackend")"
   asr_mode="$(json_value "targets.$index.summary.asrMode")"
   realtime_partial_transcription_enabled="$(json_value "targets.$index.summary.realtimePartialTranscriptionEnabled")"
   status="$(json_value "targets.$index.status")"
@@ -260,6 +261,11 @@ for required in "${REQUIRED_TARGETS[@]}"; do
     /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string asr_backend_missing" "$RESULT_PLIST" >/dev/null
     target_failures=$((target_failures + 1))
   fi
+  if [[ -z "$streaming_asr_backend" || "$streaming_asr_backend" == "unknown" ]]; then
+    echo "FAIL $required: streamingASRBackend=${streaming_asr_backend:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
+    /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string streaming_asr_backend_missing" "$RESULT_PLIST" >/dev/null
+    target_failures=$((target_failures + 1))
+  fi
   if [[ -z "$asr_mode" || "$asr_mode" == "unknown" ]]; then
     echo "FAIL $required: asrMode=${asr_mode:-unknown} target=${target:-unknown} machine=${machine_host:-unknown}"
     /usr/libexec/PlistBuddy -c "Add :targets:$result_index:failures: string asr_mode_missing" "$RESULT_PLIST" >/dev/null
@@ -274,6 +280,7 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:target" "${target:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:machineHost" "${machine_host:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:asrBackend" "${asr_backend:-unknown}"
+  plist_insert_string "$RESULT_PLIST" "targets:$result_index:streamingASRBackend" "${streaming_asr_backend:-unknown}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:asrMode" "${asr_mode:-unknown}"
   plist_insert_bool "$RESULT_PLIST" "targets:$result_index:realtimePartialTranscriptionEnabled" "${realtime_partial_transcription_enabled:-false}"
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:status" "${status:-unknown}"
@@ -283,7 +290,7 @@ for required in "${REQUIRED_TARGETS[@]}"; do
   plist_insert_string "$RESULT_PLIST" "targets:$result_index:nextAction" "${next_action:-unknown}"
 
   if [[ "$target_failures" -eq 0 ]]; then
-    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown} asrMode=${asr_mode:-unknown}"
+    echo "PASS $required: target=${target:-unknown} machine=${machine_host:-unknown} streamingASRBackend=${streaming_asr_backend:-unknown} asrMode=${asr_mode:-unknown}"
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "true"
   else
     plist_insert_bool "$RESULT_PLIST" "targets:$result_index:passed" "false"

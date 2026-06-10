@@ -34,6 +34,21 @@ distribution product yet. True live streaming partial text, notarized signing,
 polished first-run permission UX, and a final cross-machine proof gate remain
 open productization work.
 
+Latest proof-gate run:
+
+- Time: `2026-06-10T09:44:51Z`
+- Matrix:
+  `~/Library/Application Support/JarvisTap/Diagnostics/readiness-matrix-v0.1.6-test4-local-mbp1-20260610T094451Z.json`
+- Gate:
+  `~/Library/Application Support/JarvisTap/Diagnostics/proof-gate-v0.1.6-test4-local-mbp1-20260610T094451Z.json`
+- Required targets: `local`, `mbp1-tb`
+- Excluded targets: `studio2=no attached microphone`
+- Result: not proven. `local` passed; `mbp1-tb` failed before readiness
+  collection because SSH to `10.77.77.3:22` timed out. The fallback Tailscale
+  alias `mbp1` / `100.106.125.111` also timed out during the follow-up network
+  probe. Treat this as a current network proof gap, not evidence of an app
+  regression on mbp1.
+
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`
 and `mbp1` using the Accessibility menu-paste path. Older notes below preserve

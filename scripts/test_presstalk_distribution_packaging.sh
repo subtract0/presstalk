@@ -98,6 +98,12 @@ if [[ "$stable_prerelease_tag_status" -ne 2 ]]; then
   exit 1
 fi
 grep -Fq "Refusing to publish a prerelease smoke artifact with a stable-looking version" "$stable_prerelease_tag_output"
+if grep -Fq "studio2/s2 only" "$PUBLISH_PRERELEASE_SCRIPT"; then
+  echo "FAIL: prerelease notes must not list studio2/s2 as an active-only smoke target"
+  exit 1
+fi
+grep -Fq "studio2/s2" "$PUBLISH_PRERELEASE_SCRIPT"
+grep -Fq "is excluded from microphone/STT smoke" "$PUBLISH_PRERELEASE_SCRIPT"
 
 artifact_zip="$(build_ad_hoc_test_zip)"
 artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"

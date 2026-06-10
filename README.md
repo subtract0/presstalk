@@ -163,10 +163,12 @@ Tailscale, and strict BatchMode SSH probe evidence for those hosts. ARP scanning
 is disabled in that wrapper path by default.
 
 To close a candidate against the actual streaming product promise, add
-`--require-streaming`. The current fallback `parakeet_v3_ane_final_pass` build
-is useful, but it should fail this streaming gate until realtime
-partial/streaming evidence is proven on the required target Macs. Set
-`PRESSTALK_EXPECTED_ASR_MODE=<mode>` only when you want to pin one exact
+`--require-streaming`. Fresh bootstrap/install defaults now use
+`PRESSTALK_ASR_BACKEND=parakeet-v3-ane` for the final paste transcript plus
+`PRESSTALK_STREAMING_ASR_BACKEND=parakeet-eou-320` for live HUD partials, so
+runtime status should report an ASR mode like
+`parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials`.
+Set `PRESSTALK_EXPECTED_ASR_MODE=<mode>` only when you want to pin one exact
 streaming backend; otherwise streaming-required publish paths accept any
 non-missing streaming ASR mode.
 

@@ -37,6 +37,7 @@ struct JarvisTapConfig {
     let whisperLanguage: String?
     let whisperComputePreset: String
     let asrBackend: String
+    let streamingASRBackend: String?
     let streamingTranscriptionEnabled: Bool
     let parakeetQualityFallbackEnabled: Bool
     let parakeetQualityFallbackMinConfidence: Double
@@ -133,13 +134,30 @@ struct JarvisTapConfig {
             .nonEmpty ??
             "parakeet-v3-ane"
 
+        let parakeetFinalBackendAliases = ["parakeet", "parakeet-v3", "parakeet-v3-ane", "ane", "npu"]
+        let streamingASRBackend: String? = {
+            let rawValue = env["PRESSTALK_STREAMING_ASR_BACKEND"] ??
+                env["JARVISTAP_STREAMING_ASR_BACKEND"]
+            if let rawValue {
+                let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if value.isEmpty || ["0", "false", "no", "none", "off", "disabled"].contains(value) {
+                    return nil
+                }
+                return value
+            }
+            if parakeetFinalBackendAliases.contains(asrBackend) {
+                return "parakeet-eou-320"
+            }
+            return nil
+        }()
+
         let streamingTranscriptionEnabled: Bool = {
             if let streamingValue = env["PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION"] ??
                 env["JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION"] {
                 let value = streamingValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 return value != "0" && value != "false" && value != "no"
             }
-            return !["parakeet", "parakeet-v3", "parakeet-v3-ane", "ane", "npu"].contains(asrBackend)
+            return streamingASRBackend != nil || !parakeetFinalBackendAliases.contains(asrBackend)
         }()
 
         let parakeetQualityFallbackEnabled: Bool = {
@@ -215,6 +233,7 @@ struct JarvisTapConfig {
             whisperLanguage: (whisperLanguage?.isEmpty == false) ? whisperLanguage : nil,
             whisperComputePreset: whisperComputePreset,
             asrBackend: asrBackend,
+            streamingASRBackend: streamingASRBackend,
             streamingTranscriptionEnabled: streamingTranscriptionEnabled,
             parakeetQualityFallbackEnabled: parakeetQualityFallbackEnabled,
             parakeetQualityFallbackMinConfidence: parakeetQualityFallbackMinConfidence,
@@ -1424,6 +1443,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Release tail max seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds))"
         )
+        traceLogger.log("ASR backend=\(config.asrBackend)")
+        traceLogger.log("Streaming ASR backend=\(config.streamingASRBackend ?? "none")")
         traceLogger.log("Streaming transcription enabled=\(config.streamingTranscriptionEnabled ? 1 : 0)")
         traceLogger.log(
             "Parakeet quality fallback enabled=\(config.parakeetQualityFallbackEnabled ? 1 : 0) min_confidence=\(String(format: "%.3f", config.parakeetQualityFallbackMinConfidence))"
@@ -2275,6 +2296,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
             speechModelStatus: whisperStatus,
             asrBackend: config.asrBackend,
+            streamingASRBackend: config.streamingASRBackend ?? "none",
             realtimePartialTranscriptionEnabled: config.streamingTranscriptionEnabled,
             asrMode: currentASRModeDescription(),
             f5BridgeStatus: bridgeStatus,
@@ -2309,6 +2331,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "triggerKey": settingsStore.triggerKey.rawValue,
                 "selectedTriggerObserved": status.selectedTriggerObserved,
                 "asrBackend": status.asrBackend,
+                "streamingASRBackend": status.streamingASRBackend,
                 "asrMode": status.asrMode,
                 "realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled,
                 "whisperModel": config.whisperModel,
@@ -2436,6 +2459,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             Runtime
             - Speech model: \(runtimeStatus.speechModelStatus)
             - ASR backend: \(runtimeStatus.asrBackend)
+            - Streaming ASR backend: \(runtimeStatus.streamingASRBackend)
             - ASR mode: \(runtimeStatus.asrMode)
             - Realtime partial transcription: \(runtimeStatus.realtimePartialTranscriptionEnabled ? "enabled" : "disabled")
             - Trigger path: \(runtimeStatus.f5BridgeStatus)
@@ -3472,7 +3496,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private var fluidTrueStreamingVariant: StreamingModelVariant? {
-        switch config.asrBackend {
+        switch config.streamingASRBackend ?? config.asrBackend {
         case "parakeet-eou-160", "parakeet-eou-160ms":
             return .parakeetEou160ms
         case "parakeet-eou-320", "parakeet-eou-320ms":
@@ -3495,6 +3519,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func currentASRModeDescription() -> String {
+        if usesParakeetFinalBackend, let fluidTrueStreamingVariant {
+            let streamingMode = fluidTrueStreamingVariant.rawValue.replacingOccurrences(of: "-", with: "_")
+            return config.streamingTranscriptionEnabled
+                ? "parakeet_v3_ane_final_pass_with_\(streamingMode)_true_streaming_partials"
+                : "parakeet_v3_ane_final_pass"
+        }
+
         if let fluidTrueStreamingVariant {
             let baseMode = fluidTrueStreamingVariant.rawValue.replacingOccurrences(of: "-", with: "_")
             return config.streamingTranscriptionEnabled
@@ -3534,7 +3565,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
     private func loadFluidTrueStreamingASR() async throws {
         guard let variant = fluidTrueStreamingVariant else { return }
-        traceLogger.log("Loading FluidAudio true streaming ASR backend=\(variant.rawValue) compute=cpuAndNeuralEngine")
+        traceLogger.log("Loading FluidAudio true streaming ASR backend=\(config.streamingASRBackend ?? config.asrBackend) variant=\(variant.rawValue) compute=cpuAndNeuralEngine")
         let loadStart = Date()
         let configuration = MLModelConfiguration()
         configuration.computeUnits = .cpuAndNeuralEngine
@@ -3543,7 +3574,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let displayName = await manager.displayName
         fluidStreamingAsrManager = manager
         traceLogger.log(
-            "FluidAudio true streaming ASR ready backend=\(variant.rawValue) display_name=\(displayName) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))"
+            "FluidAudio true streaming ASR ready backend=\(config.streamingASRBackend ?? config.asrBackend) variant=\(variant.rawValue) display_name=\(displayName) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))"
         )
     }
 
@@ -5409,7 +5440,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let pollNanoseconds = UInt64(realtimeStreamPollSeconds * 1_000_000_000)
         var revision = 0
         var previousTranscript = ""
-        traceLogger.log("FluidAudio true streaming loop started backend=\(config.asrBackend) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))")
+        traceLogger.log("FluidAudio true streaming loop started backend=\(config.streamingASRBackend ?? config.asrBackend) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))")
 
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: pollNanoseconds)
@@ -5488,7 +5519,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let transcript = cleanedTranscriptText(try await manager.finish())
         traceTranscriptCandidate("FluidAudio true streaming transcript", text: transcript)
         traceLogger.log(
-            "FluidAudio true streaming finalize completed backend=\(config.asrBackend) samples=\(samples.count) appended_samples=\(appendedSamples) finalize_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
+            "FluidAudio true streaming finalize completed backend=\(config.streamingASRBackend ?? config.asrBackend) samples=\(samples.count) appended_samples=\(appendedSamples) finalize_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
         )
 
         return validatedFinalTranscriptCandidate(
@@ -5644,7 +5675,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     print("Parakeet v3 ANE ready.")
                     fflush(stdout)
                 }
-                if usesFluidTrueStreamingBackend {
+                if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     try await loadFluidTrueStreamingASR()
                     print("FluidAudio true streaming ASR ready.")
                     fflush(stdout)
@@ -7039,7 +7070,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "streaming_fallback"
                 )
-                if usesFluidTrueStreamingBackend, !capturedAudioSamples.isEmpty {
+                if usesFluidTrueStreamingBackend, !usesParakeetFinalBackend, !capturedAudioSamples.isEmpty {
                     traceLogger.log("Finalizing FluidAudio true streaming transcript samples=\(capturedAudioSamples.count)")
                     do {
                         if let acceptedFluidStreamingTranscript = try await finishFluidTrueStreamingTranscript(
@@ -7523,7 +7554,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "Audio normalization gain=\(String(format: "%.2f", normalizedResult.1)) normalized_rms=\(String(format: "%.5f", normalizedStats.rms)) normalized_peak=\(String(format: "%.5f", normalizedStats.peak))"
         )
 
-        if usesFluidTrueStreamingBackend {
+        if usesFluidTrueStreamingBackend, !usesParakeetFinalBackend {
             traceLogger.log("Finalizing FluidAudio true streaming transcript samples=\(capturedSamples.count)")
             do {
                 if let acceptedFluidStreamingTranscript = try await finishFluidTrueStreamingTranscript(

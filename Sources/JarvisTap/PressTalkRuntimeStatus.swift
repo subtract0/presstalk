@@ -26,6 +26,7 @@ struct PressTalkRuntimeStatus {
     let permissionPaneOpeningAllowed: Bool
     let speechModelStatus: String
     let asrBackend: String
+    let streamingASRBackend: String
     let realtimePartialTranscriptionEnabled: Bool
     let asrMode: String
     let f5BridgeStatus: String
@@ -236,6 +237,7 @@ struct PressTalkRuntimeStatus {
         permissionPaneOpeningAllowed: false,
         speechModelStatus: "Checking...",
         asrBackend: "unknown",
+        streamingASRBackend: "unknown",
         realtimePartialTranscriptionEnabled: false,
         asrMode: "unknown",
         f5BridgeStatus: "Checking...",

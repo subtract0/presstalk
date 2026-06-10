@@ -8,8 +8,10 @@ Current fallback release: `v0.1.6-test4`.
 - SHA-256: `5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161`
 - Homebrew tap: `subtract0/presstalk`, cask `presstalk`, tap commit `413da5c`
 - Default trigger: `Fn / Globe`
-- Default ASR path: Parakeet v3 ANE, streaming disabled, WhisperKit
-  large-v3-turbo quality fallback enabled at min confidence `0.96`
+- Current checked-in default ASR path: Parakeet v3 ANE finalizer,
+  Parakeet EOU 320ms live partials, streaming enabled, WhisperKit
+  large-v3-turbo quality fallback enabled at min confidence `0.96`.
+  The published fallback release listed above predates this default.
 
 Current proof status:
 
@@ -78,15 +80,17 @@ Current tooling update after that run:
   Developer ID status, hardened runtime, and stapler validation. Use
   `--require-distribution --require-notarized` for stable production artifacts.
 - Runtime status, machine readiness, matrix summaries, and proof-gate JSON now
-  carry `asrBackend`, `asrMode`, and `realtimePartialTranscriptionEnabled` so
-  release evidence can distinguish the current Parakeet ANE final-pass path from
-  future realtime partial or true-streaming ASR backends.
-- The app contains opt-in FluidAudio true-streaming backends for
-  `PRESSTALK_ASR_BACKEND=parakeet-eou-320` and
-  `PRESSTALK_ASR_BACKEND=nemotron-560`. These feed live chunks into the
-  streaming manager, update the existing partial transcript path, finalize on
-  release, and fall back to local WhisperKit if the streaming candidate is not
-  acceptable. They are not the default release path yet.
+  carry `asrBackend`, `streamingASRBackend`, `asrMode`, and
+  `realtimePartialTranscriptionEnabled` so release evidence can distinguish the
+  Parakeet ANE finalizer from the live partial backend.
+- The app contains FluidAudio true-streaming backends for
+  `PRESSTALK_STREAMING_ASR_BACKEND=parakeet-eou-320` and
+  `PRESSTALK_STREAMING_ASR_BACKEND=nemotron-560`. The default hybrid path keeps
+  `PRESSTALK_ASR_BACKEND=parakeet-v3-ane` as the final paste backend and uses
+  Parakeet EOU 320ms only for live listening HUD partials. If
+  `PRESSTALK_ASR_BACKEND` itself is set to an EOU/Nemotron backend, FluidAudio
+  may still act as the final ASR path and fall back to local WhisperKit if the
+  streaming candidate is not acceptable.
 - A local offline `chirp.wav` check keeps that line firm: `parakeet-eou-320`
   streamed quickly but produced an unusable mixed German transcript. The current
   default `parakeet-v3-ane` produced the accepted transcript in `0.226s` total

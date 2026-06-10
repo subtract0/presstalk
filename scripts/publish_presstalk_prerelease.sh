@@ -12,6 +12,9 @@ ASSET_PATH="$DIST_DIR/$ASSET_NAME"
 SHA_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
 ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
+READINESS_PREFLIGHT_SCRIPT="$ROOT/scripts/presstalk_release_readiness_preflight.sh"
+PROOF_GATE_JSON="${PRESSTALK_RELEASE_PROOF_GATE_JSON:-${PRESSTALK_PROOF_GATE_JSON:-}}"
+RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 RELEASE_TAG="v$VERSION"
 
 truthy() {
@@ -73,10 +76,29 @@ fi
   --expected-version "$VERSION" \
   --json-output "$ARTIFACT_AUDIT_JSON"
 
+if truthy "${PRESSTALK_REQUIRE_RELEASE_READINESS:-0}"; then
+  if [[ -z "$PROOF_GATE_JSON" ]]; then
+    echo "PRESSTALK_REQUIRE_RELEASE_READINESS=1 requires PRESSTALK_RELEASE_PROOF_GATE_JSON." >&2
+    exit 2
+  fi
+  if [[ ! -f "$PROOF_GATE_JSON" ]]; then
+    echo "Missing release proof gate JSON: $PROOF_GATE_JSON" >&2
+    exit 2
+  fi
+  "$READINESS_PREFLIGHT_SCRIPT" \
+    --artifact-audit "$ARTIFACT_AUDIT_JSON" \
+    --proof-gate "$PROOF_GATE_JSON" \
+    --expected-asr-mode "${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}" \
+    --json-output "$RELEASE_READINESS_JSON"
+fi
+
 if truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
   echo "PressTalk prerelease publish dry run complete"
   echo "Asset: $ASSET_PATH"
   echo "AuditJSON: $ARTIFACT_AUDIT_JSON"
+  if [[ -f "$RELEASE_READINESS_JSON" ]]; then
+    echo "ReadinessJSON: $RELEASE_READINESS_JSON"
+  fi
   exit 0
 fi
 

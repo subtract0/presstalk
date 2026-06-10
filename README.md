@@ -197,7 +197,10 @@ to continue unless `PRESSTALK_DISTRIBUTION_SIGNING=1` and
 `PRESSTALK_NOTARIZE=1` are both set. It also runs the artifact audit before
 upload; stable releases require `--require-distribution --require-notarized`,
 so a weakly signed or unstapled zip cannot be published just because the
-environment variables were set.
+environment variables were set. Stable releases also require
+`PRESSTALK_RELEASE_PROOF_GATE_JSON=/path/to/proof-gate.json`; the publish script
+runs `presstalk_release_readiness_preflight.sh --require-production` before any
+GitHub release or Homebrew tap write.
 
 That makes this install path work:
 ```bash

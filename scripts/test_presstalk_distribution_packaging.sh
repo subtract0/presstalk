@@ -9,6 +9,31 @@ ARTIFACT_AUDIT_SCRIPT="$SCRIPT_DIR/presstalk_release_artifact_audit.sh"
 TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-distribution-package-test.XXXXXX")"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
+proof_gate_json="$TEST_TMPDIR/proof-gate.json"
+cat >"$proof_gate_json" <<'JSON'
+{
+  "schemaVersion": "1",
+  "proven": true,
+  "failureCount": 0,
+  "targets": [
+    {
+      "required": "local",
+      "target": "local",
+      "machineHost": "studio1",
+      "asrBackend": "parakeet-v3-ane",
+      "asrMode": "parakeet_v3_ane_final_pass",
+      "realtimePartialTranscriptionEnabled": false,
+      "status": "ready_reported",
+      "reachable": true,
+      "physicalSTTSmokeReady": true,
+      "activeFieldSmokeReady": true,
+      "passed": true,
+      "failures": []
+    }
+  ]
+}
+JSON
+
 build_ad_hoc_test_zip() {
   local app="$TEST_TMPDIR/PressTalk.app"
   local zip="$TEST_TMPDIR/PressTalk-0.0-test-macos-arm64.zip"
@@ -90,6 +115,22 @@ grep -Fq "artifact-audit.json" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-distribution" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-notarized" "$PUBLISH_HOMEBREW_SCRIPT"
 
+stable_publish_without_proof_output="$TEST_TMPDIR/stable-publish-without-proof.txt"
+set +e
+env -u PRESSTALK_CODESIGN_IDENTITY -u CODESIGN_IDENTITY \
+  PRESSTALK_DISTRIBUTION_SIGNING=1 \
+  PRESSTALK_NOTARIZE=1 \
+  "$PUBLISH_HOMEBREW_SCRIPT" 0.1.6 >"$stable_publish_without_proof_output" 2>&1
+stable_publish_without_proof_status=$?
+set -e
+if [[ "$stable_publish_without_proof_status" -ne 2 ]]; then
+  echo "FAIL: expected stable Homebrew publish without proof gate JSON to exit 2, got $stable_publish_without_proof_status"
+  cat "$stable_publish_without_proof_output"
+  exit 1
+fi
+grep -Fq "without machine proof" "$stable_publish_without_proof_output"
+grep -Fq "PRESSTALK_RELEASE_PROOF_GATE_JSON" "$stable_publish_without_proof_output"
+
 stable_prerelease_tag_output="$TEST_TMPDIR/stable-prerelease-tag.txt"
 set +e
 PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG=0 \
@@ -114,22 +155,32 @@ grep -Fq "artifact-audit.json" "$PUBLISH_PRERELEASE_SCRIPT"
 homebrew_dry_run_dist="$TEST_TMPDIR/homebrew-dry-run-dist"
 homebrew_dry_run_output="$TEST_TMPDIR/homebrew-dry-run.txt"
 PRESSTALK_PUBLISH_DRY_RUN=1 \
+PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
+PRESSTALK_RELEASE_PROOF_GATE_JSON="$proof_gate_json" \
 PRESSTALK_DIST_DIR="$homebrew_dry_run_dist" \
   "$PUBLISH_HOMEBREW_SCRIPT" 0.0-homebrew-dryrun >"$homebrew_dry_run_output" 2>&1
 grep -Fq "PressTalk publish dry run complete" "$homebrew_dry_run_output"
+grep -Fq "ReadinessJSON:" "$homebrew_dry_run_output"
 test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64.zip"
 test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifact-audit.json"
+test -f "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-release-readiness.json"
 grep -Fq '"bundleIdentifier"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-artifact-audit.json"
+grep -Fq '"testArtifactReady"' "$homebrew_dry_run_dist/PressTalk-0.0-homebrew-dryrun-macos-arm64-release-readiness.json"
 
 prerelease_dry_run_dist="$TEST_TMPDIR/prerelease-dry-run-dist"
 prerelease_dry_run_output="$TEST_TMPDIR/prerelease-dry-run.txt"
 PRESSTALK_PUBLISH_DRY_RUN=1 \
+PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
+PRESSTALK_RELEASE_PROOF_GATE_JSON="$proof_gate_json" \
 PRESSTALK_DIST_DIR="$prerelease_dry_run_dist" \
   "$PUBLISH_PRERELEASE_SCRIPT" 0.0-prerelease-dryrun >"$prerelease_dry_run_output" 2>&1
 grep -Fq "PressTalk prerelease publish dry run complete" "$prerelease_dry_run_output"
+grep -Fq "ReadinessJSON:" "$prerelease_dry_run_output"
 test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m).zip"
 test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-artifact-audit.json"
+test -f "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-release-readiness.json"
 grep -Fq '"bundleIdentifier"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-artifact-audit.json"
+grep -Fq '"testArtifactReady"' "$prerelease_dry_run_dist/PressTalk-0.0-prerelease-dryrun-macos-$(uname -m)-release-readiness.json"
 
 artifact_zip="$(build_ad_hoc_test_zip)"
 artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"

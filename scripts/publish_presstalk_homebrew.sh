@@ -13,6 +13,9 @@ ASSET_PATH="$DIST_DIR/$ASSET_NAME"
 SHA_PATH="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
 ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
 ARTIFACT_AUDIT_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
+READINESS_PREFLIGHT_SCRIPT="$ROOT/scripts/presstalk_release_readiness_preflight.sh"
+PROOF_GATE_JSON="${PRESSTALK_RELEASE_PROOF_GATE_JSON:-${PRESSTALK_PROOF_GATE_JSON:-}}"
+RELEASE_READINESS_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-release-readiness.json"
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-publish.XXXXXX")"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -66,6 +69,18 @@ prerelease version such as 0.1.6-test5.
 EOF
     exit 2
   fi
+  if [[ -z "$PROOF_GATE_JSON" ]]; then
+    cat >&2 <<'EOF'
+Refusing to publish a stable PressTalk Homebrew release without machine proof.
+Set PRESSTALK_RELEASE_PROOF_GATE_JSON to a JSON file produced by
+presstalk_release_proof_gate.sh after proving the required target Macs.
+EOF
+    exit 2
+  fi
+  if [[ ! -f "$PROOF_GATE_JSON" ]]; then
+    echo "Missing release proof gate JSON: $PROOF_GATE_JSON" >&2
+    exit 2
+  fi
 fi
 
 require_cmd git
@@ -94,10 +109,34 @@ if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_DISTRIBUTION_AUD
 fi
 "$ARTIFACT_AUDIT_SCRIPT" "${audit_args[@]}"
 
+if [[ "$IS_PRERELEASE" == "0" ]] || truthy "${PRESSTALK_REQUIRE_RELEASE_READINESS:-0}"; then
+  if [[ -z "$PROOF_GATE_JSON" ]]; then
+    echo "PRESSTALK_REQUIRE_RELEASE_READINESS=1 requires PRESSTALK_RELEASE_PROOF_GATE_JSON." >&2
+    exit 2
+  fi
+  if [[ ! -f "$PROOF_GATE_JSON" ]]; then
+    echo "Missing release proof gate JSON: $PROOF_GATE_JSON" >&2
+    exit 2
+  fi
+  readiness_args=(
+    --artifact-audit "$ARTIFACT_AUDIT_JSON"
+    --proof-gate "$PROOF_GATE_JSON"
+    --expected-asr-mode "${PRESSTALK_EXPECTED_ASR_MODE:-parakeet_v3_ane_final_pass}"
+    --json-output "$RELEASE_READINESS_JSON"
+  )
+  if [[ "$IS_PRERELEASE" == "0" ]]; then
+    readiness_args+=(--require-production)
+  fi
+  "$READINESS_PREFLIGHT_SCRIPT" "${readiness_args[@]}"
+fi
+
 if truthy "${PRESSTALK_PUBLISH_DRY_RUN:-0}"; then
   echo "PressTalk publish dry run complete"
   echo "Asset: $ASSET_PATH"
   echo "AuditJSON: $ARTIFACT_AUDIT_JSON"
+  if [[ -f "$RELEASE_READINESS_JSON" ]]; then
+    echo "ReadinessJSON: $RELEASE_READINESS_JSON"
+  fi
   exit 0
 fi
 

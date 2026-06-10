@@ -107,6 +107,11 @@ Current tooling update after that run:
   requires Developer ID, hardened runtime, stapled notarization, proven machine
   coverage, and the expected `parakeet_v3_ane_final_pass` ASR mode on every
   proof target.
+- Stable `scripts/publish_presstalk_homebrew.sh` now refuses to publish unless
+  `PRESSTALK_RELEASE_PROOF_GATE_JSON` points at a proof-gate JSON, then runs the
+  readiness preflight with `--require-production` before any GitHub release or
+  Homebrew tap write. Prerelease publishers can opt into the same combined
+  check with `PRESSTALK_REQUIRE_RELEASE_READINESS=1`.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

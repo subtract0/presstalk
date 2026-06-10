@@ -142,7 +142,7 @@ fi
 
 find_target_index() {
   local wanted="$1"
-  local i target machine_host
+  local i target machine_host status best_alias_index=""
   for ((i = 0; i < target_count; i++)); do
     target="$(json_value "targets.$i.target")"
     machine_host="$(json_value "targets.$i.summary.machineHost")"
@@ -151,6 +151,28 @@ find_target_index() {
       return 0
     fi
   done
+
+  for ((i = 0; i < target_count; i++)); do
+    target="$(json_value "targets.$i.target")"
+    case "$target" in
+      "$wanted"-*|"$wanted".*)
+        status="$(json_value "targets.$i.status")"
+        if [[ "$status" == "ready_reported" ]]; then
+          printf '%s\n' "$i"
+          return 0
+        fi
+        if [[ -z "$best_alias_index" ]]; then
+          best_alias_index="$i"
+        fi
+        ;;
+    esac
+  done
+
+  if [[ -n "$best_alias_index" ]]; then
+    printf '%s\n' "$best_alias_index"
+    return 0
+  fi
+
   return 1
 }
 

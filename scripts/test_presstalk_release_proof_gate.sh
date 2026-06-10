@@ -8,6 +8,7 @@ trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 pass_matrix="$TEST_TMPDIR/pass.json"
 blocked_matrix="$TEST_TMPDIR/blocked.json"
+failed_alias_matrix="$TEST_TMPDIR/failed-alias.json"
 
 cat >"$pass_matrix" <<'JSON'
 {
@@ -81,6 +82,43 @@ cat >"$blocked_matrix" <<'JSON'
 }
 JSON
 
+cat >"$failed_alias_matrix" <<'JSON'
+{
+  "schemaVersion": 1,
+  "targets": [
+    {
+      "target": "local",
+      "status": "ready_reported",
+      "reachable": true,
+      "summary": {
+        "machineHost": "studio1",
+        "asrBackend": "parakeet-v3-ane",
+        "asrMode": "parakeet_v3_ane_final_pass",
+        "realtimePartialTranscriptionEnabled": false,
+        "physicalSTTSmokeReady": true,
+        "activeFieldSmokeReady": true,
+        "nextAction": "Ready for physical dictation smoke."
+      }
+    },
+    {
+      "target": "mbp1-tb",
+      "status": "failed",
+      "reachable": false,
+      "error": "ssh: connect to host 10.77.77.3 port 22: Operation timed out",
+      "summary": {
+        "machineHost": "unknown",
+        "asrBackend": "unknown",
+        "asrMode": "unknown",
+        "realtimePartialTranscriptionEnabled": "unknown",
+        "physicalSTTSmokeReady": "unknown",
+        "activeFieldSmokeReady": "unknown",
+        "nextAction": "Fix host/readiness collection error, then rerun matrix."
+      }
+    }
+  ]
+}
+JSON
+
 pass_output="$TEST_TMPDIR/pass.txt"
 pass_json="$TEST_TMPDIR/pass-result.json"
 "$GATE" --matrix "$pass_matrix" --require studio1 --require mbp1 --json-output "$pass_json" >"$pass_output"
@@ -122,6 +160,28 @@ fi
 if [[ "$(plutil -extract targets.1.failures.0 raw -o - "$blocked_json")" != "active_field_not_ready" ]]; then
   echo "FAIL: blocked JSON did not record active_field_not_ready"
   plutil -p "$blocked_json"
+  exit 1
+fi
+
+failed_alias_output="$TEST_TMPDIR/failed-alias.txt"
+failed_alias_json="$TEST_TMPDIR/failed-alias-result.json"
+if "$GATE" --matrix "$failed_alias_matrix" --require studio1 --require mbp1 --json-output "$failed_alias_json" >"$failed_alias_output"; then
+  echo "FAIL: failed alias matrix unexpectedly passed"
+  cat "$failed_alias_output"
+  exit 1
+fi
+grep -Fq "FAIL mbp1: status=failed target=mbp1-tb" "$failed_alias_output"
+grep -Fq "FAIL mbp1: reachable=false target=mbp1-tb" "$failed_alias_output"
+if grep -Fq "FAIL mbp1: missing from matrix" "$failed_alias_output"; then
+  echo "FAIL: failed alias proof should not degrade to missing_from_matrix"
+  cat "$failed_alias_output"
+  exit 1
+fi
+if [[ "$(plutil -extract targets.1.target raw -o - "$failed_alias_json")" != "mbp1-tb" ||
+      "$(plutil -extract targets.1.failures.0 raw -o - "$failed_alias_json")" != "status_not_ready_reported" ||
+      "$(plutil -extract targets.1.failures.1 raw -o - "$failed_alias_json")" != "not_reachable" ]]; then
+  echo "FAIL: failed alias JSON did not preserve mbp1-tb failure evidence"
+  plutil -p "$failed_alias_json"
   exit 1
 fi
 

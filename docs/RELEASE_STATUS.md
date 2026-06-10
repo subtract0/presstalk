@@ -127,6 +127,10 @@ Current tooling update after that run:
   physically usable, but it cannot count as release proof until its
   `runtime-status.json` records the active ASR backend, ASR mode, and realtime
   partial-transcription state.
+- The proof gate also maps host aliases such as `mbp1-tb` or `mbp1.local` back
+  to required proof target `mbp1`, preferring ready aliases when more than one
+  is present. Failed alias probes now preserve the actual alias target and
+  reachability failure instead of degrading to `missing_from_matrix`.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

@@ -26,6 +26,7 @@ cat >"$status_json" <<'JSON'
 JSON
 
 cat >"$trace_log" <<'LOG'
+[2026-06-10T21:23:20.000Z] Startup initiated trace_log=/tmp/presstalk_trace.log
 [2026-06-10T21:23:26.921Z] Input debug: cg flagsChanged keyCode=63 trigger=fn pressed=true
 [2026-06-10T21:23:26.925Z] 🎙️ Fn / Globe pressed: recording started
 [2026-06-10T21:23:27.042Z] FluidAudio true streaming loop started backend=parakeet-eou-320 poll_seconds=0.15
@@ -58,6 +59,7 @@ if [[ "$(plutil -extract success raw -o - "$output_json")" != "true" ||
       "$(plutil -extract targetCaptureSuccess raw -o - "$output_json")" != "true" ||
       "$(plutil -extract reason raw -o - "$output_json")" != "trace_inserted" ||
       "$(plutil -extract userReport raw -o - "$output_json")" != "all great" ||
+      "$(plutil -extract observed.appStartedAt raw -o - "$output_json")" != "2026-06-10T21:23:20.000Z" ||
       "$(plutil -extract observed.releaseToInsertMs raw -o - "$output_json")" != "1345" ||
       "$(plutil -extract observed.partialUpdateCount raw -o - "$output_json")" != "2" ||
       "$(plutil -extract observed.finalizer raw -o - "$output_json")" != "offline_whisper" ||
@@ -78,5 +80,21 @@ if "$HELPER" --trace-log "$trace_log" --status-json "$status_json" --json-output
   exit 1
 fi
 grep -Fq "No PressTalk dictation session found" "$TEST_TMPDIR/missing.txt"
+
+stale_output="$TEST_TMPDIR/stale.json"
+cat >"$trace_log" <<'LOG'
+[2026-06-10T21:23:26.921Z] Input debug: cg flagsChanged keyCode=63 trigger=fn pressed=true
+[2026-06-10T21:23:26.925Z] 🎙️ Fn / Globe pressed: recording started
+[2026-06-10T21:23:46.275Z] Input debug: cg flagsChanged keyCode=63 trigger=fn pressed=false
+[2026-06-10T21:23:46.278Z] 🛑 Fn / Globe released: recording ended
+[2026-06-10T21:23:47.597Z] 📝 Transkription abgeschlossen: older successful dictation
+[2026-06-10T21:23:47.623Z] Dictation inserted method=ax_menu_paste
+[2026-06-10T22:39:50.320Z] Startup initiated trace_log=/tmp/presstalk_trace.log
+LOG
+if "$HELPER" --trace-log "$trace_log" --status-json "$status_json" --json-output "$stale_output" >"$TEST_TMPDIR/stale.txt" 2>&1; then
+  echo "FAIL: collector unexpectedly passed with only a pre-startup session"
+  exit 1
+fi
+grep -Fq "No PressTalk dictation session found" "$TEST_TMPDIR/stale.txt"
 
 echo "PASS real_field_smoke_collector"

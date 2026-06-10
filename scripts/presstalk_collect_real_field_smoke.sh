@@ -148,8 +148,8 @@ parse_output="$(
       sub(/^[[:space:]]+/, "", tmp)
       return tmp
     }
-    function reset_session() {
-      pressed_at = timestamp($0)
+    function clear_session() {
+      pressed_at = ""
       released_at = ""
       inserted_at = ""
       release_to_insert_ms = ""
@@ -170,7 +170,19 @@ parse_output="$(
       insertion_method = ""
       paste_command_posted = "false"
       capture_frozen = "false"
+      session_seen = "false"
+    }
+    function reset_session() {
+      clear_session()
+      pressed_at = timestamp($0)
       session_seen = "true"
+    }
+
+    /Startup initiated trace_log=/ {
+      latest_startup_at = timestamp($0)
+      startup_seen = "true"
+      clear_session()
+      next
     }
 
     /pressed: recording started|armed: recording started/ {
@@ -237,6 +249,7 @@ parse_output="$(
       if (session_seen != "true") {
         exit 3
       }
+      printf "appStartedAt\t%s\n", latest_startup_at
       printf "pressedAt\t%s\n", pressed_at
       printf "releasedAt\t%s\n", released_at
       printf "insertedAt\t%s\n", inserted_at
@@ -270,6 +283,7 @@ parse_output="$(
 }
 
 pressed_at=""
+app_started_at=""
 released_at=""
 inserted_at=""
 held_ms=""
@@ -292,6 +306,7 @@ insertion_method=""
 
 while IFS=$'\t' read -r key value; do
   case "$key" in
+    appStartedAt) app_started_at="$value" ;;
     pressedAt) pressed_at="$value" ;;
     releasedAt) released_at="$value" ;;
     insertedAt) inserted_at="$value" ;;
@@ -359,6 +374,7 @@ plist_insert_string "$tmp_plist" "runtime.asrMode" "$(status_value runtime.asrMo
 plist_insert_string "$tmp_plist" "runtime.realtimePartialTranscriptionEnabled" "$(status_value runtime.realtimePartialTranscriptionEnabled)"
 
 plutil -insert "observed" -dictionary "$tmp_plist" >/dev/null
+plist_insert_string "$tmp_plist" "observed.appStartedAt" "$app_started_at"
 plist_insert_string "$tmp_plist" "observed.pressedAt" "$pressed_at"
 plist_insert_string "$tmp_plist" "observed.releasedAt" "$released_at"
 plist_insert_string "$tmp_plist" "observed.insertedAt" "$inserted_at"

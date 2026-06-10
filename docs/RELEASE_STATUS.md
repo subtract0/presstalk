@@ -120,7 +120,8 @@ Current tooling update after that run:
   the proof gate, performs the Homebrew publish dry-run, and records the
   combined release-readiness JSON. It does not install PressTalk, open System
   Settings, upload assets, or SSH into any machine except hosts explicitly
-  passed with `--host` / `--hosts`.
+  passed with `--host` / `--hosts`. Passing and failing attempts both write the
+  wrapper summary JSON; failed attempts record the failed step and exit status.
 - `scripts/presstalk_release_proof_gate.sh` now treats missing or `unknown`
   ASR backend/mode evidence as not proven. A stale installed app can still be
   physically usable, but it cannot count as release proof until its

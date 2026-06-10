@@ -175,6 +175,7 @@ test -f "$default_dist/PressTalk-0.0-default-candidate-preflight.json"
 
 fail_dist="$TEST_TMPDIR/fail-dist"
 fail_output="$TEST_TMPDIR/fail-output.txt"
+fail_summary="$fail_dist/PressTalk-0.0-candidate-candidate-preflight.json"
 set +e
 PRESSTALK_READINESS_MATRIX_SCRIPT="$fake_matrix" \
 PRESSTALK_PUBLISH_HOMEBREW_SCRIPT="$fake_publish" \
@@ -188,6 +189,16 @@ if [[ "$fail_status" -eq 0 ]]; then
   exit 1
 fi
 grep -Fq "FAIL mbp1: missing from matrix" "$fail_output"
+grep -Fq "CandidatePreflightJSON: $fail_summary" "$fail_output"
+grep -Fq "Result: fail" "$fail_output"
+test -f "$fail_summary"
+if [[ "$(plutil -extract passed raw -o - "$fail_summary")" != "false" ||
+      "$(plutil -extract failureStep raw -o - "$fail_summary")" != "proof_gate" ||
+      "$(plutil -extract failureStatus raw -o - "$fail_summary")" != "1" ]]; then
+  echo "FAIL: failed proof gate did not write wrapper failure summary"
+  plutil -p "$fail_summary"
+  exit 1
+fi
 if [[ -f "$fail_dist/fake-publish-ran.txt" ]]; then
   echo "FAIL: publish dry-run ran after failed proof gate"
   cat "$fail_output"

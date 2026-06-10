@@ -188,6 +188,40 @@ required_targets_csv() {
   printf '%s\n' "$joined"
 }
 
+write_wrapper_summary() {
+  local passed="$1"
+  local failure_step="${2:-}"
+  local failure_status="${3:-0}"
+  local result_plist required
+
+  result_plist="$(mktemp "${TMPDIR:-/tmp}/presstalk-candidate-preflight.XXXXXX.plist")"
+  plutil -create xml1 "$result_plist" >/dev/null
+  plutil -insert schemaVersion -string "1" "$result_plist" >/dev/null
+  plutil -insert version -string "$VERSION" "$result_plist" >/dev/null
+  plutil -insert distDir -string "$DIST_DIR" "$result_plist" >/dev/null
+  plutil -insert readinessMatrixJSON -string "$MATRIX_JSON" "$result_plist" >/dev/null
+  plutil -insert proofGateJSON -string "$PROOF_GATE_JSON" "$result_plist" >/dev/null
+  plutil -insert artifactAuditJSON -string "$ARTIFACT_AUDIT_JSON" "$result_plist" >/dev/null
+  plutil -insert releaseReadinessJSON -string "$RELEASE_READINESS_JSON" "$result_plist" >/dev/null
+  plutil -insert requiredTargets -array "$result_plist" >/dev/null
+  if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
+    for required in "${REQUIRED_TARGETS[@]}"; do
+      plutil -insert requiredTargets -string "$required" -append "$result_plist" >/dev/null
+    done
+  fi
+  case "$passed" in
+    true) plutil -insert passed -bool true "$result_plist" >/dev/null ;;
+    *) plutil -insert passed -bool false "$result_plist" >/dev/null ;;
+  esac
+  if [[ -n "$failure_step" ]]; then
+    plutil -insert failureStep -string "$failure_step" "$result_plist" >/dev/null
+    plutil -insert failureStatus -integer "$failure_status" "$result_plist" >/dev/null
+  fi
+  mkdir -p "$(dirname "$WRAPPER_JSON")"
+  plutil -convert json -r -o "$WRAPPER_JSON" "$result_plist"
+  rm -f "$result_plist"
+}
+
 mkdir -p "$DIST_DIR"
 
 MATRIX_JSON="$DIST_DIR/${PUBLIC_NAME}-${VERSION}-readiness-matrix.json"
@@ -217,7 +251,17 @@ echo "DistDir: $DIST_DIR"
 echo
 
 echo "Collecting readiness matrix..."
+set +e
 "/bin/bash" "$MATRIX_SCRIPT" "${matrix_args[@]}"
+matrix_status=$?
+set -e
+if [[ "$matrix_status" -ne 0 ]]; then
+  write_wrapper_summary false "readiness_matrix" "$matrix_status"
+  echo
+  echo "CandidatePreflightJSON: $WRAPPER_JSON"
+  echo "Result: fail"
+  exit "$matrix_status"
+fi
 
 proof_args=(--matrix "$MATRIX_JSON" --json-output "$PROOF_GATE_JSON")
 if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
@@ -233,10 +277,21 @@ fi
 
 echo
 echo "Running proof gate..."
+set +e
 "/bin/bash" "$PROOF_GATE_SCRIPT" "${proof_args[@]}"
+proof_status=$?
+set -e
+if [[ "$proof_status" -ne 0 ]]; then
+  write_wrapper_summary false "proof_gate" "$proof_status"
+  echo
+  echo "CandidatePreflightJSON: $WRAPPER_JSON"
+  echo "Result: fail"
+  exit "$proof_status"
+fi
 
 echo
 echo "Packaging and auditing with publish dry-run..."
+set +e
 PRESSTALK_PUBLISH_DRY_RUN=1 \
 PRESSTALK_REQUIRE_RELEASE_READINESS=1 \
 PRESSTALK_RELEASE_PROOF_GATE_JSON="$PROOF_GATE_JSON" \
@@ -245,6 +300,15 @@ PRESSTALK_DIST_DIR="$DIST_DIR" \
 ARCH="$ARCH" \
 PUBLIC_NAME="$PUBLIC_NAME" \
   "/bin/bash" "$PUBLISH_SCRIPT" "$VERSION"
+publish_status=$?
+set -e
+if [[ "$publish_status" -ne 0 ]]; then
+  write_wrapper_summary false "publish_dry_run" "$publish_status"
+  echo
+  echo "CandidatePreflightJSON: $WRAPPER_JSON"
+  echo "Result: fail"
+  exit "$publish_status"
+fi
 
 if [[ "$REQUIRE_PRODUCTION" -eq 1 ]]; then
   echo
@@ -261,28 +325,20 @@ if [[ "$REQUIRE_PRODUCTION" -eq 1 ]]; then
       readiness_args+=(--require-proof-target "$required")
     done
   fi
+  set +e
   "/bin/bash" "$READINESS_PREFLIGHT_SCRIPT" "${readiness_args[@]}"
+  readiness_status=$?
+  set -e
+  if [[ "$readiness_status" -ne 0 ]]; then
+    write_wrapper_summary false "release_readiness" "$readiness_status"
+    echo
+    echo "CandidatePreflightJSON: $WRAPPER_JSON"
+    echo "Result: fail"
+    exit "$readiness_status"
+  fi
 fi
 
-RESULT_PLIST="$(mktemp "${TMPDIR:-/tmp}/presstalk-candidate-preflight.XXXXXX.plist")"
-trap 'rm -f "$RESULT_PLIST"' EXIT
-plutil -create xml1 "$RESULT_PLIST" >/dev/null
-plutil -insert schemaVersion -string "1" "$RESULT_PLIST" >/dev/null
-plutil -insert version -string "$VERSION" "$RESULT_PLIST" >/dev/null
-plutil -insert distDir -string "$DIST_DIR" "$RESULT_PLIST" >/dev/null
-plutil -insert readinessMatrixJSON -string "$MATRIX_JSON" "$RESULT_PLIST" >/dev/null
-plutil -insert proofGateJSON -string "$PROOF_GATE_JSON" "$RESULT_PLIST" >/dev/null
-plutil -insert artifactAuditJSON -string "$ARTIFACT_AUDIT_JSON" "$RESULT_PLIST" >/dev/null
-plutil -insert releaseReadinessJSON -string "$RELEASE_READINESS_JSON" "$RESULT_PLIST" >/dev/null
-plutil -insert requiredTargets -array "$RESULT_PLIST" >/dev/null
-if [[ "$REQUIRED_TARGET_COUNT" -gt 0 ]]; then
-  for required in "${REQUIRED_TARGETS[@]}"; do
-    plutil -insert requiredTargets -string "$required" -append "$RESULT_PLIST" >/dev/null
-  done
-fi
-plutil -insert passed -bool true "$RESULT_PLIST" >/dev/null
-mkdir -p "$(dirname "$WRAPPER_JSON")"
-plutil -convert json -r -o "$WRAPPER_JSON" "$RESULT_PLIST"
+write_wrapper_summary true
 
 echo
 echo "CandidatePreflightJSON: $WRAPPER_JSON"

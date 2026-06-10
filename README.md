@@ -165,7 +165,9 @@ bash scripts/publish_presstalk_prerelease.sh 0.1.6-test5
 ```
 
 `publish_presstalk_prerelease.sh` also requires a hyphenated version by default
-so smoke artifacts do not look like stable production tags.
+so smoke artifacts do not look like stable production tags. Before upload it
+runs `presstalk_release_artifact_audit.sh` against the packaged zip and writes
+`dist/PressTalk-<version>-macos-arm64-artifact-audit.json`.
 
 Publish the public binary release plus Homebrew tap:
 ```bash
@@ -174,7 +176,10 @@ bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
 
 For a stable version without a hyphen, `publish_presstalk_homebrew.sh` refuses
 to continue unless `PRESSTALK_DISTRIBUTION_SIGNING=1` and
-`PRESSTALK_NOTARIZE=1` are both set.
+`PRESSTALK_NOTARIZE=1` are both set. It also runs the artifact audit before
+upload; stable releases require `--require-distribution --require-notarized`,
+so a weakly signed or unstapled zip cannot be published just because the
+environment variables were set.
 
 That makes this install path work:
 ```bash

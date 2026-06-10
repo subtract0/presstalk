@@ -87,12 +87,16 @@ Current tooling update after that run:
   processing, versus `3.508s` for the stock v1 GPU WhisperKit route.
 - `scripts/publish_presstalk_homebrew.sh` refuses stable, non-hyphenated
   versions unless both production distribution signing and notarization are
-  explicitly enabled. Hyphenated `test` / prerelease versions keep the existing
-  smoke-test publishing path.
+  explicitly enabled. It now also runs `presstalk_release_artifact_audit.sh`
+  before upload; stable releases require the audit to prove Developer ID,
+  hardened runtime, and stapled notarization. Hyphenated `test` / prerelease
+  versions keep the existing smoke-test publishing path.
 - `scripts/publish_presstalk_prerelease.sh` also refuses stable-looking,
   non-hyphenated versions unless `PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG=1` is
   deliberately set, so smoke artifacts cannot accidentally occupy stable
-  version tags.
+  version tags. It now runs the artifact audit before upload too, without
+  production signing requirements, to catch wrong bundle id, wrong version, or
+  broken code-signing artifacts.
 
 Historical status: local `main` previously proved Option+Space real-field
 dictation and active-field insertion on the eligible machines `studio1` / `s1`

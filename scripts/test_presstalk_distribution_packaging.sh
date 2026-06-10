@@ -85,6 +85,10 @@ if [[ "$stable_publish_without_notary_status" -ne 2 ]]; then
   exit 1
 fi
 grep -Fq "Refusing to publish a stable PressTalk Homebrew release without notarization" "$stable_publish_without_notary_output"
+grep -Fq "presstalk_release_artifact_audit.sh" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq "artifact-audit.json" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq -- "--require-distribution" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq -- "--require-notarized" "$PUBLISH_HOMEBREW_SCRIPT"
 
 stable_prerelease_tag_output="$TEST_TMPDIR/stable-prerelease-tag.txt"
 set +e
@@ -104,6 +108,8 @@ if grep -Fq "studio2/s2 only" "$PUBLISH_PRERELEASE_SCRIPT"; then
 fi
 grep -Fq "studio2/s2" "$PUBLISH_PRERELEASE_SCRIPT"
 grep -Fq "is excluded from microphone/STT smoke" "$PUBLISH_PRERELEASE_SCRIPT"
+grep -Fq "presstalk_release_artifact_audit.sh" "$PUBLISH_PRERELEASE_SCRIPT"
+grep -Fq "artifact-audit.json" "$PUBLISH_PRERELEASE_SCRIPT"
 
 artifact_zip="$(build_ad_hoc_test_zip)"
 artifact_audit_json="$TEST_TMPDIR/artifact-audit.json"

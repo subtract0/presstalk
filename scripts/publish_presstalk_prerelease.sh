@@ -9,6 +9,8 @@ ARCH="${ARCH:-$(uname -m)}"
 ASSET_NAME="${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.zip"
 ASSET_PATH="$ROOT/dist/$ASSET_NAME"
 SHA_PATH="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}.sha256"
+ARTIFACT_AUDIT_SCRIPT="$ROOT/scripts/presstalk_release_artifact_audit.sh"
+ARTIFACT_AUDIT_JSON="$ROOT/dist/${PUBLIC_NAME}-${VERSION}-macos-${ARCH}-artifact-audit.json"
 RELEASE_TAG="v$VERSION"
 
 if [[ "$VERSION" != *-* && "${PRESSTALK_ALLOW_STABLE_PRERELEASE_TAG:-0}" != "1" ]]; then
@@ -51,6 +53,12 @@ if [[ ! -f "$ASSET_PATH" || ! -f "$SHA_PATH" ]]; then
   echo "Missing packaged artifact for $VERSION" >&2
   exit 1
 fi
+
+"$ARTIFACT_AUDIT_SCRIPT" \
+  --zip "$ASSET_PATH" \
+  --expected-bundle-id "${PRESSTALK_EXPECTED_BUNDLE_ID:-com.am.presstalk}" \
+  --expected-version "$VERSION" \
+  --json-output "$ARTIFACT_AUDIT_JSON"
 
 SHA256="$(awk '{print $1}' "$SHA_PATH")"
 NOTES_TEMPLATE_PATH="$(mktemp "${TMPDIR:-/tmp}/presstalk-release-notes.XXXXXX")"

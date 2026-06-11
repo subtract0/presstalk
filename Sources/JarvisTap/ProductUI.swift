@@ -1023,9 +1023,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         fallbackButtonsRow.alignment = .centerY
         fallbackButtonsRow.spacing = 8
 
-        let inputMonitoringRow = makeStatusRow(title: "Trigger listener", valueLabel: inputMonitoringValueLabel)
+        let inputMonitoringRow = makeStatusRow(title: "Input Monitoring", valueLabel: inputMonitoringValueLabel)
         let microphoneRow = makeStatusRow(title: "Microphone", valueLabel: microphoneValueLabel)
-        let accessibilityRow = makeStatusRow(title: "Insertion", valueLabel: accessibilityValueLabel)
+        let accessibilityRow = makeStatusRow(title: "Accessibility", valueLabel: accessibilityValueLabel)
         let systemDictationRow = makeStatusRow(title: "Apple Dictation key", valueLabel: systemDictationValueLabel)
         let speechModelRow = makeStatusRow(title: "Speech model", valueLabel: speechModelValueLabel)
         let f5BridgeRow = makeStatusRow(title: "Trigger path", valueLabel: f5BridgeValueLabel)
@@ -1287,6 +1287,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let noPaneSuffix = runtimeStatus.permissionPaneOpeningAllowed
             ? ""
             : " This no-pane run will not open System Settings."
+
+        if runtimeStatus.permissionPaneOpeningAllowed && !runtimeStatus.readyWithoutPermissionPaneWork {
+            return "Approve the missing rows below: Microphone, Input Monitoring, and Accessibility. When they are ready, PressTalk can listen and paste into the focused field."
+        }
 
         if !runtimeStatus.microphoneGranted {
             if runtimeStatus.microphoneAuthorizationStatus == "denied" {

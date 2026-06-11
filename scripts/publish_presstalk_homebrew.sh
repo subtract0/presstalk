@@ -302,16 +302,22 @@ cask "presstalk" do
   app "PressTalk.app"
 
   postflight do |c|
-    c.system_command "/bin/bash",
-                     args: ["#{appdir}/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"],
+    c.system_command "/usr/bin/env",
+                     args: [
+                       "PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1",
+                       "PRESSTALK_OPEN_PERMISSION_PANES=1",
+                       "/bin/bash",
+                       "#{appdir}/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh",
+                     ],
                      must_succeed: false
   end
 
   caveats <<~EOS
     PressTalk defaults to the native Fn / Globe push-to-talk trigger.
-    After install, approve the macOS permission prompts from PressTalk.
+    On first launch, PressTalk opens a compact setup window for Microphone,
+    Input Monitoring, and Accessibility. Approve those three macOS permissions.
     If you need to rerun setup manually, use:
-      /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh
+      PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 PRESSTALK_OPEN_PERMISSION_PANES=1 /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh
     If you choose the optional F5 trigger and need the Karabiner bridge, use:
       /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-karabiner-fallback.sh --enable
   EOS

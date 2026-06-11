@@ -124,6 +124,9 @@ grep -Fq -- "--require-streaming-bench-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-hybrid-streaming-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-streaming" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-proof-target" "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq 'PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq 'PRESSTALK_OPEN_PERMISSION_PANES=1' "$PUBLISH_HOMEBREW_SCRIPT"
+grep -Fq '"/usr/bin/env"' "$PUBLISH_HOMEBREW_SCRIPT"
 
 stable_publish_without_proof_output="$TEST_TMPDIR/stable-publish-without-proof.txt"
 set +e

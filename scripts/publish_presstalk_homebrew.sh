@@ -297,7 +297,7 @@ cask "presstalk" do
   desc "Hold-to-talk local dictation for Apple Silicon"
   homepage "https://github.com/${RELEASE_REPO}"
 
-  depends_on macos: ">= :sonoma"
+  depends_on macos: :sonoma
 
   app "PressTalk.app"
 

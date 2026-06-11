@@ -306,6 +306,7 @@ cask "presstalk" do
                      args: [
                        "PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1",
                        "PRESSTALK_OPEN_PERMISSION_PANES=1",
+                       "PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0",
                        "/bin/bash",
                        "#{appdir}/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh",
                      ],
@@ -317,7 +318,7 @@ cask "presstalk" do
     On first launch, PressTalk opens a compact setup window for Microphone,
     Input Monitoring, and Accessibility. Approve those three macOS permissions.
     If you need to rerun setup manually, use:
-      PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 PRESSTALK_OPEN_PERMISSION_PANES=1 /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh
+      PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh
     If you choose the optional F5 trigger and need the Karabiner bridge, use:
       /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-karabiner-fallback.sh --enable
   EOS

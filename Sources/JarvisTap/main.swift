@@ -1355,6 +1355,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var processingTask: Task<Void, Never>?
     private var lastPrintedPartial = ""
     private var liveCapturedAudioSamples: [Float] = []
+    private var activeCaptureSessionID: UInt64 = 0
+    private var activeCaptureEngineStarted = false
     private var lastInputDebugSignature = ""
     private var darwinNotificationObserverInstalled = false
     private var productionInsertionProbeObserverInstalled = false
@@ -1411,6 +1413,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         audioCaptureLock.lock()
         liveCapturedAudioSamples.append(contentsOf: samples)
         audioCaptureLock.unlock()
+    }
+
+    private func appendLiveCapturedAudioSamples(_ samples: [Float], sessionID: UInt64) {
+        guard withStateLock({
+            activeCaptureSessionID == sessionID && (isRecording || isProcessing)
+        }) else { return }
+        appendLiveCapturedAudioSamples(samples)
     }
 
     private func currentLiveCapturedAudioSamples() -> [Float] {
@@ -4523,6 +4532,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             activeTrigger = nil
             activeTriggerSource = nil
             activeTriggerStartedAt = nil
+            activeCaptureEngineStarted = false
             streamTaskToCancel = streamTask
             streamTask = nil
             latestStreamingState = StreamingSnapshot()
@@ -4621,6 +4631,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             activeTrigger = nil
             activeTriggerSource = nil
             activeTriggerStartedAt = nil
+            activeCaptureEngineStarted = false
             streamTaskToCancel = streamTask
             streamTask = nil
             latestStreamingState = StreamingSnapshot()
@@ -4745,6 +4756,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             activeTrigger = nil
             activeTriggerSource = nil
             self.activeTriggerStartedAt = nil
+            activeCaptureEngineStarted = false
             streamTaskToCancel = streamTask
             streamTask = nil
             latestStreamingState = StreamingSnapshot()
@@ -6847,7 +6859,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         enum PressDecision {
             case ignoreSilently
             case ignoreStillProcessing
-            case start
+            case start(UInt64)
         }
 
         let decision = withStateLock { () -> PressDecision in
@@ -6860,13 +6872,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             latestStreamingState = StreamingSnapshot()
             lastPrintedPartial = ""
+            activeCaptureSessionID &+= 1
+            activeCaptureEngineStarted = false
             activeTrigger = trigger
             activeTriggerSource = source
             isRecording = true
             activeTriggerStartedAt = Date()
-            return .start
+            return .start(activeCaptureSessionID)
         }
 
+        let captureSessionID: UInt64
         switch decision {
         case .ignoreSilently:
             return
@@ -6875,9 +6890,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             print("⏳ [PressTalk] Still processing the previous dictation. Ignoring trigger.")
             fflush(stdout)
             return
-        case .start:
-            break
+        case .start(let sessionID):
+            captureSessionID = sessionID
         }
+        resetLiveCapturedAudioSamples()
 
         if let readinessMessage = currentWhisperReadinessMessage() {
             withStateLock {
@@ -6885,6 +6901,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 activeTrigger = nil
                 activeTriggerSource = nil
                 activeTriggerStartedAt = nil
+                activeCaptureEngineStarted = false
             }
             startWhisperWarmupIfNeeded()
             traceLogger.log("Trigger ignored trigger=\(trigger.rawValue) reason=whisper_not_ready")
@@ -6903,6 +6920,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 activeTrigger = nil
                 activeTriggerSource = nil
                 activeTriggerStartedAt = nil
+                activeCaptureEngineStarted = false
             }
             traceLogger.log("Trigger failed trigger=\(trigger.rawValue) reason=stream_transcriber_unavailable error=\(error)")
             fputs("[PressTalk] Stream transcriber unavailable: \(error)\n", stderr)
@@ -6929,10 +6947,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         let whisperKit = self.whisperKit
         let traceLogger = self.traceLogger
+        let audioStartRequestedAt = Date()
         let task = Task(priority: .userInitiated) { [self] in
             guard let whisperKit else { return }
             do {
-                resetLiveCapturedAudioSamples()
                 traceLogger.log(
                     announce
                         ? "Audio recording started mode=direct input_device=\(selectedAudioInputDescription)"
@@ -6943,30 +6961,56 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     traceLogger.log("FluidAudio true streaming state reset for capture")
                 }
                 try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id) { [weak self] samples in
-                    self?.appendLiveCapturedAudioSamples(samples)
+                    self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
                 }
-                traceLogger.log("Audio recording engine started mode=direct")
+                let shouldContinue = withStateLock { () -> Bool in
+                    guard activeCaptureSessionID == captureSessionID,
+                          isRecording,
+                          activeTrigger == trigger
+                    else {
+                        return false
+                    }
+                    activeCaptureEngineStarted = true
+                    return true
+                }
+                guard shouldContinue, !Task.isCancelled else {
+                    traceLogger.log("Audio recording engine started after session ended; stopping stale capture session=\(captureSessionID)")
+                    whisperKit.audioProcessor.stopRecording()
+                    return
+                }
+                traceLogger.log(
+                    "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", Date().timeIntervalSince(audioStartRequestedAt))) session=\(captureSessionID)"
+                )
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop(whisperKit: whisperKit)
                 } else if config.streamingTranscriptionEnabled {
                     await runRealtimeWhisperLoop(whisperKit: whisperKit)
                 } else {
                     while !Task.isCancelled {
-                        let stillRecording = withStateLock { isRecording }
+                        let stillRecording = withStateLock {
+                            isRecording && activeCaptureSessionID == captureSessionID
+                        }
                         if !stillRecording { break }
                         try? await Task.sleep(nanoseconds: 200_000_000)
                     }
                     traceLogger.log("Audio recording wait loop stopped mode=direct streaming=0")
                 }
             } catch {
-                traceLogger.log("Audio recording failed mode=direct error=\(error)")
-                self.withStateLock {
+                let shouldReportFailure = self.withStateLock { () -> Bool in
+                    guard self.activeCaptureSessionID == captureSessionID else { return false }
                     self.isRecording = false
                     self.activeTrigger = nil
                     self.activeTriggerSource = nil
                     self.activeTriggerStartedAt = nil
+                    self.activeCaptureEngineStarted = false
                     self.streamTask = nil
+                    return true
                 }
+                guard shouldReportFailure else {
+                    traceLogger.log("Audio recording failed for stale capture session=\(captureSessionID) error=\(error)")
+                    return
+                }
+                traceLogger.log("Audio recording failed mode=direct error=\(error)")
                 self.restoreInputMethodPreselectionIfNeeded(reason: "audio_recording_failed")
                 self.stopAmplitudeMonitoring()
                 if announce {
@@ -6993,11 +7037,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         var currentStreamTask: Task<Void, Never>?
         var capturedSnapshot = StreamingSnapshot()
         var captureDurationSeconds = 0.0
+        var captureEngineStartedBeforeRelease = false
+        var releasedCaptureSessionID: UInt64 = 0
         let shouldProcess = withStateLock { () -> Bool in
             guard isRecording, activeTrigger == trigger else { return false }
             if let activeTriggerStartedAt {
                 captureDurationSeconds = Date().timeIntervalSince(activeTriggerStartedAt)
             }
+            captureEngineStartedBeforeRelease = activeCaptureEngineStarted
+            releasedCaptureSessionID = activeCaptureSessionID
             isRecording = false
             activeTrigger = nil
             activeTriggerSource = nil
@@ -7035,6 +7083,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 self.withStateLock {
                     self.isProcessing = false
                     self.processingTask = nil
+                    if self.activeCaptureSessionID == releasedCaptureSessionID {
+                        self.activeCaptureEngineStarted = false
+                    }
                 }
                 self.restoreInputMethodPreselectionIfNeeded(reason: reason)
                 traceLogger.log("Processing task finished reason=\(reason) state_reset=true")
@@ -7363,6 +7414,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 let transcript = try await finalizeTranscript()
                 guard !transcript.isEmpty else {
                     traceLogger.log("No speech captured after release")
+                    if !captureEngineStartedBeforeRelease {
+                        traceLogger.log(
+                            "No speech captured because audio engine was not ready before release session=\(releasedCaptureSessionID) held_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+                        )
+                        present(.error("The microphone was still starting. Hold again."))
+                        print("⚠️ [PressTalk] Audio capture was not ready before release.")
+                        fflush(stdout)
+                        finishProcessing(reason: "capture_not_ready")
+                        return
+                    }
                     if captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds {
                         present(.error("I didn’t catch any clear speech."))
                     }

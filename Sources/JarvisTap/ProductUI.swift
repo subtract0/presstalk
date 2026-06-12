@@ -401,7 +401,6 @@ final class JarvisTapSettingsStore {
         static let showHUD = "JarvisTap.ShowHUD"
         static let pasteAutomatically = "JarvisTap.PasteAutomatically"
         static let showAbortPopups = "JarvisTap.ShowAbortPopups"
-        static let learnCorrections = "JarvisTap.LearnCorrections"
         static let preferredLanguage = "JarvisTap.PreferredLanguage"
         static let releaseTailMaxSeconds = "JarvisTap.ReleaseTailMaxSeconds"
         static let insertionSuffix = "JarvisTap.InsertionSuffix"
@@ -418,7 +417,6 @@ final class JarvisTapSettingsStore {
             Key.showHUD: true,
             Key.pasteAutomatically: config.agentMode == "dictation",
             Key.showAbortPopups: true,
-            Key.learnCorrections: false,
             Key.preferredLanguage: LanguageOption.fromWhisperLanguage(config.whisperLanguage).rawValue,
             Key.releaseTailMaxSeconds: config.releaseTailPaddingSeconds,
             Key.insertionSuffix: InsertionSuffixOption.space.rawValue,
@@ -440,11 +438,6 @@ final class JarvisTapSettingsStore {
     var showAbortPopups: Bool {
         get { defaults.bool(forKey: Key.showAbortPopups) }
         set { defaults.set(newValue, forKey: Key.showAbortPopups) }
-    }
-
-    var learnCorrections: Bool {
-        get { defaults.bool(forKey: Key.learnCorrections) }
-        set { defaults.set(newValue, forKey: Key.learnCorrections) }
     }
 
     var preferredLanguage: LanguageOption {
@@ -893,7 +886,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private var runtimeStatus: PressTalkRuntimeStatus = .placeholder
     private let showHUDCheckbox = NSButton(checkboxWithTitle: "Show compact HUD", target: nil, action: nil)
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
-    private let learnCorrectionsCheckbox = NSButton(checkboxWithTitle: "Learn personal corrections", target: nil, action: nil)
     private let triggerKeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let insertionSuffixPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -969,7 +961,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
     func reloadFromStore() {
         showHUDCheckbox.state = settingsStore.showHUD ? .on : .off
         pasteAutomaticallyCheckbox.state = settingsStore.pasteAutomatically ? .on : .off
-        learnCorrectionsCheckbox.state = settingsStore.learnCorrections ? .on : .off
         triggerKeyPopup.selectItem(at: JarvisTapSettingsStore.TriggerKeyOption.allCases.firstIndex(of: settingsStore.triggerKey) ?? 0)
         languagePopup.selectItem(at: JarvisTapSettingsStore.LanguageOption.allCases.firstIndex(of: settingsStore.preferredLanguage) ?? 0)
         insertionSuffixPopup.selectItem(at: JarvisTapSettingsStore.InsertionSuffixOption.allCases.firstIndex(of: settingsStore.insertionSuffix) ?? 0)
@@ -1151,7 +1142,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
             commerceButtonsRow,
             showHUDCheckbox,
             pasteAutomaticallyCheckbox,
-            learnCorrectionsCheckbox,
             triggerKeyRow,
             languageRow,
             insertionSuffixRow,
@@ -1198,9 +1188,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         pasteAutomaticallyCheckbox.target = self
         pasteAutomaticallyCheckbox.action = #selector(togglePasteAutomatically(_:))
-
-        learnCorrectionsCheckbox.target = self
-        learnCorrectionsCheckbox.action = #selector(toggleLearnCorrections(_:))
 
         triggerKeyPopup.target = self
         triggerKeyPopup.action = #selector(changeTriggerKey(_:))
@@ -1445,11 +1432,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func togglePasteAutomatically(_ sender: NSButton) {
         settingsStore.pasteAutomatically = sender.state == .on
-        onSettingsChanged?()
-    }
-
-    @objc private func toggleLearnCorrections(_ sender: NSButton) {
-        settingsStore.learnCorrections = sender.state == .on
         onSettingsChanged?()
     }
 

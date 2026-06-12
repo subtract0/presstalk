@@ -871,6 +871,238 @@ final class PressTalkHUDController {
     }
 }
 
+final class PressTalkCorrectionLearningPromptController: NSObject {
+    private let panel: NSPanel
+    private let originalField = NSTextField(wrappingLabelWithString: "")
+    private let correctedField = NSTextField(wrappingLabelWithString: "")
+    private let countdownField = NSTextField(labelWithString: "")
+    private let progressIndicator = NSProgressIndicator()
+    private var timer: Timer?
+    private var startedAt = Date()
+    private var durationSeconds: TimeInterval = 25
+    private var onLearn: (() -> Void)?
+    private var onReject: (() -> Void)?
+
+    override init() {
+        panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 204),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        super.init()
+
+        panel.isFloatingPanel = true
+        panel.level = .statusBar
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .ignoresCycle]
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.ignoresMouseEvents = false
+        panel.hidesOnDeactivate = false
+        panel.worksWhenModal = true
+
+        let container = NSVisualEffectView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+        container.material = .hudWindow
+        container.blendingMode = .behindWindow
+        container.state = .active
+        container.wantsLayer = true
+        container.layer?.cornerRadius = 14
+        container.layer?.masksToBounds = true
+
+        let titleLabel = NSTextField(labelWithString: "Learn correction?")
+        titleLabel.font = NSFont.systemFont(ofSize: 16, weight: .semibold)
+        titleLabel.textColor = .labelColor
+
+        let detailLabel = NSTextField(wrappingLabelWithString: "PressTalk noticed an edit after dictation. Unless you click Don't Learn, it will remember this pair locally.")
+        detailLabel.font = NSFont.systemFont(ofSize: 12)
+        detailLabel.textColor = .secondaryLabelColor
+        detailLabel.maximumNumberOfLines = 2
+
+        let originalLabel = NSTextField(labelWithString: "Heard")
+        originalLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        originalLabel.textColor = .secondaryLabelColor
+
+        let correctedLabel = NSTextField(labelWithString: "Use")
+        correctedLabel.font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        correctedLabel.textColor = .secondaryLabelColor
+
+        for field in [originalField, correctedField] {
+            field.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+            field.textColor = .labelColor
+            field.maximumNumberOfLines = 2
+            field.lineBreakMode = .byTruncatingMiddle
+        }
+
+        countdownField.font = NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .medium)
+        countdownField.textColor = .secondaryLabelColor
+        countdownField.alignment = .right
+
+        progressIndicator.isIndeterminate = false
+        progressIndicator.minValue = 0
+        progressIndicator.maxValue = 1
+        progressIndicator.doubleValue = 1
+        progressIndicator.controlSize = .small
+        progressIndicator.style = .bar
+
+        let rejectButton = NSButton(title: "Don't Learn", target: self, action: #selector(rejectCorrection(_:)))
+        rejectButton.bezelStyle = .rounded
+        rejectButton.keyEquivalent = "\u{1b}"
+
+        let learnButton = NSButton(title: "Learn Now", target: self, action: #selector(learnCorrectionNow(_:)))
+        learnButton.bezelStyle = .rounded
+
+        let originalRow = labeledCorrectionRow(label: originalLabel, field: originalField)
+        let correctedRow = labeledCorrectionRow(label: correctedLabel, field: correctedField)
+
+        let progressRow = NSStackView(views: [progressIndicator, countdownField])
+        progressRow.orientation = .horizontal
+        progressRow.alignment = .centerY
+        progressRow.spacing = 10
+
+        let buttonRow = NSStackView(views: [rejectButton, learnButton])
+        buttonRow.orientation = .horizontal
+        buttonRow.alignment = .centerY
+        buttonRow.spacing = 8
+
+        let stack = NSStackView(views: [
+            titleLabel,
+            detailLabel,
+            originalRow,
+            correctedRow,
+            progressRow,
+            buttonRow,
+        ])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 10
+
+        let rootView = NSView()
+        rootView.translatesAutoresizingMaskIntoConstraints = false
+        rootView.addSubview(container)
+        container.addSubview(stack)
+        panel.contentView = rootView
+
+        NSLayoutConstraint.activate([
+            rootView.widthAnchor.constraint(equalToConstant: 460),
+            rootView.heightAnchor.constraint(equalToConstant: 204),
+
+            container.leadingAnchor.constraint(equalTo: rootView.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: rootView.trailingAnchor),
+            container.topAnchor.constraint(equalTo: rootView.topAnchor),
+            container.bottomAnchor.constraint(equalTo: rootView.bottomAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 16),
+            stack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -16),
+            stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 14),
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -14),
+
+            originalRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            correctedRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            progressRow.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            progressIndicator.widthAnchor.constraint(greaterThanOrEqualToConstant: 260),
+            buttonRow.trailingAnchor.constraint(equalTo: stack.trailingAnchor),
+        ])
+    }
+
+    func present(
+        original: String,
+        corrected: String,
+        duration: TimeInterval = 25,
+        onLearn: @escaping () -> Void,
+        onReject: @escaping () -> Void
+    ) {
+        timer?.invalidate()
+        self.durationSeconds = max(5, duration)
+        self.startedAt = Date()
+        self.onLearn = onLearn
+        self.onReject = onReject
+        originalField.stringValue = displayText(original)
+        correctedField.stringValue = displayText(corrected)
+        updateProgress()
+        positionPanel()
+        panel.alphaValue = 1
+        NSApp.unhide(nil)
+        panel.orderFrontRegardless()
+
+        let timer = Timer(timeInterval: 0.1, target: self, selector: #selector(tick(_:)), userInfo: nil, repeats: true)
+        self.timer = timer
+        RunLoop.main.add(timer, forMode: .common)
+    }
+
+    func dismiss() {
+        timer?.invalidate()
+        timer = nil
+        onLearn = nil
+        onReject = nil
+        panel.orderOut(nil)
+    }
+
+    private func labeledCorrectionRow(label: NSTextField, field: NSTextField) -> NSStackView {
+        let row = NSStackView(views: [label, field])
+        row.orientation = .horizontal
+        row.alignment = .top
+        row.spacing = 10
+        label.widthAnchor.constraint(equalToConstant: 48).isActive = true
+        return row
+    }
+
+    @objc private func tick(_ sender: Timer) {
+        updateProgress()
+        let elapsed = Date().timeIntervalSince(startedAt)
+        guard elapsed >= durationSeconds else { return }
+        finish(learn: true)
+    }
+
+    @objc private func learnCorrectionNow(_ sender: Any?) {
+        finish(learn: true)
+    }
+
+    @objc private func rejectCorrection(_ sender: Any?) {
+        finish(learn: false)
+    }
+
+    private func finish(learn: Bool) {
+        let learnCallback = onLearn
+        let rejectCallback = onReject
+        dismiss()
+        if learn {
+            learnCallback?()
+        } else {
+            rejectCallback?()
+        }
+    }
+
+    private func updateProgress() {
+        let elapsed = Date().timeIntervalSince(startedAt)
+        let remaining = max(0, durationSeconds - elapsed)
+        progressIndicator.doubleValue = max(0, min(1, remaining / durationSeconds))
+        countdownField.stringValue = remaining > 0
+            ? "Learning in \(Int(ceil(remaining)))s"
+            : "Learning now"
+    }
+
+    private func positionPanel() {
+        let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main
+        guard let visibleFrame = screen?.visibleFrame else { return }
+        var frame = panel.frame
+        frame.origin.x = visibleFrame.maxX - frame.width - 24
+        frame.origin.y = visibleFrame.maxY - frame.height - 44
+        panel.setFrame(frame, display: true)
+    }
+
+    private func displayText(_ text: String) -> String {
+        let collapsed = text
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard collapsed.count > 120 else { return collapsed }
+        return String(collapsed.prefix(52)) + "..." + String(collapsed.suffix(52))
+    }
+}
+
 final class PressTalkSettingsWindowController: NSWindowController {
     var onSettingsChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
@@ -893,7 +1125,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private var runtimeStatus: PressTalkRuntimeStatus = .placeholder
     private let showHUDCheckbox = NSButton(checkboxWithTitle: "Show compact HUD", target: nil, action: nil)
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
-    private let learnCorrectionsCheckbox = NSButton(checkboxWithTitle: "Learn personal corrections", target: nil, action: nil)
+    private let learnCorrectionsCheckbox = NSButton(checkboxWithTitle: "Learn personal corrections locally", target: nil, action: nil)
     private let triggerKeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let insertionSuffixPopup = NSPopUpButton(frame: .zero, pullsDown: false)

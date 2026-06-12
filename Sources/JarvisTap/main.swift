@@ -1318,6 +1318,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
     private let stateLock = NSLock()
+    private let audioCaptureLock = NSLock()
 
     private var eventTap: CFMachPort?
     private var eventTapInstallSummary = "not_installed"
@@ -1353,6 +1354,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var streamTask: Task<Void, Never>?
     private var processingTask: Task<Void, Never>?
     private var lastPrintedPartial = ""
+    private var liveCapturedAudioSamples: [Float] = []
     private var lastInputDebugSignature = ""
     private var darwinNotificationObserverInstalled = false
     private var productionInsertionProbeObserverInstalled = false
@@ -1396,6 +1398,39 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         stateLock.lock()
         defer { stateLock.unlock() }
         return try body()
+    }
+
+    private func resetLiveCapturedAudioSamples() {
+        audioCaptureLock.lock()
+        liveCapturedAudioSamples.removeAll(keepingCapacity: true)
+        audioCaptureLock.unlock()
+    }
+
+    private func appendLiveCapturedAudioSamples(_ samples: [Float]) {
+        guard !samples.isEmpty else { return }
+        audioCaptureLock.lock()
+        liveCapturedAudioSamples.append(contentsOf: samples)
+        audioCaptureLock.unlock()
+    }
+
+    private func currentLiveCapturedAudioSamples() -> [Float] {
+        audioCaptureLock.lock()
+        let samples = liveCapturedAudioSamples
+        audioCaptureLock.unlock()
+        return samples
+    }
+
+    private func recentLiveCapturedAudioSamples(maxCount: Int) -> [Float] {
+        guard maxCount > 0 else { return [] }
+        audioCaptureLock.lock()
+        let samples: [Float]
+        if liveCapturedAudioSamples.count > maxCount {
+            samples = Array(liveCapturedAudioSamples.suffix(maxCount))
+        } else {
+            samples = liveCapturedAudioSamples
+        }
+        audioCaptureLock.unlock()
+        return samples
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -1894,12 +1929,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func currentInputLightBands() -> VoiceLightBands {
-        guard let whisperKit else {
-            return VoiceLightBands(low: 0.04, mid: 0.04, high: 0.04)
-        }
-
         let sampleWindow = Int(Double(WhisperKit.sampleRate) * 0.12)
-        let recentSamples = Array(whisperKit.audioProcessor.audioSamples.suffix(sampleWindow))
+        let recentSamples = recentLiveCapturedAudioSamples(maxCount: sampleWindow)
         guard !recentSamples.isEmpty else {
             return VoiceLightBands(low: 0.04, mid: 0.04, high: 0.04)
         }
@@ -4623,8 +4654,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func currentTrackpadCaptureStats() -> (durationSeconds: Double, audible: Bool, transcriptEvidence: Bool) {
-        guard let whisperKit else { return (0, false, false) }
-        let samples = Array(whisperKit.audioProcessor.audioSamples)
+        let samples = currentLiveCapturedAudioSamples()
         let stats = audioLevelStats(for: samples)
         let durationSeconds = Double(samples.count) / Double(WhisperKit.sampleRate)
         let transcriptEvidence = !bestTranscriptCandidate(from: [
@@ -5342,7 +5372,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             try? await Task.sleep(nanoseconds: pollNanoseconds)
             if Task.isCancelled { break }
 
-            let capturedSamples = Array(whisperKit.audioProcessor.audioSamples)
+            let capturedSamples = currentLiveCapturedAudioSamples()
             let sampleCount = capturedSamples.count
             let audioDurationSeconds = Double(sampleCount) / Double(WhisperKit.sampleRate)
             guard audioDurationSeconds >= realtimeStreamInitialAudioSeconds else { continue }
@@ -5383,7 +5413,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 previousTranscript = transcript
                 let shouldStopAfterPass = releaseFinalizeRequested || withStateLock { isProcessing && !isRecording }
                 if shouldStopAfterPass {
-                    let latestSampleCount = whisperKit.audioProcessor.audioSamples.count
+                    let latestSampleCount = currentLiveCapturedAudioSamples().count
                     let lagSeconds = Double(max(0, latestSampleCount - sampleCount)) / Double(WhisperKit.sampleRate)
                     traceLogger.log(
                         "Realtime release pass lag revision=\(revision) lag_seconds=\(String(format: "%.2f", lagSeconds)) max_lag_seconds=\(String(format: "%.2f", realtimeStreamFinalMaxLagSeconds))"
@@ -5447,7 +5477,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             try? await Task.sleep(nanoseconds: pollNanoseconds)
             if Task.isCancelled { break }
 
-            let capturedSamples = Array(whisperKit.audioProcessor.audioSamples)
+            let capturedSamples = currentLiveCapturedAudioSamples()
             let sampleCount = capturedSamples.count
             let audioDurationSeconds = Double(sampleCount) / Double(WhisperKit.sampleRate)
             let releaseFinalizeRequested = withStateLock { isProcessing && !isRecording }
@@ -5565,10 +5595,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             let elapsed = Date().timeIntervalSince(start)
             guard elapsed >= minimumTailSeconds else { continue }
-            guard let whisperKit else { break }
+            guard whisperKit != nil else { break }
 
             let requiredSamples = Int(Double(WhisperKit.sampleRate) * silenceWindowSeconds)
-            let recentSamples = Array(whisperKit.audioProcessor.audioSamples.suffix(requiredSamples))
+            let recentSamples = recentLiveCapturedAudioSamples(maxCount: requiredSamples)
             let stats = audioLevelStats(for: recentSamples)
             lastMeasuredRMS = stats.rms
 
@@ -6902,6 +6932,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let task = Task(priority: .userInitiated) { [self] in
             guard let whisperKit else { return }
             do {
+                resetLiveCapturedAudioSamples()
                 traceLogger.log(
                     announce
                         ? "Audio recording started mode=direct input_device=\(selectedAudioInputDescription)"
@@ -6911,7 +6942,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     try await resetFluidTrueStreamingTranscriptState()
                     traceLogger.log("FluidAudio true streaming state reset for capture")
                 }
-                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id, callback: nil)
+                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id) { [weak self] samples in
+                    self?.appendLiveCapturedAudioSamples(samples)
+                }
                 traceLogger.log("Audio recording engine started mode=direct")
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop(whisperKit: whisperKit)
@@ -7038,8 +7071,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
             processingSnapshot = withStateLock { latestStreamingState }
 
-            if let whisperKit {
-                capturedAudioSamples = Array(whisperKit.audioProcessor.audioSamples)
+            if whisperKit != nil {
+                capturedAudioSamples = currentLiveCapturedAudioSamples()
                 frozenAudioDurationSeconds = Double(capturedAudioSamples.count) / Double(WhisperKit.sampleRate)
                 capturedSignalStats = audioLevelStats(for: capturedAudioSamples)
                 let normalizedResult = normalizedAudioSamples(capturedAudioSamples)
@@ -7534,7 +7567,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             ) ?? ""
         }
 
-        let capturedSamples = Array(whisperKit.audioProcessor.audioSamples)
+        let capturedSamples = currentLiveCapturedAudioSamples()
         traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedSamples.count)")
         if capturedSamples.isEmpty {
             traceLogger.log("No captured audio samples; using filtered fallback transcript")

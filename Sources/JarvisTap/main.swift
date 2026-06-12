@@ -256,6 +256,145 @@ private struct ParakeetTranscriptCandidate {
     let confidence: Double
 }
 
+private struct PersonalCorrectionEntry: Codable {
+    var original: String
+    var corrected: String
+    var count: Int
+    var firstSeenAt: TimeInterval
+    var lastSeenAt: TimeInterval
+}
+
+private struct PersonalCorrectionFile: Codable {
+    var version: Int
+    var entries: [PersonalCorrectionEntry]
+}
+
+private final class PersonalCorrectionStore {
+    private let storeURL: URL
+    private let traceLogger: TraceLogger
+    private let lock = NSLock()
+    private let maxEntries = 400
+
+    init(supportDirectory: URL, traceLogger: TraceLogger) {
+        self.storeURL = supportDirectory.appendingPathComponent("personal-corrections.json")
+        self.traceLogger = traceLogger
+    }
+
+    func apply(to transcript: String) -> String {
+        let entries = loadEntries()
+            .filter { $0.count > 0 && !$0.original.isEmpty && $0.original != $0.corrected }
+            .sorted { lhs, rhs in
+                if lhs.original.count == rhs.original.count {
+                    return lhs.lastSeenAt > rhs.lastSeenAt
+                }
+                return lhs.original.count > rhs.original.count
+            }
+        guard !entries.isEmpty else { return transcript }
+
+        var updated = transcript
+        var appliedCount = 0
+        for entry in entries {
+            guard updated.contains(entry.original) else { continue }
+            updated = updated.replacingOccurrences(of: entry.original, with: entry.corrected)
+            appliedCount += 1
+        }
+        if appliedCount > 0 {
+            traceLogger.log("Personal corrections applied count=\(appliedCount)")
+        }
+        return updated
+    }
+
+    func record(original: String, corrected: String) {
+        let cleanedOriginal = normalize(original)
+        let cleanedCorrected = normalize(corrected)
+        guard shouldStore(original: cleanedOriginal, corrected: cleanedCorrected) else {
+            traceLogger.log("Personal correction skipped reason=validation original_chars=\(cleanedOriginal.count) corrected_chars=\(cleanedCorrected.count)")
+            return
+        }
+
+        lock.lock()
+        defer { lock.unlock() }
+
+        var file = loadFileLocked()
+        let now = Date().timeIntervalSince1970
+        let key = correctionKey(original: cleanedOriginal, corrected: cleanedCorrected)
+        if let index = file.entries.firstIndex(where: { correctionKey(original: $0.original, corrected: $0.corrected) == key }) {
+            file.entries[index].count += 1
+            file.entries[index].lastSeenAt = now
+        } else {
+            file.entries.append(PersonalCorrectionEntry(
+                original: cleanedOriginal,
+                corrected: cleanedCorrected,
+                count: 1,
+                firstSeenAt: now,
+                lastSeenAt: now
+            ))
+        }
+
+        file.entries.sort { lhs, rhs in
+            if lhs.count == rhs.count {
+                return lhs.lastSeenAt > rhs.lastSeenAt
+            }
+            return lhs.count > rhs.count
+        }
+        if file.entries.count > maxEntries {
+            file.entries = Array(file.entries.prefix(maxEntries))
+        }
+        saveFileLocked(file)
+        traceLogger.log("Personal correction learned original_chars=\(cleanedOriginal.count) corrected_chars=\(cleanedCorrected.count)")
+    }
+
+    private func loadEntries() -> [PersonalCorrectionEntry] {
+        lock.lock()
+        defer { lock.unlock() }
+        return loadFileLocked().entries
+    }
+
+    private func loadFileLocked() -> PersonalCorrectionFile {
+        guard let data = try? Data(contentsOf: storeURL),
+              let file = try? JSONDecoder().decode(PersonalCorrectionFile.self, from: data)
+        else {
+            return PersonalCorrectionFile(version: 1, entries: [])
+        }
+        return file
+    }
+
+    private func saveFileLocked(_ file: PersonalCorrectionFile) {
+        do {
+            try FileManager.default.createDirectory(
+                at: storeURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            let data = try encoder.encode(file)
+            try data.write(to: storeURL, options: .atomic)
+        } catch {
+            traceLogger.log("Personal correction persist failed error=\(error)")
+        }
+    }
+
+    private func normalize(_ value: String) -> String {
+        value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func shouldStore(original: String, corrected: String) -> Bool {
+        guard original != corrected else { return false }
+        guard (2...120).contains(original.count), (2...120).contains(corrected.count) else { return false }
+        guard original.split(separator: " ").count <= 8, corrected.split(separator: " ").count <= 8 else { return false }
+        guard !original.contains("\n"), !corrected.contains("\n") else { return false }
+        return true
+    }
+
+    private func correctionKey(original: String, corrected: String) -> String {
+        "\(original.lowercased())\u{0}\(corrected.lowercased())"
+    }
+}
+
 final class TraceLogger {
     private let logURL: URL
     private let queue = DispatchQueue(label: "com.am.jarvistap.trace-log")
@@ -1165,6 +1304,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         var armed = false
     }
 
+    private struct FocusedTextSnapshot {
+        let element: AXUIElement
+        let processID: pid_t
+        let value: String
+        let selectedRange: NSRange
+    }
+
+    private struct CorrectionLearningSeed {
+        let element: AXUIElement
+        let processID: pid_t
+        let expectedValue: String
+        let insertedRange: NSRange
+    }
+
     private enum PresentationState {
         case warming
         case ready
@@ -1286,6 +1439,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private lazy var traceLogger = TraceLogger(path: config.traceLogPath)
     private lazy var appCodeSignatureSummary = codeSignatureSummary()
     private lazy var memoryStore = ConversationMemoryStore(path: config.memoryStorePath, traceLogger: traceLogger)
+    private lazy var personalCorrectionStore = PersonalCorrectionStore(
+        supportDirectory: pressTalkSupportDirectory(),
+        traceLogger: traceLogger
+    )
     private lazy var responder = RemoteResponder(config: config, traceLogger: traceLogger)
     private lazy var codexAgent = CodexAgent(config: config, traceLogger: traceLogger, memoryStore: memoryStore)
     private let speaker = NativeSpeaker()
@@ -1376,6 +1533,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
     private var activeInputMethodPreselection: InputMethodPreselectionSession?
     private var inputMethodHelperWarmupScheduled = false
+    private var activeCorrectionLearningWatchID: UUID?
     private var activeAudioInputDeviceDescription = "unknown"
 
     private var statusItem: NSStatusItem?
@@ -1384,6 +1542,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var toggleHUDMenuItem: NSMenuItem?
     private var togglePasteMenuItem: NSMenuItem?
     private var toggleAbortPopupsMenuItem: NSMenuItem?
+    private var toggleLearnCorrectionsMenuItem: NSMenuItem?
     private var repairLocalSigningMenuItem: NSMenuItem?
     private var settingsWindowController: PressTalkSettingsWindowController?
     private var hudController: PressTalkHUDController?
@@ -1449,7 +1608,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Parakeet quality fallback enabled=\(config.parakeetQualityFallbackEnabled ? 1 : 0) min_confidence=\(String(format: "%.3f", config.parakeetQualityFallbackMinConfidence))"
         )
-        traceLogger.log("HUD enabled=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)")
+        traceLogger.log("HUD enabled=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) learn_corrections=\(settingsStore.learnCorrections ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)")
         traceLogger.log("Native microphone key path enabled=\(config.enableNativeMicrophoneKey ? 1 : 0)")
         traceLogger.log("Native microphone calibration stored=\(settingsStore.nativeTriggerCalibration == nil ? 0 : 1)")
 
@@ -1680,6 +1839,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return "PressTalk \(version)"
     }
 
+    private func pressTalkSupportDirectory() -> URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+    }
+
     private func installProductUI() {
         guard statusItem == nil else { return }
 
@@ -1765,6 +1929,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         self.toggleAbortPopupsMenuItem = abortPopupsMenuItem
         menu.addItem(abortPopupsMenuItem)
 
+        let learnCorrectionsMenuItem = NSMenuItem(title: "Learn Corrections", action: #selector(toggleLearnCorrectionsFromMenu(_:)), keyEquivalent: "")
+        learnCorrectionsMenuItem.target = self
+        learnCorrectionsMenuItem.toolTip = "Default off. When enabled, PressTalk stores small local correction pairs after successful dictation edits."
+        self.toggleLearnCorrectionsMenuItem = learnCorrectionsMenuItem
+        menu.addItem(learnCorrectionsMenuItem)
+
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettingsFromMenu(_:)), keyEquivalent: ",")
         settingsItem.target = self
         menu.addItem(settingsItem)
@@ -1810,6 +1980,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             self.toggleHUDMenuItem?.state = self.settingsStore.showHUD ? .on : .off
             self.togglePasteMenuItem?.state = self.settingsStore.pasteAutomatically ? .on : .off
             self.toggleAbortPopupsMenuItem?.state = self.settingsStore.showAbortPopups ? .on : .off
+            self.toggleLearnCorrectionsMenuItem?.state = self.settingsStore.learnCorrections ? .on : .off
         }
     }
 
@@ -1817,7 +1988,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         applyWhisperDecodingPreferences()
         refreshMenuSettingsState()
         traceLogger.log(
-            "Settings updated show_hud=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) abort_popups=\(settingsStore.showAbortPopups ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) language=\(settingsStore.preferredLanguage.rawValue) release_tail_max_seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds)) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)"
+            "Settings updated show_hud=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) abort_popups=\(settingsStore.showAbortPopups ? 1 : 0) learn_corrections=\(settingsStore.learnCorrections ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) language=\(settingsStore.preferredLanguage.rawValue) release_tail_max_seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds)) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)"
         )
 
         if !settingsStore.showHUD {
@@ -2202,6 +2373,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         handleSettingsChanged()
     }
 
+    @objc private func toggleLearnCorrectionsFromMenu(_ sender: Any?) {
+        settingsStore.learnCorrections.toggle()
+        settingsWindowController?.reloadFromStore()
+        handleSettingsChanged()
+    }
+
     @objc private func reloadSpeechModelFromMenu(_ sender: Any?) {
         traceLogger.log("Manual speech model reload requested")
         withStateLock {
@@ -2338,6 +2515,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "whisperModel": config.whisperModel,
                 "whisperLanguage": config.whisperLanguage ?? "auto",
                 "traceLogPath": config.traceLogPath,
+            ],
+            "settings": [
+                "showHUD": settingsStore.showHUD,
+                "pasteAutomatically": settingsStore.pasteAutomatically,
+                "showAbortPopups": settingsStore.showAbortPopups,
+                "learnCorrections": settingsStore.learnCorrections,
+                "insertionSuffix": settingsStore.insertionSuffix.rawValue,
+                "releaseTailMaxSeconds": settingsStore.releaseTailMaxSeconds,
             ],
             "permissions": [
                 "inputMonitoringGranted": status.inputMonitoringGranted,
@@ -2476,6 +2661,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             - Trigger key: \(settingsStore.triggerKey.rawValue)
             - HUD enabled: \(settingsStore.showHUD ? "yes" : "no")
             - Paste automatically: \(settingsStore.pasteAutomatically ? "yes" : "no")
+            - Learn corrections: \(settingsStore.learnCorrections ? "yes" : "no")
             - Release tail max seconds: \(String(format: "%.2f", settingsStore.releaseTailMaxSeconds))
             - Insertion suffix: \(settingsStore.insertionSuffix.rawValue)
 
@@ -6542,6 +6728,184 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return "ax_value_range"
     }
 
+    private func applyPersonalCorrectionsIfEnabled(to transcript: String) -> String {
+        guard settingsStore.learnCorrections else { return transcript }
+        return personalCorrectionStore.apply(to: transcript)
+    }
+
+    private func focusedTextSnapshotForCorrectionLearning() -> FocusedTextSnapshot? {
+        guard AXIsProcessTrusted() else { return nil }
+
+        let systemWideElement = AXUIElementCreateSystemWide()
+        var focusedObject: CFTypeRef?
+        let focusedError = AXUIElementCopyAttributeValue(
+            systemWideElement,
+            kAXFocusedUIElementAttribute as CFString,
+            &focusedObject
+        )
+        guard focusedError == .success,
+              let focusedObject,
+              CFGetTypeID(focusedObject) == AXUIElementGetTypeID()
+        else {
+            return nil
+        }
+
+        let focusedElement = unsafeBitCast(focusedObject, to: AXUIElement.self)
+        return textSnapshotForCorrectionLearning(element: focusedElement)
+    }
+
+    private func textSnapshotForCorrectionLearning(element: AXUIElement) -> FocusedTextSnapshot? {
+        var processID: pid_t = 0
+        guard AXUIElementGetPid(element, &processID) == .success, processID > 0 else {
+            return nil
+        }
+
+        var valueObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXValueAttribute as CFString,
+            &valueObject
+        ) == .success,
+              let value = valueObject as? String
+        else {
+            return nil
+        }
+
+        var selectedRangeObject: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(
+            element,
+            kAXSelectedTextRangeAttribute as CFString,
+            &selectedRangeObject
+        ) == .success,
+              let selectedRangeObject,
+              CFGetTypeID(selectedRangeObject) == AXValueGetTypeID()
+        else {
+            return nil
+        }
+
+        var selectedRange = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(unsafeBitCast(selectedRangeObject, to: AXValue.self), .cfRange, &selectedRange),
+              selectedRange.location >= 0,
+              selectedRange.length >= 0
+        else {
+            return nil
+        }
+
+        return FocusedTextSnapshot(
+            element: element,
+            processID: processID,
+            value: value,
+            selectedRange: NSRange(location: selectedRange.location, length: selectedRange.length)
+        )
+    }
+
+    private func correctionLearningSeed(
+        for preparedTranscript: String,
+        context: InputMethodInsertionContext
+    ) -> CorrectionLearningSeed? {
+        guard context == .dictation,
+              settingsStore.learnCorrections,
+              !preparedTranscript.isEmpty,
+              let snapshot = focusedTextSnapshotForCorrectionLearning()
+        else {
+            return nil
+        }
+
+        let currentValue = snapshot.value as NSString
+        let safeLocation = min(max(snapshot.selectedRange.location, 0), currentValue.length)
+        let safeLength = min(max(snapshot.selectedRange.length, 0), currentValue.length - safeLocation)
+        let expectedValue = currentValue.replacingCharacters(
+            in: NSRange(location: safeLocation, length: safeLength),
+            with: preparedTranscript
+        )
+        let insertedRange = NSRange(location: safeLocation, length: (preparedTranscript as NSString).length)
+        return CorrectionLearningSeed(
+            element: snapshot.element,
+            processID: snapshot.processID,
+            expectedValue: expectedValue,
+            insertedRange: insertedRange
+        )
+    }
+
+    private func startCorrectionLearningWatch(seed: CorrectionLearningSeed?) {
+        guard let seed, settingsStore.learnCorrections else { return }
+
+        let watchID = UUID()
+        activeCorrectionLearningWatchID = watchID
+        traceLogger.log("Personal correction watch started")
+
+        for delay in [4.0, 10.0, 25.0, 55.0] {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self else { return }
+                guard self.activeCorrectionLearningWatchID == watchID else { return }
+                if self.evaluateCorrectionLearning(seed: seed) {
+                    self.activeCorrectionLearningWatchID = nil
+                }
+            }
+        }
+    }
+
+    private func evaluateCorrectionLearning(seed: CorrectionLearningSeed) -> Bool {
+        guard settingsStore.learnCorrections else { return true }
+        guard let snapshot = textSnapshotForCorrectionLearning(element: seed.element) else { return false }
+        guard snapshot.processID == seed.processID else { return false }
+        guard snapshot.value != seed.expectedValue else { return false }
+
+        guard let correction = inferredCorrection(
+            expectedValue: seed.expectedValue,
+            currentValue: snapshot.value,
+            insertedRange: seed.insertedRange
+        ) else {
+            traceLogger.log("Personal correction watch observed edit but skipped reason=not_small_inserted_diff")
+            return true
+        }
+
+        personalCorrectionStore.record(original: correction.original, corrected: correction.corrected)
+        return true
+    }
+
+    private func inferredCorrection(
+        expectedValue: String,
+        currentValue: String,
+        insertedRange: NSRange
+    ) -> (original: String, corrected: String)? {
+        let expectedNSString = expectedValue as NSString
+        let currentNSString = currentValue as NSString
+        let expectedLength = expectedNSString.length
+        let currentLength = currentNSString.length
+
+        var prefixLength = 0
+        while prefixLength < expectedLength,
+              prefixLength < currentLength,
+              expectedNSString.character(at: prefixLength) == currentNSString.character(at: prefixLength) {
+            prefixLength += 1
+        }
+
+        var suffixLength = 0
+        while suffixLength < expectedLength - prefixLength,
+              suffixLength < currentLength - prefixLength,
+              expectedNSString.character(at: expectedLength - suffixLength - 1) == currentNSString.character(at: currentLength - suffixLength - 1) {
+            suffixLength += 1
+        }
+
+        let expectedDiffRange = NSRange(
+            location: prefixLength,
+            length: max(0, expectedLength - prefixLength - suffixLength)
+        )
+        let currentDiffRange = NSRange(
+            location: prefixLength,
+            length: max(0, currentLength - prefixLength - suffixLength)
+        )
+        guard NSIntersectionRange(expectedDiffRange, insertedRange).length > 0 else {
+            return nil
+        }
+
+        let original = expectedNSString.substring(with: expectedDiffRange)
+        let corrected = currentNSString.substring(with: currentDiffRange)
+        guard !original.isEmpty, !corrected.isEmpty else { return nil }
+        return (original, corrected)
+    }
+
     private func focusedApplicationProcessID() -> pid_t? {
         let systemWideElement = AXUIElementCreateSystemWide()
         var focusedApplicationObject: CFTypeRef?
@@ -6697,6 +7061,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         guard !preparedTranscript.isEmpty else {
             return .copiedFallback(reason: "empty_transcript")
         }
+        let correctionSeed = correctionLearningSeed(
+            for: preparedTranscript,
+            context: context
+        )
 
         guard AXIsProcessTrusted() else {
             let copiedBeforeFallback = context == .dictation
@@ -6742,18 +7110,21 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         pasteboard.setString(preparedTranscript, forType: .string)
 
         if pressFocusedApplicationPasteMenuItem() {
+            startCorrectionLearningWatch(seed: correctionSeed)
             return .inserted(method: "ax_menu_paste")
         }
 
         do {
             try postPasteShortcut()
             traceLogger.log("Accessibility trusted; paste command posted with transcript on pasteboard")
+            startCorrectionLearningWatch(seed: correctionSeed)
             return .pasteCommandPosted
         } catch {
             traceLogger.log("Accessibility paste command unavailable error=\(error)")
         }
 
         if let method = insertPreparedTranscriptUsingAccessibility(preparedTranscript) {
+            startCorrectionLearningWatch(seed: correctionSeed)
             return .inserted(method: method)
         }
 
@@ -7327,7 +7698,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Processing task started")
 
             do {
-                let transcript = try await finalizeTranscript()
+                var transcript = try await finalizeTranscript()
+                let correctedTranscript = applyPersonalCorrectionsIfEnabled(to: transcript)
+                if correctedTranscript != transcript {
+                    traceLogger.log("Using personal-corrected transcript as final transcript")
+                    transcript = correctedTranscript
+                }
                 guard !transcript.isEmpty else {
                     traceLogger.log("No speech captured after release")
                     if captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds {

@@ -1443,7 +1443,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         supportDirectory: pressTalkSupportDirectory(),
         traceLogger: traceLogger
     )
-    private lazy var correctionLearningPromptController = PressTalkCorrectionLearningPromptController()
     private lazy var responder = RemoteResponder(config: config, traceLogger: traceLogger)
     private lazy var codexAgent = CodexAgent(config: config, traceLogger: traceLogger, memoryStore: memoryStore)
     private let speaker = NativeSpeaker()
@@ -1932,7 +1931,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let learnCorrectionsMenuItem = NSMenuItem(title: "Learn Corrections", action: #selector(toggleLearnCorrectionsFromMenu(_:)), keyEquivalent: "")
         learnCorrectionsMenuItem.target = self
-        learnCorrectionsMenuItem.toolTip = "Default off. When enabled, PressTalk asks before storing small local correction pairs after dictation edits."
+        learnCorrectionsMenuItem.toolTip = "Default off. When enabled, PressTalk stores small local correction pairs after successful dictation edits."
         self.toggleLearnCorrectionsMenuItem = learnCorrectionsMenuItem
         menu.addItem(learnCorrectionsMenuItem)
 
@@ -6861,28 +6860,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return true
         }
 
-        presentCorrectionLearningPrompt(original: correction.original, corrected: correction.corrected)
+        personalCorrectionStore.record(original: correction.original, corrected: correction.corrected)
         return true
-    }
-
-    private func presentCorrectionLearningPrompt(original: String, corrected: String) {
-        traceLogger.log("Personal correction prompt shown original_chars=\(original.count) corrected_chars=\(corrected.count) timeout_seconds=25")
-        correctionLearningPromptController.present(
-            original: original,
-            corrected: corrected,
-            duration: 25,
-            onLearn: { [weak self] in
-                guard let self else { return }
-                guard self.settingsStore.learnCorrections else {
-                    self.traceLogger.log("Personal correction learn skipped reason=setting_disabled_before_confirm")
-                    return
-                }
-                self.personalCorrectionStore.record(original: original, corrected: corrected)
-            },
-            onReject: { [weak self] in
-                self?.traceLogger.log("Personal correction rejected by user")
-            }
-        )
     }
 
     private func inferredCorrection(

@@ -554,6 +554,7 @@ final class PressTalkHUDController {
     private let cardContainer = NSVisualEffectView()
     private let lightContainer = FlippedView()
     private let voiceLightView = VoiceLightView(frame: NSRect(x: 0, y: 0, width: 760, height: 440))
+    private let liveTranscriptField = NSTextField(wrappingLabelWithString: "")
     private let iconView = NSImageView()
     private let titleField = NSTextField(labelWithString: "")
     private let detailField = NSTextField(wrappingLabelWithString: "")
@@ -562,6 +563,7 @@ final class PressTalkHUDController {
     private var lightAnchorPoint: CGPoint?
     private var lightVerticalLift: CGFloat = 0
     private let listeningAnchorXRatio: CGFloat = 0.41
+    private let liveTranscriptMaxCharacters = 220
 
     init() {
         panel = NSPanel(
@@ -596,6 +598,25 @@ final class PressTalkHUDController {
         lightContainer.wantsLayer = true
         lightContainer.layer?.backgroundColor = NSColor.clear.cgColor
 
+        liveTranscriptField.translatesAutoresizingMaskIntoConstraints = true
+        liveTranscriptField.font = NSFont.systemFont(ofSize: 15, weight: .medium)
+        liveTranscriptField.textColor = NSColor.white.withAlphaComponent(0.95)
+        liveTranscriptField.alignment = .center
+        liveTranscriptField.maximumNumberOfLines = 3
+        liveTranscriptField.lineBreakMode = .byTruncatingHead
+        liveTranscriptField.cell?.wraps = true
+        liveTranscriptField.drawsBackground = false
+        liveTranscriptField.isBordered = false
+        liveTranscriptField.isBezeled = false
+        liveTranscriptField.isEditable = false
+        liveTranscriptField.isSelectable = false
+        liveTranscriptField.isHidden = true
+        let transcriptShadow = NSShadow()
+        transcriptShadow.shadowColor = NSColor.black.withAlphaComponent(0.50)
+        transcriptShadow.shadowBlurRadius = 9
+        transcriptShadow.shadowOffset = NSSize(width: 0, height: 1)
+        liveTranscriptField.shadow = transcriptShadow
+
         titleField.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
         titleField.textColor = .labelColor
         titleField.lineBreakMode = .byTruncatingTail
@@ -616,6 +637,7 @@ final class PressTalkHUDController {
         textStack.spacing = 4
 
         lightContainer.addSubview(voiceLightView)
+        lightContainer.addSubview(liveTranscriptField)
         cardContainer.addSubview(iconView)
         cardContainer.addSubview(textStack)
 
@@ -693,7 +715,8 @@ final class PressTalkHUDController {
         bands: VoiceLightBands,
         anchorPoint: CGPoint? = nil,
         verticalLift: CGFloat = 0,
-        alpha: CGFloat = 1
+        alpha: CGFloat = 1,
+        transcript: String? = nil
     ) {
         hideWorkItem?.cancel()
         mode = .light
@@ -702,6 +725,7 @@ final class PressTalkHUDController {
         panel.hasShadow = false
         panel.setContentSize(NSSize(width: 820, height: 470))
         setLightAnchor(anchorPoint, verticalLift: verticalLift)
+        setLiveTranscript(transcript)
         voiceLightView.setBands(bands)
         positionPanel()
         panel.contentView?.layoutSubtreeIfNeeded()
@@ -714,14 +738,16 @@ final class PressTalkHUDController {
         bands: VoiceLightBands,
         anchorPoint: CGPoint? = nil,
         verticalLift: CGFloat? = nil,
-        alpha: CGFloat? = nil
+        alpha: CGFloat? = nil,
+        transcript: String? = nil
     ) {
         if mode != .light {
             showListeningLight(
                 bands: bands,
                 anchorPoint: anchorPoint,
                 verticalLift: verticalLift ?? 0,
-                alpha: alpha ?? 1
+                alpha: alpha ?? 1,
+                transcript: transcript
             )
             return
         }
@@ -731,6 +757,9 @@ final class PressTalkHUDController {
         voiceLightView.setBands(bands)
         if let alpha {
             panel.alphaValue = alpha
+        }
+        if let transcript {
+            setLiveTranscript(transcript)
         }
         positionPanel()
         panel.contentView?.layoutSubtreeIfNeeded()
@@ -752,7 +781,26 @@ final class PressTalkHUDController {
         mode = .none
         lightAnchorPoint = nil
         lightVerticalLift = 0
+        setLiveTranscript(nil)
         panel.orderOut(nil)
+    }
+
+    private func setLiveTranscript(_ transcript: String?) {
+        let displayText = liveTranscriptDisplayText(from: transcript)
+        liveTranscriptField.stringValue = displayText ?? ""
+        liveTranscriptField.isHidden = displayText == nil
+    }
+
+    private func liveTranscriptDisplayText(from transcript: String?) -> String? {
+        guard let transcript else { return nil }
+        let collapsed = transcript
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        guard collapsed.count > liveTranscriptMaxCharacters else { return collapsed }
+        let suffixLength = max(0, liveTranscriptMaxCharacters - 3)
+        return "..." + String(collapsed.suffix(suffixLength))
     }
 
     private func positionPanel() {
@@ -784,6 +832,24 @@ final class PressTalkHUDController {
                 y: localCenterY - (voiceLightView.frame.height / 2),
                 width: voiceLightView.frame.width,
                 height: voiceLightView.frame.height
+            )
+            let transcriptWidth = min(CGFloat(520), max(CGFloat(300), frame.width - 120))
+            let transcriptHeight: CGFloat = 76
+            let horizontalInset: CGFloat = 40
+            let belowY = localCenterY + 72
+            let aboveY = localCenterY - 118
+            let preferredY = belowY + transcriptHeight + 18 <= frame.height ? belowY : aboveY
+            let maxTranscriptX = max(horizontalInset, frame.width - transcriptWidth - horizontalInset)
+            let transcriptX = min(max(localCenterX - (transcriptWidth / 2), horizontalInset), maxTranscriptX)
+            let transcriptY = min(
+                max(preferredY, CGFloat(24)),
+                max(CGFloat(24), frame.height - transcriptHeight - 24)
+            )
+            liveTranscriptField.frame = NSRect(
+                x: transcriptX,
+                y: transcriptY,
+                width: transcriptWidth,
+                height: transcriptHeight
             )
         case .cardBottom:
             let screenFrame = screen.frame

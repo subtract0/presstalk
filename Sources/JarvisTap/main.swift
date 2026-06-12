@@ -2093,14 +2093,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         switch state {
-        case .listening:
+        case .listening(let partial):
             if activeTriggerUsesVoiceLight() {
                 traceLogger.log("HUD listening presentation=voice_light")
                 hudController?.showListeningLight(
                     bands: currentLiveListeningLightBands(),
                     anchorPoint: currentHoldlightAnchorPoint(),
                     verticalLift: currentHoldlightVerticalLift(),
-                    alpha: 1
+                    alpha: 1,
+                    transcript: partial?.trimmingCharacters(in: .whitespacesAndNewlines).nonEmpty
                 )
             } else {
                 traceLogger.log("HUD listening presentation=card trigger=\(settingsStore.triggerKey.rawValue)")

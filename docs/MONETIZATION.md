@@ -1,6 +1,13 @@
 # Monetization Plan
 
-This is the current product direction for PressTalk.
+Status: superseded by [PressTalk Distribution Roadmap v1.0](PRESSTALK_DISTRIBUTION_ROADMAP_V1.md).
+
+The current v1.0 commercial direction is a buy-once local dictation wedge:
+`$20` founder early access, then `$39` personal, with later commercial
+licenses. Keep the notes below as historical context only; do not implement a
+new monthly/free/pro structure before the v1.0 paid beta validates.
+
+This was the previous product direction for PressTalk.
 
 ## Positioning
 

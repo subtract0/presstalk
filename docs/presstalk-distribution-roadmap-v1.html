@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PressTalk Distribution Roadmap v1.0</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17211c;
+      --muted: #596861;
+      --line: #d9e2dc;
+      --paper: #f7f9f6;
+      --panel: #ffffff;
+      --accent: #116c5f;
+      --accent-2: #b63e2b;
+      --accent-3: #245b96;
+      --gold: #9b6b13;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.52;
+    }
+
+    header {
+      background: #fbfcfa;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .wrap {
+      width: min(1120px, calc(100% - 40px));
+      margin: 0 auto;
+    }
+
+    .hero {
+      min-height: 72vh;
+      display: grid;
+      align-items: center;
+      padding: 64px 0 56px;
+    }
+
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+    }
+
+    h1 {
+      margin: 0;
+      max-width: 900px;
+      font-size: clamp(44px, 8vw, 92px);
+      line-height: 0.97;
+      letter-spacing: 0;
+    }
+
+    .hero p {
+      max-width: 760px;
+      margin: 24px 0 0;
+      color: var(--muted);
+      font-size: 22px;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 32px;
+    }
+
+    a.button,
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--accent);
+      background: var(--accent);
+      color: white;
+      font-weight: 750;
+      text-decoration: none;
+    }
+
+    a.button.secondary {
+      background: transparent;
+      color: var(--accent);
+    }
+
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      margin: 0 0 40px;
+    }
+
+    .meta div {
+      background: var(--panel);
+      padding: 18px;
+      min-height: 96px;
+    }
+
+    .meta b {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 14px;
+    }
+
+    .meta span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    main {
+      padding: 42px 0 72px;
+    }
+
+    section {
+      padding: 34px 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    h2 {
+      margin: 0 0 14px;
+      font-size: 34px;
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+
+    h3 {
+      margin: 0 0 10px;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0 0 14px;
+    }
+
+    .lead {
+      max-width: 820px;
+      color: var(--muted);
+      font-size: 19px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 20px;
+    }
+
+    .grid.two {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 20px;
+    }
+
+    .card strong {
+      color: var(--accent);
+    }
+
+    .danger strong {
+      color: var(--accent-2);
+    }
+
+    .blue strong {
+      color: var(--accent-3);
+    }
+
+    .gold strong {
+      color: var(--gold);
+    }
+
+    ul,
+    ol {
+      margin: 10px 0 0;
+      padding-left: 22px;
+    }
+
+    li {
+      margin: 6px 0;
+    }
+
+    code {
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: #edf2ee;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 0.92em;
+    }
+
+    pre {
+      overflow: auto;
+      margin: 16px 0 0;
+      padding: 16px;
+      border-radius: 8px;
+      background: #18221d;
+      color: #e8f1eb;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 16px;
+      border-collapse: collapse;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    th,
+    td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--muted);
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0;
+      background: #eef4f0;
+    }
+
+    tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .timeline {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 20px;
+    }
+
+    .step {
+      min-height: 180px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .step .day {
+      color: var(--accent);
+      font-weight: 850;
+      margin-bottom: 8px;
+    }
+
+    .sources a {
+      color: var(--accent-3);
+      overflow-wrap: anywhere;
+    }
+
+    footer {
+      padding: 32px 0 48px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 860px) {
+      .wrap {
+        width: min(100% - 28px, 1120px);
+      }
+
+      .hero {
+        min-height: 68vh;
+        padding: 42px 0 34px;
+      }
+
+      .hero p {
+        font-size: 18px;
+      }
+
+      .meta,
+      .grid,
+      .grid.two,
+      .timeline {
+        grid-template-columns: 1fr;
+      }
+
+      h2 {
+        font-size: 28px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap hero">
+      <div>
+        <p class="eyebrow">Final v1.0 roadmap | 2026-06-13</p>
+        <h1>PressTalk becomes the buy-once local dictation app for Apple Silicon.</h1>
+        <p>Hold Fn, speak, release, and text appears. No cloud transcription, no transcript upload, no monthly dictation rent. The job now is trust, packaging, and distribution.</p>
+        <div class="hero-actions">
+          <a class="button" href="#next-48-hours">Start the 48-hour push</a>
+          <a class="button secondary" href="PRESSTALK_DISTRIBUTION_ROADMAP_V1.md">Open agent roadmap</a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="meta">
+        <div>
+          <b>Frozen baseline</b>
+          <span><code>7a51c12</code> on <code>feature/ane-parakeet-backend</code></span>
+        </div>
+        <div>
+          <b>Current tester path</b>
+          <span><code>brew install --cask subtract0/presstalk/presstalk</code></span>
+        </div>
+        <div>
+          <b>Launch price</b>
+          <span><code>$20</code> founder, then <code>$39</code> stable</span>
+        </div>
+        <div>
+          <b>Position</b>
+          <span>Private local dictation. Buy once.</span>
+        </div>
+      </div>
+
+      <section>
+        <h2>The blunt red-team answer</h2>
+        <p class="lead">The product will not win by being a cheaper clone. It wins if it owns one promise completely: private local dictation on Apple Silicon with a one-time purchase. Every launch action must make that promise more trusted.</p>
+        <div class="grid">
+          <div class="card danger">
+            <h3><strong>What can kill it</strong></h3>
+            <ul>
+              <li>messy permissions onboarding</li>
+              <li>unnotarized scary installs</li>
+              <li>overclaiming privacy or compliance</li>
+              <li>trying to match every incumbent feature</li>
+              <li>shipping model experiments into the stable app</li>
+            </ul>
+          </div>
+          <div class="card blue">
+            <h3><strong>What makes it credible</strong></h3>
+            <ul>
+              <li>Developer ID signing and notarization</li>
+              <li>real demo video</li>
+              <li>clear privacy table</li>
+              <li>Homebrew and direct download</li>
+              <li>supportable first-run setup</li>
+            </ul>
+          </div>
+          <div class="card gold">
+            <h3><strong>What makes it sell</strong></h3>
+            <ul>
+              <li>subscription contrast</li>
+              <li>one-time founder license</li>
+              <li>technical trust with Mac users</li>
+              <li>privacy-sensitive use cases</li>
+              <li>fast install to first dictation</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>The offer</h2>
+        <p class="lead">Start narrow. Sell the working thing. Do not hide basic dictation behind artificial complexity.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Price</th>
+              <th>Buyer</th>
+              <th>Promise</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Founder License</td>
+              <td><code>$20</code> one-time</td>
+              <td>first 200 beta buyers</td>
+              <td>PressTalk for Mac, updates through 1.x, no subscription</td>
+            </tr>
+            <tr>
+              <td>Personal</td>
+              <td><code>$39</code>, later <code>$49</code></td>
+              <td>individual Mac users</td>
+              <td>private local dictation on personal Macs</td>
+            </tr>
+            <tr>
+              <td>Work</td>
+              <td><code>$99</code> per seat or <code>$299</code> team pack</td>
+              <td>professionals and small teams</td>
+              <td>business use, priority support, invoice-friendly checkout</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Non-negotiable launch gates</h2>
+        <div class="grid two">
+          <div class="card">
+            <h3>Trust gates</h3>
+            <ul>
+              <li>Developer ID signed artifact</li>
+              <li>hardened runtime enabled</li>
+              <li>notarization ticket stapled</li>
+              <li>artifact audit passes</li>
+              <li>privacy page published</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Product gates</h3>
+            <ul>
+              <li>fresh install reaches first dictation in under five minutes</li>
+              <li>proof on Studio1 and one M1/M2 class Mac</li>
+              <li>Homebrew cask SHA matches release artifact</li>
+              <li>diagnostics export works</li>
+              <li>checkout and refund path tested</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="next-48-hours">
+        <h2>Roadmap</h2>
+        <div class="timeline">
+          <div class="step">
+            <div class="day">48 hours</div>
+            <h3>Paid beta foundation</h3>
+            <ul>
+              <li>notarized <code>0.1.7-beta1</code></li>
+              <li>landing page</li>
+              <li>75-second demo</li>
+              <li>Lemon Squeezy founder checkout</li>
+              <li>10 paid testers</li>
+            </ul>
+          </div>
+          <div class="step">
+            <div class="day">7 days</div>
+            <h3>Private paid beta</h3>
+            <ul>
+              <li>25 paid testers</li>
+              <li>fix only install/paste/status blockers</li>
+              <li>collect quality scores</li>
+              <li>prepare public posts</li>
+            </ul>
+          </div>
+          <div class="step">
+            <div class="day">14 days</div>
+            <h3>Public launch</h3>
+            <ul>
+              <li>100 founder buyers</li>
+              <li>Show HN</li>
+              <li>Mac app communities</li>
+              <li>raise to <code>$39</code> if feedback supports it</li>
+            </ul>
+          </div>
+          <div class="step">
+            <div class="day">30 days</div>
+            <h3>Stable revenue loop</h3>
+            <ul>
+              <li>500 buyers or identify blocker</li>
+              <li>one high-value buyer feature</li>
+              <li>prepare <code>1.0</code></li>
+              <li>comparison content</li>
+            </ul>
+          </div>
+          <div class="step">
+            <div class="day">90 days</div>
+            <h3>Scale</h3>
+            <ul>
+              <li>2,000 buyers or reposition</li>
+              <li>commercial license</li>
+              <li>deployment docs</li>
+              <li>decide App Store later</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Launch copy</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>Headline</h3>
+            <p><strong>PressTalk</strong></p>
+            <p>Private dictation for Apple Silicon.</p>
+          </div>
+          <div class="card">
+            <h3>Subheadline</h3>
+            <p>Hold Fn, speak, release, and text appears. No cloud transcription. No monthly subscription.</p>
+          </div>
+          <div class="card">
+            <h3>Launch post</h3>
+            <p>I built a local Mac dictation app because I do not want to rent cloud voice input forever.</p>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Revenue path</h2>
+        <p class="lead">This is the upside math, not a promise. The plan creates a believable route to meaningful revenue without pretending one launch guarantees millions.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Milestone</th>
+              <th>Gross revenue</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>50 buyers at <code>$20</code></td>
+              <td><code>$1,000</code></td>
+              <td>real willingness to pay</td>
+            </tr>
+            <tr>
+              <td>1,000 buyers at <code>$39</code></td>
+              <td><code>$39,000</code></td>
+              <td>credible indie product</td>
+            </tr>
+            <tr>
+              <td>10,000 buyers at <code>$49</code></td>
+              <td><code>$490,000</code></td>
+              <td>real business</td>
+            </tr>
+            <tr>
+              <td>100,000 buyers at <code>$49</code></td>
+              <td><code>$4,900,000</code></td>
+              <td>breakout Mac utility</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section>
+        <h2>Agent command spine</h2>
+        <p class="lead">Agents should follow the Markdown roadmap for full details. The short version is freeze, notarize, publish, sell, and only then expand.</p>
+        <pre><code>cd /Users/am/Code/presstalk
+git status --short --branch
+git log -1 --oneline
+
+bash scripts/presstalk_distribution_signing_preflight.sh \
+  --json-output dist/PressTalk-0.1.7-beta1-distribution-preflight.json
+
+PRESSTALK_DISTRIBUTION_SIGNING=1 \
+PRESSTALK_NOTARIZE=1 \
+bash scripts/package_presstalk_release.sh 0.1.7-beta1
+
+bash scripts/presstalk_release_artifact_audit.sh \
+  --zip dist/PressTalk-0.1.7-beta1-macos-arm64.zip \
+  --expected-version 0.1.7-beta1 \
+  --require-distribution \
+  --require-notarized \
+  --json-output dist/PressTalk-0.1.7-beta1-artifact-audit.json</code></pre>
+      </section>
+
+      <section class="sources">
+        <h2>Sources</h2>
+        <ul>
+          <li>Wispr Flow pricing: <a href="https://wisprflow.ai/pricing">https://wisprflow.ai/pricing</a></li>
+          <li>Monologue App Store listing: <a href="https://apps.apple.com/us/app/monologue-smart-dictation/id6755956193">https://apps.apple.com/us/app/monologue-smart-dictation/id6755956193</a></li>
+          <li>Apple Developer ID distribution: <a href="https://developer.apple.com/developer-id/">https://developer.apple.com/developer-id/</a></li>
+          <li>Lemon Squeezy Merchant of Record docs: <a href="https://docs.lemonsqueezy.com/help/payments/merchant-of-record">https://docs.lemonsqueezy.com/help/payments/merchant-of-record</a></li>
+        </ul>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      PressTalk roadmap v1.0. The current product strategy is to protect the working local runtime, earn user trust through notarized distribution, and sell the privacy and buy-once wedge before adding broad features.
+    </div>
+  </footer>
+</body>
+</html>

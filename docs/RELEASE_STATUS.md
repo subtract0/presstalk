@@ -1,5 +1,12 @@
 # Release Status
 
+Status: historical evidence log. For current distribution strategy and
+go-to-market gates, use
+[PressTalk Distribution Roadmap v1.0](PRESSTALK_DISTRIBUTION_ROADMAP_V1.md).
+The current source baseline is at or after `7a51c12` on
+`feature/ane-parakeet-backend`; the older `test4` notes below are preserved for
+traceability and should not be treated as the active release target.
+
 Current fallback release: `v0.1.6-test4`.
 
 - Release commit: `31bc4f6` (`Improve Parakeet quality fallback arbitration`)

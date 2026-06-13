@@ -2,7 +2,12 @@
 
 Native macOS push-to-talk dictation for Apple Silicon.
 
-Current fallback release: `0.1.6-test4` (`v0.1.6-test4`, commit `31bc4f6`)
+Current source baseline: `7a51c12` on `feature/ane-parakeet-backend`
+(`Fix short no-speech status reset`).
+
+Current public tester cask: `0.1.6-test6`.
+
+Distribution roadmap: [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md)
 
 Homebrew cask name: `presstalk`
 

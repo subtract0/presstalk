@@ -2311,11 +2311,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private struct WhisperComputeSelection {
-        let label: String
-        let options: ModelComputeOptions?
-    }
-
     private func whisperComputeSelection() -> WhisperComputeSelection {
         let preset = config.whisperComputePreset
             .replacingOccurrences(of: "_", with: "-")

@@ -4656,31 +4656,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func snapshotPasteboardItems() -> [[NSPasteboard.PasteboardType: Data]] {
-        let pasteboard = NSPasteboard.general
-        return (pasteboard.pasteboardItems ?? []).map { item in
-            Dictionary(uniqueKeysWithValues: item.types.compactMap { type in
-                item.data(forType: type).map { (type, $0) }
-            })
-        }
+    private func stagePreparedTranscriptOnPasteboard(_ preparedTranscript: String) -> PasteboardInsertionStaging {
+        PasteboardInsertionStaging.stage(preparedTranscript, on: .general)
     }
 
-    private func restorePasteboardItems(_ items: [[NSPasteboard.PasteboardType: Data]], expectedChangeCount: Int) {
+    private func restorePasteboardAfterInsertion(_ staging: PasteboardInsertionStaging) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            let pasteboard = NSPasteboard.general
-            guard pasteboard.changeCount == expectedChangeCount else { return }
-
-            pasteboard.clearContents()
-            guard !items.isEmpty else { return }
-
-            let restoredItems = items.map { dataByType -> NSPasteboardItem in
-                let item = NSPasteboardItem()
-                for (type, data) in dataByType {
-                    item.setData(data, forType: type)
-                }
-                return item
-            }
-            _ = pasteboard.writeObjects(restoredItems)
+            staging.restoreIfUnchanged(on: .general)
         }
     }
 
@@ -4692,9 +4674,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func copyPreparedTranscriptToPasteboard(_ preparedTranscript: String) {
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(preparedTranscript, forType: .string)
+        _ = PasteboardInsertionStaging.stage(preparedTranscript, on: .general)
     }
 
     private func runTISOperationOnMainThread<T>(_ operation: () -> T) -> T {
@@ -5642,8 +5622,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         guard AXIsProcessTrusted() else {
             let copiedBeforeFallback = context == .dictation
+            var fallbackStaging: PasteboardInsertionStaging?
             if copiedBeforeFallback {
-                copyPreparedTranscriptToPasteboard(preparedTranscript)
+                fallbackStaging = stagePreparedTranscriptOnPasteboard(preparedTranscript)
                 traceLogger.log("Accessibility preflight unavailable; copied transcript before insertion fallback")
             }
 
@@ -5670,6 +5651,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 maxAttempts: maxInputMethodAttempts,
                 preselectedSession: preselectedSession
             ) {
+                if let fallbackStaging {
+                    restorePasteboardAfterInsertion(fallbackStaging)
+                }
                 return .inserted(method: method)
             }
             traceLogger.log("Accessibility preflight unavailable and input method insertion unavailable; copying transcript")
@@ -5679,11 +5663,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return .copiedFallback(reason: "accessibility_preflight_unavailable")
         }
 
-        let pasteboard = NSPasteboard.general
-        pasteboard.clearContents()
-        pasteboard.setString(preparedTranscript, forType: .string)
+        let pasteboardStaging = stagePreparedTranscriptOnPasteboard(preparedTranscript)
 
         if pressFocusedApplicationPasteMenuItem() {
+            restorePasteboardAfterInsertion(pasteboardStaging)
             return .inserted(method: "ax_menu_paste")
         }
 
@@ -5696,6 +5679,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         if let method = insertPreparedTranscriptUsingAccessibility(preparedTranscript) {
+            restorePasteboardAfterInsertion(pasteboardStaging)
             return .inserted(method: method)
         }
 

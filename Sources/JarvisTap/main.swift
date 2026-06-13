@@ -214,6 +214,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
     private let retiredAudioEngineRetainSeconds: TimeInterval = 3.0
     private let retiredAudioEngineLimit = 8
+    private let liveCaptureStallFallbackSeconds: TimeInterval = 0.70
+    private let liveCaptureStallPollSeconds: TimeInterval = 0.25
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
@@ -2658,6 +2660,73 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         retiredAudioEngines.removeAll { $0.id == id }
         pruneRetiredAudioEnginesLocked()
         audioEngineStopLock.unlock()
+    }
+
+    private func startLiveCaptureStallWatchdog(
+        whisperKit: WhisperKit,
+        sessionID: UInt64,
+        trigger: Trigger,
+        selectedAudioInput: AudioInputDeviceCandidate?
+    ) -> Task<Void, Never>? {
+        guard let selectedAudioInput, !selectedAudioInput.isDefault else { return nil }
+
+        return Task(priority: .utility) { [weak self] in
+            guard let self else { return }
+
+            let pollNanoseconds = UInt64(self.liveCaptureStallPollSeconds * 1_000_000_000)
+            var lastSampleCount = self.currentLiveCapturedAudioSamples().count
+            var lastProgressAt = Date()
+            var fallbackAttempted = false
+
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: pollNanoseconds)
+                if Task.isCancelled { break }
+
+                let stillRecording = self.withStateLock {
+                    self.isRecording &&
+                        self.activeCaptureSessionID == sessionID &&
+                        self.activeTrigger == trigger
+                }
+                guard stillRecording else { break }
+
+                let sampleCount = self.currentLiveCapturedAudioSamples().count
+                if sampleCount > lastSampleCount {
+                    lastSampleCount = sampleCount
+                    lastProgressAt = Date()
+                    continue
+                }
+
+                let stalledFor = Date().timeIntervalSince(lastProgressAt)
+                guard !fallbackAttempted, stalledFor >= self.liveCaptureStallFallbackSeconds else { continue }
+                fallbackAttempted = true
+
+                self.traceLogger.log(
+                    "Live audio capture stalled selected_input=\(selectedAudioInput.name) default=0 samples=\(sampleCount) stalled_seconds=\(String(format: "%.2f", stalledFor)); retrying system default input"
+                )
+                self.safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "capture_stall_fallback")
+
+                let shouldRestart = self.withStateLock {
+                    self.isRecording &&
+                        self.activeCaptureSessionID == sessionID &&
+                        self.activeTrigger == trigger
+                }
+                guard shouldRestart, !Task.isCancelled else { break }
+
+                do {
+                    try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
+                        self?.appendLiveCapturedAudioSamples(samples, sessionID: sessionID)
+                    }
+                    self.withStateLock {
+                        self.activeAudioInputDeviceDescription = "system default (fallback after stalled \(selectedAudioInput.name))"
+                    }
+                    self.traceLogger.log("Live audio capture fallback started input_device=system default after_stalled_input=\(selectedAudioInput.name)")
+                    break
+                } catch {
+                    self.traceLogger.log("Live audio capture fallback failed input_device=system default error=\(error)")
+                    break
+                }
+            }
+        }
     }
 
     private func localWhisperModelFolder(for model: String) -> String? {
@@ -5932,6 +6001,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
                 try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: selectedAudioInput?.id) { [weak self] samples in
                     self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                }
+                let captureStallWatchdog = startLiveCaptureStallWatchdog(
+                    whisperKit: whisperKit,
+                    sessionID: captureSessionID,
+                    trigger: trigger,
+                    selectedAudioInput: selectedAudioInput
+                )
+                defer {
+                    captureStallWatchdog?.cancel()
                 }
                 let shouldContinue = withStateLock { () -> Bool in
                     guard activeCaptureSessionID == captureSessionID,

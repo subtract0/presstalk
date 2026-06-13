@@ -98,6 +98,7 @@ Completed on `refactor/skills-code-health-audit`:
 - `d5f3345` Extract PressTalk Codex agent mode.
 - `788c764` Extract audio input device candidate.
 - `5d197cf` Extract Whisper compute selection type.
+- `788db56` Encapsulate Accessibility element casts.
 
 Verification:
 
@@ -110,6 +111,10 @@ Verification:
 
 No capture, trigger, ASR finalization, insertion, permission prompt, signing,
 or release-publishing behavior was intentionally changed in this pass.
+
+The final cleanup in `788db56` only centralized existing type-checked
+Accessibility casts and removed a selected-range force unwrap. It was verified
+with the targeted insertion/repair test and another full shell test sweep.
 
 ## Highest-Risk Areas
 

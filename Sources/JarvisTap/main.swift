@@ -5221,6 +5221,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func axElement(from object: CFTypeRef) -> AXUIElement? {
+        guard CFGetTypeID(object) == AXUIElementGetTypeID() else { return nil }
+        return unsafeBitCast(object, to: AXUIElement.self)
+    }
+
+    private func axRange(from object: CFTypeRef?) -> CFRange? {
+        guard let object, CFGetTypeID(object) == AXValueGetTypeID() else { return nil }
+        let value = unsafeBitCast(object, to: AXValue.self)
+        var range = CFRange(location: 0, length: 0)
+        guard AXValueGetValue(value, .cfRange, &range) else { return nil }
+        return range
+    }
+
     private func insertPreparedTranscriptUsingInputMethod(
         _ preparedTranscript: String,
         maxAttempts: Int = 3,
@@ -5407,12 +5420,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        guard CFGetTypeID(focusedObject) == AXUIElementGetTypeID() else {
+        guard let focusedElement = axElement(from: focusedObject) else {
             traceLogger.log("AX direct insertion unavailable reason=focused_object_not_ax_element")
             return nil
         }
 
-        let focusedElement = unsafeBitCast(focusedObject, to: AXUIElement.self)
         let selectedTextError = AXUIElementSetAttributeValue(
             focusedElement,
             kAXSelectedTextAttribute as CFString,
@@ -5428,10 +5440,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             kAXSelectedTextRangeAttribute as CFString,
             &selectedRangeObject
         )
-        var selectedRange = CFRange(location: 0, length: 0)
-        let hasSelectedRange = selectedRangeError == .success
-            && selectedRangeObject.map { CFGetTypeID($0) == AXValueGetTypeID() } == true
-            && AXValueGetValue(unsafeBitCast(selectedRangeObject!, to: AXValue.self), .cfRange, &selectedRange)
+        let selectedRange = selectedRangeError == .success ? axRange(from: selectedRangeObject) : nil
 
         var valueObject: CFTypeRef?
         let valueError = AXUIElementCopyAttributeValue(
@@ -5439,7 +5448,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             kAXValueAttribute as CFString,
             &valueObject
         )
-        guard valueError == .success, let currentValue = valueObject as? String, hasSelectedRange else {
+        guard valueError == .success, let currentValue = valueObject as? String, let selectedRange else {
             traceLogger.log(
                 "AX direct insertion unavailable reason=value_range selected_text_error=\(selectedTextError.rawValue) selected_range_error=\(selectedRangeError.rawValue) value_error=\(valueError.rawValue)"
             )
@@ -5490,12 +5499,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
 
-        guard CFGetTypeID(focusedApplicationObject) == AXUIElementGetTypeID() else {
+        guard let focusedApplication = axElement(from: focusedApplicationObject) else {
             traceLogger.log("Focused application PID unavailable reason=focused_application_not_ax_element")
             return nil
         }
 
-        let focusedApplication = unsafeBitCast(focusedApplicationObject, to: AXUIElement.self)
         var processID: pid_t = 0
         let processIDError = AXUIElementGetPid(focusedApplication, &processID)
         guard processIDError == .success, processID > 0 else {
@@ -5563,13 +5571,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         )
         guard menuBarError == .success,
               let menuBarObject,
-              CFGetTypeID(menuBarObject) == AXUIElementGetTypeID()
+              let menuBar = axElement(from: menuBarObject)
         else {
             traceLogger.log("Paste menu unavailable reason=menu_bar error=\(menuBarError.rawValue) target_pid=\(focusedPID)")
             return false
         }
 
-        let menuBar = unsafeBitCast(menuBarObject, to: AXUIElement.self)
         guard let pasteMenuItem = findPasteMenuItem(in: menuBar) else {
             traceLogger.log("Paste menu unavailable reason=item_not_found target_pid=\(focusedPID)")
             return false

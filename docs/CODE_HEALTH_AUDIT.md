@@ -46,7 +46,7 @@ From `addyosmani/agent-skills`:
 
 Largest files:
 
-- `Sources/JarvisTap/main.swift`: 6,828 lines after this pass, down from
+- `Sources/JarvisTap/main.swift`: 6,918 lines after this pass, down from
   7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
@@ -101,6 +101,8 @@ Completed on `refactor/skills-code-health-audit`:
 - `5d197cf` Extract Whisper compute selection type.
 - `788db56` Encapsulate Accessibility element casts.
 - `70162c0` Preserve pasteboard after confirmed insertion.
+- current pass: harden AVAudioEngine teardown and clean latched Option modifier
+  state after insertion.
 
 Verification:
 
@@ -109,11 +111,26 @@ Verification:
 - `bash scripts/test_presstalk_permission_status_labels.sh`
 - `bash scripts/test_presstalk_asr_quality_defaults.sh`
 - `bash scripts/test_presstalk_pasteboard_staging.sh`
+- `bash scripts/test_presstalk_modifier_cleanup_source.sh`
 - full `scripts/test_*.sh` sweep
 - `git diff --check`
 
-No capture, trigger, ASR finalization, insertion, permission prompt, signing,
-or release-publishing behavior was intentionally changed in this pass.
+The initial extraction pass intentionally preserved capture, trigger, ASR
+finalization, insertion, permission prompt, signing, and release-publishing
+behavior. The final pass made two scoped bug fixes based on real Studio1
+evidence:
+
+- AVAudioEngine teardown now goes through `safelyStopLiveAudioRecording`.
+  Crash report `jarvistap-2026-06-13-142249.ips` showed an `EXC_BAD_ACCESS`
+  in `AVAudioIOUnit` while WhisperKit's `AudioProcessor.stopRecording`
+  deallocated the engine during release-tail teardown. PressTalk now removes
+  taps, stops/resets the engine, detaches it from WhisperKit, and retains
+  retired engines briefly in a bounded pool so CoreAudio callbacks can drain.
+- Successful dictation insertion now runs a defensive Option modifier cleanup
+  when the configured trigger is not Option-based. This mirrors the manual
+  recovery where pressing/releasing Option cleared the cross cursor, and it
+  only posts left/right Option key-up events if CoreGraphics still reports the
+  alternate modifier as logically down.
 
 The final cleanup in `788db56` only centralized existing type-checked
 Accessibility casts and removed a selected-range force unwrap. It was verified
@@ -124,6 +141,16 @@ testable helper and uses it to restore the previous clipboard after confirmed
 insertions (`ax_menu_paste`, direct AX insertion, or acknowledged input-method
 insertion). The weaker `pasteCommandPosted` path and copy fallback paths keep
 the transcript on the clipboard as a safety fallback.
+
+Studio1 meatspace receipts after the final pass:
+
+- Two back-to-back Fn/Globe dictations auto-inserted, did not show "couldn't
+  hear that", and PressTalk stayed alive.
+- The final patched installed build inserted the user's freeze/commit/push
+  sentence at `2026-06-13T14:08:20Z` with `Dictation inserted
+  method=ax_menu_paste` and `Stopping live audio recording safely
+  reason=release_tail`.
+- No new `jarvistap-*.ips` crash report appeared after the patched install.
 
 ## Highest-Risk Areas
 

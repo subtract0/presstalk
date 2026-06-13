@@ -212,11 +212,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
     private let trackpadPreviewTickSeconds: TimeInterval = 1.0 / 30.0
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
+    private let retiredAudioEngineRetainSeconds: TimeInterval = 3.0
+    private let retiredAudioEngineLimit = 8
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
     private let stateLock = NSLock()
     private let audioCaptureLock = NSLock()
+    private let audioEngineStopLock = NSLock()
 
     private var eventTap: CFMachPort?
     private var eventTapInstallSummary = "not_installed"
@@ -230,6 +233,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var fluidStreamingAsrManager: (any StreamingAsrManager)?
     private var fluidStreamingFedSampleCount = 0
     private var streamTranscriber: AudioStreamTranscriber?
+    private var retiredAudioEngines: [(id: ObjectIdentifier, engine: AVAudioEngine, retiredAt: Date)] = []
     private var decodingOptions = DecodingOptions(
         verbose: false,
         task: .transcribe,
@@ -2600,10 +2604,60 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         traceLogger.log("Resetting Whisper streaming session")
-        whisperKit.clearState()
+        safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "reset_streaming_session")
         whisperKit.audioProcessor.purgeAudioSamples(keepingLast: 0)
         fluidStreamingFedSampleCount = 0
         streamTranscriber = try makeStreamTranscriber(using: whisperKit)
+    }
+
+    private func safelyStopLiveAudioRecording(whisperKit: WhisperKit?, reason: String) {
+        guard let audioProcessor = whisperKit?.audioProcessor else { return }
+
+        var retiredID: ObjectIdentifier?
+
+        audioEngineStopLock.lock()
+        if let processor = audioProcessor as? AudioProcessor,
+           let engine = processor.audioEngine {
+            retiredID = ObjectIdentifier(engine)
+            traceLogger.log("Stopping live audio recording safely reason=\(reason)")
+            processor.audioBufferCallback = nil
+
+            engine.inputNode.removeTap(onBus: 0)
+            for node in engine.attachedNodes {
+                node.removeTap(onBus: 0)
+            }
+            engine.disconnectNodeInput(engine.inputNode)
+            engine.stop()
+            engine.reset()
+
+            retiredAudioEngines.append((id: ObjectIdentifier(engine), engine: engine, retiredAt: Date()))
+            pruneRetiredAudioEnginesLocked()
+            processor.audioEngine = nil
+        } else {
+            audioProcessor.stopRecording()
+        }
+        audioEngineStopLock.unlock()
+
+        guard let retiredID else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + retiredAudioEngineRetainSeconds) { [weak self] in
+            self?.releaseRetiredAudioEngine(id: retiredID)
+        }
+    }
+
+    private func pruneRetiredAudioEnginesLocked(now: Date = Date()) {
+        retiredAudioEngines.removeAll {
+            now.timeIntervalSince($0.retiredAt) >= retiredAudioEngineRetainSeconds
+        }
+        if retiredAudioEngines.count > retiredAudioEngineLimit {
+            retiredAudioEngines.removeFirst(retiredAudioEngines.count - retiredAudioEngineLimit)
+        }
+    }
+
+    private func releaseRetiredAudioEngine(id: ObjectIdentifier) {
+        audioEngineStopLock.lock()
+        retiredAudioEngines.removeAll { $0.id == id }
+        pruneRetiredAudioEnginesLocked()
+        audioEngineStopLock.unlock()
     }
 
     private func localWhisperModelFolder(for model: String) -> String? {
@@ -3437,11 +3491,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         traceLogger.log("Trackpad prearm capture cancelled before visible arm")
         streamTaskToCancel?.cancel()
-        if let transcriber = streamTranscriber {
-            Task(priority: .userInitiated) { [weak self] in
+        Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            if let transcriber = self.streamTranscriber {
                 await transcriber.stopStreamTranscription()
-                try? self?.resetStreamingSession()
             }
+            try? self.resetStreamingSession()
         }
     }
 
@@ -3541,11 +3596,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         stopAmplitudeMonitoring()
         streamTaskToCancel?.cancel()
-        if let transcriber = streamTranscriber {
-            Task(priority: .userInitiated) { [weak self] in
+        Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            if let transcriber = self.streamTranscriber {
                 await transcriber.stopStreamTranscription()
-                try? self?.resetStreamingSession()
             }
+            try? self.resetStreamingSession()
         }
 
         guard captureDurationSeconds >= 1.0 else { return }
@@ -3663,11 +3719,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Cancelled native recording due to immediate pointer activity window_seconds=\(windowSeconds)")
         stopAmplitudeMonitoring()
         streamTaskToCancel?.cancel()
-        if let transcriber = streamTranscriber {
-            Task(priority: .userInitiated) { [weak self] in
+        Task(priority: .userInitiated) { [weak self] in
+            guard let self else { return }
+            if let transcriber = self.streamTranscriber {
                 await transcriber.stopStreamTranscription()
-                try? self?.resetStreamingSession()
             }
+            try? self.resetStreamingSession()
         }
         present(.ready)
     }
@@ -4523,7 +4580,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         traceLogger.log("Stopping live audio recording after release tail")
-        whisperKit?.audioProcessor.stopRecording()
+        safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "release_tail")
     }
 
     private func relaxedDecodingOptions() -> DecodingOptions {
@@ -5611,6 +5668,35 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Paste shortcut posted target=session")
     }
 
+    private func releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: String) {
+        guard !configuredTriggerUsesAlternateModifier else { return }
+
+        let hidFlags = CGEventSource.flagsState(.hidSystemState)
+        let sessionFlags = CGEventSource.flagsState(.combinedSessionState)
+        guard hidFlags.contains(.maskAlternate) || sessionFlags.contains(.maskAlternate) else { return }
+        guard let source = CGEventSource(stateID: .hidSystemState) else { return }
+
+        for keyCode in [CGKeyCode(kVK_Option), CGKeyCode(kVK_RightOption)] {
+            if let keyUp = CGEvent(keyboardEventSource: source, virtualKey: keyCode, keyDown: false) {
+                keyUp.flags = []
+                keyUp.post(tap: .cgSessionEventTap)
+            }
+        }
+
+        traceLogger.log(
+            "Released latched Option modifier after insertion reason=\(reason) hid_flags=0x\(String(hidFlags.rawValue, radix: 16)) session_flags=0x\(String(sessionFlags.rawValue, radix: 16))"
+        )
+    }
+
+    private var configuredTriggerUsesAlternateModifier: Bool {
+        switch settingsStore.triggerKey {
+        case .optionSpace, .option, .leftOption, .rightOption:
+            return true
+        case .fn, .trackpadHold, .f5:
+            return false
+        }
+    }
+
     private func insertTranscriptIntoFocusedApp(
         _ transcript: String,
         context: InputMethodInsertionContext
@@ -5859,7 +5945,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
                 guard shouldContinue, !Task.isCancelled else {
                     traceLogger.log("Audio recording engine started after session ended; stopping stale capture session=\(captureSessionID)")
-                    whisperKit.audioProcessor.stopRecording()
+                    safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "stale_capture_start")
                     return
                 }
                 traceLogger.log(
@@ -6333,10 +6419,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                         switch insertionResult {
                         case .inserted(let method):
                             traceLogger.log("Dictation inserted method=\(method)")
+                            releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: method)
                             present(.inserted(transcript))
                             finishProcessing(reason: "dictation_insert")
                         case .pasteCommandPosted:
                             traceLogger.log("Dictation paste command posted")
+                            releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: "paste_command_posted")
                             present(.inserted(transcript))
                             finishProcessing(reason: "dictation_paste")
                         case .copiedFallback(let reason):
@@ -6474,8 +6562,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 switch insertionResult {
                 case .inserted(let method):
                     traceLogger.log("Dictation inserted method=\(method)")
+                    releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: method)
                 case .pasteCommandPosted:
                     traceLogger.log("Dictation paste command posted")
+                    releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: "paste_command_posted")
                 case .copiedFallback(let reason):
                     traceLogger.log("Dictation copied because paste unavailable reason=\(reason)")
                 }

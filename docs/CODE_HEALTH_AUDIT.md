@@ -46,7 +46,7 @@ From `addyosmani/agent-skills`:
 
 Largest files:
 
-- `Sources/JarvisTap/main.swift`: 6,871 lines after this pass, down from
+- `Sources/JarvisTap/main.swift`: 6,918 lines after this pass, down from
   7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
@@ -61,7 +61,6 @@ New extracted modules:
 - `Sources/JarvisTap/AudioInputDeviceCandidate.swift`
 - `Sources/JarvisTap/WhisperComputeSelection.swift`
 - `Sources/JarvisTap/PasteboardInsertionStaging.swift`
-- `Sources/JarvisTap/SafeLiveAudioRecorderStopper.swift`
 
 Main responsibilities currently mixed in `main.swift`:
 
@@ -104,8 +103,6 @@ Completed on `refactor/skills-code-health-audit`:
 - `70162c0` Preserve pasteboard after confirmed insertion.
 - current pass: harden AVAudioEngine teardown and clean latched Option modifier
   state after insertion.
-- current pass: extract safe AVAudioEngine teardown into
-  `SafeLiveAudioRecorderStopper`.
 
 Verification:
 

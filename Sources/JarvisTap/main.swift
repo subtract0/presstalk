@@ -7426,6 +7426,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     }
                     if captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds {
                         present(.error("I didn’t catch any clear speech."))
+                    } else {
+                        traceLogger.log("Short no-speech hold suppressed; returning presentation to ready")
+                        present(.ready)
                     }
                     print("⚠️ [PressTalk] No speech captured.")
                     fflush(stdout)

@@ -34,5 +34,8 @@ require_contains "Audio recording engine started after session ended; stopping s
 require_contains "No speech captured because audio engine was not ready before release" "Short holds before AVAudioEngine startup must be reported as capture-not-ready"
 require_contains "The microphone was still starting. Hold again." "The user-facing capture-not-ready message must not regress to misleading no-speech text"
 require_contains "finishProcessing(reason: \"capture_not_ready\")" "Diagnostics must record capture-not-ready distinctly from no speech"
+require_contains "Short no-speech hold suppressed; returning presentation to ready" "Suppressed short-hold no-speech must not leave the menu bar stuck in processing/STT"
+require_contains "finishProcessing(" "Processing paths must keep resetting internal busy state"
+require_contains "reason: captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds ? \"no_speech\" : \"no_speech_suppressed_short_hold\"" "Short-hold no-speech suppression must stay explicit in diagnostics"
 
 echo "PASS capture_lifecycle_source"

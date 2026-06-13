@@ -46,7 +46,7 @@ From `addyosmani/agent-skills`:
 
 Largest files:
 
-- `Sources/JarvisTap/main.swift`: 6,837 lines after this pass, down from
+- `Sources/JarvisTap/main.swift`: 6,828 lines after this pass, down from
   7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
@@ -60,6 +60,7 @@ New extracted modules:
 - `Sources/JarvisTap/CodexAgent.swift`
 - `Sources/JarvisTap/AudioInputDeviceCandidate.swift`
 - `Sources/JarvisTap/WhisperComputeSelection.swift`
+- `Sources/JarvisTap/PasteboardInsertionStaging.swift`
 
 Main responsibilities currently mixed in `main.swift`:
 
@@ -99,6 +100,7 @@ Completed on `refactor/skills-code-health-audit`:
 - `788c764` Extract audio input device candidate.
 - `5d197cf` Extract Whisper compute selection type.
 - `788db56` Encapsulate Accessibility element casts.
+- `70162c0` Preserve pasteboard after confirmed insertion.
 
 Verification:
 
@@ -106,6 +108,7 @@ Verification:
 - `bash scripts/test_presstalk_capture_lifecycle_source.sh`
 - `bash scripts/test_presstalk_permission_status_labels.sh`
 - `bash scripts/test_presstalk_asr_quality_defaults.sh`
+- `bash scripts/test_presstalk_pasteboard_staging.sh`
 - full `scripts/test_*.sh` sweep
 - `git diff --check`
 
@@ -115,6 +118,12 @@ or release-publishing behavior was intentionally changed in this pass.
 The final cleanup in `788db56` only centralized existing type-checked
 Accessibility casts and removed a selected-range force unwrap. It was verified
 with the targeted insertion/repair test and another full shell test sweep.
+
+The insertion cleanup in `70162c0` moved pasteboard snapshot/staging into a
+testable helper and uses it to restore the previous clipboard after confirmed
+insertions (`ax_menu_paste`, direct AX insertion, or acknowledged input-method
+insertion). The weaker `pasteCommandPosted` path and copy fallback paths keep
+the transcript on the clipboard as a safety fallback.
 
 ## Highest-Risk Areas
 
@@ -215,6 +224,10 @@ preserving current `ax_menu_paste` behavior.
 Status: not started. This should be the next major quality step, but it should
 begin with tests around pasteboard preservation, Accessibility menu-paste
 fallback, input-method acknowledgement handling, and copy-only fallback.
+
+Status: partially started. Pasteboard preservation is now covered by
+`scripts/test_presstalk_pasteboard_staging.sh`; the remaining work is a true
+`InsertionController` boundary with tests around the full decision tree.
 
 ### Slice 5: Capture State Machine
 

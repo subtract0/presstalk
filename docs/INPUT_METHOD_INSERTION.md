@@ -12,6 +12,12 @@ PressTalk's current production insertion path is:
    only for diagnostics, production probes, or explicit experiments launched
    with `PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION=1`
 
+For confirmed insertion paths, PressTalk stages the dictated text on the
+pasteboard, performs insertion, then restores the previous pasteboard if the
+pasteboard was not changed by the user or another app in the meantime. The
+weaker targeted Cmd-V path and copy fallback paths intentionally keep the
+dictated text on the pasteboard as a safety fallback.
+
 The automated paste self-test has already shown that synthetic Cmd-V events do
 not reliably land in a focused text field without Accessibility trust. Keep that
 result as the reason not to keep iterating on CGEvent paste variants.

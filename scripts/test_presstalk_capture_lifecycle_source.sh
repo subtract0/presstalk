@@ -4,25 +4,38 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE="$REPO_ROOT/Sources/JarvisTap/main.swift"
+STOPPER_SOURCE="$REPO_ROOT/Sources/JarvisTap/SafeLiveAudioRecorderStopper.swift"
 
-require_contains() {
-  local needle="$1"
-  local message="$2"
-  if ! rg -q --fixed-strings "$needle" "$SOURCE"; then
+require_contains_in() {
+  local file="$1"
+  local needle="$2"
+  local message="$3"
+  if ! rg -q --fixed-strings "$needle" "$file"; then
     echo "FAIL: $message"
+    echo "file: $file"
     echo "missing: $needle"
     exit 1
   fi
 }
 
-require_absent() {
-  local needle="$1"
-  local message="$2"
-  if rg -q --fixed-strings "$needle" "$SOURCE"; then
+require_contains() {
+  require_contains_in "$SOURCE" "$1" "$2"
+}
+
+require_absent_in() {
+  local file="$1"
+  local needle="$2"
+  local message="$3"
+  if rg -q --fixed-strings "$needle" "$file"; then
     echo "FAIL: $message"
+    echo "file: $file"
     echo "unexpected: $needle"
     exit 1
   fi
+}
+
+require_absent() {
+  require_absent_in "$SOURCE" "$1" "$2"
 }
 
 require_absent "audioProcessor.audioSamples" "PressTalk must not read WhisperKit's mutable live audio buffer directly"
@@ -31,10 +44,13 @@ require_absent "whisperKit.clearState()" "WhisperKit clearState calls stopRecord
 require_contains "private var liveCapturedAudioSamples: [Float] = []" "PressTalk-owned live audio buffer is required for stable long holds"
 require_contains "private var activeCaptureSessionID: UInt64 = 0" "Capture sessions must be identified so stale recorder callbacks are ignored"
 require_contains "private var activeCaptureEngineStarted = false" "Release handling must distinguish no speech from a microphone startup race"
-require_contains "private var retiredAudioEngines:" "Retired AVAudioEngine instances must be retained briefly to avoid teardown use-after-free crashes"
+require_contains "private lazy var audioRecorderStopper = SafeLiveAudioRecorderStopper" "JarvisTapApp must delegate risky AVAudioEngine teardown to the safe stopper"
 require_contains "safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: \"release_tail\")" "Release-tail recorder stop must use the safe AVAudioEngine teardown path"
 require_contains "safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: \"stale_capture_start\")" "Late-started stale recorder stop must use the safe AVAudioEngine teardown path"
-require_contains "processor.audioEngine = nil" "Safe teardown must detach the stopped engine from WhisperKit after retaining it"
+require_contains "audioRecorderStopper.stop(whisperKit, reason: reason)" "Safe recorder teardown wrapper must delegate through SafeLiveAudioRecorderStopper"
+require_contains_in "$STOPPER_SOURCE" "private var retiredAudioEngines:" "Retired AVAudioEngine instances must be retained briefly to avoid teardown use-after-free crashes"
+require_contains_in "$STOPPER_SOURCE" "processor.audioEngine = nil" "Safe teardown must detach the stopped engine from WhisperKit after retaining it"
+require_contains_in "$STOPPER_SOURCE" "DispatchQueue.main.asyncAfter(deadline: .now() + retainSeconds)" "Safe teardown must retain stopped engines long enough for CoreAudio callbacks to drain"
 require_contains "appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)" "Recorder callbacks must be scoped to the active capture session"
 require_contains "Audio recording engine started after session ended; stopping stale capture session=" "Late-started AVAudioEngine sessions must be stopped instead of leaking into later holds"
 require_contains "No speech captured because audio engine was not ready before release" "Short holds before AVAudioEngine startup must be reported as capture-not-ready"

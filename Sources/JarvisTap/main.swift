@@ -212,14 +212,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
     private let trackpadPreviewTickSeconds: TimeInterval = 1.0 / 30.0
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
-    private let retiredAudioEngineRetainSeconds: TimeInterval = 3.0
-    private let retiredAudioEngineLimit = 8
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
     private let stateLock = NSLock()
     private let audioCaptureLock = NSLock()
-    private let audioEngineStopLock = NSLock()
 
     private var eventTap: CFMachPort?
     private var eventTapInstallSummary = "not_installed"
@@ -233,7 +230,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var fluidStreamingAsrManager: (any StreamingAsrManager)?
     private var fluidStreamingFedSampleCount = 0
     private var streamTranscriber: AudioStreamTranscriber?
-    private var retiredAudioEngines: [(id: ObjectIdentifier, engine: AVAudioEngine, retiredAt: Date)] = []
+    private lazy var audioRecorderStopper = SafeLiveAudioRecorderStopper { [weak self] message in
+        self?.traceLogger.log(message)
+    }
     private var decodingOptions = DecodingOptions(
         verbose: false,
         task: .transcribe,
@@ -2611,53 +2610,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func safelyStopLiveAudioRecording(whisperKit: WhisperKit?, reason: String) {
-        guard let audioProcessor = whisperKit?.audioProcessor else { return }
-
-        var retiredID: ObjectIdentifier?
-
-        audioEngineStopLock.lock()
-        if let processor = audioProcessor as? AudioProcessor,
-           let engine = processor.audioEngine {
-            retiredID = ObjectIdentifier(engine)
-            traceLogger.log("Stopping live audio recording safely reason=\(reason)")
-            processor.audioBufferCallback = nil
-
-            engine.inputNode.removeTap(onBus: 0)
-            for node in engine.attachedNodes {
-                node.removeTap(onBus: 0)
-            }
-            engine.disconnectNodeInput(engine.inputNode)
-            engine.stop()
-            engine.reset()
-
-            retiredAudioEngines.append((id: ObjectIdentifier(engine), engine: engine, retiredAt: Date()))
-            pruneRetiredAudioEnginesLocked()
-            processor.audioEngine = nil
-        } else {
-            audioProcessor.stopRecording()
-        }
-        audioEngineStopLock.unlock()
-
-        guard let retiredID else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + retiredAudioEngineRetainSeconds) { [weak self] in
-            self?.releaseRetiredAudioEngine(id: retiredID)
-        }
-    }
-
-    private func pruneRetiredAudioEnginesLocked(now: Date = Date()) {
-        retiredAudioEngines.removeAll {
-            now.timeIntervalSince($0.retiredAt) >= retiredAudioEngineRetainSeconds
-        }
-        if retiredAudioEngines.count > retiredAudioEngineLimit {
-            retiredAudioEngines.removeFirst(retiredAudioEngines.count - retiredAudioEngineLimit)
-        }
-    }
-
-    private func releaseRetiredAudioEngine(id: ObjectIdentifier) {
-        audioEngineStopLock.lock()
-        retiredAudioEngines.removeAll { $0.id == id }
-        pruneRetiredAudioEnginesLocked()
-        audioEngineStopLock.unlock()
+        audioRecorderStopper.stop(whisperKit, reason: reason)
     }
 
     private func localWhisperModelFolder(for model: String) -> String? {

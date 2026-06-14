@@ -1,14 +1,28 @@
 import CoreAudio
 import Foundation
 
-struct AudioInputDeviceCandidate {
-    let id: AudioDeviceID
-    let name: String
-    let inputChannels: UInt32
-    let isDefault: Bool
-    let transportType: UInt32?
+public struct AudioInputDeviceCandidate {
+    public let id: AudioDeviceID
+    public let name: String
+    public let inputChannels: UInt32
+    public let isDefault: Bool
+    public let transportType: UInt32?
 
-    var transportDescription: String {
+    public init(
+        id: AudioDeviceID,
+        name: String,
+        inputChannels: UInt32,
+        isDefault: Bool,
+        transportType: UInt32?
+    ) {
+        self.id = id
+        self.name = name
+        self.inputChannels = inputChannels
+        self.isDefault = isDefault
+        self.transportType = transportType
+    }
+
+    public var transportDescription: String {
         guard let transportType else { return "unknown" }
         switch transportType {
         case kAudioDeviceTransportTypeUSB:
@@ -26,22 +40,22 @@ struct AudioInputDeviceCandidate {
         }
     }
 
-    var isBluetoothLike: Bool {
+    public var isBluetoothLike: Bool {
         let lowercasedName = name.lowercased()
         return transportType == kAudioDeviceTransportTypeBluetooth ||
             transportType == kAudioDeviceTransportTypeBluetoothLE ||
             lowercasedName.contains("bluetooth")
     }
 
-    var isVirtualLike: Bool {
+    public var isVirtualLike: Bool {
         transportType == kAudioDeviceTransportTypeVirtual
     }
 
-    var isPhysicalInput: Bool {
+    public var isPhysicalInput: Bool {
         !isBluetoothLike && !isVirtualLike
     }
 
-    var selectionScore: Int {
+    public var selectionScore: Int {
         var score = 0
         if transportType == kAudioDeviceTransportTypeUSB { score += 55 }
         if transportType == kAudioDeviceTransportTypeBuiltIn { score += 20 }

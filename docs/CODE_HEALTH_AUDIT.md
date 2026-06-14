@@ -44,10 +44,10 @@ From `addyosmani/agent-skills`:
 
 ## Current Metrics
 
-Largest files:
+Largest source files after the latest pass:
 
-- `Sources/JarvisTap/main.swift`: 6,918 lines after this pass, down from
-  7,944 at baseline.
+- `Sources/JarvisTap/main.swift`: about 7,000 lines after the latest runtime
+  fix, down from 7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
 
@@ -58,7 +58,7 @@ New extracted modules:
 - `Sources/JarvisTap/RemoteResponder.swift`
 - `Sources/JarvisTap/ConversationMemoryStore.swift`
 - `Sources/JarvisTap/CodexAgent.swift`
-- `Sources/JarvisTap/AudioInputDeviceCandidate.swift`
+- `Sources/PressTalkCore/AudioInputDeviceCandidate.swift`
 - `Sources/JarvisTap/WhisperComputeSelection.swift`
 - `Sources/JarvisTap/PasteboardInsertionStaging.swift`
 
@@ -103,6 +103,15 @@ Completed on `refactor/skills-code-health-audit`:
 - `70162c0` Preserve pasteboard after confirmed insertion.
 - current pass: harden AVAudioEngine teardown and clean latched Option modifier
   state after insertion.
+- `351e426` Stabilize Bluetooth input recovery. PressTalk now avoids
+  WhisperKit's explicit non-default input-device path, promotes a generic
+  physical input to the macOS default input when the current default is
+  Bluetooth-like, and then records through `startRecordingLive(inputDeviceID:
+  nil)`.
+- current pass: move `AudioInputDeviceCandidate` into a small
+  `PressTalkCore` target and add `scripts/test_presstalk_audio_input_candidate.sh`
+  to cover transport-based classification and scoring without unavailable
+  XCTest/Swift Testing dependencies.
 
 Verification:
 
@@ -114,6 +123,7 @@ Verification:
 - `bash scripts/test_presstalk_modifier_cleanup_source.sh`
 - full `scripts/test_*.sh` sweep
 - `git diff --check`
+- `bash scripts/test_presstalk_audio_input_candidate.sh`
 
 The initial extraction pass intentionally preserved capture, trigger, ASR
 finalization, insertion, permission prompt, signing, and release-publishing
@@ -151,6 +161,10 @@ Studio1 meatspace receipts after the final pass:
   method=ax_menu_paste` and `Stopping live audio recording safely
   reason=release_tail`.
 - No new `jarvistap-*.ips` crash report appeared after the patched install.
+- After the Bluetooth-default regression, the installed build promoted the
+  physical USB mic to the system default input, captured 5.7s and 6.5s
+  continuously, and inserted both dictations through `ax_menu_paste` without
+  "Couldn't Hear That".
 
 ## Highest-Risk Areas
 

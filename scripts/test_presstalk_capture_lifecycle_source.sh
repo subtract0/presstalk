@@ -4,7 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SOURCE="$REPO_ROOT/Sources/JarvisTap/main.swift"
-DEVICE_SOURCE="$REPO_ROOT/Sources/JarvisTap/AudioInputDeviceCandidate.swift"
+PACKAGE_SOURCE="$REPO_ROOT/Package.swift"
+DEVICE_SOURCE="$REPO_ROOT/Sources/PressTalkCore/AudioInputDeviceCandidate.swift"
 
 require_contains() {
   local needle="$1"
@@ -36,6 +37,12 @@ for blocked_device_name in shure mv7 airpods camo zoom iphone; do
   fi
 done
 require_contains "private var liveCapturedAudioSamples: [Float] = []" "PressTalk-owned live audio buffer is required for stable long holds"
+if ! rg -q --fixed-strings 'name: "PressTalkCore"' "$PACKAGE_SOURCE" ||
+   ! rg -q --fixed-strings '"PressTalkCore",' "$PACKAGE_SOURCE" ||
+   ! rg -q --fixed-strings "import PressTalkCore" "$SOURCE"; then
+  echo "FAIL: audio input value types must stay outside the JarvisTap app target"
+  exit 1
+fi
 require_contains "private var activeCaptureSessionID: UInt64 = 0" "Capture sessions must be identified so stale recorder callbacks are ignored"
 require_contains "private var activeCaptureEngineStarted = false" "Release handling must distinguish no speech from a microphone startup race"
 require_contains "private var retiredAudioEngines:" "Retired AVAudioEngine instances must be retained briefly to avoid teardown use-after-free crashes"

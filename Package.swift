@@ -29,9 +29,14 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(
+            name: "PressTalkCore",
+            dependencies: []
+        ),
         .executableTarget(
             name: "JarvisTap",
             dependencies: [
+                "PressTalkCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 "WhisperKit",
             ]

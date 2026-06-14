@@ -3,11 +3,12 @@ import ApplicationServices
 import AVFoundation
 import Carbon.HIToolbox
 import CoreAudio
-import FluidAudio
 import CoreML
 import Darwin
+import FluidAudio
 import Foundation
 import IOKit.hidsystem
+import PressTalkCore
 import WhisperKit
 
 private let fnModifierMask = CGEventFlags(rawValue: UInt64(NX_SECONDARYFNMASK))

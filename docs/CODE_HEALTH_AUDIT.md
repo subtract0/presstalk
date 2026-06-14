@@ -77,7 +77,7 @@ fallback behavior just to make the code look cleaner.
 
 Largest source files after the latest pass:
 
-- `Sources/JarvisTap/main.swift`: 7,218 lines after the latest pass, down from
+- `Sources/JarvisTap/main.swift`: 7,092 lines after the latest pass, down from
   7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
@@ -90,6 +90,7 @@ New extracted modules:
 - `Sources/JarvisTap/ConversationMemoryStore.swift`
 - `Sources/JarvisTap/CodexAgent.swift`
 - `Sources/PressTalkCore/AudioInputDeviceCandidate.swift`
+- `Sources/PressTalkCore/TranscriptTextPolicy.swift`
 - `Sources/PressTalkCore/TranscriptRecallPolicy.swift`
 - `Sources/JarvisTap/WhisperComputeSelection.swift`
 - `Sources/JarvisTap/PasteboardInsertionStaging.swift`
@@ -149,6 +150,12 @@ Completed on `refactor/skills-code-health-audit`:
   `scripts/test_presstalk_transcript_recall_policy.sh`, and tighten the
   code-switch guard so English openings translated into German do not override
   a recalled Parakeet/streaming prefix.
+- current pass: extract transcript cleaning, normalization, plausibility, best
+  candidate, and silence-hallucination policy into
+  `Sources/PressTalkCore/TranscriptTextPolicy.swift`, add
+  `scripts/test_presstalk_transcript_text_policy.sh`, and share that policy
+  with `TranscriptRecallPolicy` so recall arbitration and runtime filtering use
+  one text normalizer.
 
 Verification:
 
@@ -162,6 +169,7 @@ Verification:
 - `git diff --check`
 - `bash scripts/test_presstalk_audio_input_candidate.sh`
 - `bash scripts/test_presstalk_transcript_recall_policy.sh`
+- `bash scripts/test_presstalk_transcript_text_policy.sh`
 
 The initial extraction pass intentionally preserved capture, trigger, ASR
 finalization, insertion, permission prompt, signing, and release-publishing

@@ -7,9 +7,14 @@ public struct TranscriptRecallPolicy {
     }
 
     public let chunkedWhisperFallbackMinimumCaptureSeconds: TimeInterval
+    public let textPolicy: TranscriptTextPolicy
 
-    public init(chunkedWhisperFallbackMinimumCaptureSeconds: TimeInterval = 7.5) {
+    public init(
+        chunkedWhisperFallbackMinimumCaptureSeconds: TimeInterval = 7.5,
+        textPolicy: TranscriptTextPolicy = TranscriptTextPolicy()
+    ) {
         self.chunkedWhisperFallbackMinimumCaptureSeconds = chunkedWhisperFallbackMinimumCaptureSeconds
+        self.textPolicy = textPolicy
     }
 
     public func wordCount(_ text: String) -> Int {
@@ -17,10 +22,7 @@ public struct TranscriptRecallPolicy {
     }
 
     public func tokens(_ text: String) -> [String] {
-        cleanedText(text)
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .map { $0.lowercased() }
-            .filter { !$0.isEmpty }
+        textPolicy.tokens(text)
     }
 
     public func shouldDeferShortWhisperCandidateForRecall(
@@ -178,15 +180,15 @@ public struct TranscriptRecallPolicy {
 
     public func mergeTranscriptSegments(_ segments: [String]) -> String {
         segments.reduce(into: "") { partialResult, segment in
-            let cleanedSegment = cleanedText(segment)
+            let cleanedSegment = textPolicy.cleanedText(segment)
             guard !cleanedSegment.isEmpty else { return }
             guard !partialResult.isEmpty else {
                 partialResult = cleanedSegment
                 return
             }
 
-            let normalizedExisting = normalizedPhrase(partialResult)
-            let normalizedSegment = normalizedPhrase(cleanedSegment)
+            let normalizedExisting = textPolicy.normalizedPhrase(partialResult)
+            let normalizedSegment = textPolicy.normalizedPhrase(cleanedSegment)
             guard !normalizedExisting.contains(normalizedSegment) else { return }
 
             if partialResult.last?.isWhitespace == false {
@@ -244,21 +246,6 @@ public struct TranscriptRecallPolicy {
             logMessage: "Whisper candidate deferred because it is much shorter than streaming recall candidate context=\(context) whisper_words=\(whisperWordCount) streaming_words=\(streamingWordCount) ratio=\(formatRatio(ratio)) duration_seconds=\(formatSeconds(captureDurationSeconds))",
             fallbackReason: nil
         )
-    }
-
-    private func cleanedText(_ text: String) -> String {
-        text
-            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
-            .replacingOccurrences(of: #"\s+([,.;:!?])"#, with: "$1", options: .regularExpression)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func normalizedPhrase(_ text: String) -> String {
-        cleanedText(text)
-            .lowercased()
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .filter { !$0.isEmpty }
-            .joined(separator: " ")
     }
 
     private func formatRatio(_ ratio: Double) -> String {

@@ -7,6 +7,7 @@ TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-transcript-recall-policy-tes
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 cp "$REPO_ROOT/Sources/PressTalkCore/TranscriptRecallPolicy.swift" "$TEST_TMPDIR/TranscriptRecallPolicy.swift"
+cp "$REPO_ROOT/Sources/PressTalkCore/TranscriptTextPolicy.swift" "$TEST_TMPDIR/TranscriptTextPolicy.swift"
 cat > "$TEST_TMPDIR/main.swift" <<'SWIFT'
 import Darwin
 import Foundation
@@ -92,7 +93,7 @@ let merged = policy.mergeTranscriptSegments([
 expect(merged == "First complete sentence. Second complete sentence.", "chunk merge must drop duplicate segments")
 SWIFT
 
-swiftc "$TEST_TMPDIR/TranscriptRecallPolicy.swift" "$TEST_TMPDIR/main.swift" -o "$TEST_TMPDIR/transcript-recall-policy-test"
+swiftc "$TEST_TMPDIR/TranscriptTextPolicy.swift" "$TEST_TMPDIR/TranscriptRecallPolicy.swift" "$TEST_TMPDIR/main.swift" -o "$TEST_TMPDIR/transcript-recall-policy-test"
 "$TEST_TMPDIR/transcript-recall-policy-test"
 
 echo "PASS transcript_recall_policy"

@@ -30,19 +30,22 @@ struct AudioInputDeviceCandidate {
         let lowercasedName = name.lowercased()
         return transportType == kAudioDeviceTransportTypeBluetooth ||
             transportType == kAudioDeviceTransportTypeBluetoothLE ||
-            lowercasedName.contains("airpods") ||
             lowercasedName.contains("bluetooth")
     }
 
+    var isVirtualLike: Bool {
+        transportType == kAudioDeviceTransportTypeVirtual
+    }
+
+    var isPhysicalInput: Bool {
+        !isBluetoothLike && !isVirtualLike
+    }
+
     var selectionScore: Int {
-        let lowercasedName = name.lowercased()
         var score = 0
         if transportType == kAudioDeviceTransportTypeUSB { score += 55 }
         if transportType == kAudioDeviceTransportTypeBuiltIn { score += 20 }
-        if transportType == kAudioDeviceTransportTypeVirtual { score -= 15 }
-        if lowercasedName.contains("camo") { score -= 20 }
-        if lowercasedName.contains("zoom") { score -= 35 }
-        if lowercasedName.contains("iphone") { score -= 25 }
+        if isVirtualLike { score -= 15 }
         if isBluetoothLike { score -= 140 }
         if isDefault { score += isBluetoothLike ? -40 : 20 }
         score += min(Int(inputChannels), 4)

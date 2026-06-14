@@ -122,6 +122,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         case inserted(String)
         case copied(String)
         case aborted(String)
+        case audioUnavailable(String)
         case error(String)
         case setupRequired(String)
         case diagnosticStarted(String)
@@ -997,6 +998,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             uiState = ("Copied to Clipboard", transcript, "doc.on.clipboard.fill", .copied, 1.5)
         case .aborted(let message):
             uiState = ("Transcription Aborted", message, "hand.raised.fill", .error, 4.0)
+        case .audioUnavailable(let message):
+            uiState = ("No Audio Input", message, "mic.slash.fill", .error, 4.0)
         case .error(let message):
             uiState = ("Couldn’t Hear That", message, "exclamationmark.triangle.fill", .error, 1.7)
         case .setupRequired(let message):
@@ -1056,7 +1059,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             }
         case .setupRequired:
             hudController?.hide()
-        case .aborted, .error, .diagnosticStarted:
+        case .aborted, .audioUnavailable, .error, .diagnosticStarted:
             hudController?.show(
                 title: uiState.summary,
                 detail: uiState.detail,
@@ -4108,6 +4111,30 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         ).map { AudioDeviceID($0) }
     }
 
+    @discardableResult
+    private func setDefaultCoreAudioInputDeviceID(_ deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultInputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain
+        )
+        var mutableDeviceID = deviceID
+        let status = AudioObjectSetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject),
+            &address,
+            0,
+            nil,
+            UInt32(MemoryLayout<AudioDeviceID>.size),
+            &mutableDeviceID
+        )
+        guard status == noErr else {
+            traceLogger.log("Audio input default promotion failed status=\(status) device_id=\(deviceID)")
+            return false
+        }
+        traceLogger.log("Audio input default promotion requested device_id=\(deviceID)")
+        return true
+    }
+
     private func coreAudioInputChannelCount(for deviceID: AudioDeviceID) -> UInt32 {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioDevicePropertyStreamConfiguration,
@@ -4188,7 +4215,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func preferredAudioInputDevice() -> AudioInputDeviceCandidate? {
+    private struct AudioInputSelection {
+        let candidate: AudioInputDeviceCandidate
+        let source: String
+    }
+
+    private func preferredAudioInputDevice() -> AudioInputSelection? {
         let candidates = coreAudioInputDevices()
         guard !candidates.isEmpty else {
             traceLogger.log("Audio input selection unavailable reason=no_input_devices")
@@ -4204,8 +4236,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let selected: AudioInputDeviceCandidate
         let selectionSource: String
         if let defaultInput = candidates.first(where: { $0.isDefault }) {
-            selected = defaultInput
-            selectionSource = "system_default"
+            if defaultInput.isBluetoothLike,
+               let physicalFallback = rankedCandidates.first(where: { $0.isPhysicalInput }) {
+                selected = physicalFallback
+                selectionSource = "non_bluetooth_fallback"
+            } else {
+                selected = defaultInput
+                selectionSource = "system_default"
+            }
         } else {
             selected = rankedCandidates[0]
             selectionSource = "generic_fallback"
@@ -4216,7 +4254,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Audio input selected source=\(selectionSource) id=\(selected.id) name=\(selected.name) transport=\(selected.transportDescription) channels=\(selected.inputChannels) default=\(selected.isDefault ? 1 : 0) score=\(selected.selectionScore) candidates=\(summary)"
         )
-        return selected
+        return AudioInputSelection(candidate: selected, source: selectionSource)
     }
 
     private func normalizedAudioSamples(_ samples: [Float]) -> ([Float], Double) {
@@ -5916,14 +5954,34 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             traceLogger.log("Trackpad prearm capture started")
         }
 
-        let selectedAudioInput = preferredAudioInputDevice()
-        let selectedAudioInputDescription = selectedAudioInput.map {
+        let selectedAudioInputSelection = preferredAudioInputDevice()
+        let selectedAudioInput = selectedAudioInputSelection?.candidate
+        var selectedAudioInputDescription = selectedAudioInput.map {
             if $0.isDefault {
                 return "system default (\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)])"
             }
             return "\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)]"
         } ?? "system default"
-        let liveInputDeviceID = selectedAudioInput?.isDefault == true ? nil : selectedAudioInput?.id
+        if let selectedAudioInput, selectedAudioInput.isDefault == false {
+            let promotionSucceeded = setDefaultCoreAudioInputDeviceID(selectedAudioInput.id)
+            if promotionSucceeded {
+                Thread.sleep(forTimeInterval: 0.12)
+            }
+            let promotedDefaultID = defaultCoreAudioInputDeviceID()
+            if promotionSucceeded, promotedDefaultID == selectedAudioInput.id {
+                selectedAudioInputDescription = "system default promoted (\(selectedAudioInput.name) [id=\(selectedAudioInput.id), transport=\(selectedAudioInput.transportDescription), channels=\(selectedAudioInput.inputChannels)])"
+                traceLogger.log(
+                    "Audio input default promotion verified source=\(selectedAudioInputSelection?.source ?? "unknown") device_id=\(selectedAudioInput.id)"
+                )
+            } else {
+                traceLogger.log(
+                    "Audio input default promotion not active source=\(selectedAudioInputSelection?.source ?? "unknown") selected_device_id=\(selectedAudioInput.id) current_default_id=\(promotedDefaultID.map(String.init) ?? "none")"
+                )
+                if let currentDefault = coreAudioInputDevices().first(where: { $0.isDefault }) {
+                    selectedAudioInputDescription = "system default (\(currentDefault.name) [id=\(currentDefault.id), transport=\(currentDefault.transportDescription), channels=\(currentDefault.inputChannels)])"
+                }
+            }
+        }
         withStateLock {
             activeAudioInputDeviceDescription = selectedAudioInputDescription
         }
@@ -5942,7 +6000,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     try await resetFluidTrueStreamingTranscriptState()
                     traceLogger.log("FluidAudio true streaming state reset for capture")
                 }
-                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: liveInputDeviceID) { [weak self] samples in
+                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
                     self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
                 }
                 let shouldContinue = withStateLock { () -> Bool in
@@ -6396,6 +6454,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 let transcript = try await finalizeTranscript()
                 guard !transcript.isEmpty else {
                     traceLogger.log("No speech captured after release")
+                    if capturedAudioSamples.isEmpty {
+                        let audioInputDescription = withStateLock { activeAudioInputDeviceDescription }
+                        traceLogger.log(
+                            "No speech captured because selected audio input produced no buffers input_device=\(audioInputDescription) held_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+                        )
+                        present(.audioUnavailable("No audio received from \(audioInputDescription). Check the macOS input device."))
+                        print("⚠️ [PressTalk] No audio buffers captured from \(audioInputDescription).")
+                        fflush(stdout)
+                        finishProcessing(reason: "audio_no_buffers")
+                        return
+                    }
                     if !captureEngineStartedBeforeRelease {
                         traceLogger.log(
                             "No speech captured because audio engine was not ready before release session=\(releasedCaptureSessionID) held_seconds=\(String(format: "%.2f", captureDurationSeconds))"

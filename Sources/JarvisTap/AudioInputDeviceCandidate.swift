@@ -37,8 +37,6 @@ struct AudioInputDeviceCandidate {
     var selectionScore: Int {
         let lowercasedName = name.lowercased()
         var score = 0
-        if lowercasedName.contains("shure") { score += 120 }
-        if lowercasedName.contains("mv7") { score += 80 }
         if transportType == kAudioDeviceTransportTypeUSB { score += 55 }
         if transportType == kAudioDeviceTransportTypeBuiltIn { score += 20 }
         if transportType == kAudioDeviceTransportTypeVirtual { score -= 15 }

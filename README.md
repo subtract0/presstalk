@@ -2,12 +2,14 @@
 
 Native macOS push-to-talk dictation for Apple Silicon.
 
-Current source baseline: `c3182c0` on `refactor/skills-code-health-audit`
-(`Guard mixed-language ASR fallback`).
+Current source baseline: `d6c0da1` on `refactor/skills-code-health-audit`
+(`Extract transcript text policy`).
 
-Current public tester cask: `0.1.6-test7`.
+Current public tester cask: `0.1.6-test8`.
 
 Distribution roadmap: [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md)
+
+Crow tester handoff: [docs/CROW_TESTING_HANDOFF.md](docs/CROW_TESTING_HANDOFF.md)
 
 Homebrew cask name: `presstalk`
 
@@ -145,15 +147,15 @@ Supported trigger values:
 ## Public Packaging
 Package a Homebrew test/prerelease zip:
 ```bash
-bash scripts/package_presstalk_release.sh 0.1.6-test4
+bash scripts/package_presstalk_release.sh 0.1.6-test8
 ```
 
 Audit an existing zip before handing it to testers:
 ```bash
 bash scripts/presstalk_release_artifact_audit.sh \
-  --zip dist/PressTalk-0.1.6-test4-macos-arm64.zip \
-  --expected-version 0.1.6-test4 \
-  --json-output dist/PressTalk-0.1.6-test4-artifact-audit.json
+  --zip dist/PressTalk-0.1.6-test8-macos-arm64.zip \
+  --expected-version 0.1.6-test8 \
+  --json-output dist/PressTalk-0.1.6-test8-artifact-audit.json
 ```
 
 To exercise packaging and publish-time audit checks without uploading anything:

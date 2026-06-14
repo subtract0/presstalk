@@ -185,19 +185,19 @@ brew tap subtract0/presstalk
 brew reinstall --cask presstalk
 ```
 
-The cask points at `v0.1.6-test4` in `subtract0/presstalk-releases`:
+The cask points at `v0.1.6-test8` in `subtract0/presstalk-releases`:
 
-- Asset: `PressTalk-0.1.6-test4-macos-arm64.zip`
-- SHA-256: `5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161`
+- Asset: `PressTalk-0.1.6-test8-macos-arm64.zip`
+- SHA-256: `e222363c9093da4c434dcbadd9c718aa0a9608beaf2bce1bbf7b3ccbec7de3e6`
 
 For a direct `~/Applications` smoke install without Homebrew:
 
 ```bash
 tmpdir="$(mktemp -d /tmp/presstalk.XXXXXX)"
-curl -L -o "$tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" \
-  https://github.com/subtract0/presstalk-releases/releases/download/v0.1.6-test4/PressTalk-0.1.6-test4-macos-arm64.zip
-echo "5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161  $tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" | shasum -a 256 -c -
-ditto -x -k "$tmpdir/PressTalk-0.1.6-test4-macos-arm64.zip" "$tmpdir"
+curl -L -o "$tmpdir/PressTalk-0.1.6-test8-macos-arm64.zip" \
+  https://github.com/subtract0/presstalk-releases/releases/download/v0.1.6-test8/PressTalk-0.1.6-test8-macos-arm64.zip
+echo "e222363c9093da4c434dcbadd9c718aa0a9608beaf2bce1bbf7b3ccbec7de3e6  $tmpdir/PressTalk-0.1.6-test8-macos-arm64.zip" | shasum -a 256 -c -
+ditto -x -k "$tmpdir/PressTalk-0.1.6-test8-macos-arm64.zip" "$tmpdir"
 mkdir -p "$HOME/Applications"
 rm -rf "$HOME/Applications/PressTalk.app"
 ditto "$tmpdir/PressTalk.app" "$HOME/Applications/PressTalk.app"
@@ -225,7 +225,7 @@ PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing \
 Expected SHA-256:
 
 ```text
-5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161
+e222363c9093da4c434dcbadd9c718aa0a9608beaf2bce1bbf7b3ccbec7de3e6
 ```
 
 Homebrew install path:
@@ -248,16 +248,12 @@ The cask should:
 
 - install `PressTalk.app`
 - run the bundled bootstrap helper
-- create or reuse a local development code-signing identity, then re-sign
-  `PressTalk.app` before launchd starts it when macOS allows noninteractive
-  Keychain trust changes
+- run the public tester bootstrap with stable-signing repair disabled
 - write `~/Library/Application Support/JarvisTap/runtime-status.json`
 - write the LaunchAgent
-- leave macOS permission panes closed during bootstrap
-- pass `PRESSTALK_OPEN_PERMISSION_PANES` into the app so Settings cannot open
-  macOS privacy panes during no-pane smoke runs
-- write diagnostics quietly when `PRESSTALK_OPEN_PERMISSION_PANES=0`, without
-  activating Finder
+- open the compact PressTalk setup window and macOS permission panes when a
+  fresh tester still needs Microphone, Input Monitoring, or Accessibility
+- write diagnostics without requiring shell commands from the tester
 
 When bootstrap is run over SSH and `PRESSTALK_BOOTSTRAP_STABLE_SIGNING` was not
 set explicitly, it only reuses an already-valid PressTalk local signing identity.

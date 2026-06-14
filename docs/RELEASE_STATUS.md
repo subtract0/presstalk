@@ -3,24 +3,26 @@
 Status: historical evidence log. For current distribution strategy and
 go-to-market gates, use
 [PressTalk Distribution Roadmap v1.0](PRESSTALK_DISTRIBUTION_ROADMAP_V1.md).
-The current source baseline is at or after `c3182c0` on
-`refactor/skills-code-health-audit`; the older `test4` notes below are preserved for
-traceability and should not be treated as the active release target.
+The current source baseline is at or after `d6c0da1` on
+`refactor/skills-code-health-audit`; the older `test4` proof notes below are
+preserved for traceability and should not be treated as the active release
+target.
 
-Current fallback release: `v0.1.6-test4`.
+Current public tester release: `v0.1.6-test8`.
 
-- Release commit: `31bc4f6` (`Improve Parakeet quality fallback arbitration`)
+- Release commit: `d6c0da1` (`Extract transcript text policy`)
 - Release repo: `subtract0/presstalk-releases`
-- Asset: `PressTalk-0.1.6-test4-macos-arm64.zip`
-- SHA-256: `5d8327dc06da388679125aaf831dc35736c67c2d4e9728363b919965296f5161`
-- Homebrew tap: `subtract0/presstalk`, cask `presstalk`, tap commit `413da5c`
+- Asset: `PressTalk-0.1.6-test8-macos-arm64.zip`
+- SHA-256: `e222363c9093da4c434dcbadd9c718aa0a9608beaf2bce1bbf7b3ccbec7de3e6`
+- Homebrew tap: `subtract0/presstalk`, cask `presstalk`, tap commit
+  `bd695c4dcc2f192f2d77235ffe17d9f3098b1e2f`
 - Default trigger: `Fn / Globe`
 - Current checked-in default ASR path: Parakeet v3 ANE finalizer,
   Parakeet EOU 320ms live partials, streaming enabled, WhisperKit
   large-v3-turbo quality fallback enabled at min confidence `0.96`.
-  The published fallback release listed above predates this default.
+  The public tester release listed above is the active conservative baseline.
 
-Current proof status:
+Historical proof status from the older `test4` matrix:
 
 - `studio1` / `s1`: ready locally with `com.am.presstalk`, Fn/Globe trigger,
   microphone authorized, Accessibility trusted, speech model ready, and
@@ -38,7 +40,7 @@ Current proof status:
   readiness correctly reports no input microphone, ad-hoc signing, missing
   Accessibility trust, and not-determined microphone permission.
 
-The current fallback build is useful and fast, but it is not the final
+The public tester build is useful and fast, but it is not the final
 distribution product yet. True live streaming partial text, notarized signing,
 polished first-run permission UX, and a final cross-machine proof gate remain
 open productization work.

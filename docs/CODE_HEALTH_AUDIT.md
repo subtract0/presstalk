@@ -26,28 +26,59 @@ entire history of the project.
 
 ## Skills Applied
 
-From `addyosmani/agent-skills`:
+From `addyosmani/agent-skills`, used as audit lenses rather than as permission
+to rewrite the product:
 
+- `using-agent-skills`: choose the minimum useful skill set for each slice.
+- `context-engineering`: preserve local PressTalk guardrails and history.
+- `planning-and-task-breakdown`: slice work so each patch can be reviewed.
+- `spec-driven-development`: keep the product contract explicit before code.
+- `source-driven-development`: ground platform-sensitive code in existing
+  project evidence and vendor APIs instead of guesses.
+- `test-driven-development`: add regression guards before changing logic.
+- `debugging-and-error-recovery`: reproduce and localize failures before fixes.
+- `doubt-driven-development`: adversarially check non-trivial safety claims.
+- `incremental-implementation`: land small, reversible slices.
+- `git-workflow-and-versioning`: keep clean commits, verify before push, and
+  preserve the frozen working baseline.
 - `code-simplification`: preserve exact behavior, understand before moving,
   simplify one slice at a time.
-- `code-review-and-quality`: review on correctness, readability, architecture,
-  security, and performance.
+- `code-review-and-quality`: review correctness, readability, architecture,
+  security, and performance before commit.
 - `api-and-interface-design`: define clear module boundaries and make wrong
   state transitions hard.
-- `test-driven-development`: add regression guards before changing risky logic.
 - `documentation-and-adrs`: document architectural direction before large code
   movement.
 - `deprecation-and-migration`: remove legacy behavior only when usage is proven
   absent and migration risk is understood.
 - `observability-and-instrumentation`: keep diagnostics useful while avoiding
   dictated-content leakage in new telemetry.
+- `performance-optimization`: measure or preserve known latency paths before
+  optimizing.
+- `security-and-hardening`: avoid new content logging, shell injection, or
+  permission churn.
+- `ci-cd-and-automation`: prefer scriptable checks and release gates; automatic
+  hosted CI remains a follow-up because macOS runners can be expensive and
+  signing-sensitive.
+- `shipping-and-launch`: do not publish stable artifacts without signing,
+  notarization, and target-machine proof.
+- `frontend-ui-engineering`: apply only to setup/settings/HUD changes; no UI
+  changes in this slice.
+- `browser-testing-with-devtools`: not applicable to this native macOS slice.
+- `idea-refine`: keep the product wedge narrow: local push-to-talk dictation.
+- `interview-me`: skipped because the current requirement is already bounded
+  by prior PressTalk context and meatspace rules.
+
+Stop rule: `shipping-and-launch`, `security-and-hardening`, and
+`deprecation-and-migration` all say the same thing here: do not remove working
+fallback behavior just to make the code look cleaner.
 
 ## Current Metrics
 
 Largest source files after the latest pass:
 
-- `Sources/JarvisTap/main.swift`: about 7,000 lines after the latest runtime
-  fix, down from 7,944 at baseline.
+- `Sources/JarvisTap/main.swift`: 7,218 lines after the latest pass, down from
+  7,944 at baseline.
 - `Sources/JarvisTap/ProductUI.swift`: 1,525 lines.
 - `Sources/PressTalkAsrBench/main.swift`: 1,182 lines.
 
@@ -59,6 +90,7 @@ New extracted modules:
 - `Sources/JarvisTap/ConversationMemoryStore.swift`
 - `Sources/JarvisTap/CodexAgent.swift`
 - `Sources/PressTalkCore/AudioInputDeviceCandidate.swift`
+- `Sources/PressTalkCore/TranscriptRecallPolicy.swift`
 - `Sources/JarvisTap/WhisperComputeSelection.swift`
 - `Sources/JarvisTap/PasteboardInsertionStaging.swift`
 
@@ -112,6 +144,11 @@ Completed on `refactor/skills-code-health-audit`:
   `PressTalkCore` target and add `scripts/test_presstalk_audio_input_candidate.sh`
   to cover transport-based classification and scoring without unavailable
   XCTest/Swift Testing dependencies.
+- current pass: extract mixed-language recall and Whisper fallback arbitration
+  policy into `Sources/PressTalkCore/TranscriptRecallPolicy.swift`, add
+  `scripts/test_presstalk_transcript_recall_policy.sh`, and tighten the
+  code-switch guard so English openings translated into German do not override
+  a recalled Parakeet/streaming prefix.
 
 Verification:
 
@@ -124,6 +161,7 @@ Verification:
 - full `scripts/test_*.sh` sweep
 - `git diff --check`
 - `bash scripts/test_presstalk_audio_input_candidate.sh`
+- `bash scripts/test_presstalk_transcript_recall_policy.sh`
 
 The initial extraction pass intentionally preserved capture, trigger, ASR
 finalization, insertion, permission prompt, signing, and release-publishing

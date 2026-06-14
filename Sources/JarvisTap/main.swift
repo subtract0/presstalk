@@ -184,6 +184,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
     private lazy var traceLogger = TraceLogger(path: config.traceLogPath)
+    private lazy var transcriptRecallPolicy = TranscriptRecallPolicy(
+        chunkedWhisperFallbackMinimumCaptureSeconds: chunkedWhisperFallbackMinimumCaptureSeconds
+    )
     private lazy var appCodeSignatureSummary = codeSignatureSummary()
     private lazy var memoryStore = ConversationMemoryStore(path: config.memoryStorePath, traceLogger: traceLogger)
     private lazy var responder = RemoteResponder(config: config, traceLogger: traceLogger)
@@ -3973,67 +3976,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return nil
     }
 
-    private func transcriptWordCount(_ text: String) -> Int {
-        transcriptTokens(text).count
-    }
-
-    private func transcriptTokens(_ text: String) -> [String] {
-        cleanedTranscriptText(text)
-            .components(separatedBy: CharacterSet.alphanumerics.inverted)
-            .map { $0.lowercased() }
-            .filter { !$0.isEmpty }
-    }
-
-    private func shouldDeferShortWhisperCandidateForParakeetRecall(
-        whisperTranscript: String,
-        parakeetTranscript: String?,
-        captureDurationSeconds: TimeInterval,
-        context: String
-    ) -> Bool {
-        guard let parakeetTranscript else { return false }
-
-        let whisperWordCount = transcriptWordCount(whisperTranscript)
-        let parakeetWordCount = transcriptWordCount(parakeetTranscript)
-        guard captureDurationSeconds >= 12.0,
-              parakeetWordCount >= 24,
-              parakeetWordCount - whisperWordCount >= 10 else {
-            return false
-        }
-
-        let ratio = Double(whisperWordCount) / Double(max(1, parakeetWordCount))
-        guard ratio < 0.78 else { return false }
-
-        traceLogger.log(
-            "Whisper candidate deferred because it is much shorter than accepted Parakeet recall candidate context=\(context) whisper_words=\(whisperWordCount) parakeet_words=\(parakeetWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-        )
-        return true
-    }
-
-    private func shouldDeferShortWhisperCandidateForStreamingRecall(
-        whisperTranscript: String,
-        streamingTranscript: String?,
-        captureDurationSeconds: TimeInterval,
-        context: String
-    ) -> Bool {
-        guard let streamingTranscript else { return false }
-
-        let whisperWordCount = transcriptWordCount(whisperTranscript)
-        let streamingWordCount = transcriptWordCount(streamingTranscript)
-        guard captureDurationSeconds >= chunkedWhisperFallbackMinimumCaptureSeconds,
-              streamingWordCount >= 14,
-              streamingWordCount - whisperWordCount >= 6 else {
-            return false
-        }
-
-        let ratio = Double(whisperWordCount) / Double(max(1, streamingWordCount))
-        guard ratio < 0.70 else { return false }
-
-        traceLogger.log(
-            "Whisper candidate deferred because it is much shorter than streaming recall candidate context=\(context) whisper_words=\(whisperWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-        )
-        return true
-    }
-
     private func shouldDeferShortWhisperCandidateForRecall(
         whisperTranscript: String,
         parakeetTranscript: String?,
@@ -4041,61 +3983,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         captureDurationSeconds: TimeInterval,
         context: String
     ) -> Bool {
-        if shouldDeferShortWhisperCandidateForParakeetRecall(
+        guard let decision = transcriptRecallPolicy.shouldDeferShortWhisperCandidateForRecall(
             whisperTranscript: whisperTranscript,
             parakeetTranscript: parakeetTranscript,
-            captureDurationSeconds: captureDurationSeconds,
-            context: context
-        ) {
-            return true
-        }
-        return shouldDeferShortWhisperCandidateForStreamingRecall(
-            whisperTranscript: whisperTranscript,
             streamingTranscript: streamingTranscript,
             captureDurationSeconds: captureDurationSeconds,
             context: context
-        )
-    }
-
-    private func finalTranscriptHasDanglingEnding(_ text: String) -> Bool {
-        let tokens = transcriptTokens(text)
-        guard let lastToken = tokens.last else { return false }
-
-        let danglingEndingTokens: Set<String> = [
-            "a", "an", "and", "as", "at", "but", "by", "for", "from", "if", "in", "of", "on", "or", "that", "the", "to", "when", "with",
-            "aber", "auf", "dass", "das", "dem", "den", "der", "des", "die", "ein", "eine", "einem", "einen", "einer", "im", "in", "mit", "oder", "und", "von", "wenn", "weil", "zu",
-        ]
-        return danglingEndingTokens.contains(lastToken)
-    }
-
-    private func hasContentStemRepetition(_ text: String) -> Bool {
-        let tokens = transcriptTokens(text)
-        guard tokens.count >= 24 else { return false }
-
-        let stopwords: Set<String> = [
-            "aber", "and", "are", "auf", "but", "das", "den", "der", "die", "for", "in", "ist", "mit", "oder", "the", "und", "was", "wenn", "with", "you",
-        ]
-        let stems = tokens.compactMap { token -> String? in
-            guard token.count >= 4, !stopwords.contains(token) else { return nil }
-            return String(token.prefix(4))
+        ) else {
+            return false
         }
-        guard stems.count >= 16 else { return false }
-
-        let stemCounts = Dictionary(grouping: stems, by: { $0 }).mapValues(\.count)
-        let repeatedStemCounts = stemCounts.values.filter { $0 >= 3 }
-        let repeatedTokenCount = repeatedStemCounts.reduce(0, +)
-        return repeatedStemCounts.count >= 2 && Double(repeatedTokenCount) / Double(stems.count) >= 0.22
-    }
-
-    private func lacksRecallPrefix(_ candidateTranscript: String, recallTranscript: String) -> Bool {
-        let candidateTokens = Set(transcriptTokens(candidateTranscript))
-        let prefixTokens = transcriptTokens(recallTranscript)
-            .prefix(10)
-            .filter { $0.count >= 3 }
-        guard prefixTokens.count >= 5 else { return false }
-
-        let overlapCount = prefixTokens.filter { candidateTokens.contains($0) }.count
-        return overlapCount <= 1
+        traceLogger.log(decision.logMessage)
+        return true
     }
 
     private func shouldRejectWhisperCandidateForRecallQuality(
@@ -4105,38 +4003,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         captureDurationSeconds: TimeInterval,
         context: String
     ) -> Bool {
-        let recallTranscript = parakeetTranscript ?? streamingTranscript
-        guard let recallTranscript else { return false }
-
-        let recallWordCount = transcriptWordCount(recallTranscript)
-        let whisperWordCount = transcriptWordCount(whisperTranscript)
-        guard recallWordCount >= 8,
-              lacksRecallPrefix(whisperTranscript, recallTranscript: recallTranscript) else {
+        guard let decision = transcriptRecallPolicy.shouldRejectWhisperCandidateForRecallQuality(
+            whisperTranscript: whisperTranscript,
+            parakeetTranscript: parakeetTranscript,
+            streamingTranscript: streamingTranscript,
+            captureDurationSeconds: captureDurationSeconds,
+            context: context
+        ) else {
             return false
         }
-
-        if captureDurationSeconds >= 2.0 {
-            if finalTranscriptHasDanglingEnding(whisperTranscript) {
-                traceLogger.log(
-                    "Whisper candidate rejected because it loses recall prefix and ends mid-phrase context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-                )
-                return true
-            }
-
-            if hasContentStemRepetition(whisperTranscript) {
-                traceLogger.log(
-                    "Whisper candidate rejected because it loses recall prefix and looks repetitive context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-                )
-                return true
-            }
-
-            traceLogger.log(
-                "Whisper candidate rejected because it loses recall prefix context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-            )
-            return true
-        }
-
-        return false
+        traceLogger.log(decision.logMessage)
+        return true
     }
 
     private func parakeetStreamingRecallFallbackReason(
@@ -4145,53 +4022,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         captureDurationSeconds: TimeInterval,
         context: String
     ) -> String? {
-        guard let streamingTranscript else { return nil }
-
-        let parakeetWordCount = transcriptWordCount(parakeetTranscript)
-        let streamingWordCount = transcriptWordCount(streamingTranscript)
-        guard captureDurationSeconds >= chunkedWhisperFallbackMinimumCaptureSeconds,
-              streamingWordCount >= 14,
-              streamingWordCount > parakeetWordCount else {
+        guard let decision = transcriptRecallPolicy.parakeetStreamingRecallFallback(
+            parakeetTranscript: parakeetTranscript,
+            streamingTranscript: streamingTranscript,
+            captureDurationSeconds: captureDurationSeconds,
+            context: context
+        ) else {
             return nil
         }
-
-        let wordDelta = streamingWordCount - parakeetWordCount
-        let ratio = Double(parakeetWordCount) / Double(max(1, streamingWordCount))
-        if wordDelta >= 6, ratio < 0.86 {
-            traceLogger.log(
-                "Parakeet v3 ANE transcript accepted but shorter than streaming recall context=\(context) parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-            )
-            return "shorter_than_streaming_recall parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio))"
-        }
-
-        if wordDelta >= 3, finalTranscriptHasDanglingEnding(parakeetTranscript) {
-            traceLogger.log(
-                "Parakeet v3 ANE transcript accepted but ends like a truncated prefix context=\(context) parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
-            )
-            return "dangling_ending_with_streaming_recall parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount)"
-        }
-
-        return nil
-    }
-
-    private func mergeTranscriptSegments(_ segments: [String]) -> String {
-        segments.reduce(into: "") { partialResult, segment in
-            let cleanedSegment = cleanedTranscriptText(segment)
-            guard !cleanedSegment.isEmpty else { return }
-            guard !partialResult.isEmpty else {
-                partialResult = cleanedSegment
-                return
-            }
-
-            let normalizedExisting = normalizedTranscriptPhrase(partialResult)
-            let normalizedSegment = normalizedTranscriptPhrase(cleanedSegment)
-            guard !normalizedExisting.contains(normalizedSegment) else { return }
-
-            if partialResult.last?.isWhitespace == false {
-                partialResult += " "
-            }
-            partialResult += cleanedSegment
-        }
+        traceLogger.log(decision.logMessage)
+        return decision.fallbackReason
     }
 
     private func chunkedWhisperFallbackTranscript(
@@ -4242,7 +4082,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             start = end
         }
 
-        let mergedTranscript = mergeTranscriptSegments(chunkTranscripts)
+        let mergedTranscript = transcriptRecallPolicy.mergeTranscriptSegments(chunkTranscripts)
         traceLogger.log(
             "Chunked offline Whisper fallback completed context=\(context) chunks=\(chunkIndex) accepted_chunks=\(chunkTranscripts.count) seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
         )

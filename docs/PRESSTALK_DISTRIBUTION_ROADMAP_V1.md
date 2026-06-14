@@ -2,8 +2,8 @@
 
 Date: 2026-06-13
 Audience: agents, operators, collaborators
-Source baseline: `feature/ane-parakeet-backend` at `7a51c12` (`Fix short no-speech status reset`)
-Public tester build currently available: `0.1.6-test6` through `subtract0/homebrew-presstalk`
+Source baseline: `refactor/skills-code-health-audit` at `c3182c0` (`Guard mixed-language ASR fallback`)
+Public tester build currently available: `0.1.6-test7` through `subtract0/homebrew-presstalk`
 
 ## One Sentence
 
@@ -22,7 +22,7 @@ The goal is not to beat every feature of Wispr Flow or Monologue immediately. Th
 - Product name: `PressTalk`.
 - Platform: Apple Silicon macOS first.
 - Default trigger: `Fn / Globe`.
-- Technical baseline: freeze `7a51c12` until the first paid beta is stable.
+- Technical baseline: freeze `c3182c0` until the first paid beta is stable.
 - Distribution: direct notarized Mac app plus Homebrew cask first; Mac App Store later.
 - Pricing: paid early access at `$20` one-time, stable launch at `$39` one-time, later commercial license at `$99` per seat or `$299` per small team.
 - Payment stack: Lemon Squeezy first, because it is a Merchant of Record and handles payment, sales tax, refunds, chargebacks, and PCI surface for digital purchases.
@@ -375,8 +375,8 @@ git log -1 --oneline
 
 Expected:
 
-- branch `feature/ane-parakeet-backend`
-- head at or after `7a51c12`
+- branch `refactor/skills-code-health-audit`
+- head at or after `c3182c0`
 - no dirty source changes unless intentionally staged
 
 Rule:

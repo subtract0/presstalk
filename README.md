@@ -2,10 +2,10 @@
 
 Native macOS push-to-talk dictation for Apple Silicon.
 
-Current source baseline: `7a51c12` on `feature/ane-parakeet-backend`
-(`Fix short no-speech status reset`).
+Current source baseline: `c3182c0` on `refactor/skills-code-health-audit`
+(`Guard mixed-language ASR fallback`).
 
-Current public tester cask: `0.1.6-test6`.
+Current public tester cask: `0.1.6-test7`.
 
 Distribution roadmap: [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md)
 

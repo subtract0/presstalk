@@ -209,6 +209,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private let realtimeStreamPollSeconds: TimeInterval = 0.15
     private let realtimeStreamFreshnessSeconds: TimeInterval = 2.0
     private let realtimeStreamFinalMaxLagSeconds: TimeInterval = 0.65
+    private let chunkedWhisperFallbackChunkSeconds: TimeInterval = 5.5
+    private let chunkedWhisperFallbackMinimumCaptureSeconds: TimeInterval = 7.5
     private let trackpadHoldDelaySeconds: TimeInterval = 0.50
     private let trackpadHoldCancelDistancePoints: CGFloat = 15.0
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
@@ -3972,10 +3974,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func transcriptWordCount(_ text: String) -> Int {
+        transcriptTokens(text).count
+    }
+
+    private func transcriptTokens(_ text: String) -> [String] {
         cleanedTranscriptText(text)
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .map { $0.lowercased() }
             .filter { !$0.isEmpty }
-            .count
     }
 
     private func shouldDeferShortWhisperCandidateForParakeetRecall(
@@ -4001,6 +4007,252 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             "Whisper candidate deferred because it is much shorter than accepted Parakeet recall candidate context=\(context) whisper_words=\(whisperWordCount) parakeet_words=\(parakeetWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
         )
         return true
+    }
+
+    private func shouldDeferShortWhisperCandidateForStreamingRecall(
+        whisperTranscript: String,
+        streamingTranscript: String?,
+        captureDurationSeconds: TimeInterval,
+        context: String
+    ) -> Bool {
+        guard let streamingTranscript else { return false }
+
+        let whisperWordCount = transcriptWordCount(whisperTranscript)
+        let streamingWordCount = transcriptWordCount(streamingTranscript)
+        guard captureDurationSeconds >= chunkedWhisperFallbackMinimumCaptureSeconds,
+              streamingWordCount >= 14,
+              streamingWordCount - whisperWordCount >= 6 else {
+            return false
+        }
+
+        let ratio = Double(whisperWordCount) / Double(max(1, streamingWordCount))
+        guard ratio < 0.70 else { return false }
+
+        traceLogger.log(
+            "Whisper candidate deferred because it is much shorter than streaming recall candidate context=\(context) whisper_words=\(whisperWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+        )
+        return true
+    }
+
+    private func shouldDeferShortWhisperCandidateForRecall(
+        whisperTranscript: String,
+        parakeetTranscript: String?,
+        streamingTranscript: String?,
+        captureDurationSeconds: TimeInterval,
+        context: String
+    ) -> Bool {
+        if shouldDeferShortWhisperCandidateForParakeetRecall(
+            whisperTranscript: whisperTranscript,
+            parakeetTranscript: parakeetTranscript,
+            captureDurationSeconds: captureDurationSeconds,
+            context: context
+        ) {
+            return true
+        }
+        return shouldDeferShortWhisperCandidateForStreamingRecall(
+            whisperTranscript: whisperTranscript,
+            streamingTranscript: streamingTranscript,
+            captureDurationSeconds: captureDurationSeconds,
+            context: context
+        )
+    }
+
+    private func finalTranscriptHasDanglingEnding(_ text: String) -> Bool {
+        let tokens = transcriptTokens(text)
+        guard let lastToken = tokens.last else { return false }
+
+        let danglingEndingTokens: Set<String> = [
+            "a", "an", "and", "as", "at", "but", "by", "for", "from", "if", "in", "of", "on", "or", "that", "the", "to", "when", "with",
+            "aber", "auf", "dass", "das", "dem", "den", "der", "des", "die", "ein", "eine", "einem", "einen", "einer", "im", "in", "mit", "oder", "und", "von", "wenn", "weil", "zu",
+        ]
+        return danglingEndingTokens.contains(lastToken)
+    }
+
+    private func hasContentStemRepetition(_ text: String) -> Bool {
+        let tokens = transcriptTokens(text)
+        guard tokens.count >= 24 else { return false }
+
+        let stopwords: Set<String> = [
+            "aber", "and", "are", "auf", "but", "das", "den", "der", "die", "for", "in", "ist", "mit", "oder", "the", "und", "was", "wenn", "with", "you",
+        ]
+        let stems = tokens.compactMap { token -> String? in
+            guard token.count >= 4, !stopwords.contains(token) else { return nil }
+            return String(token.prefix(4))
+        }
+        guard stems.count >= 16 else { return false }
+
+        let stemCounts = Dictionary(grouping: stems, by: { $0 }).mapValues(\.count)
+        let repeatedStemCounts = stemCounts.values.filter { $0 >= 3 }
+        let repeatedTokenCount = repeatedStemCounts.reduce(0, +)
+        return repeatedStemCounts.count >= 2 && Double(repeatedTokenCount) / Double(stems.count) >= 0.22
+    }
+
+    private func lacksRecallPrefix(_ candidateTranscript: String, recallTranscript: String) -> Bool {
+        let candidateTokens = Set(transcriptTokens(candidateTranscript))
+        let prefixTokens = transcriptTokens(recallTranscript)
+            .prefix(10)
+            .filter { $0.count >= 3 }
+        guard prefixTokens.count >= 5 else { return false }
+
+        let overlapCount = prefixTokens.filter { candidateTokens.contains($0) }.count
+        return overlapCount <= 1
+    }
+
+    private func shouldRejectWhisperCandidateForRecallQuality(
+        whisperTranscript: String,
+        parakeetTranscript: String?,
+        streamingTranscript: String?,
+        captureDurationSeconds: TimeInterval,
+        context: String
+    ) -> Bool {
+        let recallTranscript = parakeetTranscript ?? streamingTranscript
+        guard let recallTranscript else { return false }
+
+        let recallWordCount = transcriptWordCount(recallTranscript)
+        let whisperWordCount = transcriptWordCount(whisperTranscript)
+        guard recallWordCount >= 8,
+              lacksRecallPrefix(whisperTranscript, recallTranscript: recallTranscript) else {
+            return false
+        }
+
+        if captureDurationSeconds >= 2.0 {
+            if finalTranscriptHasDanglingEnding(whisperTranscript) {
+                traceLogger.log(
+                    "Whisper candidate rejected because it loses recall prefix and ends mid-phrase context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+                )
+                return true
+            }
+
+            if hasContentStemRepetition(whisperTranscript) {
+                traceLogger.log(
+                    "Whisper candidate rejected because it loses recall prefix and looks repetitive context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+                )
+                return true
+            }
+
+            traceLogger.log(
+                "Whisper candidate rejected because it loses recall prefix context=\(context) whisper_words=\(whisperWordCount) recall_words=\(recallWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+            )
+            return true
+        }
+
+        return false
+    }
+
+    private func parakeetStreamingRecallFallbackReason(
+        parakeetTranscript: String,
+        streamingTranscript: String?,
+        captureDurationSeconds: TimeInterval,
+        context: String
+    ) -> String? {
+        guard let streamingTranscript else { return nil }
+
+        let parakeetWordCount = transcriptWordCount(parakeetTranscript)
+        let streamingWordCount = transcriptWordCount(streamingTranscript)
+        guard captureDurationSeconds >= chunkedWhisperFallbackMinimumCaptureSeconds,
+              streamingWordCount >= 14,
+              streamingWordCount > parakeetWordCount else {
+            return nil
+        }
+
+        let wordDelta = streamingWordCount - parakeetWordCount
+        let ratio = Double(parakeetWordCount) / Double(max(1, streamingWordCount))
+        if wordDelta >= 6, ratio < 0.86 {
+            traceLogger.log(
+                "Parakeet v3 ANE transcript accepted but shorter than streaming recall context=\(context) parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+            )
+            return "shorter_than_streaming_recall parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) ratio=\(String(format: "%.2f", ratio))"
+        }
+
+        if wordDelta >= 3, finalTranscriptHasDanglingEnding(parakeetTranscript) {
+            traceLogger.log(
+                "Parakeet v3 ANE transcript accepted but ends like a truncated prefix context=\(context) parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+            )
+            return "dangling_ending_with_streaming_recall parakeet_words=\(parakeetWordCount) streaming_words=\(streamingWordCount)"
+        }
+
+        return nil
+    }
+
+    private func mergeTranscriptSegments(_ segments: [String]) -> String {
+        segments.reduce(into: "") { partialResult, segment in
+            let cleanedSegment = cleanedTranscriptText(segment)
+            guard !cleanedSegment.isEmpty else { return }
+            guard !partialResult.isEmpty else {
+                partialResult = cleanedSegment
+                return
+            }
+
+            let normalizedExisting = normalizedTranscriptPhrase(partialResult)
+            let normalizedSegment = normalizedTranscriptPhrase(cleanedSegment)
+            guard !normalizedExisting.contains(normalizedSegment) else { return }
+
+            if partialResult.last?.isWhitespace == false {
+                partialResult += " "
+            }
+            partialResult += cleanedSegment
+        }
+    }
+
+    private func chunkedWhisperFallbackTranscript(
+        whisperKit: WhisperKit,
+        samples: [Float],
+        signalStats: (rms: Double, peak: Double),
+        captureDurationSeconds: TimeInterval,
+        context: String
+    ) async throws -> String? {
+        guard captureDurationSeconds >= chunkedWhisperFallbackMinimumCaptureSeconds else { return nil }
+
+        let chunkSampleCount = max(
+            Int(Double(WhisperKit.sampleRate) * chunkedWhisperFallbackChunkSeconds),
+            WhisperKit.sampleRate
+        )
+        guard samples.count > chunkSampleCount else { return nil }
+
+        let chunkDecodeOptions = autoDetectDecodingOptions()
+        var chunkTranscripts: [String] = []
+        var chunkIndex = 0
+        var start = 0
+        let startedAt = Date()
+
+        while start < samples.count {
+            let end = min(samples.count, start + chunkSampleCount)
+            let chunkSamples = Array(samples[start..<end])
+            let chunkDurationSeconds = Double(chunkSamples.count) / Double(WhisperKit.sampleRate)
+            guard chunkDurationSeconds >= 1.0 else { break }
+
+            chunkIndex += 1
+            let results = try await whisperKit.transcribe(audioArray: chunkSamples, decodeOptions: chunkDecodeOptions)
+            let transcript = cleanedTranscriptText(
+                results
+                    .map(\.text)
+                    .joined(separator: " ")
+            )
+            traceTranscriptCandidate("Chunked offline Whisper transcript chunk=\(chunkIndex)", text: transcript)
+            if let acceptedTranscript = validatedFinalTranscriptCandidate(
+                transcript,
+                signalStats: signalStats,
+                captureDurationSeconds: chunkDurationSeconds,
+                context: "\(context)_chunk_\(chunkIndex)"
+            ) {
+                chunkTranscripts.append(acceptedTranscript)
+            }
+
+            if end == samples.count { break }
+            start = end
+        }
+
+        let mergedTranscript = mergeTranscriptSegments(chunkTranscripts)
+        traceLogger.log(
+            "Chunked offline Whisper fallback completed context=\(context) chunks=\(chunkIndex) accepted_chunks=\(chunkTranscripts.count) seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
+        )
+        traceTranscriptCandidate("Chunked offline Whisper merged transcript", text: mergedTranscript)
+        return validatedFinalTranscriptCandidate(
+            mergedTranscript,
+            signalStats: signalStats,
+            captureDurationSeconds: captureDurationSeconds,
+            context: "\(context)_merged"
+        )
     }
 
     private func isPlausibleTranscript(_ text: String) -> Bool {
@@ -6221,6 +6473,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
 
                 var acceptedParakeetTranscriptForFallback: String?
+                var whisperCandidateDeferredForRecall = false
                 if usesParakeetFinalBackend, !capturedAudioSamples.isEmpty {
                     traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedAudioSamples.count)")
                     do {
@@ -6237,7 +6490,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                                 text: acceptedParakeetTranscript,
                                 confidence: parakeetCandidate.confidence
                             )
-                            if let fallbackReason = parakeetQualityFallbackReason(
+                            if let fallbackReason = parakeetStreamingRecallFallbackReason(
+                                parakeetTranscript: acceptedParakeetTranscript,
+                                streamingTranscript: acceptedStreamingTranscript,
+                                captureDurationSeconds: effectiveCaptureDurationSeconds,
+                                context: "parakeet_v3_ane"
+                            ) {
+                                parakeetAcceptedForQualityFallback = true
+                                traceLogger.log(
+                                    "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                                )
+                            } else if let fallbackReason = parakeetQualityFallbackReason(
                                 for: acceptedCandidate,
                                 captureDurationSeconds: effectiveCaptureDurationSeconds
                             ) {
@@ -6300,12 +6563,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "offline_primary"
                 ) {
-                    if shouldDeferShortWhisperCandidateForParakeetRecall(
+                    if shouldRejectWhisperCandidateForRecallQuality(
                         whisperTranscript: acceptedPrimaryTranscript,
                         parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
                         captureDurationSeconds: effectiveCaptureDurationSeconds,
                         context: "offline_primary"
                     ) {
+                        traceLogger.log("Primary offline Whisper transcript accepted but implausible against recall; retrying with relaxed decoding")
+                    } else if shouldDeferShortWhisperCandidateForRecall(
+                        whisperTranscript: acceptedPrimaryTranscript,
+                        parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
+                        captureDurationSeconds: effectiveCaptureDurationSeconds,
+                        context: "offline_primary"
+                    ) {
+                        whisperCandidateDeferredForRecall = true
                         traceLogger.log("Primary offline Whisper transcript accepted but too short; retrying with relaxed decoding")
                     } else {
                         traceLogger.log("Using offline Whisper transcript as final transcript")
@@ -6331,12 +6604,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "offline_relaxed"
                 ) {
-                    if shouldDeferShortWhisperCandidateForParakeetRecall(
+                    if shouldRejectWhisperCandidateForRecallQuality(
                         whisperTranscript: acceptedRelaxedTranscript,
                         parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
                         captureDurationSeconds: effectiveCaptureDurationSeconds,
                         context: "offline_relaxed"
                     ) {
+                        traceLogger.log("Relaxed offline Whisper transcript accepted but implausible against recall; retrying with auto-detect decoding")
+                    } else if shouldDeferShortWhisperCandidateForRecall(
+                        whisperTranscript: acceptedRelaxedTranscript,
+                        parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
+                        captureDurationSeconds: effectiveCaptureDurationSeconds,
+                        context: "offline_relaxed"
+                    ) {
+                        whisperCandidateDeferredForRecall = true
                         traceLogger.log("Relaxed offline Whisper transcript accepted but too short; retrying with auto-detect decoding")
                     } else {
                         traceLogger.log("Relaxed offline Whisper transcript accepted")
@@ -6362,16 +6645,48 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     captureDurationSeconds: effectiveCaptureDurationSeconds,
                     context: "offline_auto_detect"
                 ) {
-                    if shouldDeferShortWhisperCandidateForParakeetRecall(
+                    if shouldRejectWhisperCandidateForRecallQuality(
                         whisperTranscript: acceptedAutoTranscript,
                         parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
                         captureDurationSeconds: effectiveCaptureDurationSeconds,
                         context: "offline_auto_detect"
                     ) {
+                        traceLogger.log("Auto-detect offline Whisper transcript accepted but implausible against recall; using recall fallback if available")
+                    } else if shouldDeferShortWhisperCandidateForRecall(
+                        whisperTranscript: acceptedAutoTranscript,
+                        parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
+                        captureDurationSeconds: effectiveCaptureDurationSeconds,
+                        context: "offline_auto_detect"
+                    ) {
+                        whisperCandidateDeferredForRecall = true
                         traceLogger.log("Auto-detect offline Whisper transcript accepted but too short; using recall fallback if available")
                     } else {
                         traceLogger.log("Auto-detect offline Whisper transcript accepted")
                         return acceptedAutoTranscript
+                    }
+                }
+
+                if whisperCandidateDeferredForRecall,
+                   let acceptedChunkedTranscript = try await chunkedWhisperFallbackTranscript(
+                    whisperKit: whisperKit,
+                    samples: normalizedSamples,
+                    signalStats: capturedSignalStats,
+                    captureDurationSeconds: effectiveCaptureDurationSeconds,
+                    context: "recall_deferred"
+                   ) {
+                    if shouldDeferShortWhisperCandidateForRecall(
+                        whisperTranscript: acceptedChunkedTranscript,
+                        parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                        streamingTranscript: acceptedStreamingTranscript,
+                        captureDurationSeconds: effectiveCaptureDurationSeconds,
+                        context: "chunked_whisper_fallback"
+                    ) {
+                        traceLogger.log("Chunked offline Whisper transcript still too short; using recall fallback if available")
+                    } else {
+                        traceLogger.log("Using chunked offline Whisper transcript after short-candidate recall deferral")
+                        return acceptedChunkedTranscript
                     }
                 }
 
@@ -6707,6 +7022,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log(
             "Audio normalization gain=\(String(format: "%.2f", normalizedResult.1)) normalized_rms=\(String(format: "%.5f", normalizedStats.rms)) normalized_peak=\(String(format: "%.5f", normalizedStats.peak))"
         )
+        let acceptedStreamingTranscript = validatedFinalTranscriptCandidate(
+            fallbackTranscript(),
+            signalStats: signalStats,
+            captureDurationSeconds: captureDurationSeconds,
+            context: "streaming_fallback"
+        )
 
         if usesFluidTrueStreamingBackend, !usesParakeetFinalBackend {
             traceLogger.log("Finalizing FluidAudio true streaming transcript samples=\(capturedSamples.count)")
@@ -6726,6 +7047,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         var acceptedParakeetTranscriptForFallback: String?
+        var whisperCandidateDeferredForRecall = false
         if usesParakeetFinalBackend {
             traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedSamples.count)")
             do {
@@ -6742,7 +7064,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                         text: acceptedParakeetTranscript,
                         confidence: parakeetCandidate.confidence
                     )
-                    if let fallbackReason = parakeetQualityFallbackReason(
+                    if let fallbackReason = parakeetStreamingRecallFallbackReason(
+                        parakeetTranscript: acceptedParakeetTranscript,
+                        streamingTranscript: acceptedStreamingTranscript,
+                        captureDurationSeconds: captureDurationSeconds,
+                        context: "parakeet_v3_ane"
+                    ) {
+                        traceLogger.log(
+                            "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                        )
+                        parakeetAcceptedForQualityFallback = true
+                    } else if let fallbackReason = parakeetQualityFallbackReason(
                         for: acceptedCandidate,
                         captureDurationSeconds: captureDurationSeconds
                     ) {
@@ -6778,12 +7110,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             captureDurationSeconds: captureDurationSeconds,
             context: "offline_primary"
         ) {
-            if shouldDeferShortWhisperCandidateForParakeetRecall(
+            if shouldRejectWhisperCandidateForRecallQuality(
                 whisperTranscript: acceptedPrimaryTranscript,
                 parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
                 captureDurationSeconds: captureDurationSeconds,
                 context: "offline_primary"
             ) {
+                traceLogger.log("Primary offline Whisper transcript accepted but implausible against recall; retrying with relaxed decoding")
+            } else if shouldDeferShortWhisperCandidateForRecall(
+                whisperTranscript: acceptedPrimaryTranscript,
+                parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
+                captureDurationSeconds: captureDurationSeconds,
+                context: "offline_primary"
+            ) {
+                whisperCandidateDeferredForRecall = true
                 traceLogger.log("Primary offline Whisper transcript accepted but too short; retrying with relaxed decoding")
             } else {
                 return acceptedPrimaryTranscript
@@ -6805,12 +7147,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             captureDurationSeconds: captureDurationSeconds,
             context: "offline_relaxed"
         ) {
-            if shouldDeferShortWhisperCandidateForParakeetRecall(
+            if shouldRejectWhisperCandidateForRecallQuality(
                 whisperTranscript: acceptedRelaxedTranscript,
                 parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
                 captureDurationSeconds: captureDurationSeconds,
                 context: "offline_relaxed"
             ) {
+                traceLogger.log("Relaxed offline Whisper transcript accepted but implausible against recall; retrying with auto-detect decoding")
+            } else if shouldDeferShortWhisperCandidateForRecall(
+                whisperTranscript: acceptedRelaxedTranscript,
+                parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
+                captureDurationSeconds: captureDurationSeconds,
+                context: "offline_relaxed"
+            ) {
+                whisperCandidateDeferredForRecall = true
                 traceLogger.log("Relaxed offline Whisper transcript accepted but too short; retrying with auto-detect decoding")
             } else {
                 traceLogger.log("Relaxed offline Whisper transcript accepted")
@@ -6833,16 +7185,48 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             captureDurationSeconds: captureDurationSeconds,
             context: "offline_auto_detect"
         ) {
-            if shouldDeferShortWhisperCandidateForParakeetRecall(
+            if shouldRejectWhisperCandidateForRecallQuality(
                 whisperTranscript: acceptedAutoTranscript,
                 parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
                 captureDurationSeconds: captureDurationSeconds,
                 context: "offline_auto_detect"
             ) {
+                traceLogger.log("Auto-detect offline Whisper transcript accepted but implausible against recall; using recall fallback if available")
+            } else if shouldDeferShortWhisperCandidateForRecall(
+                whisperTranscript: acceptedAutoTranscript,
+                parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
+                captureDurationSeconds: captureDurationSeconds,
+                context: "offline_auto_detect"
+            ) {
+                whisperCandidateDeferredForRecall = true
                 traceLogger.log("Auto-detect offline Whisper transcript accepted but too short; using recall fallback if available")
             } else {
                 traceLogger.log("Auto-detect offline Whisper transcript accepted")
                 return acceptedAutoTranscript
+            }
+        }
+
+        if whisperCandidateDeferredForRecall,
+           let acceptedChunkedTranscript = try await chunkedWhisperFallbackTranscript(
+            whisperKit: whisperKit,
+            samples: normalizedSamples,
+            signalStats: signalStats,
+            captureDurationSeconds: captureDurationSeconds,
+            context: "recall_deferred"
+           ) {
+            if shouldDeferShortWhisperCandidateForRecall(
+                whisperTranscript: acceptedChunkedTranscript,
+                parakeetTranscript: acceptedParakeetTranscriptForFallback,
+                streamingTranscript: acceptedStreamingTranscript,
+                captureDurationSeconds: captureDurationSeconds,
+                context: "chunked_whisper_fallback"
+            ) {
+                traceLogger.log("Chunked offline Whisper transcript still too short; using recall fallback if available")
+            } else {
+                traceLogger.log("Using chunked offline Whisper transcript after short-candidate recall deferral")
+                return acceptedChunkedTranscript
             }
         }
 
@@ -6851,13 +7235,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return acceptedParakeetTranscriptForFallback
         }
 
-        let acceptedFallbackTranscript = validatedFinalTranscriptCandidate(
-            fallbackTranscript(),
-            signalStats: signalStats,
-            captureDurationSeconds: captureDurationSeconds,
-            context: "streaming_fallback"
-        )
-        if let acceptedFallbackTranscript {
+        if let acceptedFallbackTranscript = acceptedStreamingTranscript {
             traceLogger.log("Whisper transcription empty or implausible; using filtered fallback transcript")
             return acceptedFallbackTranscript
         }

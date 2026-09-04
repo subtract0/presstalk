@@ -113,6 +113,7 @@ enum JarvisTapError: Error, CustomStringConvertible {
     case audioBufferUnavailable
     case accessibilityPermissionMissing
     case eventSynthesisUnavailable
+    case audioInputUnavailable(String)
 
     var description: String {
         switch self {
@@ -132,6 +133,8 @@ enum JarvisTapError: Error, CustomStringConvertible {
             return "Paste permission preflight is unavailable"
         case .eventSynthesisUnavailable:
             return "Failed to synthesize keyboard events"
+        case .audioInputUnavailable(let message):
+            return "Audio input unavailable: \(message)"
         }
     }
 }

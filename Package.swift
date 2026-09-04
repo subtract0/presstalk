@@ -45,6 +45,10 @@ let package = Package(
             name: "PressTalkInputMethod",
             dependencies: []
         ),
+        .testTarget(
+            name: "PressTalkCoreTests",
+            dependencies: ["PressTalkCore"]
+        ),
         .executableTarget(
             name: "PressTalkAsrBench",
             dependencies: [

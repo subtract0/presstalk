@@ -2623,6 +2623,29 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         streamTranscriber = try makeStreamTranscriber(using: whisperKit)
     }
 
+    /// Reads the live audio device and asks `AudioInputPreflightPolicy` whether
+    /// it is safe to hand to WhisperKit.
+    ///
+    /// The decision lives in PressTalkCore so it can be tested; only the device
+    /// read is here. See AudioInputPreflightPolicy for why this guard exists --
+    /// short version: installTapOnBus raises an ObjC exception that Swift cannot
+    /// catch, and it killed the app three times in six days.
+    private static func audioInputPreflightFailure() -> String? {
+        let engine = AVAudioEngine()
+        let input = engine.inputNode
+        let hardware = input.inputFormat(forBus: 0)
+        let output = input.outputFormat(forBus: 0)
+        let buildable = AVAudioFormat(commonFormat: output.commonFormat,
+                                      sampleRate: hardware.sampleRate,
+                                      channels: output.channelCount,
+                                      interleaved: output.isInterleaved) != nil
+        return AudioInputPreflightPolicy().failureReason(
+            hardwareSampleRate: hardware.sampleRate,
+            nodeSampleRate: output.sampleRate,
+            nodeChannelCount: output.channelCount,
+            canBuildTapFormat: buildable)
+    }
+
     private func safelyStopLiveAudioRecording(whisperKit: WhisperKit?, reason: String) {
         guard let audioProcessor = whisperKit?.audioProcessor else { return }
 
@@ -5966,6 +5989,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if usesFluidTrueStreamingBackend {
                     try await resetFluidTrueStreamingTranscriptState()
                     traceLogger.log("FluidAudio true streaming state reset for capture")
+                }
+                if let failure = Self.audioInputPreflightFailure() {
+                    traceLogger.log("Audio input preflight FAILED: \(failure) -- refusing capture instead of aborting")
+                    throw JarvisTapError.audioInputUnavailable(failure)
                 }
                 try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
                     self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)

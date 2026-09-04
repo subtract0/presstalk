@@ -63,6 +63,17 @@ cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/
 chmod 755 "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
 cp "$PKG_DIR/scripts/presstalk_karabiner_fallback.sh" "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-karabiner-fallback.sh"
+# SwiftPM emits target resources as a side-by-side .bundle. Without copying it
+# the app runs with Bundle.module empty -- which for the German vocabulary guard
+# list means the corrector loses its safety net. Copy every resource bundle the
+# build produced.
+for _resource_bundle in "$PKG_DIR"/.build/*/release/*.bundle "$PKG_DIR"/.build/release/*.bundle; do
+  [[ -d "$_resource_bundle" ]] || continue
+  echo "Bundling resources: $(basename "$_resource_bundle")"
+  rm -rf "$APP_RESOURCES_DIR/$(basename "$_resource_bundle")"
+  ditto "$_resource_bundle" "$APP_RESOURCES_DIR/$(basename "$_resource_bundle")"
+done
+
 cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
 cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"

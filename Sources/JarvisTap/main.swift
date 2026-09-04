@@ -3859,6 +3859,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             return nil
         }
         let vocabulary = GermanVocabularyPolicy.loadUserVocabulary()
+        // FAIL SAFE. The guard list is what stops the corrector rewriting real
+        // German words the user actually says. If the resource bundle is missing
+        // -- which it was on the first packaged build, because the app bundle did
+        // not copy JarvisTap_PressTalkCore.bundle -- an empty set would mean NO
+        // guard, and the repair would run at full confidence over everything.
+        // Silently degrading to unguarded correction is worse than not correcting
+        // at all, so refuse instead.
+        guard vocabulary.count >= 1000 else {
+            traceLogger.log(
+                "German vocabulary repair DISABLED: guard list missing or too small (\(vocabulary.count) words). "
+                + "Refusing to correct without the guard.")
+            return nil
+        }
         traceLogger.log("German vocabulary repair enabled guard_words=\(vocabulary.count)")
         return GermanVocabularyPolicy(userVocabulary: vocabulary)
     }()

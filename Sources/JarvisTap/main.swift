@@ -6122,6 +6122,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
         guard shouldProcess else { return }
 
+        let keyUpAt = Date()
         stopAmplitudeMonitoring()
         traceLogger.log(triggerReleaseLogMessage(for: trigger))
         present(.processing)
@@ -6138,6 +6139,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let pasteAutomatically = self.settingsStore.pasteAutomatically
         let streamTaskToStop = currentStreamTask
         let initialCapturedSnapshot = capturedSnapshot
+        let releaseTelemetryStart = keyUpAt
 
         let task = Task(priority: .userInitiated) { [self] in
             var processingSnapshot = initialCapturedSnapshot
@@ -6191,8 +6193,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     streamShutdownCompleted = true
                     Task.detached(priority: .utility) {
                         _ = await streamTaskToStop.result
+                        // span: cancelIssued -> streamExit. Off the critical
+                        // path, but logged so an abandoned task that never
+                        // exits is visible rather than silently leaked.
                         traceLogger.log(
-                            "Realtime stream torn down off-path after_seconds=\(String(format: "%.3f", Date().timeIntervalSince(shutdownStartedAt)))")
+                            "latency span=cancel_to_stream_exit seconds=\(String(format: "%.3f", Date().timeIntervalSince(shutdownStartedAt)))")
                     }
                     traceLogger.log("Realtime stream cancelled without blocking paste")
                 } else {
@@ -6214,6 +6219,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 normalizedSamples = normalizedResult.0
                 let normalizedStats = audioLevelStats(for: normalizedSamples)
                 let audioInputDescription = withStateLock { activeAudioInputDeviceDescription }
+                traceLogger.log(
+                    "latency span=keyup_to_audio_frozen seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
                 traceLogger.log(
                     "Audio capture frozen samples=\(capturedAudioSamples.count) duration_seconds=\(String(format: "%.2f", frozenAudioDurationSeconds)) rms=\(String(format: "%.5f", capturedSignalStats.rms)) peak=\(String(format: "%.5f", capturedSignalStats.peak)) input_device=\(audioInputDescription)"
                 )
@@ -6269,7 +6276,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedAudioSamples.count)")
                     do {
                         var parakeetAcceptedForQualityFallback = false
+                        let finalInferenceStartedAt = Date()
                         let parakeetCandidate = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                        traceLogger.log(
+                            "latency span=final_inference seconds=\(String(format: "%.3f", Date().timeIntervalSince(finalInferenceStartedAt)))")
                         traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetCandidate.text)
                         if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
                             parakeetCandidate.text,
@@ -6603,7 +6613,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 if agentMode == "dictation" {
                     if pasteAutomatically {
                         traceLogger.log("Pasting dictated transcript into focused app")
-                        let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
+                        let insertStartedAt = Date()
+                        let insertStartedAt2 = Date()
+                let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
+                traceLogger.log(
+                    "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt2))) span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
+                        traceLogger.log(
+                            "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt))) span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
                         switch insertionResult {
                         case .inserted(let method):
                             traceLogger.log("Dictation inserted method=\(method)")

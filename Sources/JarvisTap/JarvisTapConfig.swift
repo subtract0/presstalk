@@ -138,7 +138,20 @@ struct JarvisTapConfig {
                 let value = streamingValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
                 return value != "0" && value != "false" && value != "no"
             }
-            return streamingASRBackend != nil || !parakeetFinalBackendAliases.contains(asrBackend)
+            // Live partials default OFF as of 2026-09-04.
+            //
+            // They cost rather than save: PressTalk is push-to-talk, so key
+            // release already supplies the endpoint, and the preview never
+            // shortens key-up-to-paste -- it only added teardown work to the
+            // release path. The default streaming model (parakeet-eou-320) is
+            // also English-only and emits no punctuation or capitalisation, so
+            // for German dictation the preview was actively wrong-looking even
+            // though the final parakeet-v3 pass repaired it.
+            //
+            // The capability is intact: set PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION=1
+            // to turn partials back on (useful for debugging, which is what they
+            // were mostly serving).
+            return false
         }()
 
         let parakeetQualityFallbackEnabled: Bool = {

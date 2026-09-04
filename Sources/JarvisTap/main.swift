@@ -6143,17 +6143,37 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             await captureSilenceAwareReleaseTail(whisperKit: whisperKit)
             if let streamTaskToStop {
                 if config.streamingTranscriptionEnabled {
-                    streamShutdownCompleted = await awaitStreamShutdown(for: streamTaskToStop)
-                    traceLogger.log("Realtime stream shutdown completed=\(streamShutdownCompleted ? 1 : 0)")
-                    if !streamShutdownCompleted {
-                        streamTaskToStop.cancel()
+                    // Do NOT block the paste on stream teardown.
+                    //
+                    // This used to `await awaitStreamShutdown(...)`, which waits up
+                    // to streamShutdownTimeoutSeconds (2.0s) before the final pass
+                    // can even start. Measured field smokes showed the cost:
+                    // parakeet inference is 82-133 ms while release-to-insert was
+                    // 245-1345 ms, so the model was 5-35% of the wait and pipeline
+                    // overhead was the rest.
+                    //
+                    // The streaming text is only ever used as a FALLBACK when the
+                    // final pass produces nothing, and a snapshot was already taken
+                    // at release time. So cancel, keep that snapshot, and let
+                    // teardown finish off the critical path.
+                    let shutdownStartedAt = Date()
+                    streamTaskToStop.cancel()
+                    streamShutdownCompleted = true
+                    Task.detached(priority: .utility) {
+                        _ = await streamTaskToStop.result
+                        traceLogger.log(
+                            "Realtime stream torn down off-path after_seconds=\(String(format: "%.3f", Date().timeIntervalSince(shutdownStartedAt)))")
                     }
+                    traceLogger.log("Realtime stream cancelled without blocking paste")
                 } else {
                     streamTaskToStop.cancel()
                     streamShutdownCompleted = true
                     traceLogger.log("Capture task cancelled without realtime stream")
                 }
             }
+            // Refresh the fallback snapshot with whatever the stream already
+            // published. Not waiting for teardown means this can be marginally
+            // staler than before -- it is only consulted if the final pass fails.
             processingSnapshot = withStateLock { latestStreamingState }
 
             if whisperKit != nil {

@@ -31,7 +31,8 @@ let package = Package(
     targets: [
         .target(
             name: "PressTalkCore",
-            dependencies: []
+            dependencies: [],
+            resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "JarvisTap",

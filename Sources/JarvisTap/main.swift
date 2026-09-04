@@ -3840,8 +3840,38 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         traceLogger.log("Input debug: \(message)")
     }
 
+    /// German vocabulary repair. Backend-independent: it fixes what the
+    /// recogniser mangles regardless of which recogniser produced it, which
+    /// matters because brands and compounds fail on parakeet and whisper at
+    /// nearly the same rate. Measured on a held-out German eval:
+    /// 16.55%% -> 13.93%% WER, 13 clips fixed, 0 broken.
+    ///
+    /// The guard against over-correction is Alex's own vocabulary (a 26k-word
+    /// list built from 4.76M tokens of his German transcripts), so a real word
+    /// he actually says is never rewritten.
+    ///
+    /// Set PRESSTALK_DISABLE_VOCAB_REPAIR=1 to turn it off.
+    private lazy var germanVocabularyPolicy: GermanVocabularyPolicy? = {
+        let raw = ProcessInfo.processInfo.environment["PRESSTALK_DISABLE_VOCAB_REPAIR"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if let raw, !raw.isEmpty, !["0", "false", "no", "off"].contains(raw) {
+            traceLogger.log("German vocabulary repair DISABLED by environment")
+            return nil
+        }
+        let vocabulary = GermanVocabularyPolicy.loadUserVocabulary()
+        traceLogger.log("German vocabulary repair enabled guard_words=\(vocabulary.count)")
+        return GermanVocabularyPolicy(userVocabulary: vocabulary)
+    }()
+
     private func cleanedTranscriptText(_ text: String) -> String {
-        transcriptTextPolicy.cleanedText(text)
+        let cleaned = transcriptTextPolicy.cleanedText(text)
+        guard let policy = germanVocabularyPolicy else { return cleaned }
+        let (repaired, changes) = policy.corrected(cleaned)
+        if !changes.isEmpty {
+            let summary = changes.map { "\($0.kind):'\($0.from)'->'\($0.to)'" }.joined(separator: " ")
+            traceLogger.log("Vocabulary repair applied count=\(changes.count) \(summary)")
+        }
+        return repaired
     }
 
     private func normalizedTranscriptPhrase(_ text: String) -> String {

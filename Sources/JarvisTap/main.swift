@@ -7051,7 +7051,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         let insertStartedAt = Date()
                         let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
                         traceLogger.log(
-                            "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt))) span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
+                            "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt)))")
+                        traceLogger.log(
+                            "latency span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
                         switch insertionResult {
                         case .inserted(let method):
                             traceLogger.log("Dictation inserted method=\(method)")

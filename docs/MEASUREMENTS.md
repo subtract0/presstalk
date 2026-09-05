@@ -32,7 +32,36 @@ recognition reached the end of the pipeline, not that words arrived in another
 app. That distinction is why the fresh-Mac run in
 [LAUNCH_GATES.md](LAUNCH_GATES.md) is still the top open gate.
 
-## Latency
+## Latency on real speech (2026-09-05, 12 dictations, physical Fn key)
+
+The first numbers from a person actually dictating, rather than replayed audio.
+
+| | p50 | p95 | min | max |
+|---|---|---|---|---|
+| **Key release → text on screen** | **0.762 s** | 3.894 s | 0.345 s | 6.070 s |
+| without the quality fallback (n=6) | 0.425 s | | | |
+| with the quality fallback (n=6) | 1.220 s | | | |
+
+Two things this settles and one it opens.
+
+**The release tail is not a problem.** It exited early on detected silence in 12
+of 13 captures, giving a 0.139 s p50 against the 0.507 s the replayed fixtures
+showed. The fixture number was an artifact of clips ending mid-speech, as
+predicted below; real speech ends in silence and the tail leaves immediately.
+
+**The quality fallback costs 2.9× on half of all dictations.** It fired on 6 of
+12. Parakeet's median confidence on this speaker was 0.963 against a 0.96
+threshold, so these dictations sit right on the boundary and a small drift in
+either direction changes how often a second recognizer runs.
+
+**The tail is a retry ladder, not the fallback alone.** The 6.070 s case ran
+Whisper three times — primary, relaxed decoding, then auto-detect — each rejected
+by the recall guard before the third was accepted. Three full passes over 4.2 s
+of audio. Nothing bounds that chain by time.
+
+Sample of 12, one speaker, one machine, one room.
+
+## Latency on replayed audio (fixtures)
 
 | Span | p50 | p95 | max | n |
 |---|---|---|---|---|

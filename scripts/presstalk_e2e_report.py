@@ -13,7 +13,11 @@ import re
 import statistics
 from pathlib import Path
 
-SPAN = re.compile(r"latency span=(?P<name>[a-z_]+) seconds=(?P<seconds>[0-9.]+)")
+# Deliberately not anchored on the "latency " prefix. A line once carried two
+# spans and prefixed only the first, so a stricter pattern dropped
+# keyup_to_inserted -- the single number that describes what a user waits for --
+# while still reporting a confident set of percentiles for everything else.
+SPAN = re.compile(r"span=(?P<name>[a-z_]+) seconds=(?P<seconds>[0-9.]+)")
 
 
 def percentile(values: list[float], fraction: float) -> float | None:

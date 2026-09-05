@@ -21,13 +21,32 @@ final class TraceLogger {
         return formatter
     }()
 
-    init(path: String) {
+    /// Rotate once the log passes this. Left unbounded, the trace log reached
+    /// 45 MB on the development machine, which is both a disk cost nobody agreed
+    /// to and a very long-lived record of app activity.
+    private let maximumBytes: Int
+    private var writtenSinceCheck = 0
+
+    init(path: String, maximumBytes: Int = 8 * 1024 * 1024) {
         logURL = URL(fileURLWithPath: path)
+        self.maximumBytes = maximumBytes
         let directoryURL = logURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
         if !FileManager.default.fileExists(atPath: logURL.path) {
             FileManager.default.createFile(atPath: logURL.path, contents: nil)
         }
+    }
+
+    /// Keeps one previous file. Two generations is enough to investigate
+    /// something that happened yesterday and few enough to stay bounded.
+    private func rotateIfNeeded() {
+        let attributes = try? FileManager.default.attributesOfItem(atPath: logURL.path)
+        let size = (attributes?[.size] as? NSNumber)?.intValue ?? 0
+        guard size > maximumBytes else { return }
+        let previous = logURL.appendingPathExtension("1")
+        try? FileManager.default.removeItem(at: previous)
+        try? FileManager.default.moveItem(at: logURL, to: previous)
+        FileManager.default.createFile(atPath: logURL.path, contents: nil)
     }
 
     func log(_ message: String) {
@@ -36,6 +55,13 @@ final class TraceLogger {
 
         queue.sync { [logURL] in
             guard let data = line.data(using: .utf8) else { return }
+            // Checking the file size on every line would stat the file thousands
+            // of times a minute, so amortise it.
+            writtenSinceCheck += data.count
+            if writtenSinceCheck > 256 * 1024 {
+                writtenSinceCheck = 0
+                rotateIfNeeded()
+            }
             do {
                 let handle = try FileHandle(forWritingTo: logURL)
                 defer { try? handle.close() }

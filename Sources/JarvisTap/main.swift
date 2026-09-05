@@ -15,7 +15,7 @@ private let fnModifierMask = CGEventFlags(rawValue: UInt64(NX_SECONDARYFNMASK))
 private let leftOptionModifierMask = CGEventFlags(rawValue: UInt64(NX_DEVICELALTKEYMASK))
 private let rightOptionModifierMask = CGEventFlags(rawValue: UInt64(NX_DEVICERALTKEYMASK))
 
-final class JarvisTapApp: NSObject, NSApplicationDelegate {
+final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private struct StreamingSnapshot {
         var currentText = ""
         var confirmedText = ""
@@ -751,6 +751,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
         let recentItem = NSMenuItem(title: "Recent Dictations", action: nil, keyEquivalent: "")
         let recentMenu = NSMenu()
+        // Prune when the submenu opens, not only when a dictation completes.
+        // Otherwise an entry that aged out during an idle afternoon is still
+        // sitting there to be copied.
+        recentMenu.delegate = self
         recentItem.submenu = recentMenu
         recentItem.toolTip = "The last few transcripts, kept in memory only. Choose one to copy it."
         recentDictationsMenu = recentMenu
@@ -4060,8 +4064,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         guard let policy = germanVocabularyPolicy else { return cleaned }
         let (repaired, changes) = policy.corrected(cleaned)
         if !changes.isEmpty {
-            let summary = changes.map { "\($0.kind):'\($0.from)'->'\($0.to)'" }.joined(separator: " ")
-            traceLogger.log("Vocabulary repair applied count=\(changes.count) \(summary)")
+            // The change list is the most useful diagnostic this feature has and
+            // it is also made of words the user said, so the pairs are behind the
+            // same opt-in as the transcripts. The kinds and the count are not.
+            let kinds = changes.map(\.kind).joined(separator: ",")
+            if TranscriptRedaction.isVerboseLoggingEnabled() {
+                let summary = changes.map { "\($0.kind):'\($0.from)'->'\($0.to)'" }.joined(separator: " ")
+                traceLogger.log("Vocabulary repair applied count=\(changes.count) \(summary)")
+            } else {
+                traceLogger.log("Vocabulary repair applied count=\(changes.count) kinds=\(kinds)")
+            }
         }
         return repaired
     }
@@ -4098,7 +4110,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             captureDurationSeconds: captureDurationSeconds
         ) {
             traceLogger.log(
-                "Rejected likely silence hallucination context=\(context) transcript=\(cleaned) rms=\(String(format: "%.5f", signalStats.rms)) peak=\(String(format: "%.5f", signalStats.peak)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
+                "Rejected likely silence hallucination context=\(context) transcript=\(TranscriptRedaction.loggable(cleaned)) rms=\(String(format: "%.5f", signalStats.rms)) peak=\(String(format: "%.5f", signalStats.peak)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
             )
             return nil
         }
@@ -4572,7 +4584,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         guard let cleanedToLog else { return }
-        traceLogger.log("Realtime partial transcript revision=\(revision): \(cleanedToLog)")
+        traceLogger.log("Realtime partial transcript revision=\(revision): \(TranscriptRedaction.loggable(cleanedToLog))")
         if shouldPresentPartial {
             present(.listening(cleanedToLog))
         }
@@ -5015,6 +5027,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    func menuWillOpen(_ menu: NSMenu) {
+        if menu === recentDictationsMenu {
+            refreshRecentDictationsMenu()
+        }
+    }
+
     private func refreshRecentDictationsMenu() {
         guard let menu = recentDictationsMenu else { return }
         // Prune on display too: an entry that aged out while the menu sat closed
@@ -5048,7 +5066,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     @objc private func copyRecentDictation(_ sender: NSMenuItem) {
-        guard recoverableDictations.indices.contains(sender.tag) else { return }
+        // Re-check expiry at the moment of use. A menu can be held open past an
+        // entry's lifetime, and handing back expired text would quietly break
+        // the promise the expiry exists to keep.
+        recoverableDictations = dictationRecoveryPolicy.pruned(recoverableDictations, now: Date())
+        guard recoverableDictations.indices.contains(sender.tag) else {
+            traceLogger.log("Recovered dictation expired before it was copied")
+            refreshRecentDictationsMenu()
+            return
+        }
         let entry = recoverableDictations[sender.tag]
         copyTranscriptToPasteboard(entry.text)
         traceLogger.log("Recovered dictation copied characters=\(entry.text.count)")
@@ -6988,8 +7014,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     return
                 }
 
-                traceLogger.log("📝 Transkription abgeschlossen: \(transcript)")
-                print("🗣️ [PressTalk recognized] \(transcript)")
+                traceLogger.log("📝 Transkription abgeschlossen: \(TranscriptRedaction.loggable(transcript))")
+                print("🗣️ [PressTalk recognized] \(TranscriptRedaction.loggable(transcript))")
                 fflush(stdout)
 
                 recordHarnessOutcome(transcript: transcript, releasedAt: releaseTelemetryStart)
@@ -7117,7 +7143,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         guard let cleanedToLog else { return }
-        traceLogger.log("Partial transcript: \(cleanedToLog)")
+        traceLogger.log("Partial transcript: \(TranscriptRedaction.loggable(cleanedToLog))")
         present(.listening(cleanedToLog))
         if shouldPrintPartial {
             print("📝 [PressTalk partial] \(cleanedToLog)")
@@ -7143,8 +7169,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 return
             }
 
-            traceLogger.log("📝 Transkription abgeschlossen: \(transcript)")
-            print("🗣️ [PressTalk recognized] \(transcript)")
+            traceLogger.log("📝 Transkription abgeschlossen: \(TranscriptRedaction.loggable(transcript))")
+            print("🗣️ [PressTalk recognized] \(TranscriptRedaction.loggable(transcript))")
             fflush(stdout)
 
             if config.agentMode == "dictation" {

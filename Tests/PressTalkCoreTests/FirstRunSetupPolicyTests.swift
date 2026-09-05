@@ -10,7 +10,8 @@ final class FirstRunSetupPolicyTests: XCTestCase {
         accessibility: Bool = false,
         speechModel: Bool = false,
         firstDictation: Bool = false,
-        needsInputMonitoring: Bool = true
+        needsInputMonitoring: Bool = true,
+        skipped: Set<FirstRunSetupPolicy.Step> = []
     ) -> FirstRunSetupPolicy.Conditions {
         FirstRunSetupPolicy.Conditions(
             microphoneCaptureVerified: microphone,
@@ -18,7 +19,8 @@ final class FirstRunSetupPolicyTests: XCTestCase {
             accessibilityGranted: accessibility,
             speechModelReady: speechModel,
             firstDictationDelivered: firstDictation,
-            triggerRequiresInputMonitoring: needsInputMonitoring
+            triggerRequiresInputMonitoring: needsInputMonitoring,
+            skippedSteps: skipped
         )
     }
 
@@ -127,6 +129,34 @@ final class FirstRunSetupPolicyTests: XCTestCase {
 
     // The microphone step must key off captured frames, never the authorization
     // status, which stays .authorized through stale grants and dead devices.
+    // "Skip for now" has to move the user on. Announcing a skip without
+    // recording it leaves the same step selected, which is what it used to do.
+    func testSkippingAnOptionalStepAdvances() {
+        let before = conditions(microphone: true, inputMonitoring: true)
+        XCTAssertEqual(policy.currentStep(for: before), .accessibility)
+
+        let after = conditions(microphone: true, inputMonitoring: true, skipped: [.accessibility])
+        XCTAssertEqual(policy.state(of: .accessibility, given: after), .skipped)
+        XCTAssertEqual(policy.currentStep(for: after), .speechModel)
+    }
+
+    // Skipping a required step is not on offer, so asking for it changes nothing.
+    func testARequiredStepCannotBeSkipped() {
+        let attempted = conditions(skipped: [.microphone, .speechModel])
+        XCTAssertEqual(policy.state(of: .microphone, given: attempted), .pending)
+        XCTAssertEqual(policy.currentStep(for: attempted), .microphone)
+    }
+
+    // Otherwise someone who legitimately declined Accessibility sits at 80%
+    // forever.
+    func testSkippedStepsCountTowardProgress() {
+        let done = conditions(
+            microphone: true, inputMonitoring: true, speechModel: true,
+            firstDictation: true, skipped: [.accessibility])
+        XCTAssertEqual(policy.progress(done), 1, accuracy: 0.001)
+        XCTAssertNil(policy.currentStep(for: done))
+    }
+
     func testMicrophoneStepTracksVerifiedCaptureNotPermission() {
         XCTAssertEqual(policy.state(of: .microphone, given: conditions(microphone: false)), .pending)
         XCTAssertEqual(policy.state(of: .microphone, given: conditions(microphone: true)), .satisfied)

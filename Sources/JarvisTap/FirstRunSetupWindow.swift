@@ -22,6 +22,7 @@ final class FirstRunSetupWindowController: NSWindowController {
     private let policy = FirstRunSetupPolicy()
     private var pollTimer: Timer?
     private var lastProbe: AudioCaptureProbeReport?
+    private var skippedSteps: Set<FirstRunSetupPolicy.Step> = []
 
     private let progressBar = NSProgressIndicator()
     private let progressLabel = NSTextField(labelWithString: "")
@@ -132,7 +133,16 @@ final class FirstRunSetupWindowController: NSWindowController {
     }
 
     private func refresh() {
-        guard let conditions = onReadConditions?() else { return }
+        guard let base = onReadConditions?() else { return }
+        // The window owns the skip decisions; the app only reports the facts.
+        let conditions = FirstRunSetupPolicy.Conditions(
+            microphoneCaptureVerified: base.microphoneCaptureVerified,
+            inputMonitoringGranted: base.inputMonitoringGranted,
+            accessibilityGranted: base.accessibilityGranted,
+            speechModelReady: base.speechModelReady,
+            firstDictationDelivered: base.firstDictationDelivered,
+            triggerRequiresInputMonitoring: base.triggerRequiresInputMonitoring,
+            skippedSteps: skippedSteps)
         let steps = policy.steps(for: conditions)
         let current = policy.currentStep(for: conditions)
 
@@ -195,8 +205,7 @@ final class FirstRunSetupWindowController: NSWindowController {
     }
 
     @objc private func primaryTapped(_ sender: Any?) {
-        guard let conditions = onReadConditions?() else { return }
-        guard let current = policy.currentStep(for: conditions) else {
+        guard let current = currentStepIncludingSkips() else {
             close(finished: true)
             return
         }
@@ -222,12 +231,24 @@ final class FirstRunSetupWindowController: NSWindowController {
     }
 
     @objc private func skipTapped(_ sender: Any?) {
-        guard let conditions = onReadConditions?(),
-              let current = policy.currentStep(for: conditions),
-              current.isOptional
-        else { return }
+        guard let current = currentStepIncludingSkips(), current.isOptional else { return }
+        // Recorded, not just announced. Changing the label without recording the
+        // choice left the same step selected, so "Skip for now" did nothing.
+        skippedSteps.insert(current)
+        refresh()
         detailLabel.stringValue =
             "Skipped. PressTalk will copy dictated text to the clipboard so you can paste it yourself."
-        refresh()
+    }
+
+    private func currentStepIncludingSkips() -> FirstRunSetupPolicy.Step? {
+        guard let base = onReadConditions?() else { return nil }
+        return policy.currentStep(for: FirstRunSetupPolicy.Conditions(
+            microphoneCaptureVerified: base.microphoneCaptureVerified,
+            inputMonitoringGranted: base.inputMonitoringGranted,
+            accessibilityGranted: base.accessibilityGranted,
+            speechModelReady: base.speechModelReady,
+            firstDictationDelivered: base.firstDictationDelivered,
+            triggerRequiresInputMonitoring: base.triggerRequiresInputMonitoring,
+            skippedSteps: skippedSteps))
     }
 }

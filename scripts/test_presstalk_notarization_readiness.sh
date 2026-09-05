@@ -122,6 +122,39 @@ codesign --force --sign - --timestamp=none --options runtime \
 check "missing NSMicrophoneUsageDescription is caught" 1 bash "$GATE" --app "$WORK/NoPlist.app"
 
 echo
+echo "== an entitlement set to false is not an entitlement =="
+# `grep` for the entitlement name is satisfied by <false/>. The gate has to read
+# the value.
+cat >"$WORK/false.entitlements" <<'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>com.apple.security.device.audio-input</key>
+    <false/>
+</dict>
+</plist>
+PLIST
+make_bundle "$WORK/FalseEnt.app" 1 0 0
+codesign --force --sign - --timestamp=none --options runtime \
+  --entitlements "$WORK/false.entitlements" "$WORK/FalseEnt.app/Contents/MacOS/tinyapp" >/dev/null 2>&1
+codesign --force --sign - --timestamp=none --options runtime \
+  --entitlements "$WORK/false.entitlements" "$WORK/FalseEnt.app" >/dev/null 2>&1
+check "audio-input set to false is caught" 1 bash "$GATE" --app "$WORK/FalseEnt.app"
+expect_output "  says it is set to false" "set to false"
+
+echo
+echo "== a Mach-O without the executable bit is still code =="
+# find -perm +111 walks straight past this one.
+make_bundle "$WORK/NoExecBit.app" 1 1 0
+cc -o "$WORK/NoExecBit.app/Contents/Resources/quiet-helper" "$WORK/tiny.c"
+chmod 644 "$WORK/NoExecBit.app/Contents/Resources/quiet-helper"
+codesign --force --sign - --timestamp=none --options runtime \
+  --entitlements "$ROOT/resources/PressTalk.entitlements" "$WORK/NoExecBit.app" >/dev/null 2>&1
+check "non-executable Mach-O is still inspected" 1 bash "$GATE" --app "$WORK/NoExecBit.app"
+expect_output "  names the quiet binary" "quiet-helper"
+
+echo
 echo "== json output is valid =="
 bash "$GATE" --app "$WORK/Clean.app" --json-output "$WORK/result.json" >/dev/null 2>&1 || true
 check "json output parses" 0 python3 -c "import json,sys; json.load(open('$WORK/result.json'))"

@@ -86,18 +86,52 @@ def main() -> int:
             total += t
         return (errors / total * 100) if total else None
 
+    # The delivered text is what the user actually got: post-cleanup,
+    # post-vocabulary-repair, and after the app decided which candidate to keep.
+    # Scoring the first Whisper candidate instead measures a value the app is
+    # free to discard.
+    delivered: dict[str, str] = {}
+    results_path = Path(args.sweep, "results.jsonl")
+    if results_path.exists():
+        for line in results_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            fixture = Path(record.get("fixture", "")).stem
+            if fixture:
+                delivered[fixture] = record.get("transcript", "")
+    for row in rows:
+        row["delivered"] = delivered.get(row["fixture"])
+
     contested = [r for r in rows if r["whisper"] is not None]
     print(f"clips scored                     {len(rows)}")
-    print(f"clips where the fallback ran     {len(contested)}"
-          f"  ({len(contested) / len(rows):.0%})" if rows else "")
+    if rows:
+        print(f"clips where the fallback ran     {len(contested)}  ({len(contested) / len(rows):.0%})")
+
+    # The corpus number, including clips the fallback never touched and clips
+    # that produced nothing. This is the one to quote about the product.
+    scored_delivered = [r for r in rows if r.get("delivered") is not None]
+    if scored_delivered:
+        corpus = wer_over((r["reference"], r["delivered"]) for r in scored_delivered)
+        empty = sum(1 for r in scored_delivered if not r["delivered"].strip())
+        print()
+        print(f"WHOLE CORPUS, text as delivered  {corpus:.2f}% WER over {len(scored_delivered)} clips"
+              f" ({empty} produced nothing)")
     print()
 
     if contested:
         parakeet_wer = wer_over((r["reference"], r["parakeet"]) for r in contested)
-        whisper_wer = wer_over((r["reference"], r["whisper"]) for r in contested)
+        # Prefer the delivered text; fall back to the raw candidate only where the
+        # harness did not record one.
+        whisper_wer = wer_over(
+            (r["reference"], r["delivered"] if r.get("delivered") else r["whisper"])
+            for r in contested)
         print("On the clips where the fallback ran, scored against the same reference:")
-        print(f"  Parakeet alone                 {parakeet_wer:.2f}% WER")
-        print(f"  Whisper fallback (what ships)  {whisper_wer:.2f}% WER")
+        print(f"  Parakeet candidate alone       {parakeet_wer:.2f}% WER")
+        print(f"  As delivered (with fallback)   {whisper_wer:.2f}% WER")
         delta = whisper_wer - parakeet_wer
         verdict = "worse" if delta > 0 else "better"
         print(f"  The fallback is {abs(delta):.2f} points {verdict}.")
@@ -106,7 +140,7 @@ def main() -> int:
         better = worse = same = 0
         for r in contested:
             pe, _ = word_error_rate(r["reference"], r["parakeet"])
-            we, _ = word_error_rate(r["reference"], r["whisper"])
+            we, _ = word_error_rate(r["reference"], r["delivered"] if r.get("delivered") else r["whisper"])
             if we < pe:
                 better += 1
             elif we > pe:
@@ -120,11 +154,13 @@ def main() -> int:
     for r in contested:
         by_category.setdefault(r["category"], []).append(r)
     if by_category:
-        print(f"{'category':<16}{'n':>4}{'parakeet':>11}{'whisper':>10}{'delta':>9}")
+        print(f"{'category':<16}{'n':>4}{'parakeet':>11}{'delivered':>12}{'delta':>9}")
         for category, group in sorted(by_category.items()):
             p = wer_over((r["reference"], r["parakeet"]) for r in group)
-            w = wer_over((r["reference"], r["whisper"]) for r in group)
-            print(f"{category:<16}{len(group):>4}{p:>10.1f}%{w:>9.1f}%{w - p:>+9.1f}")
+            w = wer_over(
+                (r["reference"], r["delivered"] if r.get("delivered") else r["whisper"])
+                for r in group)
+            print(f"{category:<16}{len(group):>4}{p:>10.1f}%{w:>11.1f}%{w - p:>+9.1f}")
 
     if args.out:
         Path(args.out).write_text(json.dumps(rows, indent=2, ensure_ascii=False) + "\n")

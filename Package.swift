@@ -20,6 +20,11 @@ let package = Package(
             name: "presstalk-asr-bench",
             targets: ["PressTalkAsrBench"]
         ),
+        // Never bundled into the app: the app holds only public keys.
+        .executable(
+            name: "presstalk-license",
+            targets: ["PressTalkLicenseTool"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
@@ -48,6 +53,10 @@ let package = Package(
         ),
         .testTarget(
             name: "PressTalkCoreTests",
+            dependencies: ["PressTalkCore"]
+        ),
+        .executableTarget(
+            name: "PressTalkLicenseTool",
             dependencies: ["PressTalkCore"]
         ),
         .executableTarget(

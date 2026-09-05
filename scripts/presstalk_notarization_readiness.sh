@@ -55,6 +55,8 @@ fi
 
 FAILURES=()
 CHECKS=()
+WORK_PLIST="$(mktemp "${TMPDIR:-/tmp}/presstalk-entitlements.XXXXXX")"
+trap 'rm -f "$WORK_PLIST"' EXIT
 
 record() {
   # record <name> <ok|fail> <detail>
@@ -129,6 +131,9 @@ MACHO_TOTAL=0
 MACHO_BAD_FLAGS=()
 MACHO_BAD_AUTHORITY=()
 
+# Classify by file content, not by the executable bit. A dylib or a bundled
+# binary shipped without +x is still code the notary service inspects, and
+# filtering on permissions would walk straight past it.
 while IFS= read -r candidate; do
   file "$candidate" 2>/dev/null | grep -q 'Mach-O' || continue
   MACHO_TOTAL=$((MACHO_TOTAL + 1))
@@ -147,7 +152,7 @@ while IFS= read -r candidate; do
   if [[ "$authority" != "$EXPECTED_AUTHORITY" ]]; then
     MACHO_BAD_AUTHORITY+=("$relative signed by ${authority}")
   fi
-done < <(find "$APP_BUNDLE" -type f -perm +111)
+done < <(find "$APP_BUNDLE" -type f)
 
 record "macho.count" ok "$MACHO_TOTAL Mach-O binaries in the bundle"
 
@@ -164,9 +169,22 @@ else
 fi
 
 # --- Entitlements ----------------------------------------------------------
-ENTITLEMENTS="$(codesign -d --entitlements - --xml "$MAIN_BINARY" 2>/dev/null || true)"
-if printf '%s' "$ENTITLEMENTS" | grep -q 'com.apple.security.device.audio-input'; then
-  record "entitlements.audio_input" ok "com.apple.security.device.audio-input present"
+ENTITLEMENTS_PLIST="$WORK_PLIST"
+codesign -d --entitlements - --xml "$MAIN_BINARY" >"$ENTITLEMENTS_PLIST" 2>/dev/null || true
+
+# Read the value, not just the key. `grep` for the entitlement name is satisfied
+# by `<false/>`, which is the same as not having it.
+audio_input_value=""
+if [[ -s "$ENTITLEMENTS_PLIST" ]]; then
+  audio_input_value="$(/usr/libexec/PlistBuddy -c 'Print :com.apple.security.device.audio-input' \
+    "$ENTITLEMENTS_PLIST" 2>/dev/null || true)"
+fi
+
+if [[ "$audio_input_value" == "true" ]]; then
+  record "entitlements.audio_input" ok "com.apple.security.device.audio-input = true"
+elif [[ -n "$audio_input_value" ]]; then
+  record "entitlements.audio_input" fail \
+    "com.apple.security.device.audio-input is present but set to ${audio_input_value}"
 elif [[ "$REQUIRE_HARDENED" == "0" ]]; then
   record "entitlements.audio_input" ok "not required for an unhardened dev build"
 else
@@ -187,6 +205,15 @@ if [[ "$REQUIRE_DEVELOPER_ID" == "1" ]]; then
     record "developer_id.team" ok "$team"
   else
     record "developer_id.team" fail "TeamIdentifier not set"
+  fi
+
+  # Notarization rejects signatures without a secure timestamp, and the local
+  # build default is --timestamp=none, so this is easy to ship by accident.
+  if codesign_report "$MAIN_BINARY" | grep -q '^Timestamp='; then
+    record "developer_id.secure_timestamp" ok "signature carries a secure timestamp"
+  else
+    record "developer_id.secure_timestamp" fail \
+      "no secure timestamp; sign with --timestamp (PRESSTALK_CODESIGN_TIMESTAMP=1)"
   fi
 
   if xcrun stapler validate "$APP_BUNDLE" >/dev/null 2>&1; then

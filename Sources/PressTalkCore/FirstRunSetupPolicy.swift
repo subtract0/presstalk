@@ -37,6 +37,10 @@ public struct FirstRunSetupPolicy {
         public let speechModelReady: Bool
         public let firstDictationDelivered: Bool
         public let triggerRequiresInputMonitoring: Bool
+        /// Optional steps the user chose to pass over. Without this the
+        /// policy keeps selecting a step the UI already offered to skip, so
+        /// the advertised optional path never advances.
+        public let skippedSteps: Set<Step>
 
         public init(
             microphoneCaptureVerified: Bool,
@@ -44,7 +48,8 @@ public struct FirstRunSetupPolicy {
             accessibilityGranted: Bool,
             speechModelReady: Bool,
             firstDictationDelivered: Bool,
-            triggerRequiresInputMonitoring: Bool
+            triggerRequiresInputMonitoring: Bool,
+            skippedSteps: Set<Step> = []
         ) {
             self.microphoneCaptureVerified = microphoneCaptureVerified
             self.inputMonitoringGranted = inputMonitoringGranted
@@ -52,6 +57,7 @@ public struct FirstRunSetupPolicy {
             self.speechModelReady = speechModelReady
             self.firstDictationDelivered = firstDictationDelivered
             self.triggerRequiresInputMonitoring = triggerRequiresInputMonitoring
+            self.skippedSteps = skippedSteps
         }
     }
 
@@ -69,6 +75,9 @@ public struct FirstRunSetupPolicy {
     }
 
     public func state(of step: Step, given conditions: Conditions) -> StepState {
+        if conditions.skippedSteps.contains(step), step.isOptional {
+            return .skipped
+        }
         switch step {
         case .microphone:
             // Deliberately not the authorization status. That reads .authorized
@@ -89,7 +98,10 @@ public struct FirstRunSetupPolicy {
     /// The one step to put in front of the user. Returning a single step is the
     /// point: three simultaneous system dialogs are three chances to say no.
     public func currentStep(for conditions: Conditions) -> Step? {
-        steps(for: conditions).first { state(of: $0, given: conditions) != .satisfied }
+        steps(for: conditions).first {
+            let state = state(of: $0, given: conditions)
+            return state != .satisfied && state != .skipped
+        }
     }
 
     /// Setup is complete when text has actually been delivered, not when the
@@ -110,7 +122,12 @@ public struct FirstRunSetupPolicy {
     public func progress(_ conditions: Conditions) -> Double {
         let required = steps(for: conditions)
         guard !required.isEmpty else { return 1 }
-        let done = required.filter { state(of: $0, given: conditions) == .satisfied }.count
+        // A skipped optional step counts as resolved, or progress sticks below
+        // 100% for someone who legitimately declined it.
+        let done = required.filter {
+            let state = state(of: $0, given: conditions)
+            return state == .satisfied || state == .skipped
+        }.count
         return Double(done) / Double(required.count)
     }
 }

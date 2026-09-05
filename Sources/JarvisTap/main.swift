@@ -7022,6 +7022,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 rememberDictation(transcript, deliveryFailed: false)
                 if !settingsStore.firstDictationDelivered {
                     settingsStore.firstDictationDelivered = true
+                    // The trial clock starts when the product first works, not
+                    // when it was installed, so a slow model download does not
+                    // eat someone's trial.
+                    licenseStore.startTrialIfNeeded()
                     traceLogger.log("First dictation delivered; setup can complete")
                 }
 

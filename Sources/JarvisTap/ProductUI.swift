@@ -1,5 +1,7 @@
 import AppKit
+import CryptoKit
 import Foundation
+import PressTalkCore
 
 struct VoiceLightBands {
     let low: Double
@@ -40,60 +42,102 @@ struct PressTalkNativeTriggerCalibration: Codable, Hashable {
     }
 }
 
+/// Holds the installation's entitlement: a verified licence if one has been
+/// imported, otherwise grandfathering or a trial.
+///
+/// Verification is entirely offline. No activation call, no machine binding, no
+/// periodic re-check. A buy-once local app that stops working when a server does
+/// has broken the thing it was sold on, so the licence is a signed file this Mac
+/// can check on its own forever.
 final class PressTalkLicenseStore {
-    enum Tier: String {
-        case freeBeta
-        case pro
-        case founding
-
-        var displayName: String {
-            switch self {
-            case .freeBeta:
-                return "Free Beta"
-            case .pro:
-                return "Pro"
-            case .founding:
-                return "Founding"
-            }
-        }
-
-        var summary: String {
-            switch self {
-            case .freeBeta:
-                return "Unlimited local dictation stays free. Paid plans are for power features, not basic speech-to-text."
-            case .pro:
-                return "Pro is intended for advanced vocabulary, formatting modes, app profiles, and workflow control."
-            case .founding:
-                return "Founding is the early-supporter tier with all Pro features through the early product cycle."
-            }
-        }
-    }
-
     private enum Key {
-        static let tier = "JarvisTap.PlanTier"
+        static let legacyTier = "JarvisTap.PlanTier"
+        static let licenseString = "PressTalk.License"
+        static let trialStartedAt = "PressTalk.TrialStartedAt"
     }
+
+    /// Public keys the app trusts. Rotating means adding a key here and shipping
+    /// an update; licences signed by an older key keep working because the key
+    /// id travels with the licence.
+    ///
+    /// Empty until the owner runs `presstalk-license generate-key` and pastes the
+    /// public key in. With no trusted keys, imports fail closed with
+    /// "signed by a key this version does not recognise", which is accurate.
+    static let trustedPublicKeys: [String: String] = [:]
 
     private let defaults: UserDefaults
-    private let overrideTier: Tier?
+    private let policy = EntitlementPolicy()
+    private let overrideEntitlement: String?
+    private let verifier: PressTalkLicenseVerifier
 
     init(defaults: UserDefaults = .standard, env: [String: String] = ProcessInfo.processInfo.environment) {
         self.defaults = defaults
-        self.overrideTier = env["PRESSTALK_PLAN_TIER"].flatMap(Tier.init(rawValue:))
-        defaults.register(defaults: [
-            Key.tier: Tier.freeBeta.rawValue,
-        ])
-    }
+        self.overrideEntitlement = env["PRESSTALK_ENTITLEMENT_OVERRIDE"]
 
-    var currentTier: Tier {
-        if let overrideTier {
-            return overrideTier
+        var keys: [String: Curve25519.Signing.PublicKey] = [:]
+        for (keyID, encoded) in Self.trustedPublicKeys {
+            guard let data = Data(base64Encoded: encoded),
+                  let key = try? Curve25519.Signing.PublicKey(rawRepresentation: data)
+            else { continue }
+            keys[keyID] = key
         }
-        return Tier(rawValue: defaults.string(forKey: Key.tier) ?? "") ?? .freeBeta
+        let major = Int(
+            (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0")
+                .split(separator: ".").first.map(String.init) ?? "0") ?? 0
+        self.verifier = PressTalkLicenseVerifier(trustedKeys: keys, runningMajorVersion: max(major, 1))
     }
 
-    var pricingSummary: String {
-        "Planned pricing: Pro $8/mo or $59/yr. Founding $49 lifetime. Core local dictation remains free."
+    private var priorUse: EntitlementPolicy.PriorUseEvidence {
+        EntitlementPolicy.PriorUseEvidence(
+            hasSeenSetupGuide: defaults.bool(forKey: "JarvisTap.HasSeenSetupGuide"),
+            hasDeliveredDictation: defaults.bool(forKey: "JarvisTap.FirstDictationDelivered"),
+            hasStoredPlanTier: defaults.string(forKey: Key.legacyTier) != nil)
     }
+
+    private var verifiedEntitlement: String? {
+        if let overrideEntitlement { return overrideEntitlement }
+        guard let stored = defaults.string(forKey: Key.licenseString) else { return nil }
+        guard case .success(let license) = verifier.verify(stored) else { return nil }
+        return license.entitlement
+    }
+
+    var state: EntitlementPolicy.State {
+        policy.state(
+            verifiedEntitlement: verifiedEntitlement,
+            priorUse: priorUse,
+            trialStartedAt: defaults.object(forKey: Key.trialStartedAt) as? Date,
+            now: Date())
+    }
+
+    /// Called after the first successful dictation. The trial starts when the
+    /// product first works, not when it was installed.
+    func startTrialIfNeeded() {
+        guard defaults.object(forKey: Key.trialStartedAt) == nil else { return }
+        defaults.set(Date(), forKey: Key.trialStartedAt)
+    }
+
+    /// Verifies before storing. A bad paste must never displace a licence that
+    /// was working.
+    @discardableResult
+    func importLicense(_ encoded: String) -> Result<PressTalkLicense, PressTalkLicenseError> {
+        let result = verifier.verify(encoded)
+        if case .success = result {
+            defaults.set(encoded.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.licenseString)
+        }
+        return result
+    }
+
+    var currentPlanName: String {
+        switch state {
+        case .grandfathered: return "Free (early user)"
+        case .licensed(let entitlement): return entitlement.capitalized
+        case .trial: return "Trial"
+        case .trialExpired: return "Trial finished"
+        }
+    }
+
+    var planSummary: String { PressTalkOffer.stateSummary(state) }
+    var pricingSummary: String { PressTalkOffer.founderSummary }
 }
 
 private final class VoiceLightView: NSView {
@@ -925,6 +969,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let restartAppButton = NSButton(title: "Restart PressTalk", target: nil, action: nil)
     private let repairLocalSigningButton = NSButton(title: "Repair Signing", target: nil, action: nil)
     private let exportDiagnosticsButton = NSButton(title: "Export Diagnostics", target: nil, action: nil)
+    private let enterLicenseButton = NSButton(title: "Enter Licence Key…", target: nil, action: nil)
     private let microphoneSettingsButton = NSButton(title: "Microphone", target: nil, action: nil)
     private let inputMonitoringSettingsButton = NSButton(title: "Input Monitoring", target: nil, action: nil)
     private let accessibilitySettingsButton = NSButton(title: "Accessibility", target: nil, action: nil)
@@ -982,8 +1027,8 @@ final class PressTalkSettingsWindowController: NSWindowController {
         languagePopup.selectItem(at: JarvisTapSettingsStore.LanguageOption.allCases.firstIndex(of: settingsStore.preferredLanguage) ?? 0)
         insertionSuffixPopup.selectItem(at: JarvisTapSettingsStore.InsertionSuffixOption.allCases.firstIndex(of: settingsStore.insertionSuffix) ?? 0)
         releaseTailSlider.doubleValue = settingsStore.releaseTailMaxSeconds
-        currentPlanValueLabel.stringValue = licenseStore.currentTier.displayName
-        planSummaryLabel.stringValue = licenseStore.currentTier.summary
+        currentPlanValueLabel.stringValue = licenseStore.currentPlanName
+        planSummaryLabel.stringValue = licenseStore.planSummary
         pricingSummaryLabel.stringValue = licenseStore.pricingSummary
         plansButton.isHidden = commerceConfig.plansURL == nil
         upgradeButton.isHidden = commerceConfig.upgradeURL == nil
@@ -1081,7 +1126,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         setupButtonsRow.alignment = .centerY
         setupButtonsRow.spacing = 8
 
-        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, repairLocalSigningButton, exportDiagnosticsButton])
+        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, repairLocalSigningButton, exportDiagnosticsButton, enterLicenseButton])
         diagnosticsButtonsRow.orientation = .horizontal
         diagnosticsButtonsRow.alignment = .centerY
         diagnosticsButtonsRow.spacing = 8
@@ -1238,6 +1283,8 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         exportDiagnosticsButton.target = self
         exportDiagnosticsButton.action = #selector(exportDiagnostics(_:))
+        enterLicenseButton.target = self
+        enterLicenseButton.action = #selector(enterLicense(_:))
 
         microphoneSettingsButton.target = self
         microphoneSettingsButton.action = #selector(openMicrophoneSettings(_:))
@@ -1502,6 +1549,42 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func repairLocalSigning(_ sender: Any?) {
         onRepairLocalSigning?()
+    }
+
+    /// Paste a licence key. Verified before it is stored, so a bad paste cannot
+    /// displace a licence that was already working.
+    @objc private func enterLicense(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "Enter your licence key"
+        alert.informativeText = "Paste the key from your receipt email. "
+            + "It is checked on this Mac; nothing is sent anywhere."
+        alert.addButton(withTitle: "Activate")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.placeholderString = "PRESSTALK-1.…"
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        switch licenseStore.importLicense(field.stringValue) {
+        case .success(let license):
+            let confirmation = NSAlert()
+            confirmation.messageText = "Licence activated"
+            confirmation.informativeText =
+                "\(license.entitlement.capitalized). Covers updates through \(license.maxMajorVersion).x."
+            confirmation.runModal()
+            currentPlanValueLabel.stringValue = licenseStore.currentPlanName
+            planSummaryLabel.stringValue = licenseStore.planSummary
+        case .failure(let error):
+            let failure = NSAlert()
+            failure.alertStyle = .warning
+            failure.messageText = "That licence key did not activate"
+            // The user-facing message says what to do; the raw case does not.
+            failure.informativeText = error.userFacingMessage
+            failure.runModal()
+        }
     }
 
     @objc private func exportDiagnostics(_ sender: Any?) {

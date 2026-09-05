@@ -1,104 +1,30 @@
-# Monetization Plan
+# Monetization
 
-Status: superseded by [PressTalk Distribution Roadmap v1.0](PRESSTALK_DISTRIBUTION_ROADMAP_V1.md).
+Superseded. There is exactly one source for prices and entitlements now, and it
+is code:
 
-The current v1.0 commercial direction is a buy-once local dictation wedge:
-`$20` founder early access, then `$39` personal, with later commercial
-licenses. Keep the notes below as historical context only; do not implement a
-new monthly/free/pro structure before the v1.0 paid beta validates.
+- `Sources/PressTalkCore/EntitlementPolicy.swift` — `PressTalkOffer` holds the
+  prices and what they cover; `EntitlementPolicy` decides what an installation
+  is entitled to.
 
-This was the previous product direction for PressTalk.
+The offer: **$20 founder, $39 personal, one-time, updates through 1.x, no
+subscription.**
 
-## Positioning
+This file previously described a Free/Pro/Founding structure at $8/mo, $59/yr,
+and $49 lifetime. That contradicted both the distribution roadmap and the
+string the app itself displayed, and three prices in three places is how a
+product ends up charging someone something they never agreed to. The old
+structure is not deferred; it is dropped.
 
-PressTalk is a local-first Apple Silicon dictation tool.
+Two commitments the code enforces, not just documents:
 
-That means the monetization should feel lighter and fairer than cloud transcription products. The core promise is:
+- Anyone who used PressTalk before it was paid keeps core dictation free. The
+  shipped settings pane promised that for months. `EntitlementPolicy` detects
+  prior use and grandfathers those installations, and there is a test whose only
+  job is to fail if an existing user is ever turned into an expired trial.
+- "Updates through 1.x" is written into the licence as `maxMajorVersion` and
+  checked at verification, so it is a promise the app can keep rather than a
+  sentence on a checkout page.
 
-- hold `Option + Space`, `Fn / Globe`, `Option`, `F5`, or trackpad hold
-- speak
-- release
-- get text locally
-
-That should remain free.
-
-## Model
-
-The recommended structure is:
-
-- `Free`
-- `Pro`
-- `Founding`
-
-## Pricing
-
-Planned pricing:
-
-- `Free`
-- `Pro Monthly`: `$8/mo`
-- `Pro Yearly`: `$59/yr`
-- `Founding Lifetime`: `$49`
-
-These numbers are intentionally below the common `$12–15/mo` cloud-dictation range because PressTalk has a narrower, local-first cost structure.
-
-## What Stays Free
-
-- unlimited basic local dictation
-- configurable hold-to-talk trigger
-- basic HUD
-- basic language and insertion settings
-- standard local WhisperKit path
-- normal text insertion into the focused app
-
-## What Belongs in Pro
-
-Pro should unlock leverage, not basic usability.
-
-Recommended Pro features:
-
-- custom vocabulary
-- replacements and snippets
-- app-specific profiles
-- formatting modes such as `plain`, `email`, `notes`, `code-safe`
-- advanced punctuation behavior
-- hotkey customization
-- dictation history
-- export/import settings
-- future sync
-
-## Founding Tier
-
-Founding should be simple:
-
-- one-time payment
-- all Pro features through the early product cycle
-- optional supporter badge in Settings
-
-This is the fastest way to validate willingness to pay without forcing a subscription too early.
-
-## Payments
-
-Recommended payment stack:
-
-- `Lemon Squeezy` first
-
-Reason:
-
-- Merchant of Record
-- simpler VAT/sales-tax handling
-- good fit for indie Mac software
-
-The app should eventually support:
-
-- `Upgrade to Pro`
-- `Enter License Key`
-- `Restore Purchase`
-- `Manage Subscription`
-
-## Rollout
-
-1. Keep `0.1.x` generous and stable.
-2. Add visible plan/billing scaffolding in-app.
-3. Wire a real checkout URL.
-4. Launch Founding + Pro.
-5. Gate only power features, not core dictation quality.
+Commercial and team licensing are not designed yet. They need inbound demand
+first; see `PRESSTALK_DISTRIBUTION_ROADMAP_V1.md`.

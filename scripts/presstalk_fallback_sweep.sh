@@ -53,7 +53,7 @@ done < <(find "$FIXTURE_DIR" -type f \( -name '*.aiff' -o -name '*.wav' -o -name
 if [[ "$LIMIT" -gt 0 && "${#FIXTURES[@]}" -gt "$LIMIT" ]]; then
   FIXTURES=("${FIXTURES[@]:0:$LIMIT}")
 fi
-echo "Sweeping ${#FIXTURES[@]} fixtures"
+echo "Sweeping ${#FIXTURES[@]} fixtures (transcript logging ON for scoring; output goes to $OUT_DIR)"
 
 harness_pid=""
 cleanup() {
@@ -67,6 +67,10 @@ pkill -f "$APP_BUNDLE/Contents/MacOS/jarvistap" 2>/dev/null || true
 perl -e 'select(undef,undef,undef,1.0)'
 
 printf '%s\n' "${FIXTURES[0]}" >"$POINTER"
+# Scoring needs the candidate transcripts, and they are redacted by default. This
+# is the case the opt-in exists for: a developer measuring recognition on their
+# own machine, against fixtures, into a temporary directory.
+PRESSTALK_LOG_TRANSCRIPTS=1 \
 PRESSTALK_TEST_HARNESS=1 \
 PRESSTALK_FIXTURE_AUDIO="$POINTER" \
 PRESSTALK_HARNESS_RESULTS="$RESULTS" \

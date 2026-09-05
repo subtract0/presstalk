@@ -66,6 +66,18 @@ def main() -> int:
                 attempted.append({"fixture": "", "transcript": "", "outcome": "unparseable"})
 
     trace = Path(args.sweep, "trace.log").read_text(errors="replace")
+
+    # Transcripts are redacted in the log by default. Scoring "<redacted chars=57
+    # ...>" against a reference yields a word error rate over 100% and a glowing
+    # verdict for whichever engine was not redacted, which is how a privacy fix
+    # silently turned into a 84-point improvement.
+    if "<redacted chars=" in trace:
+        raise SystemExit(
+            "This trace has redacted transcripts, so nothing here can be scored.\n"
+            "Re-run the sweep with PRESSTALK_LOG_TRANSCRIPTS=1 "
+            "(presstalk_fallback_sweep.sh sets it)."
+        )
+
     rows = []
     for block in trace.split("Fixture audio loaded")[1:]:
         fixture_match = FIXTURE.search("Fixture audio loaded" + block[:400])

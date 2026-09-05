@@ -284,6 +284,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var darwinNotificationObserverInstalled = false
     private var productionInsertionProbeObserverInstalled = false
     private var whisperLoadState: WhisperLoadState = .idle
+    private let dictationRecoveryPolicy = DictationRecoveryPolicy()
+    /// In memory only, bounded and expiring. Never written to disk: someone who
+    /// bought this because it is local should not find a transcript log in
+    /// Application Support.
+    private var recoverableDictations: [DictationRecoveryPolicy.Entry] = []
+    private var recentDictationsMenu: NSMenu?
     private var firstRunSetupWindowController: FirstRunSetupWindowController?
     private var whisperWarmupTask: Task<Void, Never>?
     private var amplitudeMonitorTask: Task<Void, Never>?
@@ -742,6 +748,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         abortPopupsMenuItem.target = self
         self.toggleAbortPopupsMenuItem = abortPopupsMenuItem
         menu.addItem(abortPopupsMenuItem)
+
+        let recentItem = NSMenuItem(title: "Recent Dictations", action: nil, keyEquivalent: "")
+        let recentMenu = NSMenu()
+        recentItem.submenu = recentMenu
+        recentItem.toolTip = "The last few transcripts, kept in memory only. Choose one to copy it."
+        recentDictationsMenu = recentMenu
+        menu.addItem(recentItem)
+        refreshRecentDictationsMenu()
 
         let setupItem = NSMenuItem(title: "Run Setup…", action: #selector(openFirstRunSetupFromMenu(_:)), keyEquivalent: "")
         setupItem.target = self
@@ -4989,6 +5003,65 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     /// Shows guided setup, wiring each step to the same code paths the rest of
     /// the app uses, so the window cannot drift into claiming something the app
     /// disagrees with.
+    /// Records a transcript so it can be recovered from the menu. Dictating a
+    /// paragraph into the wrong window used to mean losing it outright.
+    private func rememberDictation(_ transcript: String, deliveryFailed: Bool) {
+        let entry = DictationRecoveryPolicy.Entry(
+            text: transcript, createdAt: Date(), deliveryFailed: deliveryFailed)
+        recoverableDictations = dictationRecoveryPolicy.inserting(
+            entry, into: recoverableDictations, now: Date())
+        DispatchQueue.main.async { [weak self] in
+            self?.refreshRecentDictationsMenu()
+        }
+    }
+
+    private func refreshRecentDictationsMenu() {
+        guard let menu = recentDictationsMenu else { return }
+        // Prune on display too: an entry that aged out while the menu sat closed
+        // must not still be offered.
+        recoverableDictations = dictationRecoveryPolicy.pruned(recoverableDictations, now: Date())
+        menu.removeAllItems()
+
+        if recoverableDictations.isEmpty {
+            let empty = NSMenuItem(title: "Nothing yet", action: nil, keyEquivalent: "")
+            empty.isEnabled = false
+            menu.addItem(empty)
+            return
+        }
+
+        for (index, entry) in recoverableDictations.enumerated() {
+            let item = NSMenuItem(
+                title: dictationRecoveryPolicy.menuLabel(for: entry),
+                action: #selector(copyRecentDictation(_:)),
+                keyEquivalent: "")
+            item.target = self
+            item.tag = index
+            item.toolTip = entry.text
+            menu.addItem(item)
+        }
+
+        menu.addItem(.separator())
+        let forget = NSMenuItem(title: "Forget These", action: #selector(forgetRecentDictations(_:)), keyEquivalent: "")
+        forget.target = self
+        forget.toolTip = "Clears them from memory now, rather than waiting for them to expire."
+        menu.addItem(forget)
+    }
+
+    @objc private func copyRecentDictation(_ sender: NSMenuItem) {
+        guard recoverableDictations.indices.contains(sender.tag) else { return }
+        let entry = recoverableDictations[sender.tag]
+        copyTranscriptToPasteboard(entry.text)
+        traceLogger.log("Recovered dictation copied characters=\(entry.text.count)")
+        present(.copied(entry.text))
+    }
+
+    @objc private func forgetRecentDictations(_ sender: Any?) {
+        let count = recoverableDictations.count
+        recoverableDictations.removeAll()
+        refreshRecentDictationsMenu()
+        traceLogger.log("Recoverable dictations cleared count=\(count)")
+    }
+
     @objc private func openFirstRunSetupFromMenu(_ sender: Any?) {
         presentFirstRunSetup()
     }
@@ -6920,6 +6993,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 fflush(stdout)
 
                 recordHarnessOutcome(transcript: transcript, releasedAt: releaseTelemetryStart)
+                rememberDictation(transcript, deliveryFailed: false)
                 if !settingsStore.firstDictationDelivered {
                     settingsStore.firstDictationDelivered = true
                     traceLogger.log("First dictation delivered; setup can complete")
@@ -6945,7 +7019,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                             finishProcessing(reason: "dictation_paste")
                         case .copiedFallback(let reason):
                             traceLogger.log("Dictation copied because paste unavailable reason=\(reason)")
-                            present(.copied(transcript))
+                            rememberDictation(transcript, deliveryFailed: true)
+                            present(.copied("Copied — could not paste. \(transcript)"))
                             finishProcessing(reason: "dictation_copy_fallback")
                         }
                     } else {

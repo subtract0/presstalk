@@ -1,5 +1,6 @@
 import CryptoKit
 import Foundation
+import Security
 
 /// Keeps dictated words out of files.
 ///
@@ -27,10 +28,24 @@ public enum TranscriptRedaction {
         return value == "1" || value == "true" || value == "yes"
     }
 
-    /// A short digest, enough to tell whether two transcripts are the same
-    /// without revealing either.
+    /// Random per process, discarded on exit. Without it the digest below is an
+    /// unsalted SHA-256 prefix over a short, guessable string, which is not
+    /// redaction at all: a four-digit utterance falls to ten thousand guesses,
+    /// and "what is my PIN" is exactly the kind of thing people dictate. Salting
+    /// per run keeps the digest useful for comparing two transcripts inside one
+    /// debugging session and worthless to anyone reading the file afterwards.
+    private static let sessionSalt: Data = {
+        var bytes = [UInt8](repeating: 0, count: 32)
+        _ = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        return Data(bytes)
+    }()
+
+    /// Tells two transcripts apart within one run. Means nothing across runs, on
+    /// purpose.
     public static func digest(_ text: String) -> String {
-        let hash = SHA256.hash(data: Data(text.utf8))
+        var input = sessionSalt
+        input.append(Data(text.utf8))
+        let hash = SHA256.hash(data: input)
         return hash.compactMap { String(format: "%02x", $0) }.joined().prefix(8).description
     }
 
@@ -42,7 +57,7 @@ public enum TranscriptRedaction {
     public static func redacted(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         if trimmed.isEmpty { return "<empty>" }
-        return "<redacted chars=\(trimmed.count) words=\(wordCount(trimmed)) digest=\(digest(trimmed))>"
+        return "<redacted chars=\(trimmed.count) words=\(wordCount(trimmed)) run-digest=\(digest(trimmed))>"
     }
 
     /// What actually gets written, honouring the opt-in.

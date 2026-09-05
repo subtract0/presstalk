@@ -101,10 +101,24 @@ provisional recommendation is primary-only with the second pass explicitly
 optional. Note that a fresh install already behaves that way, because the
 fallback model is never downloaded implicitly.
 
+**Trial expiry is classified but not enforced.** `EntitlementPolicy` works out
+whether an install is grandfathered, licensed, on trial, or expired, and
+`allowsDictation` says what each state permits — but nothing calls it. That is
+deliberate: enforcing expiry before there is any way to buy a licence locks
+people out of a product they cannot pay for. Wire it up when the checkout opens,
+and test the whole sequence first: fresh defaults, setup, a dictation, restart,
+then day 15.
+
 **No updater.** Homebrew users get `brew upgrade`; direct-download buyers get an
 email. Sparkle belongs at paid launch, after an actual old-to-new distribution
 build test, which needs the certificate. Do not set `auto_updates true` in the
 cask until the app really installs updates.
+
+**The harness measures recognition, not delivery.** It suppresses insertion by
+default so a test run cannot type into whatever window happens to be focused,
+which means its 144/144 figure means "produced text", not "text arrived in
+another app". Those are the same thing only when insertion works, and insertion
+is exactly what the fresh-Mac run above has to check.
 
 **Live-speech latency is unmeasured.** The 0.95 s p50 comes from replayed audio
 where the silence-aware release tail always runs to its cap. Real speech ends in

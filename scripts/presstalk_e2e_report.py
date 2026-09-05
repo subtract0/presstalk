@@ -74,8 +74,12 @@ def main() -> int:
         "runsAttempted": attempted,
         "runsProducingText": len(produced),
         "runsProducingNothing": empty,
-        # Stated as a rate over attempts, so an empty run cannot be rounded away.
-        "textDeliveryRate": round(len(produced) / attempted, 3) if attempted else None,
+        # Recognition, not delivery. The harness suppresses insertion by default so
+        # it cannot type into the operator's windows, which means it cannot prove
+        # text reached another app. Naming it "delivery" would claim exactly the
+        # thing this harness is unable to check.
+        "textProducedRate": round(len(produced) / attempted, 3) if attempted else None,
+        "insertionExercised": False,
         "keyupToTranscriptSeconds": {
             "count": len(end_to_end),
             "min": round(min(end_to_end), 3) if end_to_end else None,
@@ -97,8 +101,8 @@ def main() -> int:
     print(f"runs attempted       {attempted}")
     print(f"produced text        {len(produced)}")
     print(f"produced nothing     {empty}")
-    if report["textDeliveryRate"] is not None:
-        print(f"text delivery rate   {report['textDeliveryRate']:.1%}")
+    if report["textProducedRate"] is not None:
+        print(f"produced-text rate   {report['textProducedRate']:.1%}  (insertion not exercised)")
     if end_to_end:
         k = report["keyupToTranscriptSeconds"]
         print(f"keyup -> transcript  p50 {k['p50']}s  p95 {k['p95']}s  max {k['max']}s")

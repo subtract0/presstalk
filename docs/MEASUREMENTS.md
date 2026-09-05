@@ -17,11 +17,20 @@ trigger, capture, freeze, recognition, cleanup, vocabulary repair, delivery.
 | Clips attempted | 144 |
 | Produced text | 144 |
 | Produced nothing | 0 |
-| Word error rate, as delivered | **11.25 %** |
+| Word error rate | **11.25 %** |
 
 Scored with `scripts/presstalk_score_fallback_sweep.py` against the written
-references in `~/presstalk-de-eval/eval_set.tsv`, using the text the app actually
-delivered rather than any intermediate candidate.
+references in `~/presstalk-de-eval/eval_set.tsv`, using the text the app finally
+settled on rather than any intermediate candidate. The denominator is every clip
+attempted, taken from the results file: an earlier version built it from trace
+blocks that contained a recogniser candidate, which dropped failed clips entirely
+and then reported "0 produced nothing" over the survivors.
+
+**"Produced text" is not "delivered text".** The harness suppresses insertion so
+a test run cannot type into whatever window is focused, so these runs prove
+recognition reached the end of the pipeline, not that words arrived in another
+app. That distinction is why the fresh-Mac run in
+[LAUNCH_GATES.md](LAUNCH_GATES.md) is still the top open gate.
 
 ## Latency
 

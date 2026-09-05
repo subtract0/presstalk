@@ -50,6 +50,21 @@ def main() -> int:
         if len(parts) >= 3:
             references[(parts[0], parts[1])] = parts[2]
 
+    # The denominator is what was ATTEMPTED, taken from the results file, not
+    # from what the trace happened to contain. Building rows only from trace
+    # blocks that carry a recogniser candidate silently drops every clip that
+    # failed, and then reports "0 produced nothing" over the survivors.
+    attempted: list[dict] = []
+    results_path = Path(args.sweep, "results.jsonl")
+    if results_path.exists():
+        for line in results_path.read_text().splitlines():
+            if not line.strip():
+                continue
+            try:
+                attempted.append(json.loads(line))
+            except json.JSONDecodeError:
+                attempted.append({"fixture": "", "transcript": "", "outcome": "unparseable"})
+
     trace = Path(args.sweep, "trace.log").read_text(errors="replace")
     rows = []
     for block in trace.split("Fixture audio loaded")[1:]:
@@ -113,13 +128,39 @@ def main() -> int:
 
     # The corpus number, including clips the fallback never touched and clips
     # that produced nothing. This is the one to quote about the product.
-    scored_delivered = [r for r in rows if r.get("delivered") is not None]
-    if scored_delivered:
-        corpus = wer_over((r["reference"], r["delivered"]) for r in scored_delivered)
-        empty = sum(1 for r in scored_delivered if not r["delivered"].strip())
-        print()
-        print(f"WHOLE CORPUS, text as delivered  {corpus:.2f}% WER over {len(scored_delivered)} clips"
+    # Every attempted clip counts, including the ones that produced nothing: an
+    # empty transcript scores as a total miss against its reference, which is
+    # what it is.
+    corpus_rows = []
+    rows_by_fixture = {r["fixture"]: r for r in rows}
+    unscorable = 0
+    for record in attempted:
+        fixture = Path(record.get("fixture", "")).stem
+        row = rows_by_fixture.get(fixture)
+        if row is not None:
+            corpus_rows.append((row["reference"], record.get("transcript", "")))
+            continue
+        pieces = fixture.split("__")
+        reference = references.get((pieces[0], pieces[1])) if len(pieces) >= 2 else None
+        if reference is None:
+            # No reference to score against. Reported, never silently dropped.
+            unscorable += 1
+            continue
+        corpus_rows.append((reference, record.get("transcript", "")))
+
+    print()
+    if corpus_rows:
+        corpus = wer_over(iter(corpus_rows))
+        empty = sum(1 for _, hypothesis in corpus_rows if not hypothesis.strip())
+        print(f"WHOLE CORPUS, text as delivered  {corpus:.2f}% WER over {len(corpus_rows)} attempted clips"
               f" ({empty} produced nothing)")
+    else:
+        print("WHOLE CORPUS                     no attempted clips could be scored")
+    if unscorable:
+        print(f"                                 {unscorable} attempted clip(s) had no reference and were skipped")
+    if attempted and len(corpus_rows) + unscorable != len(attempted):
+        print(f"                                 WARNING: {len(attempted)} attempted but "
+              f"{len(corpus_rows)} scored; the denominator is wrong")
     print()
 
     if contested:

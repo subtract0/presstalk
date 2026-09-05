@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Refuses phrases PressTalk has no evidence for.
 #
+# What this catches: superlatives, absolutes, and borrowed numbers. What it
+# cannot catch: an ordinary sentence that is simply false. Passing is a floor,
+# not a review.
+#
 # Every entry here was blocked for a reason recorded beside it. Marketing copy
 # drifts toward superlatives on its own, and the gap between "115x realtime
 # throughput" and "20x faster dictation" is the kind of sentence that gets
@@ -117,4 +121,8 @@ if [[ "$failures" -gt 0 ]]; then
   echo "$failures unsupported claim(s). Either remove the phrase or produce the evidence." >&2
   exit 1
 fi
-echo "No unsupported claims."
+# Deliberately modest. A phrase list cannot establish that a sentence is true --
+# it caught nothing in "no silence guessing, no waiting", which was plainly false
+# against a capture path that waits for silence. Only a reader who knows the code
+# catches that.
+echo "None of the blocked phrases appear. This does not establish that the claims are true."

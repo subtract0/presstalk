@@ -17,6 +17,12 @@ public struct EntitlementPolicy {
         case trial(daysRemaining: Int)
         case trialExpired
 
+        /// Advisory only. Nothing in the app calls this yet, and that is
+        /// deliberate rather than an oversight: enforcing expiry before there is
+        /// a way to buy a licence would lock people out of a product they cannot
+        /// pay for. Classifying correctly and enforcing are separate steps, and
+        /// wiring this up is a decision for whoever turns on the checkout.
+        /// Recorded in docs/LAUNCH_GATES.md as an open gate.
         public var allowsDictation: Bool {
             switch self {
             case .grandfathered, .licensed, .trial: return true

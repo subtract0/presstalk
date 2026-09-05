@@ -5022,6 +5022,24 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// Shows guided setup, wiring each step to the same code paths the rest of
     /// the app uses, so the window cannot drift into claiming something the app
     /// disagrees with.
+    /// Called once the transcript has actually gone somewhere: inserted into the
+    /// focused app, or copied to the clipboard when insertion was unavailable.
+    ///
+    /// Recognising text and delivering it are different events, and this used to
+    /// fire on the first. Setup's entire claim is that it finishes when words
+    /// arrive somewhere the user can see, so recording it before insertion made
+    /// that claim false, and started the trial clock for someone who might never
+    /// have seen a word appear.
+    private func recordDelivery(_ transcript: String, reachedTargetApp: Bool) {
+        rememberDictation(transcript, deliveryFailed: !reachedTargetApp)
+        guard !settingsStore.firstDictationDelivered else { return }
+        settingsStore.firstDictationDelivered = true
+        // The trial starts when the product first works, not when it was
+        // installed, so a slow model download does not eat someone's trial.
+        licenseStore.startTrialIfNeeded()
+        traceLogger.log("First dictation delivered reached_target_app=\(reachedTargetApp ? 1 : 0)")
+    }
+
     /// Records a transcript so it can be recovered from the menu. Dictating a
     /// paragraph into the wrong window used to mean losing it outright.
     private func rememberDictation(_ transcript: String, deliveryFailed: Bool) {
@@ -7026,15 +7044,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 fflush(stdout)
 
                 recordHarnessOutcome(transcript: transcript, releasedAt: releaseTelemetryStart)
-                rememberDictation(transcript, deliveryFailed: false)
-                if !settingsStore.firstDictationDelivered {
-                    settingsStore.firstDictationDelivered = true
-                    // The trial clock starts when the product first works, not
-                    // when it was installed, so a slow model download does not
-                    // eat someone's trial.
-                    licenseStore.startTrialIfNeeded()
-                    traceLogger.log("First dictation delivered; setup can complete")
-                }
 
                 if agentMode == "dictation" {
                     if pasteAutomatically && !config.testHarnessSuppressesInsertion {
@@ -7047,22 +7056,25 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         case .inserted(let method):
                             traceLogger.log("Dictation inserted method=\(method)")
                             releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: method)
+                            recordDelivery(transcript, reachedTargetApp: true)
                             present(.inserted(transcript))
                             finishProcessing(reason: "dictation_insert")
                         case .pasteCommandPosted:
                             traceLogger.log("Dictation paste command posted")
                             releaseLatchedAlternateModifierAfterInsertionIfNeeded(reason: "paste_command_posted")
+                            recordDelivery(transcript, reachedTargetApp: true)
                             present(.inserted(transcript))
                             finishProcessing(reason: "dictation_paste")
                         case .copiedFallback(let reason):
                             traceLogger.log("Dictation copied because paste unavailable reason=\(reason)")
-                            rememberDictation(transcript, deliveryFailed: true)
+                            recordDelivery(transcript, reachedTargetApp: false)
                             present(.copied("Copied — could not paste. \(transcript)"))
                             finishProcessing(reason: "dictation_copy_fallback")
                         }
                     } else {
                         copyTranscriptToPasteboard(transcript)
                         traceLogger.log("Dictation copy completed")
+                        recordDelivery(transcript, reachedTargetApp: false)
                         present(.copied(transcript))
                         finishProcessing(reason: "dictation_copy")
                     }

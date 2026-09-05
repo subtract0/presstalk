@@ -405,6 +405,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return 0
         }
 
+        // Before anything writes a first-run default. Deciding this later cannot
+        // work: by then a new install carries the same flags an old one does,
+        // which grandfathered every user and made the trial unreachable.
+        licenseStore.recordInstallGenerationIfNeeded()
+
         traceLogger.log("Startup initiated trace_log=\(config.traceLogPath)")
         guard acquireSingletonLock() else {
             traceLogger.log("Duplicate PressTalk instance detected; exiting secondary process")

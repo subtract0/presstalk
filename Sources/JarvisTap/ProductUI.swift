@@ -51,9 +51,12 @@ struct PressTalkNativeTriggerCalibration: Codable, Hashable {
 /// can check on its own forever.
 final class PressTalkLicenseStore {
     private enum Key {
-        static let legacyTier = "JarvisTap.PlanTier"
         static let licenseString = "PressTalk.License"
         static let trialStartedAt = "PressTalk.TrialStartedAt"
+        /// Recorded once, at the first launch of a licensing-aware build.
+        static let predatesPaidLicensing = "PressTalk.PredatesPaidLicensing"
+        static let hasSeenSetupGuide = "JarvisTap.HasSeenSetupGuide"
+        static let firstDictationDelivered = "JarvisTap.FirstDictationDelivered"
     }
 
     /// Public keys the app trusts. Rotating means adding a key here and shipping
@@ -87,11 +90,22 @@ final class PressTalkLicenseStore {
         self.verifier = PressTalkLicenseVerifier(trustedKeys: keys, runningMajorVersion: max(major, 1))
     }
 
+    /// Must run before any first-run default is written, and is called from the
+    /// top of `runStartup()` for that reason. A second later the flags it reads
+    /// are indistinguishable between a year-old install and one that launched
+    /// moments ago.
+    func recordInstallGenerationIfNeeded() {
+        guard defaults.object(forKey: Key.predatesPaidLicensing) == nil else { return }
+        let predates = InstallGeneration.predatesPaidLicensing(
+            hasSeenSetupGuide: defaults.bool(forKey: Key.hasSeenSetupGuide),
+            hasDeliveredDictation: defaults.bool(forKey: Key.firstDictationDelivered))
+        defaults.set(predates, forKey: Key.predatesPaidLicensing)
+    }
+
     private var priorUse: EntitlementPolicy.PriorUseEvidence {
+        // Reads the recorded decision, never the live flags.
         EntitlementPolicy.PriorUseEvidence(
-            hasSeenSetupGuide: defaults.bool(forKey: "JarvisTap.HasSeenSetupGuide"),
-            hasDeliveredDictation: defaults.bool(forKey: "JarvisTap.FirstDictationDelivered"),
-            hasStoredPlanTier: defaults.string(forKey: Key.legacyTier) != nil)
+            predatesPaidLicensing: defaults.bool(forKey: Key.predatesPaidLicensing))
     }
 
     private var verifiedEntitlement: String? {

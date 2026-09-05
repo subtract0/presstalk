@@ -64,8 +64,9 @@ bash scripts/presstalk_notarization_readiness.sh --app ~/Applications/PressTalk.
 # Refuses marketing copy the evidence does not support.
 bash scripts/presstalk_claims_gate.sh
 
-# Refuses any code path that can write dictated words to a log.
-bash scripts/test_presstalk_no_transcript_logging.sh
+# Invariants runtime tests cannot see: no code path writes dictated words
+# to a log, and the grandfathering decision is recorded before anything else.
+bash scripts/test_presstalk_source_invariants.sh
 
 # Runs the whole journey headlessly -- trigger, capture, recognition, delivery --
 # and reports every attempt, not just the successful ones.

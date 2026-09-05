@@ -25,23 +25,26 @@ public struct EntitlementPolicy {
         }
     }
 
-    /// Evidence that this install predates paid licensing. Any one of these is
-    /// enough: the failure this guards against -- silently revoking a promise --
-    /// is far worse than occasionally grandfathering someone who reinstalled.
+    /// Whether this installation predates paid licensing.
+    ///
+    /// This is a single decision recorded once, not a heuristic re-evaluated on
+    /// every launch, and the difference is the whole point. The first version of
+    /// this read live flags -- "has seen the setup guide", "has delivered a
+    /// dictation" -- and every one of those is also set by a brand new install
+    /// within seconds of its first launch. It grandfathered everybody. The trial
+    /// could never begin, and no test caught it, because the tests handed the
+    /// policy its evidence directly while the real app handed it the wrong
+    /// evidence.
+    ///
+    /// See `InstallGeneration`, which decides once, before anything writes.
     public struct PriorUseEvidence {
-        public let hasSeenSetupGuide: Bool
-        public let hasDeliveredDictation: Bool
-        public let hasStoredPlanTier: Bool
+        public let predatesPaidLicensing: Bool
 
-        public init(hasSeenSetupGuide: Bool, hasDeliveredDictation: Bool, hasStoredPlanTier: Bool) {
-            self.hasSeenSetupGuide = hasSeenSetupGuide
-            self.hasDeliveredDictation = hasDeliveredDictation
-            self.hasStoredPlanTier = hasStoredPlanTier
+        public init(predatesPaidLicensing: Bool) {
+            self.predatesPaidLicensing = predatesPaidLicensing
         }
 
-        public var indicatesPriorUse: Bool {
-            hasSeenSetupGuide || hasDeliveredDictation || hasStoredPlanTier
-        }
+        public var indicatesPriorUse: Bool { predatesPaidLicensing }
     }
 
     public let trialDays: Int
@@ -105,5 +108,23 @@ public enum PressTalkOffer {
         case .trialExpired:
             return "Trial finished. \(founderSummary)"
         }
+    }
+}
+
+
+/// Answers "did this installation exist before PressTalk was paid?" exactly once.
+///
+/// The answer has to be taken at the very start of the first launch of a
+/// licensing-aware build, before any first-run default is written, and then
+/// stored. Asked a second later it is already wrong: a new install has by then
+/// set the same flags an old one carries.
+public enum InstallGeneration {
+    /// Only ever call this before first-run state is written. Flags observed at
+    /// that instant can only have come from an earlier version of the app.
+    public static func predatesPaidLicensing(
+        hasSeenSetupGuide: Bool,
+        hasDeliveredDictation: Bool
+    ) -> Bool {
+        hasSeenSetupGuide || hasDeliveredDictation
     }
 }

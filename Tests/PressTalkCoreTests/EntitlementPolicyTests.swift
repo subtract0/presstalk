@@ -5,27 +5,50 @@ final class EntitlementPolicyTests: XCTestCase {
     private let policy = EntitlementPolicy(trialDays: 14)
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
-    private func evidence(setupGuide: Bool = false, dictation: Bool = false, tier: Bool = false)
-        -> EntitlementPolicy.PriorUseEvidence
-    {
-        .init(hasSeenSetupGuide: setupGuide, hasDeliveredDictation: dictation, hasStoredPlanTier: tier)
+    private func evidence(predates: Bool = false) -> EntitlementPolicy.PriorUseEvidence {
+        .init(predatesPaidLicensing: predates)
     }
 
     // The shipped settings pane has been promising free core dictation for
     // months. Anyone already using it keeps that.
     func testExistingUsersAreGrandfathered() {
-        for existing in [evidence(setupGuide: true), evidence(dictation: true), evidence(tier: true)] {
-            XCTAssertEqual(
-                policy.state(verifiedEntitlement: nil, priorUse: existing, trialStartedAt: nil, now: now),
-                .grandfathered)
-        }
+        XCTAssertEqual(
+            policy.state(
+                verifiedEntitlement: nil, priorUse: evidence(predates: true),
+                trialStartedAt: nil, now: now),
+            .grandfathered)
+    }
+
+    // The bug this replaced: the decision used to be re-derived on every launch
+    // from flags a brand new install sets within seconds of starting, so every
+    // user was grandfathered and the trial could never begin. It is now taken
+    // once, before anything writes.
+    func testANewInstallIsNotGrandfathered() {
+        XCTAssertFalse(
+            InstallGeneration.predatesPaidLicensing(
+                hasSeenSetupGuide: false, hasDeliveredDictation: false))
+        XCTAssertEqual(
+            policy.state(
+                verifiedEntitlement: nil, priorUse: evidence(predates: false),
+                trialStartedAt: nil, now: now),
+            .trial(daysRemaining: 14))
+    }
+
+    // Anyone carrying state from a pre-licensing build keeps free core dictation.
+    func testAnInstallCarryingOlderStatePredatesLicensing() {
+        XCTAssertTrue(
+            InstallGeneration.predatesPaidLicensing(
+                hasSeenSetupGuide: true, hasDeliveredDictation: false))
+        XCTAssertTrue(
+            InstallGeneration.predatesPaidLicensing(
+                hasSeenSetupGuide: false, hasDeliveredDictation: true))
     }
 
     // The exact failure this design exists to prevent.
     func testAnExistingUserIsNeverTurnedIntoAnExpiredTrial() {
         let longAgo = now.addingTimeInterval(-365 * 86_400)
         let state = policy.state(
-            verifiedEntitlement: nil, priorUse: evidence(dictation: true),
+            verifiedEntitlement: nil, priorUse: evidence(predates: true),
             trialStartedAt: longAgo, now: now)
         XCTAssertEqual(state, .grandfathered)
         XCTAssertTrue(state.allowsDictation)
@@ -33,7 +56,7 @@ final class EntitlementPolicyTests: XCTestCase {
 
     func testANewInstallStartsWithAFullTrial() {
         XCTAssertEqual(
-            policy.state(verifiedEntitlement: nil, priorUse: evidence(), trialStartedAt: nil, now: now),
+            policy.state(verifiedEntitlement: nil, priorUse: evidence(predates: false), trialStartedAt: nil, now: now),
             .trial(daysRemaining: 14))
     }
 
@@ -42,14 +65,14 @@ final class EntitlementPolicyTests: XCTestCase {
     func testTheTrialCountsDownFromFirstDictation() {
         let started = now.addingTimeInterval(-10 * 86_400)
         XCTAssertEqual(
-            policy.state(verifiedEntitlement: nil, priorUse: evidence(), trialStartedAt: started, now: now),
+            policy.state(verifiedEntitlement: nil, priorUse: evidence(predates: false), trialStartedAt: started, now: now),
             .trial(daysRemaining: 4))
     }
 
     func testTheTrialExpires() {
         let started = now.addingTimeInterval(-15 * 86_400)
         let state = policy.state(
-            verifiedEntitlement: nil, priorUse: evidence(), trialStartedAt: started, now: now)
+            verifiedEntitlement: nil, priorUse: evidence(predates: false), trialStartedAt: started, now: now)
         XCTAssertEqual(state, .trialExpired)
         XCTAssertFalse(state.allowsDictation)
     }
@@ -57,7 +80,7 @@ final class EntitlementPolicyTests: XCTestCase {
     func testTheLastDayIsStillATrialDay() {
         let started = now.addingTimeInterval(-13.5 * 86_400)
         XCTAssertEqual(
-            policy.state(verifiedEntitlement: nil, priorUse: evidence(), trialStartedAt: started, now: now),
+            policy.state(verifiedEntitlement: nil, priorUse: evidence(predates: false), trialStartedAt: started, now: now),
             .trial(daysRemaining: 1))
     }
 
@@ -65,7 +88,7 @@ final class EntitlementPolicyTests: XCTestCase {
         let expiredTrial = now.addingTimeInterval(-100 * 86_400)
         XCTAssertEqual(
             policy.state(
-                verifiedEntitlement: "founder", priorUse: evidence(),
+                verifiedEntitlement: "founder", priorUse: evidence(predates: false),
                 trialStartedAt: expiredTrial, now: now),
             .licensed(entitlement: "founder"))
     }

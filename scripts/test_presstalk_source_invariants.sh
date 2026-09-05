@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fails if dictated text can reach a log file or stdout unredacted.
+# Source-level invariants that runtime tests cannot see.
 #
 # This is a source guard rather than a runtime test because the failure is
 # invisible at runtime: the app works perfectly while quietly accumulating every
@@ -62,9 +62,25 @@ if ! grep -q 'isVerboseLoggingEnabled' "$ROOT/Sources/PressTalkCore/TranscriptRe
   report "Sources/PressTalkCore/TranscriptRedaction.swift" "opt-in mechanism is missing"
 fi
 
+# The grandfathering decision has to be recorded before anything writes a
+# first-run default, or a brand new install looks identical to a year-old one and
+# every user is grandfathered for free. Unit tests cannot see this: they hand the
+# policy its evidence, while the app hands it whatever the ordering produced.
+main_swift="$SOURCES/main.swift"
+record_line="$(grep -n 'recordInstallGenerationIfNeeded' "$main_swift" | head -1 | cut -d: -f1 || true)"
+setup_flag_line="$(grep -n 'hasSeenSetupGuide = true' "$main_swift" | head -1 | cut -d: -f1 || true)"
+if [[ -z "$record_line" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "startup must call recordInstallGenerationIfNeeded before any first-run write"
+elif [[ -n "$setup_flag_line" && "$record_line" -gt "$setup_flag_line" ]]; then
+  report "Sources/JarvisTap/main.swift:${record_line}" \
+    "recordInstallGenerationIfNeeded runs after hasSeenSetupGuide is set (line ${setup_flag_line})" \
+    "every new install would be classified as predating paid licensing"
+fi
+
 echo
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures place(s) can write dictated text to a log." >&2
   exit 1
 fi
-echo "No unredacted transcript logging."
+echo "All source invariants hold."

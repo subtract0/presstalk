@@ -4863,6 +4863,29 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         safelyStopLiveAudioRecording(captureKit: captureKit, reason: "release_tail")
     }
 
+    /// Wall-clock ceiling for the whole Whisper retry chain, shared across the
+    /// primary, relaxed and auto-detect passes.
+    ///
+    /// Each pass looked reasonable on its own, which is exactly how a 4.2 s
+    /// dictation turned into a 6.07 s wait: primary rejected by the recall guard,
+    /// relaxed rejected, auto-detect finally accepted. Past the deadline the
+    /// already-validated primary candidate is used instead of trying harder,
+    /// because a user waiting six seconds for a better sentence would rather have
+    /// had the good-enough one.
+    var whisperLadderBudgetSeconds: TimeInterval {
+        TimeInterval(
+            ProcessInfo.processInfo.environment["PRESSTALK_WHISPER_LADDER_BUDGET_SECONDS"]
+                .flatMap(Double.init) ?? 1.0)
+    }
+
+    private func whisperLadderBudgetExhausted(startedAt: Date, context: String) -> Bool {
+        let elapsed = Date().timeIntervalSince(startedAt)
+        guard elapsed >= whisperLadderBudgetSeconds else { return false }
+        traceLogger.log(
+            "Whisper retry budget exhausted context=\(context) elapsed_seconds=\(String(format: "%.3f", elapsed)) budget_seconds=\(String(format: "%.2f", whisperLadderBudgetSeconds))")
+        return true
+    }
+
     private func relaxedDecodingOptions() -> DecodingOptions {
         var options = decodingOptions
         options.noSpeechThreshold = nil
@@ -6245,6 +6268,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         do {
             try postPasteShortcut()
             traceLogger.log("Accessibility trusted; paste command posted with transcript on pasteboard")
+            restorePasteboardAfterInsertion(pasteboardStaging)
             return .pasteCommandPosted
         } catch {
             traceLogger.log("Accessibility paste command unavailable error=\(error)")
@@ -6777,6 +6801,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     return acceptedStreamingTranscript ?? ""
                 }
 
+                let whisperLadderStartedAt = Date()
                 traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedAudioSamples.count)")
                 if capturedAudioSamples.isEmpty {
                     traceLogger.log("No captured audio samples; using filtered streaming transcript fallback")
@@ -6791,6 +6816,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 )
                 traceTranscriptCandidate("Primary offline Whisper transcript", text: primaryTranscript)
 
+                // Held outside the if-let so the retry budget below can fall back
+                // to a candidate that was already validated, rather than to
+                // nothing.
+                var budgetFallbackTranscript: String? = acceptedParakeetTranscriptForFallback
                 if let acceptedPrimaryTranscript = validatedFinalTranscriptCandidate(
                     primaryTranscript,
                     signalStats: capturedSignalStats,
@@ -6804,6 +6833,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         captureDurationSeconds: effectiveCaptureDurationSeconds,
                         context: "offline_primary"
                     ) {
+                        budgetFallbackTranscript = acceptedPrimaryTranscript
                         traceLogger.log("Primary offline Whisper transcript accepted but implausible against recall; retrying with relaxed decoding")
                     } else if shouldDeferShortWhisperCandidateForRecall(
                         whisperTranscript: acceptedPrimaryTranscript,
@@ -6813,6 +6843,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         context: "offline_primary"
                     ) {
                         whisperCandidateDeferredForRecall = true
+                        budgetFallbackTranscript = acceptedPrimaryTranscript
                         traceLogger.log("Primary offline Whisper transcript accepted but too short; retrying with relaxed decoding")
                     } else {
                         traceLogger.log("Using offline Whisper transcript as final transcript")
@@ -6822,7 +6853,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     traceLogger.log("Primary offline Whisper transcript rejected; retrying with relaxed decoding")
                 }
 
-                let relaxedResults = try await whisperKit.transcribe(
+                                if whisperLadderBudgetExhausted(startedAt: whisperLadderStartedAt, context: "relaxed"),
+                   let budgeted = budgetFallbackTranscript {
+                    return budgeted
+                }
+let relaxedResults = try await whisperKit.transcribe(
                     audioArray: normalizedSamples,
                     decodeOptions: relaxedDecodingOptions()
                 )
@@ -7248,7 +7283,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let capturedSamples = currentLiveCapturedAudioSamples()
-        traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedSamples.count)")
+        let whisperLadderStartedAt = Date()
+            traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedSamples.count)")
         if capturedSamples.isEmpty {
             traceLogger.log("No captured audio samples; using filtered fallback transcript")
             return validatedFinalTranscriptCandidate(

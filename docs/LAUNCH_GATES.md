@@ -1,5 +1,10 @@
 # What stands between here and selling PressTalk
 
+For current decisions, limits and ordering, use the
+[5–18 September two-week plan](TWO_WEEK_PLAN_2026-09-05.md).
+This earlier technical checklist includes dated status and is not proof that
+the new plan's gates have passed.
+
 Written 2026-09-05. Everything below is either **yours** (needs your Apple ID,
 your bank details, your face, or a Mac I do not have) or **open** (mine, not
 finished).

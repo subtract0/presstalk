@@ -14,6 +14,7 @@ APP_BUNDLE=""
 OUT_DIR=""
 HOLD_SECONDS=0.3
 SETTLE_SECONDS=12
+DISABLE_FALLBACK=0
 
 usage() {
   cat <<'USAGE'
@@ -28,6 +29,7 @@ while [[ $# -gt 0 ]]; do
     --out) OUT_DIR="${2:-}"; shift 2 ;;
     --app) APP_BUNDLE="${2:-}"; shift 2 ;;
     --settle) SETTLE_SECONDS="${2:-}"; shift 2 ;;
+    --no-fallback) DISABLE_FALLBACK=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -71,6 +73,7 @@ printf '%s\n' "${FIXTURES[0]}" >"$POINTER"
 # is the case the opt-in exists for: a developer measuring recognition on their
 # own machine, against fixtures, into a temporary directory.
 PRESSTALK_LOG_TRANSCRIPTS=1 \
+PRESSTALK_PARAKEET_QUALITY_FALLBACK=$([ "$DISABLE_FALLBACK" = 1 ] && echo 0 || echo 1) \
 PRESSTALK_TEST_HARNESS=1 \
 PRESSTALK_FIXTURE_AUDIO="$POINTER" \
 PRESSTALK_HARNESS_RESULTS="$RESULTS" \

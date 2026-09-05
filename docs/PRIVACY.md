@@ -19,11 +19,26 @@ Last verified against the source on 2026-09-05.
 | Your voice while you hold the key | Memory only, discarded when the dictation finishes | No |
 | The transcript | Pasted into the app you were using, and kept in memory for the "Recent Dictations" menu | No |
 | Recent Dictations (last 5) | Memory only. Gone after 15 minutes, on quit, or via "Forget These" | No |
-| The clipboard | The normal macOS clipboard, when PressTalk copies instead of pasting | Follows macOS clipboard behaviour, including Universal Clipboard if you have it on |
+| The clipboard | Every dictation passes through the normal macOS clipboard on its way into the app, then the previous contents are put back about a second later | While it is on the clipboard it follows macOS clipboard behaviour, including Universal Clipboard if you have Handoff on |
 | Trace log (`~/Library/Logs/presstalk_trace.log`) | Your Mac. Transcripts are redacted to a length, a word count, and a short digest. Rotates at 8 MB | No, unless you attach it to a support email yourself |
 | Diagnostics export | A file you choose to create | Only if you send it |
 | Speech models (~460 MB) | `~/Library/Application Support/` | Downloaded from huggingface.co during setup |
 | Licence key | Your Mac, checked locally | No. There is no activation server |
+
+### About the clipboard, specifically
+
+PressTalk pastes by putting the text on the clipboard and sending Cmd-V. That is
+how nearly every dictation and text-expansion tool on macOS works, and it means
+your dictated text is briefly on the clipboard even on the normal path.
+
+An earlier version of this page said the clipboard was only used when PressTalk
+could not paste. That was wrong, and with Handoff enabled it was wrong in a way
+that mattered: dictated text could reach your other Apple devices. PressTalk now
+restores whatever you had on the clipboard about a second after pasting, and
+leaves it alone if you copied something else in the meantime.
+
+If that still bothers you, turn Handoff off in System Settings → General →
+AirDrop & Handoff.
 
 ## What PressTalk connects to
 

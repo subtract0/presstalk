@@ -1586,8 +1586,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
         case .success(let license):
             let confirmation = NSAlert()
             confirmation.messageText = "Licence activated"
-            confirmation.informativeText =
-                "\(license.entitlement.capitalized). Covers updates through \(license.maxMajorVersion).x."
+            confirmation.informativeText = license.maxMajorVersion == PressTalkLicense.allMajorVersions
+                ? "\(license.entitlement.capitalized). Every future Mac update included."
+                : "\(license.entitlement.capitalized). Covers updates through \(license.maxMajorVersion).x."
             confirmation.runModal()
             currentPlanValueLabel.stringValue = licenseStore.currentPlanName
             planSummaryLabel.stringValue = licenseStore.planSummary

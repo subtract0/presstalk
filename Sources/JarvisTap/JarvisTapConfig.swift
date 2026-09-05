@@ -161,10 +161,23 @@ struct JarvisTapConfig {
             return false
         }()
 
+        // Off by default as of 2026-09-05.
+        //
+        // The second recognizer fires on about half of real dictations and
+        // roughly triples the wait when it does: 0.425s p50 without it against
+        // 1.220s with, measured on live speech. What it buys is 1.46 points of
+        // word error rate across the German corpus (12.71% -> 11.25%), measured
+        // on synthetic voices.
+        //
+        // A fresh install does not have the model anyway -- it is never
+        // downloaded implicitly -- so leaving this on made the default behaviour
+        // depend on whether a machine happened to have a 620 MB file, and made
+        // the published accuracy figure describe a configuration no new buyer
+        // has. PRESSTALK_PARAKEET_QUALITY_FALLBACK=1 turns it back on.
         let parakeetQualityFallbackEnabled: Bool = {
             guard let rawValue = env["PRESSTALK_PARAKEET_QUALITY_FALLBACK"] ??
                 env["JARVISTAP_PARAKEET_QUALITY_FALLBACK"] else {
-                return true
+                return false
             }
             let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
             return value != "0" && value != "false" && value != "no"

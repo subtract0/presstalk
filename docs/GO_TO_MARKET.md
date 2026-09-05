@@ -1,5 +1,9 @@
 # Go to market: the plan three models agreed on
 
+Historical decision record. The [5–18 September two-week plan](TWO_WEEK_PLAN_2026-09-05.md)
+supersedes the sequencing and commercial gates below; these earlier arguments
+remain for traceability.
+
 2026-09-05. Claude, a local frontier model (ddalcu-flashnext on studio1), and
 GPT-6 Astra argued this out over two rounds. Where we disagreed is recorded, and
 so is who conceded.
@@ -36,11 +40,14 @@ German clips, scored by the same function, against the same references:
 
 | Engine | Word error rate |
 |---|---|
-| Apple's on-device speech engine | 21.94 % |
-| PressTalk, text as delivered | **11.25 %** |
+| Apple's on-device speech engine, same vocabulary pass | 19.38 % |
+| PressTalk, default configuration | **12.71 %** |
 
-**Roughly half the word errors.** That is the wedge, measured against exactly the
-baseline that matters, and it is the strongest evidence this project has.
+**About a third fewer word errors, like for like.** An earlier version of this
+said "roughly half", comparing PressTalk with its German vocabulary pass against
+Apple without it, and quoting a PressTalk figure that needed a 620 MB model a new
+buyer never downloads. Corrected: both sides now get the same vocabulary pass and
+both are the default configuration.
 
 Two limits, stated so nobody over-reads it: the audio is synthesised speech in
 three voices, and this compares recognition engines rather than the whole

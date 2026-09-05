@@ -17,7 +17,8 @@ trigger, capture, freeze, recognition, cleanup, vocabulary repair, delivery.
 | Clips attempted | 144 |
 | Produced text | 144 |
 | Produced nothing | 0 |
-| Word error rate | **11.25 %** |
+| Word error rate, default config | **12.71 %** |
+| Word error rate, quality fallback forced on | 11.25 % |
 
 Scored with `scripts/presstalk_score_fallback_sweep.py` against the written
 references in `~/presstalk-de-eval/eval_set.tsv`, using the text the app finally
@@ -31,6 +32,28 @@ a test run cannot type into whatever window is focused, so these runs prove
 recognition reached the end of the pipeline, not that words arrived in another
 app. That distinction is why the fresh-Mac run in
 [LAUNCH_GATES.md](LAUNCH_GATES.md) is still the top open gate.
+
+## Against Apple's own engine, like for like
+
+The competitor is the microphone key already on the Mac. Both engines get the
+**same** German vocabulary post-processing, and PressTalk is in the configuration
+a new buyer actually receives.
+
+| | Word error rate |
+|---|---|
+| Apple's on-device engine, raw | 21.94 % |
+| Apple's on-device engine, same vocabulary pass | 19.38 % |
+| PressTalk, default configuration | **12.71 %** |
+
+**About a third fewer word errors.** An earlier version of this claimed "roughly
+half", comparing PressTalk *with* its vocabulary pass against Apple *without* it,
+and quoting a PressTalk figure (11.25 %) that required a 620 MB model a fresh
+install never downloads. Both halves of that were unfair and both are corrected.
+
+One caveat that flatters both columns: 68 of the 70 terms in the vocabulary
+lexicon appear verbatim in the evaluation references. The pass is partly being
+scored against its own word list. It is applied to both engines, so the
+comparison stands, but the absolute numbers are optimistic on this corpus.
 
 ## Latency on real speech (2026-09-05, 12 dictations, physical Fn key)
 

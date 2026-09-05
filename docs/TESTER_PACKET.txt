@@ -1,0 +1,102 @@
+PressTalk 0.1.7 — test build
+============================
+
+Hold the Fn key (bottom-left, the one with the globe), say a sentence, let go.
+The text appears in whatever app you were typing in. Speech recognition runs on
+your Mac — nothing is uploaded.
+
+You need: an Apple Silicon Mac (M1 or newer), macOS 14 or later.
+Not compatible with Intel Macs.
+
+
+1. INSTALL
+----------
+Unzip PressTalk-0.1.7-macos-arm64.zip and drag PressTalk.app into Applications.
+
+
+2. THE FIRST LAUNCH WILL BE BLOCKED — this is expected
+------------------------------------------------------
+This build isn't signed with an Apple developer certificate yet, so macOS
+refuses it the first time. It is not broken and it is not a virus; it just
+hasn't been through Apple's paperwork.
+
+  Double-click PressTalk. You'll get "Apple could not verify PressTalk is free
+  of malware". Click Done.
+
+  Then: System Settings > Privacy & Security > scroll down > "Open Anyway"
+  next to PressTalk. Confirm.
+
+  (On macOS 14 you can instead right-click the app > Open > Open.)
+
+You only do this once.
+
+
+3. FIRST RUN
+------------
+A setup window walks you through three macOS permissions, one at a time:
+microphone, input monitoring (to notice the Fn key), accessibility (to paste).
+
+Then it downloads the speech model, about 460 MB. Once. After that it works
+offline — you can turn off Wi-Fi and it still works.
+
+Setup finishes when you've successfully dictated once.
+
+Note: this build doesn't add itself to login items, so after a restart you'll
+need to open PressTalk again from Applications.
+
+
+4. WHAT I'D LIKE YOU TO DO
+--------------------------
+Please actually use it for two days for real work. Emails, messages, notes,
+Slack, whatever you'd normally type. That's the only way to find out if it's
+good or just impressive for thirty seconds.
+
+If you have twenty minutes and want to be more systematic: do about 20
+dictations across two different apps and note how many didn't work.
+
+
+5. WHAT I'D LIKE TO KNOW
+------------------------
+Short answers are fine. Blunt answers are better.
+
+  1. Did you get to your first working dictation without asking me for help?
+     Roughly how long did it take?
+
+  2. Out of your dictations, how many failed — nothing appeared, or the text
+     went somewhere wrong?
+
+  3. How good was the text? Did you have to fix things, and what kind of things?
+
+  4. How does it compare to just pressing the dictation key macOS already has?
+     (If you don't know it: press the microphone key, or Fn twice.)
+
+  5. Did you keep using it, or did you stop? Why?
+
+  6. It'll be $20, one payment, no subscription, and every future update
+     included. Would you pay that? If not, what would have to be different?
+
+Question 5 is the one I care about most. Question 6 — please say no if it's no.
+
+
+6. IF SOMETHING BREAKS
+----------------------
+Click the PressTalk icon in the menu bar > Settings > "Export Diagnostics".
+It saves a text file and opens Finder. Send me that file.
+
+It contains your permission states, your Mac's audio setup, and the app's recent
+activity log. It does NOT contain anything you dictated — transcripts are
+stripped out before anything is written to disk. You can open it and read it
+first; it's plain text.
+
+
+7. UNINSTALLING
+---------------
+Drag PressTalk.app to the Trash, then delete:
+  ~/Library/Application Support/JarvisTap
+  ~/Library/Application Support/FluidAudio
+  ~/Library/Logs/presstalk_trace.log
+The FluidAudio folder is the model download and is the big one. Nothing else is
+left behind, and nothing was ever sent anywhere.
+
+
+Thanks. Genuinely — tell me if it's bad.

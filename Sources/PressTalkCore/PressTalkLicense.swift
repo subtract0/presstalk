@@ -21,9 +21,14 @@ public struct PressTalkLicense: Codable, Equatable {
     public let licenseID: String
     public let entitlement: String
     public let issuedAt: Date
-    /// The last major version this licence covers. "Updates through 1.x" is a
-    /// promise the app can actually check, and a later paid major version does
-    /// not silently disable what someone already bought.
+    /// The last major version this licence covers, or
+    /// `PressTalkLicense.allMajorVersions` for every future release.
+    ///
+    /// The offer sold is "every future Mac update, including major versions,
+    /// free", so licences are issued unbounded. The field stays because a
+    /// bounded entitlement is a thing a later commercial tier might need, and
+    /// adding it back after the fact would mean a schema change and a second
+    /// signing key rollout.
     public let maxMajorVersion: Int
 
     public init(
@@ -46,6 +51,9 @@ public struct PressTalkLicense: Codable, Equatable {
 
     public static let currentSchemaVersion = 1
     public static let productIdentifier = "com.am.presstalk"
+    /// Sentinel for "no upper bound". Zero rather than Int.max so the encoded
+    /// payload stays short and readable.
+    public static let allMajorVersions = 0
 
     /// Entitlements are names, not tiers with prices baked in. Pricing changes;
     /// what someone bought does not.
@@ -176,7 +184,8 @@ public struct PressTalkLicenseVerifier {
         guard license.keyID == envelopeKeyID else {
             return .failure(.malformed("key id does not match the envelope"))
         }
-        guard license.maxMajorVersion >= runningMajorVersion else {
+        if license.maxMajorVersion != PressTalkLicense.allMajorVersions,
+           license.maxMajorVersion < runningMajorVersion {
             return .failure(.versionNotCovered(
                 licensed: license.maxMajorVersion, running: runningMajorVersion))
         }

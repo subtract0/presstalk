@@ -62,7 +62,7 @@ FORBIDDEN=(
   "lightweight|model storage, peak RAM, and energy were never measured"
   "battery efficient|energy use was never measured"
   "battery-efficient|energy use was never measured"
-  "lifetime updates|undefined and unenforceable; the licence covers 1.x"
+  "lifetime updates|promises a release schedule nobody can keep; the offer includes every release we make, and says so"
   "unlimited support|undefined and unenforceable"
   "HIPAA|no compliance assessment exists"
   "GDPR compliant|no compliance assessment exists"

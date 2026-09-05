@@ -100,10 +100,14 @@ final class EntitlementPolicyTests: XCTestCase {
         XCTAssertEqual(PressTalkOffer.personalPriceUSD, 39)
         for summary in [PressTalkOffer.founderSummary, PressTalkOffer.personalSummary] {
             XCTAssertTrue(summary.contains("once"), summary)
-            XCTAssertTrue(summary.contains("1.x"), summary)
+            XCTAssertTrue(summary.contains("Every future Mac update"), summary)
             XCTAssertFalse(summary.lowercased().contains("/mo"), summary)
+            // "Lifetime" promises a schedule nobody can keep. Including every
+            // release costs nothing per customer; promising to keep producing
+            // them is unbounded labour.
             XCTAssertFalse(summary.lowercased().contains("lifetime"), summary)
         }
+        XCTAssertTrue(PressTalkOffer.updateDisclaimer.contains("not guaranteed"))
     }
 
     func testEveryStateReadsAsPlainEnglish() {

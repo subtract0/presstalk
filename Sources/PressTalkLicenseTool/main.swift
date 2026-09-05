@@ -25,6 +25,8 @@ func usage() -> Never {
 
     issue --key <path to private key> --key-id <id> --entitlement <personal|founder|commercial>
           [--max-major <n>] [--count <n>]
+        --max-major defaults to unbounded. Pass a number only for a deliberately
+        bounded entitlement.
         Prints one licence per line.
 
     verify --public-key <path> --key-id <id> --license <string> [--running-major <n>]
@@ -85,7 +87,9 @@ case "issue":
     guard PressTalkLicense.Entitlement(rawValue: entitlement) != nil else {
         fail("Unknown entitlement: \(entitlement)")
     }
-    let maxMajor = Int(argument("max-major", in: arguments) ?? "1") ?? 1
+    // Unbounded by default: the offer is every future Mac update, free.
+    let maxMajor = Int(argument("max-major", in: arguments)
+        ?? String(PressTalkLicense.allMajorVersions)) ?? PressTalkLicense.allMajorVersions
     let count = Int(argument("count", in: arguments) ?? "1") ?? 1
 
     let raw = try String(contentsOfFile: keyPath, encoding: .utf8)
@@ -130,7 +134,8 @@ case "verify":
         print("  entitlement     \(license.entitlement)")
         print("  licence id      \(license.licenseID)")
         print("  issued          \(ISO8601DateFormatter().string(from: license.issuedAt))")
-        print("  covers up to    \(license.maxMajorVersion).x")
+        print("  covers          " + (license.maxMajorVersion == PressTalkLicense.allMajorVersions
+            ? "every future version" : "up to \(license.maxMajorVersion).x"))
     case .failure(let error):
         fail("invalid: \(error)  (\(error.userFacingMessage))")
     }

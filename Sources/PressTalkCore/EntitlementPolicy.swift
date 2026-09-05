@@ -94,20 +94,28 @@ public enum PressTalkOffer {
     public static let founderPriceUSD = 20
     public static let personalPriceUSD = 39
 
-    /// What the money buys. Deliberately narrow: "updates through 1.x" is
-    /// checkable in the licence, "lifetime updates" is not a promise anyone can
-    /// keep.
+    /// What the money buys, and what it does not.
+    ///
+    /// Two different promises get confused here, and only one of them is
+    /// dangerous. "Every update we release is free to you" costs nothing extra
+    /// per customer and is what someone means by not wanting to be rented to.
+    /// "We will keep releasing updates forever" is unbounded labour by one
+    /// person against a platform that changes annually, and nobody can honour
+    /// it. So the offer includes every future release and promises no schedule,
+    /// and the disclaimer is part of the offer rather than buried in a FAQ.
     public static let founderSummary =
-        "PressTalk Founder — $\(founderPriceUSD) once. Updates through 1.x. No subscription."
+        "PressTalk Founder — $\(founderPriceUSD) once. Every future Mac update included, major versions too. No subscription."
     public static let personalSummary =
-        "PressTalk Personal — $\(personalPriceUSD) once. Updates through 1.x. No subscription."
+        "PressTalk Personal — $\(personalPriceUSD) once. Every future Mac update included, major versions too. No subscription."
+    public static let updateDisclaimer =
+        "Future releases, indefinite support, and compatibility with future macOS versions are not guaranteed."
 
     public static func stateSummary(_ state: EntitlementPolicy.State) -> String {
         switch state {
         case .grandfathered:
             return "Free — you used PressTalk before it was paid, so core dictation stays free on this Mac."
         case .licensed(let entitlement):
-            return "Licensed (\(entitlement)). Updates through 1.x."
+            return "Licensed (\(entitlement)). Every future Mac update included."
         case .trial(let daysRemaining):
             let dayWord = daysRemaining == 1 ? "day" : "days"
             return "Trial — \(daysRemaining) \(dayWord) left. \(founderSummary)"

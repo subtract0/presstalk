@@ -23,6 +23,7 @@ dictation you can see arrive.
 | Landing page draft | [site/index.html](site/index.html) |
 | What is measured, and how | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
 | What still blocks a paid launch | [docs/LAUNCH_GATES.md](docs/LAUNCH_GATES.md) |
+| The plan, and the gates before spending | [docs/GO_TO_MARKET.md](docs/GO_TO_MARKET.md) |
 | Getting to a paid launch | [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md) |
 | Permission trouble | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Testing on other Macs | [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md) |

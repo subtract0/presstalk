@@ -406,6 +406,8 @@ final class JarvisTapSettingsStore {
         static let insertionSuffix = "JarvisTap.InsertionSuffix"
         static let triggerKey = "JarvisTap.TriggerKey"
         static let hasSeenSetupGuide = "JarvisTap.HasSeenSetupGuide"
+        static let firstDictationDelivered = "JarvisTap.FirstDictationDelivered"
+        static let firstRunSetupCompleted = "JarvisTap.FirstRunSetupCompleted"
         static let nativeTriggerCalibration = "JarvisTap.NativeTriggerCalibration"
     }
 
@@ -422,6 +424,8 @@ final class JarvisTapSettingsStore {
             Key.insertionSuffix: InsertionSuffixOption.space.rawValue,
             Key.triggerKey: config.triggerKey.rawValue,
             Key.hasSeenSetupGuide: false,
+            Key.firstDictationDelivered: false,
+            Key.firstRunSetupCompleted: false,
         ])
     }
 
@@ -475,6 +479,19 @@ final class JarvisTapSettingsStore {
         set {
             defaults.set(newValue.rawValue, forKey: Key.triggerKey)
         }
+    }
+
+    /// Set the first time a dictation actually produces text. Setup is not
+    /// finished because three toggles are on; it is finished because words
+    /// arrived.
+    var firstDictationDelivered: Bool {
+        get { defaults.bool(forKey: Key.firstDictationDelivered) }
+        set { defaults.set(newValue, forKey: Key.firstDictationDelivered) }
+    }
+
+    var firstRunSetupCompleted: Bool {
+        get { defaults.bool(forKey: Key.firstRunSetupCompleted) }
+        set { defaults.set(newValue, forKey: Key.firstRunSetupCompleted) }
     }
 
     var hasSeenSetupGuide: Bool {

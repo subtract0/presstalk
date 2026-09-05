@@ -284,6 +284,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var darwinNotificationObserverInstalled = false
     private var productionInsertionProbeObserverInstalled = false
     private var whisperLoadState: WhisperLoadState = .idle
+    private var firstRunSetupWindowController: FirstRunSetupWindowController?
     private var whisperWarmupTask: Task<Void, Never>?
     private var amplitudeMonitorTask: Task<Void, Never>?
     private var trackpadPreviewTask: Task<Void, Never>?
@@ -298,6 +299,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var firstPointerEventLogged = false
     private var trackpadHoldState: TrackpadHoldState?
     private var trackpadArmWorkItem: DispatchWorkItem?
+    /// Set by an actual capture probe, never by the authorization status.
+    private var microphoneCaptureVerified = false
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
@@ -429,6 +432,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let shouldPresentSetupGuide = config.autoShowSetupWindow && !settingsStore.hasSeenSetupGuide
         if shouldPresentSetupGuide {
             settingsStore.hasSeenSetupGuide = true
+        }
+
+        // Guided setup runs until text has actually been delivered once, not
+        // just until the permissions look right.
+        if config.autoShowSetupWindow && !settingsStore.firstRunSetupCompleted {
+            DispatchQueue.main.async { [weak self] in
+                self?.presentFirstRunSetup()
+            }
         }
 
         completeStartupIfPossible(
@@ -731,6 +742,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         abortPopupsMenuItem.target = self
         self.toggleAbortPopupsMenuItem = abortPopupsMenuItem
         menu.addItem(abortPopupsMenuItem)
+
+        let setupItem = NSMenuItem(title: "Run Setup…", action: #selector(openFirstRunSetupFromMenu(_:)), keyEquivalent: "")
+        setupItem.target = self
+        setupItem.toolTip = "Walks through microphone, trigger, and pasting one step at a time."
+        menu.addItem(setupItem)
 
         let settingsItem = NSMenuItem(title: "Settings…", action: #selector(openSettingsFromMenu(_:)), keyEquivalent: ",")
         settingsItem.target = self
@@ -4970,6 +4986,67 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     /// Flips the app into the dictating state. Idempotent, because the Parakeet
     /// path announces readiness before the optional fallback finishes loading
     /// and the warmup tail would otherwise announce it a second time.
+    /// Shows guided setup, wiring each step to the same code paths the rest of
+    /// the app uses, so the window cannot drift into claiming something the app
+    /// disagrees with.
+    @objc private func openFirstRunSetupFromMenu(_ sender: Any?) {
+        presentFirstRunSetup()
+    }
+
+    func presentFirstRunSetup() {
+        let controller = firstRunSetupWindowController ?? FirstRunSetupWindowController()
+        firstRunSetupWindowController = controller
+
+        controller.onReadConditions = { [weak self] in
+            guard let self else {
+                return FirstRunSetupPolicy.Conditions(
+                    microphoneCaptureVerified: false, inputMonitoringGranted: false,
+                    accessibilityGranted: false, speechModelReady: false,
+                    firstDictationDelivered: false, triggerRequiresInputMonitoring: true)
+            }
+            let status = self.currentRuntimeStatus()
+            return FirstRunSetupPolicy.Conditions(
+                microphoneCaptureVerified: self.microphoneCaptureVerified,
+                inputMonitoringGranted: status.inputMonitoringEffective,
+                accessibilityGranted: status.accessibilityGranted,
+                speechModelReady: self.withStateLock {
+                    if case .ready = self.whisperLoadState { return true }
+                    return false
+                },
+                firstDictationDelivered: self.settingsStore.firstDictationDelivered,
+                triggerRequiresInputMonitoring: status.triggerRequiresWritableEventTap
+                    || status.triggerUsesRegisteredHotKey)
+        }
+
+        controller.onRequestMicrophoneAccess = { completion in
+            AVCaptureDevice.requestAccess(for: .audio) { granted in completion(granted) }
+        }
+
+        controller.onVerifyMicrophone = { [weak self] in
+            let report = AudioCaptureProbe.run()
+            self?.microphoneCaptureVerified = report.isUsable
+            self?.traceLogger.log(
+                "Setup microphone probe outcome=\(report.outcome.rawValue) frames=\(report.framesCaptured) authorization=\(report.authorizationStatus)")
+            return report
+        }
+
+        controller.onOpenInputMonitoringSettings = { [weak self] in
+            self?.openInputMonitoringPrivacyPane()
+        }
+        controller.onOpenAccessibilitySettings = { [weak self] in
+            self?.openAccessibilityPrivacyPane()
+        }
+        controller.onDownloadSpeechModel = { [weak self] in
+            self?.startWhisperWarmupIfNeeded()
+        }
+        controller.onFinish = { [weak self] in
+            self?.settingsStore.firstRunSetupCompleted = true
+            self?.traceLogger.log("First-run setup completed")
+        }
+
+        controller.present()
+    }
+
     private func markSpeechModelReady() {
         let alreadyReady = withStateLock { () -> Bool in
             if case .ready = whisperLoadState { return true }
@@ -6843,6 +6920,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 fflush(stdout)
 
                 recordHarnessOutcome(transcript: transcript, releasedAt: releaseTelemetryStart)
+                if !settingsStore.firstDictationDelivered {
+                    settingsStore.firstDictationDelivered = true
+                    traceLogger.log("First dictation delivered; setup can complete")
+                }
 
                 if agentMode == "dictation" {
                     if pasteAutomatically && !config.testHarnessSuppressesInsertion {

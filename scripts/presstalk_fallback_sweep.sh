@@ -46,7 +46,10 @@ LAUNCHD_LABEL="com.am.presstalk"
 : >"$RESULTS"
 : >"$TRACE"
 
-mapfile -t FIXTURES < <(find "$FIXTURE_DIR" -type f \( -name '*.aiff' -o -name '*.wav' -o -name '*.m4a' \) | sort)
+FIXTURES=()
+while IFS= read -r _fixture; do
+  FIXTURES+=("$_fixture")
+done < <(find "$FIXTURE_DIR" -type f \( -name '*.aiff' -o -name '*.wav' -o -name '*.m4a' \) | sort)
 if [[ "$LIMIT" -gt 0 && "${#FIXTURES[@]}" -gt "$LIMIT" ]]; then
   FIXTURES=("${FIXTURES[@]:0:$LIMIT}")
 fi

@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+    Notarization requires the hardened runtime, and Apple documents
+    com.apple.security.device.audio-input as required for a hardened process to
+    use the microphone.
+
+    What was measured here on 2026-09-05 (macOS 26.6), so nobody re-derives it:
+    on a Mac that ALREADY holds a TCC microphone grant for com.am.presstalk, a
+    hardened build captures audio with or without this entitlement. 26,400
+    frames in every one of five paired runs. So this entitlement is not what
+    keeps dictation working on an already-approved machine.
+
+    The case that matters is the one that cannot be tested here: a fresh Mac
+    with no prior grant, where the first microphone prompt has to succeed. Every
+    existing grant is keyed to the current signing identity, so switching to
+    Developer ID puts every user back into exactly that untested state. Ship the
+    entitlement.
+
+    Keep this list minimal. PressTalk loads no third-party dylibs, uses no JIT,
+    and sends no Apple Events, so it needs no other exception.
+
+    Note for editors: XML forbids a double hyphen inside a comment. plutil
+    accepts such a file; AMFI rejects it at signing time with "syntax error".
+    -->
+    <key>com.apple.security.device.audio-input</key>
+    <true/>
+</dict>
+</plist>

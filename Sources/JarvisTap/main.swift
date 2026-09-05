@@ -7190,6 +7190,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 }
 
+// Runs before any AppKit setup: the self-test must not race the dictation
+// pipeline for the input device.
+AudioCaptureProbe.runCommandLineSelfTestIfRequested(CommandLine.arguments)
+
 private let jarvisTapApplication = NSApplication.shared
 private let jarvisTapDelegate = JarvisTapApp()
 

@@ -59,6 +59,7 @@ fi
 
 PRESSTALK_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-com.am.presstalk}" \
 PRESSTALK_BUILD_STABLE_SIGNING=0 \
+PRESSTALK_INCLUDE_DEV_TOOLS="${PRESSTALK_INCLUDE_DEV_TOOLS:-0}" \
 PRESSTALK_CODESIGN_HARDENED_RUNTIME="$PRESSTALK_CODESIGN_HARDENED_RUNTIME" \
 PRESSTALK_CODESIGN_TIMESTAMP="$PRESSTALK_CODESIGN_TIMESTAMP" \
 PRESSTALK_VERSION="$VERSION" \
@@ -80,6 +81,13 @@ if truthy "$DISTRIBUTION_SIGNING"; then
   fi
   echo "Distribution signature authority: $AUTHORITY"
 fi
+
+READINESS_ARGS=(--app "$APP_BUNDLE")
+if ! truthy "$DISTRIBUTION_SIGNING"; then
+  READINESS_ARGS+=(--allow-unhardened)
+fi
+echo "Checking notarization readiness..."
+bash "$ROOT/scripts/presstalk_notarization_readiness.sh" "${READINESS_ARGS[@]}"
 
 if truthy "$NOTARIZE"; then
   require_cmd xcrun
@@ -111,6 +119,10 @@ EOF
   echo "Stapling notarization ticket..."
   xcrun stapler staple "$APP_BUNDLE"
   xcrun stapler validate "$APP_BUNDLE"
+
+  echo "Re-checking readiness with Developer ID requirements..."
+  bash "$ROOT/scripts/presstalk_notarization_readiness.sh" \
+    --app "$APP_BUNDLE" --require-developer-id
 fi
 
 mkdir -p "$DIST_DIR"

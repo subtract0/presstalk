@@ -13,6 +13,20 @@ APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
 APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
 APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
 LOCAL_CODESIGN_HELPER="$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh"
+ENTITLEMENTS_PLIST="${PRESSTALK_ENTITLEMENTS:-$PKG_DIR/resources/PressTalk.entitlements}"
+# Developer probes and smoke helpers are useful locally and are a liability in a
+# shipped app: the compiled smoke binary is a second Mach-O that the notary
+# service checks, and the signing-repair helpers exist to re-sign the app, which
+# would throw away a stapled notarization ticket. Distribution packaging sets
+# this to 0.
+INCLUDE_DEV_TOOLS="${PRESSTALK_INCLUDE_DEV_TOOLS:-1}"
+
+include_dev_tools() {
+  case "$INCLUDE_DEV_TOOLS" in
+    1|true|TRUE|yes|YES) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 current_bundle_identifier() {
   if [[ -f "$APP_INFO_PLIST" ]]; then
@@ -74,50 +88,55 @@ for _resource_bundle in "$PKG_DIR"/.build/*/release/*.bundle "$PKG_DIR"/.build/r
   ditto "$_resource_bundle" "$APP_RESOURCES_DIR/$(basename "$_resource_bundle")"
 done
 
-cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
-chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
-cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
 cp "$PKG_DIR/scripts/presstalk_accessibility_handoff.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-handoff.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-handoff.sh"
-cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
-cp "$PKG_DIR/scripts/presstalk_collect_real_field_smoke.sh" "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
 cp "$PKG_DIR/scripts/presstalk_machine_readiness.sh" "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-machine-readiness.sh"
-cp "$PKG_DIR/scripts/presstalk_readiness_matrix.sh" "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
-cp "$PKG_DIR/scripts/presstalk_host_discovery.sh" "$APP_RESOURCES_DIR/presstalk-host-discovery.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-host-discovery.sh"
-cp "$PKG_DIR/scripts/presstalk_release_proof_gate.sh" "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
-cp "$PKG_DIR/scripts/presstalk_verify_repair_result.sh" "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
-cp "$PKG_DIR/scripts/presstalk_accessibility_identity_probe.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
-cp "$PKG_DIR/scripts/presstalk_actual_accessibility_probe.sh" "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"
-cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
-swiftc "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" -o "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
-cp "$PKG_DIR/scripts/presstalk_automated_f5_smoke.swift" "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
-cp "$PKG_DIR/scripts/presstalk_production_insertion_probe.swift" "$APP_RESOURCES_DIR/presstalk-production-insertion-probe.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-production-insertion-probe.swift"
-cp "$PKG_DIR/scripts/presstalk_run_production_insertion_probe.sh" "$APP_RESOURCES_DIR/presstalk-run-production-insertion-probe.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-run-production-insertion-probe.sh"
-cp "$PKG_DIR/scripts/presstalk_input_method_insert_probe.sh" "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
-cp "$PKG_DIR/scripts/presstalk_input_method_status.swift" "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
-cp "$PKG_DIR/scripts/presstalk_input_method_client_probe.swift" "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
-cp "$PKG_DIR/scripts/presstalk_unicode_event_insert_probe.swift" "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
-cp "$PKG_DIR/scripts/presstalk_virtual_hid_paste_probe.swift" "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
-chmod 755 "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
+
+if include_dev_tools; then
+  cp "$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh" "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
+  chmod 755 "$APP_RESOURCES_DIR/create-presstalk-local-codesign-identity.sh"
+  cp "$PKG_DIR/scripts/presstalk_repair_local_signing.sh" "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-repair-local-signing.sh"
+  cp "$PKG_DIR/scripts/presstalk_collect_smoke_status.sh" "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
+  cp "$PKG_DIR/scripts/presstalk_collect_real_field_smoke.sh" "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-collect-real-field-smoke.sh"
+  cp "$PKG_DIR/scripts/presstalk_readiness_matrix.sh" "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-readiness-matrix.sh"
+  cp "$PKG_DIR/scripts/presstalk_host_discovery.sh" "$APP_RESOURCES_DIR/presstalk-host-discovery.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-host-discovery.sh"
+  cp "$PKG_DIR/scripts/presstalk_release_proof_gate.sh" "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-release-proof-gate.sh"
+  cp "$PKG_DIR/scripts/presstalk_verify_repair_result.sh" "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-verify-repair-result.sh"
+  cp "$PKG_DIR/scripts/presstalk_accessibility_identity_probe.sh" "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-accessibility-identity-probe.sh"
+  cp "$PKG_DIR/scripts/presstalk_actual_accessibility_probe.sh" "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-actual-accessibility-probe.sh"
+  cp "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke.swift"
+  swiftc "$PKG_DIR/scripts/presstalk_manual_fn_smoke.swift" -o "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-manual-fn-smoke"
+  cp "$PKG_DIR/scripts/presstalk_automated_f5_smoke.swift" "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-automated-f5-smoke.swift"
+  cp "$PKG_DIR/scripts/presstalk_production_insertion_probe.swift" "$APP_RESOURCES_DIR/presstalk-production-insertion-probe.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-production-insertion-probe.swift"
+  cp "$PKG_DIR/scripts/presstalk_run_production_insertion_probe.sh" "$APP_RESOURCES_DIR/presstalk-run-production-insertion-probe.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-run-production-insertion-probe.sh"
+  cp "$PKG_DIR/scripts/presstalk_input_method_insert_probe.sh" "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-insert-probe.sh"
+  cp "$PKG_DIR/scripts/presstalk_input_method_status.swift" "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-status.swift"
+  cp "$PKG_DIR/scripts/presstalk_input_method_client_probe.swift" "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-input-method-client-probe.swift"
+  cp "$PKG_DIR/scripts/presstalk_unicode_event_insert_probe.swift" "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-unicode-event-insert-probe.swift"
+  cp "$PKG_DIR/scripts/presstalk_virtual_hid_paste_probe.swift" "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
+  chmod 755 "$APP_RESOURCES_DIR/presstalk-virtual-hid-paste-probe.swift"
+else
+  echo "Developer probes and smoke helpers: excluded (PRESSTALK_INCLUDE_DEV_TOOLS=$INCLUDE_DEV_TOOLS)"
+fi
 cp "$PKG_DIR/scripts/presstalk_install_input_method.sh" "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-install-input-method.sh"
 bash "$PKG_DIR/scripts/build_presstalk_input_method.sh" \
@@ -252,10 +271,41 @@ case "$TIMESTAMP_MODE_NORMALIZED" in
     codesign_args+=(--timestamp="$TIMESTAMP_MODE")
     ;;
 esac
-if [[ "${PRESSTALK_CODESIGN_HARDENED_RUNTIME:-0}" == "1" ]]; then
+HARDENED_RUNTIME="${PRESSTALK_CODESIGN_HARDENED_RUNTIME:-0}"
+if [[ "$HARDENED_RUNTIME" == "1" ]]; then
   codesign_args+=(--options runtime)
 fi
 
+# A hardened process is denied microphone input unless it carries
+# com.apple.security.device.audio-input, and the denial is silent: the
+# authorization status still reads .authorized while the input tap delivers zero
+# frames. Sign with the entitlements in every mode so a local build exercises
+# the same signature shape the release build ships.
+if [[ ! -f "$ENTITLEMENTS_PLIST" ]]; then
+  echo "Missing entitlements plist: $ENTITLEMENTS_PLIST" >&2
+  exit 1
+fi
+codesign_args+=(--entitlements "$ENTITLEMENTS_PLIST")
+
+# codesign on a bundle hashes a Mach-O under Contents/Resources as a *resource*
+# rather than signing it as code, so anything compiled into Resources keeps its
+# linker-signed signature. `codesign --verify --deep --strict` accepts that; the
+# notary service rejects it. Sign every Mach-O in the bundle inside-out.
+sign_nested_machos() {
+  local found=0
+  while IFS= read -r candidate; do
+    file "$candidate" 2>/dev/null | grep -q 'Mach-O' || continue
+    [[ "$candidate" == "$APP_MACOS_DIR/jarvistap" ]] && continue
+    # The nested input method app signs itself in its own build script.
+    [[ "$candidate" == *"/PressTalkInputMethod.app/"* ]] && continue
+    echo "Signing nested Mach-O: ${candidate#$APP_BUNDLE/}"
+    codesign "${codesign_args[@]}" "$candidate"
+    found=$((found + 1))
+  done < <(find "$APP_BUNDLE" -type f -perm +111)
+  echo "Nested Mach-O binaries signed: $found"
+}
+
+sign_nested_machos
 codesign "${codesign_args[@]}" --identifier "$APP_BUNDLE_IDENTIFIER" "$APP_MACOS_DIR/jarvistap"
 codesign "${codesign_args[@]}" "$APP_BUNDLE"
 

@@ -4589,7 +4589,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             present(.listening(cleanedToLog))
         }
         if shouldPrintPartial {
-            print("📝 [PressTalk partial] \(cleanedToLog)")
+            print("📝 [PressTalk partial] \(TranscriptRedaction.loggable(cleanedToLog))")
             fflush(stdout)
         }
     }
@@ -4876,10 +4876,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return options
     }
 
+    /// The single place recognizer candidates reach the log. Twelve call sites
+    /// route through here, which is why redacting here rather than at each one
+    /// is the fix that actually holds.
     private func traceTranscriptCandidate(_ label: String, text: String) {
         let cleaned = cleanedTranscriptText(text)
-        let rendered = cleaned.isEmpty ? "<empty>" : cleaned
-        traceLogger.log("\(label): \(rendered)")
+        traceLogger.log("\(label): \(TranscriptRedaction.loggable(cleaned))")
     }
 
     private func transcriptForInsertion(_ transcript: String) -> String {
@@ -7150,7 +7152,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         traceLogger.log("Partial transcript: \(TranscriptRedaction.loggable(cleanedToLog))")
         present(.listening(cleanedToLog))
         if shouldPrintPartial {
-            print("📝 [PressTalk partial] \(cleanedToLog)")
+            print("📝 [PressTalk partial] \(TranscriptRedaction.loggable(cleanedToLog))")
             fflush(stdout)
         }
     }

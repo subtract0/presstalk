@@ -21,6 +21,8 @@ dictation you can see arrive.
 | Support and refunds | [docs/SUPPORT.md](docs/SUPPORT.md) |
 | What it costs | [docs/MONETIZATION.md](docs/MONETIZATION.md) |
 | Landing page draft | [site/index.html](site/index.html) |
+| What is measured, and how | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
+| What still blocks a paid launch | [docs/LAUNCH_GATES.md](docs/LAUNCH_GATES.md) |
 | Getting to a paid launch | [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md) |
 | Permission trouble | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Testing on other Macs | [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md) |
@@ -61,6 +63,9 @@ bash scripts/presstalk_notarization_readiness.sh --app ~/Applications/PressTalk.
 
 # Refuses marketing copy the evidence does not support.
 bash scripts/presstalk_claims_gate.sh
+
+# Refuses any code path that can write dictated words to a log.
+bash scripts/test_presstalk_no_transcript_logging.sh
 
 # Runs the whole journey headlessly -- trigger, capture, recognition, delivery --
 # and reports every attempt, not just the successful ones.

@@ -238,6 +238,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private var registeredHotKeyRef: EventHotKeyRef?
     private var registeredHotKeyEventHandler: EventHandlerRef?
     private var specialKeyMonitor: Any?
+    /// Microphone capture. PressTalk records through WhisperKit's
+    /// `AudioProcessor` no matter which recognizer transcribes, so this instance
+    /// is built with `load: false, download: false`: it costs 2 ms and zero
+    /// bytes on disk, and it is what makes a 461 MB first run possible instead
+    /// of 1.1 GB.
+    private var audioCaptureKit: WhisperKit?
+
+    /// The full WhisperKit model, ~619 MB on disk. Needed only when WhisperKit
+    /// is the final recognizer, or when the Parakeet quality fallback actually
+    /// fires. Nil is a normal state, not a failure.
     private var whisperKit: WhisperKit?
     private var parakeetAsrManager: AsrManager?
     private var parakeetDecoderLayerCount = 2
@@ -1163,6 +1173,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             whisperWarmupTask?.cancel()
             whisperWarmupTask = nil
             whisperKit = nil
+            audioCaptureKit = nil
             parakeetAsrManager = nil
             parakeetDecoderLayerCount = 2
             streamTranscriber = nil
@@ -1213,6 +1224,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// The optional second-opinion recognizer. "Enabled" in settings and
+    /// "actually loaded" are different things once the model is a separate
+    /// download, so say which one is true.
+    private func currentQualityFallbackStatus() -> String {
+        guard usesParakeetFinalBackend else { return "Not applicable" }
+        guard config.parakeetQualityFallbackEnabled else { return "Off" }
+        if whisperKit != nil { return "Ready" }
+        if whisperModelIsLocallyAvailable { return "Downloaded, loading" }
+        return "Not downloaded (dictation uses Parakeet alone)"
+    }
+
     private func currentRuntimeStatus() -> PressTalkRuntimeStatus {
         let microphoneAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .audio)
         let whisperStatus: String = withStateLock {
@@ -1255,6 +1277,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             streamingASRBackend: config.streamingASRBackend ?? "none",
             realtimePartialTranscriptionEnabled: config.streamingTranscriptionEnabled,
             asrMode: currentASRModeDescription(),
+            qualityFallbackStatus: currentQualityFallbackStatus(),
             f5BridgeStatus: bridgeStatus,
             codeSignatureIdentifier: codeSignatureIdentifier,
             codeSignatureCDHash: codeSignatureCDHash,
@@ -1289,6 +1312,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 "asrBackend": status.asrBackend,
                 "streamingASRBackend": status.streamingASRBackend,
                 "asrMode": status.asrMode,
+                "qualityFallbackStatus": status.qualityFallbackStatus,
                 "realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled,
                 "whisperModel": config.whisperModel,
                 "whisperLanguage": config.whisperLanguage ?? "auto",
@@ -2373,6 +2397,122 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
     }
 
+    /// Brings up microphone capture without touching a speech model.
+    ///
+    /// `WhisperKit(load: false, download: false)` returns in about 2 ms with a
+    /// working `AudioProcessor` and no tokenizer, which is all the recording
+    /// path needs. Startup used to call `loadWhisperKit()` unconditionally, so a
+    /// new user waited for a 619 MB download of a model the default recognizer
+    /// never consults.
+    /// Reads an audio file and resamples it to the 16 kHz mono float samples the
+    /// capture callback would have produced.
+    /// Appends one JSON line per completed dictation when the harness is
+    /// running. The trace log already carries this, but parsing prose is how
+    /// measurement scripts quietly start reporting the wrong number.
+    private func recordHarnessOutcome(transcript: String, releasedAt: Date) {
+        guard let resultsURL = config.harnessResultsURL else { return }
+        let record: [String: Any] = [
+            "transcript": transcript,
+            "fixture": Self.resolveFixtureAudioURL(config.fixtureAudioURL)?.lastPathComponent ?? "",
+            "keyupToTranscriptSeconds": Date().timeIntervalSince(releasedAt),
+            "recordedAt": ISO8601DateFormatter().string(from: Date()),
+            "asrBackend": config.asrBackend,
+            "qualityFallbackStatus": currentQualityFallbackStatus(),
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: record),
+              var line = String(data: data, encoding: .utf8)
+        else { return }
+        line.append("\n")
+        if let handle = try? FileHandle(forWritingTo: resultsURL) {
+            defer { try? handle.close() }
+            _ = try? handle.seekToEnd()
+            try? handle.write(contentsOf: Data(line.utf8))
+        } else {
+            try? Data(line.utf8).write(to: resultsURL)
+        }
+    }
+
+    /// A `.txt` fixture is a pointer, re-read on every capture, so one app
+    /// session can sweep a whole corpus. Pointing straight at audio keeps the
+    /// simple single-clip case unchanged.
+    static func resolveFixtureAudioURL(_ configured: URL?) -> URL? {
+        guard let configured else { return nil }
+        guard configured.pathExtension.lowercased() == "txt" else { return configured }
+        guard let contents = try? String(contentsOf: configured, encoding: .utf8) else { return nil }
+        let path = contents.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path.isEmpty ? nil : URL(fileURLWithPath: path)
+    }
+
+    static func loadFixtureAudioSamples(at url: URL) throws -> [Float] {
+        let file = try AVAudioFile(forReading: url)
+        guard let targetFormat = AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: Double(WhisperKit.sampleRate),
+            channels: 1,
+            interleaved: false
+        ) else {
+            throw JarvisTapError.audioInputUnavailable("cannot build a 16 kHz mono fixture format")
+        }
+
+        guard let converter = AVAudioConverter(from: file.processingFormat, to: targetFormat) else {
+            throw JarvisTapError.audioInputUnavailable("cannot convert \(file.processingFormat) to 16 kHz mono")
+        }
+
+        let sourceFrames = AVAudioFrameCount(file.length)
+        guard sourceFrames > 0,
+              let sourceBuffer = AVAudioPCMBuffer(pcmFormat: file.processingFormat, frameCapacity: sourceFrames)
+        else {
+            throw JarvisTapError.audioInputUnavailable("fixture is empty: \(url.lastPathComponent)")
+        }
+        try file.read(into: sourceBuffer)
+
+        let ratio = targetFormat.sampleRate / file.processingFormat.sampleRate
+        let targetCapacity = AVAudioFrameCount(Double(sourceFrames) * ratio) + 1024
+        guard let targetBuffer = AVAudioPCMBuffer(pcmFormat: targetFormat, frameCapacity: targetCapacity) else {
+            throw JarvisTapError.audioInputUnavailable("cannot allocate a fixture conversion buffer")
+        }
+
+        var consumed = false
+        var conversionError: NSError?
+        converter.convert(to: targetBuffer, error: &conversionError) { _, status in
+            if consumed {
+                status.pointee = .endOfStream
+                return nil
+            }
+            consumed = true
+            status.pointee = .haveData
+            return sourceBuffer
+        }
+        if let conversionError {
+            throw conversionError
+        }
+
+        guard let channel = targetBuffer.floatChannelData?[0] else { return [] }
+        return Array(UnsafeBufferPointer(start: channel, count: Int(targetBuffer.frameLength)))
+    }
+
+    private func loadAudioCaptureEngine() async throws {
+        if audioCaptureKit != nil { return }
+        let started = Date()
+        let captureConfig = WhisperKitConfig(
+            model: config.whisperModel,
+            verbose: false,
+            logLevel: .error,
+            prewarm: false,
+            load: false,
+            download: false
+        )
+        audioCaptureKit = try await WhisperKit(captureConfig)
+        traceLogger.log(
+            "Audio capture engine ready seconds=\(String(format: "%.3f", Date().timeIntervalSince(started))) model_loaded=0")
+    }
+
+    /// True when the full WhisperKit model is already on disk, so loading it
+    /// costs time but no download.
+    private var whisperModelIsLocallyAvailable: Bool {
+        localWhisperModelFolder(for: config.whisperModel) != nil
+    }
+
     private func loadWhisperKit() async throws {
         print("Loading WhisperKit model: \(config.whisperModel)")
         fflush(stdout)
@@ -2612,15 +2752,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     }
 
     private func resetStreamingSession() throws {
-        guard let whisperKit else {
+        guard let audioCaptureKit else {
             throw JarvisTapError.whisperUnavailable
         }
 
         traceLogger.log("Resetting Whisper streaming session")
-        safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "reset_streaming_session")
-        whisperKit.audioProcessor.purgeAudioSamples(keepingLast: 0)
+        safelyStopLiveAudioRecording(captureKit: audioCaptureKit, reason: "reset_streaming_session")
+        audioCaptureKit.audioProcessor.purgeAudioSamples(keepingLast: 0)
         fluidStreamingFedSampleCount = 0
-        streamTranscriber = try makeStreamTranscriber(using: whisperKit)
+        // Only the WhisperKit-backed streaming preview needs the full model.
+        if let whisperKit {
+            streamTranscriber = try makeStreamTranscriber(using: whisperKit)
+        } else {
+            streamTranscriber = nil
+        }
     }
 
     /// Reads the live audio device and asks `AudioInputPreflightPolicy` whether
@@ -2646,8 +2791,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             canBuildTapFormat: buildable)
     }
 
-    private func safelyStopLiveAudioRecording(whisperKit: WhisperKit?, reason: String) {
-        guard let audioProcessor = whisperKit?.audioProcessor else { return }
+    private func safelyStopLiveAudioRecording(captureKit: WhisperKit?, reason: String) {
+        guard let audioProcessor = captureKit?.audioProcessor else { return }
 
         var retiredID: ObjectIdentifier?
 
@@ -2920,7 +3065,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
     private func handleDarwinTriggerNotification(named name: String) {
         traceLogger.log("Darwin trigger notification received name=\(name)")
         DispatchQueue.main.async { [self] in
-            guard settingsStore.triggerKey == .f5 else {
+            // The notification normally exists for the F5 bridge. The test
+            // harness reuses it as a headless trigger, because there is no way
+            // to hold a physical key from a script and an unexercised paste path
+            // is how silent regressions ship.
+            guard settingsStore.triggerKey == .f5 || config.testHarnessEnabled else {
                 traceLogger.log("Darwin trigger notification ignored reason=trigger_key_not_f5 selected=\(settingsStore.triggerKey.rawValue)")
                 return
             }
@@ -3932,6 +4081,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         captureDurationSeconds: TimeInterval
     ) -> String? {
         guard config.parakeetQualityFallbackEnabled else { return nil }
+        // Asking for a second opinion nobody can give throws away a usable
+        // transcript: the caller marks the Parakeet result as superseded and the
+        // Whisper path then has nothing to supersede it with. When the fallback
+        // model is not loaded, the Parakeet transcript is the answer.
+        guard whisperKit != nil else { return nil }
 
         let cleaned = cleanedTranscriptText(candidate.text)
         if candidate.confidence < config.parakeetQualityFallbackMinConfidence {
@@ -4493,7 +4647,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return newSamples.count
     }
 
-    private func runFluidTrueStreamingLoop(whisperKit: WhisperKit) async {
+    private func runFluidTrueStreamingLoop() async {
         guard let manager = fluidStreamingAsrManager else {
             traceLogger.log("FluidAudio true streaming loop unavailable reason=manager_not_loaded")
             return
@@ -4617,7 +4771,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         return fresh
     }
 
-    private func captureSilenceAwareReleaseTail(whisperKit: WhisperKit?) async {
+    private func captureSilenceAwareReleaseTail(captureKit: WhisperKit?) async {
         let maximumTailSeconds = max(0.15, settingsStore.releaseTailMaxSeconds)
         let minimumTailSeconds = min(0.10, maximumTailSeconds)
         let silenceWindowSeconds = min(0.10, maximumTailSeconds)
@@ -4636,7 +4790,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
 
             let elapsed = Date().timeIntervalSince(start)
             guard elapsed >= minimumTailSeconds else { continue }
-            guard whisperKit != nil else { break }
+            guard captureKit != nil else { break }
 
             let requiredSamples = Int(Double(WhisperKit.sampleRate) * silenceWindowSeconds)
             let recentSamples = recentLiveCapturedAudioSamples(maxCount: requiredSamples)
@@ -4659,7 +4813,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         }
 
         traceLogger.log("Stopping live audio recording after release tail")
-        safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "release_tail")
+        safelyStopLiveAudioRecording(captureKit: captureKit, reason: "release_tail")
     }
 
     private func relaxedDecodingOptions() -> DecodingOptions {
@@ -4735,16 +4889,58 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let task = Task(priority: .userInitiated) { [self] in
             do {
                 traceLogger.log("ASR backend=\(config.asrBackend)")
-                traceLogger.log("Loading WhisperKit model=\(config.whisperModel)")
                 traceLogger.log("Whisper decode language=\(settingsStore.preferredLanguage.whisperLanguageCode ?? "auto")")
-                try await loadWhisperKit()
-                traceLogger.log("WhisperKit ready")
-                print("WhisperKit ready.")
-                fflush(stdout)
+
+                // Capture first, and cheaply. Everything below is a recognizer.
+                try await loadAudioCaptureEngine()
 
                 if usesParakeetFinalBackend {
                     try await loadParakeetV3ANE()
                     print("Parakeet v3 ANE ready.")
+                    fflush(stdout)
+
+                    // Dictation is ready the moment the primary recognizer is,
+                    // which is about 0.7s in. Waiting for the optional fallback
+                    // too made that 7.3s, and a trigger pressed inside that
+                    // window is refused with "still warming up" -- so the app
+                    // spent seven seconds looking broken to earn a second
+                    // opinion it usually does not need.
+                    markSpeechModelReady()
+
+                    // The quality fallback re-checks low-confidence Parakeet
+                    // output. Worth loading when the model is already here;
+                    // never worth a surprise 619 MB download on someone who just
+                    // wanted to dictate a sentence. While it is absent the
+                    // fallback does not fire and currentQualityFallbackStatus
+                    // says so out loud.
+                    if config.parakeetQualityFallbackEnabled {
+                        if whisperModelIsLocallyAvailable || config.qualityFallbackAutoDownload {
+                            traceLogger.log("Loading Whisper quality fallback in background local=\(whisperModelIsLocallyAvailable ? 1 : 0)")
+                            Task(priority: .utility) { [self] in
+                                let started = Date()
+                                do {
+                                    try await loadWhisperKit()
+                                    traceLogger.log(
+                                        "Whisper quality fallback ready seconds=\(String(format: "%.2f", Date().timeIntervalSince(started)))")
+                                } catch {
+                                    // Not fatal. Parakeet is the recognizer;
+                                    // this was the optional second opinion.
+                                    traceLogger.log("Whisper quality fallback failed to load error=\(error)")
+                                }
+                                refreshRuntimeStatusUI()
+                            }
+                        } else {
+                            traceLogger.log(
+                                "Whisper quality fallback NOT loaded reason=model_not_downloaded; dictation uses Parakeet alone")
+                        }
+                    }
+                } else {
+                    // WhisperKit is the final recognizer here, so the model is
+                    // not optional.
+                    traceLogger.log("Loading WhisperKit model=\(config.whisperModel)")
+                    try await loadWhisperKit()
+                    traceLogger.log("WhisperKit ready")
+                    print("WhisperKit ready.")
                     fflush(stdout)
                 }
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
@@ -4753,13 +4949,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     fflush(stdout)
                 }
 
-                withStateLock {
-                    whisperLoadState = .ready
-                    whisperWarmupTask = nil
-                }
-                traceLogger.log("Whisper warmup skipped; model ready for live use")
-                refreshRuntimeStatusUI()
-                present(.ready)
+                markSpeechModelReady()
             } catch {
                 traceLogger.log("Startup failed: WhisperKit load error=\(error)")
                 fputs("[PressTalk] Failed to load WhisperKit: \(error)\n", stderr)
@@ -4775,6 +4965,22 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         withStateLock {
             whisperWarmupTask = task
         }
+    }
+
+    /// Flips the app into the dictating state. Idempotent, because the Parakeet
+    /// path announces readiness before the optional fallback finishes loading
+    /// and the warmup tail would otherwise announce it a second time.
+    private func markSpeechModelReady() {
+        let alreadyReady = withStateLock { () -> Bool in
+            if case .ready = whisperLoadState { return true }
+            whisperLoadState = .ready
+            whisperWarmupTask = nil
+            return false
+        }
+        guard !alreadyReady else { return }
+        traceLogger.log("Speech model ready for live use")
+        refreshRuntimeStatusUI()
+        present(.ready)
     }
 
     private func currentWhisperReadinessMessage() -> String? {
@@ -6018,11 +6224,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         withStateLock {
             activeAudioInputDeviceDescription = selectedAudioInputDescription
         }
-        let whisperKit = self.whisperKit
+        let captureKit = self.audioCaptureKit
         let traceLogger = self.traceLogger
         let audioStartRequestedAt = Date()
         let task = Task(priority: .userInitiated) { [self] in
-            guard let whisperKit else { return }
+            guard let captureKit else { return }
             do {
                 traceLogger.log(
                     announce
@@ -6037,8 +6243,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                     traceLogger.log("Audio input preflight FAILED: \(failure) -- refusing capture instead of aborting")
                     throw JarvisTapError.audioInputUnavailable(failure)
                 }
-                try whisperKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
-                    self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                if let fixtureURL = Self.resolveFixtureAudioURL(config.fixtureAudioURL) {
+                    // Replay mode. Everything downstream of capture -- freezing,
+                    // recognition, cleanup, insertion, the latency spans -- runs
+                    // exactly as it does for a real hold, but the samples are
+                    // byte-identical between runs, so a timing or quality change
+                    // means the code changed.
+                    let samples = try Self.loadFixtureAudioSamples(at: fixtureURL)
+                    traceLogger.log(
+                        "Fixture audio loaded path=\(fixtureURL.path) samples=\(samples.count) seconds=\(String(format: "%.2f", Double(samples.count) / Double(WhisperKit.sampleRate)))")
+                    appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                } else {
+                    try captureKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
+                        self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                    }
                 }
                 let shouldContinue = withStateLock { () -> Bool in
                     guard activeCaptureSessionID == captureSessionID,
@@ -6052,15 +6270,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 }
                 guard shouldContinue, !Task.isCancelled else {
                     traceLogger.log("Audio recording engine started after session ended; stopping stale capture session=\(captureSessionID)")
-                    safelyStopLiveAudioRecording(whisperKit: whisperKit, reason: "stale_capture_start")
+                    safelyStopLiveAudioRecording(captureKit: captureKit, reason: "stale_capture_start")
                     return
                 }
                 traceLogger.log(
                     "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", Date().timeIntervalSince(audioStartRequestedAt))) session=\(captureSessionID)"
                 )
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
-                    await runFluidTrueStreamingLoop(whisperKit: whisperKit)
-                } else if config.streamingTranscriptionEnabled {
+                    await runFluidTrueStreamingLoop()
+                } else if config.streamingTranscriptionEnabled, let whisperKit = self.whisperKit {
                     await runRealtimeWhisperLoop(whisperKit: whisperKit)
                 } else {
                     while !Task.isCancelled {
@@ -6148,6 +6366,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
         let agentMode = self.config.agentMode
         let speaker = self.speaker
         let whisperKit = self.whisperKit
+        let captureKit = self.audioCaptureKit
         let decodingOptions = self.decodingOptions
         let pasteAutomatically = self.settingsStore.pasteAutomatically
         let streamTaskToStop = currentStreamTask
@@ -6185,7 +6404,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             let normalizedSamples: [Float]
             let capturedSignalStats: (rms: Double, peak: Double)
             let frozenAudioDurationSeconds: Double
-            await captureSilenceAwareReleaseTail(whisperKit: whisperKit)
+            await captureSilenceAwareReleaseTail(captureKit: captureKit)
             if let streamTaskToStop {
                 if config.streamingTranscriptionEnabled {
                     // Do NOT block the paste on stream teardown.
@@ -6224,7 +6443,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
             // staler than before -- it is only consulted if the final pass fails.
             processingSnapshot = withStateLock { latestStreamingState }
 
-            if whisperKit != nil {
+            if captureKit != nil {
                 capturedAudioSamples = currentLiveCapturedAudioSamples()
                 frozenAudioDurationSeconds = Double(capturedAudioSamples.count) / Double(WhisperKit.sampleRate)
                 capturedSignalStats = audioLevelStats(for: capturedAudioSamples)
@@ -6623,14 +6842,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate {
                 print("🗣️ [PressTalk recognized] \(transcript)")
                 fflush(stdout)
 
+                recordHarnessOutcome(transcript: transcript, releasedAt: releaseTelemetryStart)
+
                 if agentMode == "dictation" {
-                    if pasteAutomatically {
+                    if pasteAutomatically && !config.testHarnessSuppressesInsertion {
                         traceLogger.log("Pasting dictated transcript into focused app")
                         let insertStartedAt = Date()
-                        let insertStartedAt2 = Date()
-                let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
-                traceLogger.log(
-                    "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt2))) span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
+                        let insertionResult = try insertTranscriptIntoFocusedApp(transcript, context: .dictation)
                         traceLogger.log(
                             "latency span=insert seconds=\(String(format: "%.3f", Date().timeIntervalSince(insertStartedAt))) span=keyup_to_inserted seconds=\(String(format: "%.3f", Date().timeIntervalSince(releaseTelemetryStart)))")
                         switch insertionResult {

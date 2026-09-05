@@ -22,6 +22,13 @@ struct JarvisTapConfig {
     let streamingTranscriptionEnabled: Bool
     let parakeetQualityFallbackEnabled: Bool
     let parakeetQualityFallbackMinConfidence: Double
+    let qualityFallbackAutoDownload: Bool
+    let testHarnessEnabled: Bool
+    let fixtureAudioURL: URL?
+    let harnessResultsURL: URL?
+    /// Harness runs do not paste by default. A test that types into whatever
+    /// window happens to be focused is a test that damages the operator's work.
+    let testHarnessSuppressesInsertion: Bool
     let sayVoice: String?
     let printPartials: Bool
     let traceLogPath: String
@@ -163,6 +170,51 @@ struct JarvisTapConfig {
             return value != "0" && value != "false" && value != "no"
         }()
 
+        // The quality-fallback model is a 619 MB download that the default
+        // recognizer never needs. Fetching it behind someone's back on first
+        // launch is the difference between a 461 MB setup and a 1.1 GB one, so
+        // it is opt-in.
+        let qualityFallbackAutoDownload: Bool = {
+            guard let rawValue = env["PRESSTALK_QUALITY_FALLBACK_AUTODOWNLOAD"] else { return false }
+            let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return value == "1" || value == "true" || value == "yes"
+        }()
+
+        // Headless end-to-end testing. Neither of these does anything unless
+        // explicitly set, and both are absent from every shipped launch path;
+        // they exist so the trigger-to-paste journey can be exercised without a
+        // human holding a key.
+        let testHarnessEnabled: Bool = {
+            let rawValue = env["PRESSTALK_TEST_HARNESS"] ?? "0"
+            let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return value == "1" || value == "true" || value == "yes"
+        }()
+
+        let fixtureAudioURL: URL? = {
+            guard testHarnessEnabled,
+                  let path = env["PRESSTALK_FIXTURE_AUDIO"]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .nonEmpty
+            else { return nil }
+            return URL(fileURLWithPath: path)
+        }()
+
+        let harnessResultsURL: URL? = {
+            guard testHarnessEnabled,
+                  let path = env["PRESSTALK_HARNESS_RESULTS"]?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                    .nonEmpty
+            else { return nil }
+            return URL(fileURLWithPath: path)
+        }()
+
+        let testHarnessSuppressesInsertion: Bool = {
+            guard testHarnessEnabled else { return false }
+            let rawValue = env["PRESSTALK_HARNESS_ALLOW_INSERT"] ?? "0"
+            let value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return !(value == "1" || value == "true" || value == "yes")
+        }()
+
         let parakeetQualityFallbackMinConfidence = min(
             1.0,
             max(
@@ -175,6 +227,7 @@ struct JarvisTapConfig {
         )
 
         let traceLogPath =
+            env["PRESSTALK_TRACE_LOG"] ??
             env["JARVISTAP_TRACE_LOG"] ??
             "\(homeDirectory)/Library/Logs/presstalk_trace.log"
 
@@ -231,6 +284,11 @@ struct JarvisTapConfig {
             streamingTranscriptionEnabled: streamingTranscriptionEnabled,
             parakeetQualityFallbackEnabled: parakeetQualityFallbackEnabled,
             parakeetQualityFallbackMinConfidence: parakeetQualityFallbackMinConfidence,
+            qualityFallbackAutoDownload: qualityFallbackAutoDownload,
+            testHarnessEnabled: testHarnessEnabled,
+            fixtureAudioURL: fixtureAudioURL,
+            harnessResultsURL: harnessResultsURL,
+            testHarnessSuppressesInsertion: testHarnessSuppressesInsertion,
             sayVoice: env["JARVISTAP_SAY_VOICE"],
             printPartials: env["JARVISTAP_PRINT_PARTIALS"].map { $0 != "0" } ?? true,
             traceLogPath: traceLogPath,

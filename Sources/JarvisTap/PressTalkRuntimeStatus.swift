@@ -29,6 +29,10 @@ struct PressTalkRuntimeStatus {
     let streamingASRBackend: String
     let realtimePartialTranscriptionEnabled: Bool
     let asrMode: String
+    /// Whether the optional Whisper quality-fallback model is loaded, and if
+    /// not, why. Users are told plainly rather than left to wonder why a
+    /// setting they enabled has no effect.
+    let qualityFallbackStatus: String
     let f5BridgeStatus: String
     let codeSignatureIdentifier: String
     let codeSignatureCDHash: String
@@ -240,6 +244,7 @@ struct PressTalkRuntimeStatus {
         streamingASRBackend: "unknown",
         realtimePartialTranscriptionEnabled: false,
         asrMode: "unknown",
+        qualityFallbackStatus: "Checking...",
         f5BridgeStatus: "Checking...",
         codeSignatureIdentifier: "unknown",
         codeSignatureCDHash: "unknown",

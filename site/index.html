@@ -1,0 +1,528 @@
+<title>PressTalk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;800&family=IBM+Plex+Mono:wght@400;500&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap">
+
+<style>
+  :root {
+    --ground: #f3f4f6;
+    --raised: #fbfbfc;
+    --ink: #15171c;
+    --muted: #666d7a;
+    --rule: #dbdde2;
+    --live: #c2620b;
+    --live-soft: rgba(194, 98, 11, 0.12);
+    --keycap-face: #fdfdfe;
+    --keycap-edge: #c9ccd3;
+    --shadow: rgba(21, 23, 28, 0.10);
+
+    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #131519;
+      --raised: #1a1d23;
+      --ink: #e8e9ec;
+      --muted: #8b92a0;
+      --rule: #2a2e36;
+      --live: #e8912c;
+      --live-soft: rgba(232, 145, 44, 0.16);
+      --keycap-face: #22262e;
+      --keycap-edge: #0d0f13;
+      --shadow: rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #131519;
+    --raised: #1a1d23;
+    --ink: #e8e9ec;
+    --muted: #8b92a0;
+    --rule: #2a2e36;
+    --live: #e8912c;
+    --live-soft: rgba(232, 145, 44, 0.16);
+    --keycap-face: #22262e;
+    --keycap-edge: #0d0f13;
+    --shadow: rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 18px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .measure { width: min(62ch, calc(100% - 3rem)); margin-inline: auto; }
+  .band { border-block: 1px solid var(--rule); padding-block: clamp(2.5rem, 6vw, 4.5rem); }
+
+  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+  h1 { font-size: clamp(2.6rem, 8vw, 4.4rem); font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
+  h2 { font-size: clamp(1.5rem, 3.6vw, 2rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
+  h3 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+  p { margin: 0 0 1.1em; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+
+  .label {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    color: var(--muted);
+    margin: 0 0 1.2rem;
+  }
+
+  /* ---------- masthead ---------- */
+  .masthead { padding: 2rem 0 0; }
+  .masthead-inner { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  .wordmark { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; font-size: 1.1rem; }
+  .masthead .label { margin: 0; }
+
+  /* ---------- hero ---------- */
+  .hero { padding-block: clamp(2.5rem, 7vw, 5rem) clamp(2rem, 5vw, 3.5rem); }
+  .lede {
+    font-size: clamp(1.1rem, 2.4vw, 1.32rem);
+    color: var(--muted);
+    max-width: 46ch;
+    margin-top: 1.4rem;
+  }
+  .lede strong { color: var(--ink); font-weight: 600; }
+
+  /* ---------- the key ---------- */
+  .stage {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: clamp(1.5rem, 4vw, 3rem);
+    align-items: center;
+    width: min(72ch, calc(100% - 3rem));
+    margin-inline: auto;
+  }
+  @media (max-width: 620px) { .stage { grid-template-columns: 1fr; } }
+
+  .keycap {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 148px;
+    height: 148px;
+    border-radius: 18px;
+    border: 1px solid var(--keycap-edge);
+    background: var(--keycap-face);
+    box-shadow: 0 7px 0 var(--keycap-edge), 0 12px 22px var(--shadow);
+    display: grid;
+    place-content: center;
+    gap: 0.35rem;
+    cursor: pointer;
+    color: var(--ink);
+    transition: transform 90ms ease, box-shadow 90ms ease, border-color 140ms ease;
+    touch-action: none;
+    justify-self: center;
+  }
+  .keycap:focus-visible { outline: 2px solid var(--live); outline-offset: 5px; }
+  .keycap .glyph { font-family: var(--display); font-weight: 800; font-size: 2rem; letter-spacing: -0.02em; }
+  .keycap .hint { font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
+
+  .keycap[data-held="true"] {
+    transform: translateY(6px);
+    box-shadow: 0 1px 0 var(--keycap-edge), 0 3px 8px var(--shadow);
+    border-color: var(--live);
+  }
+  .keycap[data-held="true"] .hint { color: var(--live); }
+
+  .readout { min-width: 0; }
+  .meterline { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.9rem; }
+
+  .lamp {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--rule);
+    flex: none;
+    transition: background 120ms ease, box-shadow 120ms ease;
+  }
+  .stage[data-live="true"] .lamp { background: var(--live); box-shadow: 0 0 0 4px var(--live-soft); }
+
+  .elapsed { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .stage[data-live="true"] .elapsed { color: var(--live); }
+
+  .meter { display: flex; align-items: flex-end; gap: 3px; height: 30px; flex: 1; }
+  .meter i {
+    display: block; flex: 1; min-width: 2px; height: 3px;
+    background: var(--rule); border-radius: 1px;
+    transition: height 70ms ease, background 120ms ease;
+  }
+  .stage[data-live="true"] .meter i { background: var(--live); }
+
+  .field {
+    border: 1px solid var(--rule);
+    border-radius: 10px;
+    background: var(--raised);
+    padding: 0.9rem 1.05rem;
+    min-height: 5.4rem;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+  .field .placeholder { color: var(--muted); font-style: italic; }
+  .caret {
+    display: inline-block; width: 2px; height: 1.05em; margin-left: 1px;
+    background: var(--live); vertical-align: text-bottom;
+    animation: blink 1.05s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* ---------- steps: a real sequence, numbered once ---------- */
+  .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem; }
+  @media (min-width: 760px) { .steps { grid-template-columns: repeat(4, 1fr); gap: 1.4rem; } }
+  .steps li { border-top: 2px solid var(--ink); padding-top: 0.7rem; }
+  .steps .n { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.16em; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+  .steps h3 { margin-bottom: 0.2rem; }
+  .steps p { font-size: 0.92rem; color: var(--muted); margin: 0; }
+
+  /* ---------- measurements ---------- */
+  .measurements { width: min(80ch, calc(100% - 3rem)); margin-inline: auto; }
+  .scroller { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  caption { text-align: left; color: var(--muted); font-size: 0.86rem; padding-bottom: 0.9rem; }
+  th, td { text-align: left; padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .caveat {
+    font-size: 0.88rem;
+    color: var(--muted);
+    border-left: 2px solid var(--live);
+    padding-left: 1rem;
+    margin-top: 1.6rem;
+  }
+
+  /* ---------- price ---------- */
+  .price { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
+  .price .amount { font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 7vw, 3.6rem); letter-spacing: -0.04em; line-height: 1; }
+  .price .unit { font-family: var(--mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
+  .includes { list-style: none; padding: 0; margin: 1.4rem 0 0; display: grid; gap: 0.55rem; font-size: 0.95rem; }
+  .includes li { padding-left: 1.4rem; position: relative; }
+  .includes li::before { content: "—"; position: absolute; left: 0; color: var(--live); }
+
+  .cta {
+    display: inline-block;
+    font-family: var(--display); font-weight: 600; font-size: 0.98rem;
+    background: var(--ink); color: var(--ground);
+    padding: 0.85rem 1.6rem; border-radius: 8px;
+    text-decoration: none; margin-top: 1.8rem;
+    transition: opacity 120ms ease;
+  }
+  .cta:hover { opacity: 0.86; }
+  .cta:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
+  .cta-note { font-size: 0.86rem; color: var(--muted); margin-top: 0.9rem; }
+
+  pre {
+    font-family: var(--mono); font-size: 0.82rem;
+    background: var(--raised); border: 1px solid var(--rule); border-radius: 8px;
+    padding: 0.9rem 1.05rem; overflow-x: auto; margin: 0;
+  }
+
+  footer { padding-block: 3rem; font-size: 0.86rem; color: var(--muted); }
+  footer a { color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+  }
+</style>
+
+<header class="masthead">
+  <div class="measure masthead-inner">
+    <span class="wordmark">PressTalk</span>
+    <p class="label">Dictation for Apple Silicon</p>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="measure">
+    <h1>Hold a key.<br>Say the thing.<br>Let go.</h1>
+    <p class="lede">
+      Push-to-talk dictation that runs <strong>on your Mac</strong>. Your voice is
+      not uploaded. Your text is not uploaded. There is no subscription.
+    </p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="stage" id="stage" data-live="false">
+    <button class="keycap" id="keycap" data-held="false"
+            aria-describedby="keycap-help">
+      <span class="glyph">fn</span>
+      <span class="hint" id="hint">hold</span>
+    </button>
+
+    <div class="readout">
+      <p class="label" id="keycap-help">Press and hold — this is the whole product</p>
+      <div class="meterline">
+        <span class="lamp" aria-hidden="true"></span>
+        <span class="elapsed" id="elapsed">0.00 s</span>
+        <span class="meter" id="meter" aria-hidden="true"></span>
+      </div>
+      <div class="field" id="field" aria-live="polite">
+        <span class="placeholder">Text lands here, the way it lands in whatever app you were already using.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="measure">
+    <p class="label">What actually happens</p>
+    <ol class="steps">
+      <li>
+        <span class="n">01</span>
+        <h3>Hold</h3>
+        <p>Fn / Globe by default. Option, Option-Space, F5 or a trackpad hold if you prefer.</p>
+      </li>
+      <li>
+        <span class="n">02</span>
+        <h3>Speak</h3>
+        <p>Recognition runs on the Neural Engine. Nothing is sent anywhere.</p>
+      </li>
+      <li>
+        <span class="n">03</span>
+        <h3>Release</h3>
+        <p>Letting go is the endpoint. No wake word, no silence guessing, no waiting.</p>
+      </li>
+      <li>
+        <span class="n">04</span>
+        <h3>Paste</h3>
+        <p>Into the app you were already in. If it can't paste, it copies rather than losing your words.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="band">
+  <div class="measurements">
+    <p class="label">What was measured</p>
+    <div class="scroller">
+      <table>
+        <caption>
+          144 German clips replayed through the shipped pipeline, end to end:
+          trigger, capture, recognition, cleanup, delivery.
+        </caption>
+        <thead>
+          <tr><th scope="col">Measurement</th><th scope="col">Result</th><th scope="col">How</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Runs that produced text</td>
+            <td class="num">144 / 144</td>
+            <td>Every attempt counted, including failures</td>
+          </tr>
+          <tr>
+            <td>Word error rate, German</td>
+            <td class="num">11.25 %</td>
+            <td>Against written references, text as delivered</td>
+          </tr>
+          <tr>
+            <td>Release to transcript</td>
+            <td class="num">0.95 s p50 · 1.45 s p95</td>
+            <td>M4 Max, 144 runs</td>
+          </tr>
+          <tr>
+            <td>Recognition speed</td>
+            <td class="num">115× · 62× · 57×</td>
+            <td>Realtime factor: M4 Max, M1 Ultra, M1 Max</td>
+          </tr>
+          <tr>
+            <td>Model download</td>
+            <td class="num">~460 MB</td>
+            <td>During setup, from Hugging Face</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caveat">
+      Read these honestly. The audio is synthesised speech in three voices, not
+      144 different people in 144 different rooms, so the error rate is a
+      regression baseline rather than a promise about your voice. The timings come
+      from replayed audio on one machine. PressTalk has not been benchmarked
+      against any other dictation app, so this page will not tell you it is
+      quicker or more accurate than one.
+    </p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="measure">
+    <h2>Why local matters here</h2>
+    <p>
+      Cloud dictation works well and costs about $12–15 every month, forever, and
+      every sentence you dictate goes through somebody's server. For a lot of
+      work that is fine. For the sentence about your health, your salary, or the
+      client you are about to lose, it is a decision you made once and now make
+      every day without noticing.
+    </p>
+    <p>
+      PressTalk removes the decision. Recognition happens on the Neural Engine in
+      your Mac. Turn off Wi-Fi after setup and dictation still works — that is the
+      test, and you should run it.
+    </p>
+    <p>
+      The <a href="https://github.com/subtract0/presstalk">source is public</a>,
+      so the privacy claim is checkable rather than promised. There are two
+      network calls in it and both download models.
+    </p>
+  </div>
+</section>
+
+<section class="band">
+  <div class="measure">
+    <p class="label">Founder licence</p>
+    <div class="price">
+      <span class="amount">$20</span>
+      <span class="unit">once · not per month</span>
+    </div>
+    <p style="color: var(--muted); margin-top: 0.6rem;">Rising to $39 at general release.</p>
+    <ul class="includes">
+      <li>Updates through 1.x, written into the licence and checked by the app</li>
+      <li>Verified on your Mac. No account, no activation server, no phoning home</li>
+      <li>14-day refund, no argument</li>
+      <li>Direct support from the person who wrote it</li>
+    </ul>
+    <a class="cta" href="#availability">What's the catch?</a>
+  </div>
+</section>
+
+<section class="band" id="availability">
+  <div class="measure">
+    <h2>Two things to know before you buy</h2>
+    <p>
+      <strong>It is not notarized by Apple yet.</strong> macOS will warn you that
+      the developer cannot be verified, and you will have to right-click → Open on
+      first launch. That is being fixed, and until it is, this page is not going
+      to pretend otherwise.
+    </p>
+    <p>
+      <strong>Apple Silicon and macOS 14 or later.</strong> No Intel build, no
+      Windows, no iPhone.
+    </p>
+    <p>For now, install with Homebrew:</p>
+    <pre>brew tap subtract0/presstalk
+brew install --cask presstalk</pre>
+  </div>
+</section>
+
+<footer>
+  <div class="measure">
+    <p>
+      PressTalk · <a href="https://github.com/subtract0/presstalk">Source</a> ·
+      <a href="https://github.com/subtract0/presstalk/blob/main/docs/PRIVACY.md">Privacy</a> ·
+      <a href="https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md">Support</a>
+    </p>
+    <p>Draft page. Prices and availability are not final.</p>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    const stage = document.getElementById("stage");
+    const keycap = document.getElementById("keycap");
+    const hint = document.getElementById("hint");
+    const elapsed = document.getElementById("elapsed");
+    const meter = document.getElementById("meter");
+    const field = document.getElementById("field");
+
+    const BARS = 26;
+    const bars = [];
+    for (let i = 0; i < BARS; i += 1) {
+      const bar = document.createElement("i");
+      meter.appendChild(bar);
+      bars.push(bar);
+    }
+
+    const SENTENCE =
+      "Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.";
+
+    let held = false;
+    let startedAt = 0;
+    let raf = null;
+    let typing = null;
+
+    function frame() {
+      if (!held) return;
+      const seconds = (performance.now() - startedAt) / 1000;
+      elapsed.textContent = seconds.toFixed(2) + " s";
+      // A plausible speech envelope rather than random noise: syllables have
+      // shape, and a jittering bar chart reads as a loading spinner.
+      for (let i = 0; i < BARS; i += 1) {
+        const phase = seconds * 7 - i * 0.32;
+        const envelope = (Math.sin(phase) * 0.5 + 0.5) * (Math.sin(phase * 0.37) * 0.35 + 0.65);
+        bars[i].style.height = (3 + envelope * 26).toFixed(1) + "px";
+      }
+      raf = requestAnimationFrame(frame);
+    }
+
+    function press(event) {
+      if (event) event.preventDefault();
+      if (held) return;
+      held = true;
+      startedAt = performance.now();
+      stage.dataset.live = "true";
+      keycap.dataset.held = "true";
+      hint.textContent = "listening";
+      if (typing) { clearInterval(typing); typing = null; }
+      field.innerHTML = '<span class="placeholder">Listening…</span>';
+      raf = requestAnimationFrame(frame);
+    }
+
+    function release() {
+      if (!held) return;
+      held = false;
+      const seconds = (performance.now() - startedAt) / 1000;
+      stage.dataset.live = "false";
+      keycap.dataset.held = "false";
+      hint.textContent = "hold";
+      if (raf) cancelAnimationFrame(raf);
+      bars.forEach((bar) => { bar.style.height = "3px"; });
+
+      if (seconds < 0.25) {
+        field.innerHTML =
+          '<span class="placeholder">Too short — hold it while you talk, then let go.</span>';
+        elapsed.textContent = "0.00 s";
+        return;
+      }
+
+      // The real measured p50 from key release to transcript.
+      field.innerHTML = '<span class="placeholder">Recognising…</span>';
+      window.setTimeout(function () {
+        field.textContent = "";
+        const caret = document.createElement("span");
+        caret.className = "caret";
+        field.appendChild(caret);
+        let index = 0;
+        typing = window.setInterval(function () {
+          index += 1;
+          caret.insertAdjacentText("beforebegin", SENTENCE.charAt(index - 1));
+          if (index >= SENTENCE.length) {
+            clearInterval(typing);
+            typing = null;
+            window.setTimeout(function () { caret.remove(); }, 900);
+          }
+        }, 18);
+      }, 945);
+    }
+
+    keycap.addEventListener("mousedown", press);
+    keycap.addEventListener("touchstart", press, { passive: false });
+    window.addEventListener("mouseup", release);
+    window.addEventListener("touchend", release);
+    keycap.addEventListener("keydown", function (event) {
+      if (event.code === "Space" || event.code === "Enter") press(event);
+    });
+    keycap.addEventListener("keyup", function (event) {
+      if (event.code === "Space" || event.code === "Enter") release();
+    });
+    keycap.addEventListener("blur", release);
+  })();
+</script>

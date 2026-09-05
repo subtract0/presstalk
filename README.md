@@ -1,393 +1,90 @@
 # PressTalk
 
-Native macOS push-to-talk dictation for Apple Silicon.
-
-Current source baseline: `d6c0da1` on `refactor/skills-code-health-audit`
-(`Extract transcript text policy`).
-
-Current public tester cask: `0.1.6-test8`.
-
-Distribution roadmap: [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md)
-
-Crow tester handoff: [docs/CROW_TESTING_HANDOFF.md](docs/CROW_TESTING_HANDOFF.md)
-
-Homebrew cask name: `presstalk`
-
-Production naming:
-- shipped app bundle: `PressTalk.app`
-- app bundle identifier: `com.am.presstalk`
-- product name: `PressTalk`
-- some legacy helper names such as `JARVISTAP_*` stay stable for now
-- for machines with older working TCC grants, the bootstrap helper can preserve
-  the legacy app identity with `PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap`
-
-Current packaged behavior:
-- hold `Fn / Globe` by default to bring up the light and start recording
-- release the trigger key to finalize transcription with silence-aware tail capture
-- choose `Option + Space`, `Option`, left/right `Option`, `Fn`, `F5`, or trackpad hold from settings
-- moving too far while using the trackpad trigger cancels the capture instead of pasting garbage
-- paste the final transcript into the currently focused app
-- no cloud round-trip in the default path
-- compact HUD and menu bar control surface
-- small runtime settings window for HUD, auto-paste, language, and release tail
-
-The current default runtime uses the local Parakeet v3 ANE backend for final dictation. Parakeet quality fallback is enabled by default: low-confidence or weakly punctuated Parakeet output is retried through local WhisperKit large-v3-turbo before paste, while high-confidence ANE output stays fast.
-
-The current public fallback release is intentionally conservative: it is
-hold-trigger, record locally, run a fast local ASR final pass, then paste on
-release. True live streaming partial text remains a benchmark/product track,
-not the release baseline.
-
-## Release Status
-
-The current public source is staged for Apple Silicon testing. See
-[docs/RELEASE_STATUS.md](docs/RELEASE_STATUS.md) before treating a build as a
-verified release across all target machines.
-
-## Homebrew Cask
-
-The public cask is live.
+Push-to-talk dictation for Apple Silicon. Hold `Fn`, speak, release, and the text
+lands in whatever app you were using. Recognition runs on the Neural Engine in
+your Mac.
 
 ```bash
 brew tap subtract0/presstalk
 brew install --cask presstalk
 ```
 
-The Homebrew cask runs the bundled bootstrap helper so a fresh Mac lands closer to:
+Then hold `Fn / Globe` and start talking. First launch walks through the three
+permissions macOS requires and downloads the speech model (~460 MB), ending in a
+dictation you can see arrive.
 
-- install
-- approve only any fresh macOS prompts that have not already been granted
-- hold `Fn / Globe` to dictate
+## Where things are
 
-Legacy F5 compatibility still ships as an optional helper, but it is no longer the default path:
+| | |
+|---|---|
+| Privacy, in detail | [docs/PRIVACY.md](docs/PRIVACY.md) |
+| Support and refunds | [docs/SUPPORT.md](docs/SUPPORT.md) |
+| What it costs | [docs/MONETIZATION.md](docs/MONETIZATION.md) |
+| Landing page draft | [site/index.html](site/index.html) |
+| Getting to a paid launch | [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md) |
+| Permission trouble | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
+| Testing on other Macs | [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md) |
 
-```bash
-/bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-karabiner-fallback.sh --enable
-```
+## Current state
 
-Cross-device Apple Silicon checklist:
+**Not notarized.** Builds are ad-hoc signed, so macOS reports an unverified
+developer and first launch needs right-click → Open. A Developer ID certificate
+is the remaining gate; everything downstream of it is scripted and tested.
 
-- [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md)
+Recognition uses Parakeet v3 on the Neural Engine. A larger WhisperKit model can
+re-check low-confidence results, but it is a separate ~620 MB download that is
+never fetched implicitly — without it, dictation runs on Parakeet alone and
+`currentQualityFallbackStatus()` says so.
 
-If macOS shows a permission toggle as enabled but PressTalk still reports a
-runtime preflight mismatch, do not keep re-approving it; see
-[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+Live partial text is off by default. PressTalk is push-to-talk, so key release
+already supplies the endpoint; the preview never shortened the wait and put
+teardown work on the paste path.
 
-## Build
-```bash
-bash scripts/build_jarvistap.sh
-```
-
-Local builds preserve the currently installed `PressTalk.app` bundle identifier
-by default. That prevents a working development install from silently switching
-between `com.am.jarvistap` and `com.am.presstalk`, which macOS treats as
-different privacy clients. Source-tree builds also create or reuse the local
-development code-signing identity by default; set
-`PRESSTALK_BUILD_STABLE_SIGNING=0` only when you deliberately want an ad-hoc
-debug build.
-
-For a no-surprise local update that must not create a signing trust prompt or
-fall back to ad-hoc signing, reuse only an existing trusted PressTalk identity:
+## Building
 
 ```bash
-PRESSTALK_BUILD_STABLE_SIGNING=existing \
-  PRESSTALK_BUILD_REQUIRE_STABLE_SIGNING=1 \
-  bash scripts/build_jarvistap.sh
-
-PRESSTALK_BOOTSTRAP_STABLE_SIGNING=existing \
-  PRESSTALK_OPEN_PERMISSION_PANES=0 \
-  PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+bash scripts/build_jarvistap.sh     # builds and installs to ~/Applications
+swift test                          # unit tests for the policy layer
 ```
 
-If the trusted identity is missing or untrusted, the build fails before
-installing an ad-hoc replacement. Run the signing repair from the logged-in
-desktop session only when you are deliberately ready for the macOS trust prompt.
+Set `PRESSTALK_INCLUDE_DEV_TOOLS=0` to leave the probe and smoke helpers out, as
+distribution packaging does.
 
-That produces:
-- `bin/jarvistap`
-- `~/Applications/PressTalk.app`
+## Gates worth knowing about
 
-To build or bootstrap against a legacy local privacy identity:
+These exist because each one caught something that had already shipped.
 
 ```bash
-PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap bash scripts/build_jarvistap.sh
-PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
-  PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
+# Refuses a build the notary service would reject, without needing a certificate:
+# unsigned nested Mach-O, missing entitlements, no secure timestamp.
+bash scripts/presstalk_notarization_readiness.sh --app ~/Applications/PressTalk.app
+
+# Refuses marketing copy the evidence does not support.
+bash scripts/presstalk_claims_gate.sh
+
+# Runs the whole journey headlessly -- trigger, capture, recognition, delivery --
+# and reports every attempt, not just the successful ones.
+bash scripts/presstalk_e2e_harness.sh --fixture path/to/audio.wav --runs 10
 ```
 
-## Install As LaunchAgent
-```bash
-bash scripts/install_jarvistap_launchd.sh
-```
+## Measured
 
-The launchd installer prefers:
-- `/Applications/PressTalk.app` if you installed via Homebrew cask
-- `~/Applications/PressTalk.app` if you built locally from source
-- legacy `JarvisTap.app` paths only as migration fallback
+144 German clips through the shipped pipeline end to end: 144/144 produced text,
+11.25% word error rate against written references, release-to-transcript 0.95 s
+at p50 and 1.45 s at p95 on an M4 Max. Recognition realtime factor 115× on M4
+Max, 62× on M1 Ultra, 57× on M1 Max.
 
-That installs `com.am.presstalk` with these defaults:
-- `JARVISTAP_AGENT_MODE=dictation`
-- `JARVISTAP_WHISPERKIT_MODEL=openai_whisper-large-v3-v20240930_turbo_632MB`
-- `JARVISTAP_WHISPER_LANGUAGE=auto`
-- `JARVISTAP_SAY_VOICE=Samantha`
-- `JARVISTAP_RELEASE_TAIL_PADDING_SECONDS=0.35`
-- `PRESSTALK_TRIGGER_KEY=fn`
+The audio is synthesised speech in three voices, so treat the error rate as a
+regression baseline rather than a claim about your voice. No comparison against
+other dictation apps has been run.
 
-Supported trigger values:
-- `fn`
-- `option_space`
-- `option`
-- `left_option`
-- `right_option`
-- `trackpad_hold`
-- `f5`
+## Layout
 
-## Public Packaging
-Package a Homebrew test/prerelease zip:
-```bash
-bash scripts/package_presstalk_release.sh 0.1.6-test8
-```
-
-Audit an existing zip before handing it to testers:
-```bash
-bash scripts/presstalk_release_artifact_audit.sh \
-  --zip dist/PressTalk-0.1.6-test8-macos-arm64.zip \
-  --expected-version 0.1.6-test8 \
-  --json-output dist/PressTalk-0.1.6-test8-artifact-audit.json
-```
-
-To exercise packaging and publish-time audit checks without uploading anything:
-```bash
-PRESSTALK_PUBLISH_DRY_RUN=1 bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
-```
-
-Set `PRESSTALK_DIST_DIR=/path/to/dist` when you want generated zips, checksums,
-and audit JSON written outside the repo `dist/` directory.
-
-To collect the current no-publish release-candidate evidence in one pass:
-```bash
-bash scripts/presstalk_release_candidate_preflight.sh 0.1.6-test5 \
-  --local \
-  --host mbp1-tb \
-  --require studio1 \
-  --require mbp1 \
-  --exclude-host "studio2=no attached microphone"
-```
-
-This wrapper collects the readiness matrix, runs the proof gate, performs the
-Homebrew publish dry-run, and records the combined readiness JSON. It does not
-install PressTalk, open System Settings, upload a release, or SSH anywhere
-except hosts supplied with `--host` / `--hosts`. Passing and failing runs both
-write `PressTalk-<version>-candidate-preflight.json`; failed runs include the
-failed step and exit status so target-machine blockers remain machine-readable.
-When explicit hosts are supplied, it also writes
-`PressTalk-<version>-host-discovery.json` with read-only SSH config, Bonjour,
-Tailscale, and strict BatchMode SSH probe evidence for those hosts. ARP scanning
-is disabled in that wrapper path by default.
-
-To close a candidate against the actual streaming product promise, add
-`--require-streaming`. Fresh bootstrap/install defaults now use
-`PRESSTALK_ASR_BACKEND=parakeet-v3-ane` for the final paste transcript plus
-`PRESSTALK_STREAMING_ASR_BACKEND=parakeet-eou-320` for live HUD partials, so
-runtime status should report an ASR mode like
-`parakeet_v3_ane_final_pass_with_parakeet_eou_320_true_streaming_partials`.
-Set `PRESSTALK_EXPECTED_ASR_MODE=<mode>` only when you want to pin one exact
-streaming backend; otherwise streaming-required publish paths accept any
-non-missing streaming ASR mode.
-
-```bash
-bash scripts/presstalk_release_candidate_preflight.sh 0.1.6-test5 \
-  --local \
-  --host mbp1-tb \
-  --require studio1 \
-  --require mbp1 \
-  --require-streaming \
-  --exclude-host "studio2=no attached microphone"
-```
-
-Streaming candidates also need ASR quality evidence. Capture benchmark JSON
-from `presstalk-asr-bench`, then gate it before using it in release readiness:
-
-```bash
-swift run -c release presstalk-asr-bench \
-  --input /Users/am/Downloads/chirp.wav \
-  --backend parakeet-eou-320 \
-  --reference docs/fixtures/chirp-reference.txt \
-  --json | tee dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt
-
-bash scripts/presstalk_streaming_bench_quality_gate.sh \
-  --bench-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt \
-  --expected-backend parakeet-eou-320 \
-  --json-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-quality.json
-```
-
-The gate requires live partial updates, fast finalization, bounded per-slice
-latency, and WER/CER under the configured thresholds. Stable Homebrew publishing
-requires `PRESSTALK_STREAMING_BENCH_QUALITY_JSON=/path/to/quality.json` once the
-streaming release gate is active.
-
-If the shipping architecture uses a streaming model only for the live listening
-HUD and a separate ANE finalizer for the pasted text, gate the two pieces
-separately instead of weakening the strict streaming gate:
-
-```bash
-swift run -c release presstalk-asr-bench \
-  --input /Users/am/Downloads/chirp.wav \
-  --backend parakeet-v3-ane \
-  --reference docs/fixtures/chirp-reference.txt \
-  --offline \
-  --json | tee dist/release-candidate-0.1.6-test5/parakeet-v3-ane-chirp-bench.txt
-
-bash scripts/presstalk_hybrid_streaming_quality_gate.sh \
-  --streaming-bench-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-chirp-bench.txt \
-  --expected-streaming-backend parakeet-eou-320 \
-  --finalizer-bench-output dist/release-candidate-0.1.6-test5/parakeet-v3-ane-chirp-bench.txt \
-  --expected-finalizer-backend parakeet-v3-ane \
-  --json-output dist/release-candidate-0.1.6-test5/parakeet-eou-320-plus-parakeet-v3-ane-chirp-hybrid-quality.json
-```
-
-Use `--hybrid-streaming-quality` plus
-`--require-hybrid-streaming-quality` in candidate/readiness preflights, or set
-`PRESSTALK_HYBRID_STREAMING_QUALITY_JSON=/path/to/hybrid-quality.json` and
-`PRESSTALK_REQUIRE_HYBRID_STREAMING_QUALITY=1` before stable Homebrew
-publishing. The streaming side must prove partials and latency; the finalizer
-side must prove paste-quality WER/CER and release speed.
-
-If the candidate fails because a target Mac is unreachable or not ready, turn
-the receipts into a manual target handoff without probing anything again:
-```bash
-bash scripts/presstalk_release_target_handoff.sh \
-  --candidate-preflight dist/release-candidate-0.1.6-test5/PressTalk-0.1.6-test5-candidate-preflight.json \
-  --json-output dist/release-candidate-0.1.6-test5/PressTalk-0.1.6-test5-target-handoff.json
-```
-
-The handoff report is read-only. It does not SSH, install PressTalk, open
-System Settings, or touch excluded machines such as `studio2` while it is out of
-microphone/STT scope.
-
-Release packaging explicitly builds the public `com.am.presstalk` identity even
-when your local development install is preserving `com.am.jarvistap`.
-
-For a production distribution artifact, use an explicit Developer ID signing
-identity, hardened runtime, secure timestamping, and notarization:
-
-```bash
-bash scripts/presstalk_distribution_signing_preflight.sh \
-  --require-notarization \
-  --json-output dist/PressTalk-0.1.6-distribution-signing-preflight.json
-```
-
-This preflight is read-only. It checks whether a Developer ID Application
-identity is available and whether notarytool credentials are configured through
-`PRESSTALK_NOTARYTOOL_PROFILE` or the Apple ID/team/password environment
-variables. It does not build, sign, notarize, upload, open System Settings, or
-print secrets.
-
-```bash
-PRESSTALK_DISTRIBUTION_SIGNING=1 \
-PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" \
-PRESSTALK_NOTARIZE=1 \
-PRESSTALK_NOTARYTOOL_PROFILE=presstalk-notary \
-  bash scripts/package_presstalk_release.sh 0.1.6
-```
-
-Then require the production signature and stapled notarization ticket:
-```bash
-bash scripts/presstalk_release_artifact_audit.sh \
-  --zip dist/PressTalk-0.1.6-macos-arm64.zip \
-  --expected-version 0.1.6 \
-  --require-distribution \
-  --require-notarized
-```
-
-After collecting a proof-gate JSON for the target machines, combine artifact
-and machine evidence into one release-readiness verdict:
-```bash
-bash scripts/presstalk_release_readiness_preflight.sh \
-  --artifact-audit dist/PressTalk-0.1.6-macos-arm64-artifact-audit.json \
-  --proof-gate "$HOME/Library/Application Support/JarvisTap/Diagnostics/proof-gate-0.1.6.json" \
-  --require-production \
-  --json-output dist/PressTalk-0.1.6-release-readiness.json
-```
-
-Without `PRESSTALK_DISTRIBUTION_SIGNING=1`, the packaged zip is a test artifact
-and should not be described as a production-grade notarized Mac release.
-
-Publish a public prerelease artifact for machine smoke testing:
-```bash
-bash scripts/publish_presstalk_prerelease.sh 0.1.6-test5
-```
-
-`publish_presstalk_prerelease.sh` also requires a hyphenated version by default
-so smoke artifacts do not look like stable production tags. Before upload it
-runs `presstalk_release_artifact_audit.sh` against the packaged zip and writes
-`dist/PressTalk-<version>-macos-arm64-artifact-audit.json`.
-
-Publish the public binary release plus Homebrew tap:
-```bash
-bash scripts/publish_presstalk_homebrew.sh 0.1.6-test5
-```
-
-For a stable version without a hyphen, `publish_presstalk_homebrew.sh` refuses
-to continue unless `PRESSTALK_DISTRIBUTION_SIGNING=1` and
-`PRESSTALK_NOTARIZE=1` are both set. It also runs the artifact audit before
-upload; stable releases require `--require-distribution --require-notarized`,
-so a weakly signed or unstapled zip cannot be published just because the
-environment variables were set. Stable releases also require
-`PRESSTALK_RELEASE_PROOF_GATE_JSON=/path/to/proof-gate.json`; the publish script
-runs `presstalk_release_readiness_preflight.sh --require-production` before any
-GitHub release or Homebrew tap write. By default stable publishing requires
-proof targets for `studio1` and `mbp1`; override or extend that with
-`PRESSTALK_REQUIRED_PROOF_TARGETS=studio1,mbp1,studio2` once `studio2` is back
-in microphone/STT scope. Stable publishing also requires streaming proof by
-default, using proof-gate JSON whose targets report
-`realtimePartialTranscriptionEnabled=true`. Set
-`PRESSTALK_EXPECTED_ASR_MODE=<streaming-mode>` when a stable release must pin
-one exact backend; otherwise the stable gate accepts any non-missing streaming
-ASR mode. Hyphenated test versions keep the current final-pass fallback path
-unless `PRESSTALK_REQUIRE_STREAMING_RELEASE=1` is set.
-
-That makes this install path work:
-```bash
-brew tap subtract0/presstalk
-brew install --cask presstalk
-```
-
-## Performance
-
-Measured local performance notes for the current `0.1` build are in:
-
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md)
-
-Product / pricing plan:
-
-- [docs/MONETIZATION.md](docs/MONETIZATION.md)
-
-## Logs
-```bash
-tail -f ~/Library/Logs/presstalk_trace.log
-```
-
-Other runtime logs:
-- `~/Library/Logs/presstalk.out.log`
-- `~/Library/Logs/presstalk.err.log`
-
-Legacy local bootstrap paths may still write `jarvistap_*` logs when preserving
-an older `com.am.jarvistap` privacy identity.
-
-## Permissions
-Grant `PressTalk.app`:
-- Microphone
-- Accessibility, if paste insertion uses the direct paste path
-- Input Monitoring only for modifier-only triggers such as bare `Option` or `Fn`
-
-## Optional Modes
-The codebase still supports a `codex-confirm-execute` mode, but that is no longer the packaged default. The packaged installer is optimized for local dictation first.
-
-## Full Stack Installer
-The repo still contains `install_jarvis_os.sh` for the larger localbrain + Jarvis setup, but the clean dictation install path is:
-```bash
-bash scripts/install_jarvistap_launchd.sh
-```
+- `Sources/PressTalkCore/` — decision logic with no AppKit or AVFoundation, so it
+  can be tested: setup ordering, transcript cleanup, German vocabulary repair,
+  licence verification, entitlements, retention rules.
+- `Sources/JarvisTap/` — the app. Trigger handling, capture, recognition,
+  insertion, menu bar, settings, first-run setup.
+- `Sources/PressTalkLicenseTool/` — issues offline licences. Never bundled; the
+  app holds only public keys.
+- `scripts/` — build, package, publish, and the gates above.

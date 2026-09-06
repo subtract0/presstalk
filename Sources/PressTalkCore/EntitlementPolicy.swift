@@ -97,12 +97,19 @@ public struct EntitlementPolicy {
 /// $20 then $39 one-time, and a reviewer's note suggesting euros. Whichever is
 /// right, a product cannot ship all three.
 public enum PressTalkOffer {
-    /// The Lemon Squeezy checkout. **Set this string when the store goes live.**
+    /// The Stripe Managed Payments checkout, live since 2026-09-06.
     ///
-    /// One line, one place. While it is empty the buy button stays hidden, which
-    /// is honest: there is nowhere to pay. `PRESSTALK_CHECKOUT_URL` overrides it
-    /// for staging.
-    public static let checkoutURLString = ""
+    /// One line, one place. While it was empty the buy button stayed hidden and
+    /// the trial refused nobody, because locking someone out of a product they
+    /// cannot pay for is a broken app rather than a paywall. Setting it turns on
+    /// both at once. `PRESSTALK_CHECKOUT_URL` overrides it for staging.
+    ///
+    /// Stripe is the merchant of record here, so it collects and remits VAT.
+    /// EUR is tax-inclusive and USD/CAD add tax at checkout, which is each
+    /// market's own convention -- see docs/MONETIZATION.md before quoting a
+    /// price anywhere, because the euro and dollar figures are not conversions
+    /// of one another.
+    public static let checkoutURLString = "https://buy.stripe.com/eVq9AU7Egdf55cc345cs80c"
 
     /// Where the offer is described. Empty until a domain exists.
     public static let pricingPageURLString = ""

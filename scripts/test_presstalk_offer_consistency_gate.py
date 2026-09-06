@@ -36,6 +36,11 @@ MUST_FAIL = {
         "index.html", "<p>Free trial: 30 days, no account.</p>"),
 }
 
+MUST_FAIL["dollar price on a German page"] = (
+    "de/index.html", '<p>PressTalk kaufen — $20</p>')
+MUST_FAIL["US-Dollar wording on a German page"] = (
+    "de/index.html", '<p>20 US-Dollar. Einmalig.</p>')
+
 MUST_PASS = {
     "correct trial and correct refund in one clause": (
         "index.html",
@@ -53,6 +58,17 @@ MUST_PASS = {
         "index.html", "<p>A 30-day refund is available after purchase.</p>"),
     "a version number that is not a day count": (
         "index.html", "<p>Requires macOS 14 or later.</p>"),
+    # Dollars are correct on the English pages, and the English pages carry a
+    # language switcher whose lang="de" made the first version of the currency
+    # check flag every one of them.
+    "dollar price on an English page": (
+        "index.html", "<p>$20 once. Every future Mac update included.</p>"),
+    "English page that links to the German one": (
+        "index.html",
+        '<a lang="de" hreflang="de" href="de/index.html">Deutsch</a>'
+        "<p>Buy PressTalk — $20</p>"),
+    "euro price on a German page": (
+        "de/index.html", "<p>PressTalk kaufen — 20 €</p>"),
 }
 
 

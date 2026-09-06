@@ -43,6 +43,14 @@ REFUND_WORDS = ("refund", "erstattung", "widerruf", "money back", "geld zurück"
 # record -- so it is left alone.
 NEAREST = 45
 
+# German pages are charged in euros, and euros and dollars are not conversions
+# of one another here: EUR is tax-inclusive while USD and CAD have tax added at
+# checkout, so 20 EUR and 20 USD are deliberately different amounts. Printing
+# "$20" to a German who is then charged 20 EUR advertises a price that is not
+# charged, which the Preisangabenverordnung does not permit. The claims gate
+# saw nothing, because 20 is 20 in both.
+PRICE_IN_DOLLARS = re.compile(r"(?:US-?Dollar|\$\s?\d)", re.IGNORECASE)
+
 TAG = re.compile(r"<[^>]+>")
 
 
@@ -102,6 +110,28 @@ def main() -> int:
                 failures.append(
                     f"{rel}: offers {days} days where the app grants {expected}"
                     f"\n        …{quote}…")
+
+    # Currency, per page language.
+    for path in targets:
+        if path.suffix != ".html":
+            continue
+        raw = path.read_text(encoding="utf-8")
+        # Only pages served to German readers. The document's own language,
+        # not any occurrence of lang="de" -- the English pages carry a language
+        # switcher that links to the German ones, and matching that flagged
+        # every correct dollar price on the English site.
+        html_lang = re.search(r"<html[^>]*\blang=[\"']([a-zA-Z-]+)", raw)
+        page_is_german = (path.parent.name == "de"
+                          or (html_lang and html_lang.group(1).lower().startswith("de")))
+        if not page_is_german:
+            continue
+        text = TAG.sub(" ", raw)
+        for m in PRICE_IN_DOLLARS.finditer(text):
+            quote = text[max(0, m.start() - 45):m.end() + 45].strip()
+            quote = re.sub(r"\s+", " ", quote)
+            failures.append(
+                f"{path.relative_to(ROOT)}: quotes a dollar price on a German "
+                f"page, which is charged in euros\n        …{quote}…")
 
     for f in failures:
         print(f"FAIL  {f}")

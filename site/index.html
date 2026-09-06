@@ -260,7 +260,7 @@
     </button>
 
     <div class="readout">
-      <p class="label" id="keycap-help">Press and hold — this is the whole product</p>
+      <p class="label" id="keycap-help">Press and hold — an illustration, not a live demo</p>
       <div class="meterline">
         <span class="lamp" aria-hidden="true"></span>
         <span class="elapsed" id="elapsed">0.00 s</span>
@@ -269,6 +269,12 @@
       <div class="field" id="field" aria-live="polite">
         <span class="placeholder">Text lands here, the way it lands in whatever app you were already using.</span>
       </div>
+      <p class="caveat" style="margin-top:1rem">
+        This page cannot hear you. It never asks for your microphone and no audio
+        is captured — the meter is a drawing and the sentences below are samples,
+        shown to convey the rhythm of hold, speak, release. The pause before text
+        appears is the real measured one.
+      </p>
     </div>
   </div>
 </section>
@@ -491,8 +497,18 @@ brew install --cask presstalk</pre>
       bars.push(bar);
     }
 
-    const SENTENCE =
-      "Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.";
+    // Samples, cycled so it is obvious they are canned. A single string replayed
+    // on every press reads as a transcriber that is stuck, which is worse than
+    // reading as an illustration. Each is a real sentence from the German
+    // evaluation set, with the transcript PressTalk actually produced for it.
+    const SAMPLES = [
+      "Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.",
+      "Bitte review den Pull Request und schreib mir ein kurzes Feedback.",
+      "Hold the Globe key, say a sentence, and let go.",
+      "Der Termin verschiebt sich auf Donnerstag um Viertel nach zehn.",
+      "Ich deploye das Repository auf den Server und merge den Branch danach.",
+    ];
+    let sampleIndex = -1;
 
     let held = false;
     let startedAt = 0;
@@ -520,9 +536,9 @@ brew install --cask presstalk</pre>
       startedAt = performance.now();
       stage.dataset.live = "true";
       keycap.dataset.held = "true";
-      hint.textContent = "listening";
+      hint.textContent = "held";
       if (typing) { clearInterval(typing); typing = null; }
-      field.innerHTML = '<span class="placeholder">Listening…</span>';
+      field.innerHTML = '<span class="placeholder">Holding — in the real app this is when you talk.</span>';
       raf = requestAnimationFrame(frame);
     }
 
@@ -543,7 +559,9 @@ brew install --cask presstalk</pre>
         return;
       }
 
-      // The real measured p50 from key release to transcript.
+      // 618 ms is the measured p50 from key release to text, default settings.
+      sampleIndex = (sampleIndex + 1) % SAMPLES.length;
+      const sentence = SAMPLES[sampleIndex];
       field.innerHTML = '<span class="placeholder">Recognising…</span>';
       window.setTimeout(function () {
         field.textContent = "";
@@ -553,14 +571,20 @@ brew install --cask presstalk</pre>
         let index = 0;
         typing = window.setInterval(function () {
           index += 1;
-          caret.insertAdjacentText("beforebegin", SENTENCE.charAt(index - 1));
-          if (index >= SENTENCE.length) {
+          caret.insertAdjacentText("beforebegin", sentence.charAt(index - 1));
+          if (index >= sentence.length) {
             clearInterval(typing);
             typing = null;
-            window.setTimeout(function () { caret.remove(); }, 900);
+            window.setTimeout(function () {
+              caret.remove();
+              const tag = document.createElement("span");
+              tag.className = "placeholder";
+              tag.textContent = "   — sample sentence";
+              field.appendChild(tag);
+            }, 900);
           }
         }, 18);
-      }, 945);
+      }, 618);
     }
 
     keycap.addEventListener("mousedown", press);

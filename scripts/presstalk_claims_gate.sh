@@ -84,13 +84,15 @@ files=()
 for target in "${TARGETS[@]}"; do
   [[ -e "$target" ]] || continue
   if [[ -d "$target" ]]; then
+    # Keep exclusions consistent when callers pass a relative path such as site.
+    scan_target="$(cd "$target" && pwd)"
     # site/fonts holds vendored font binaries and their OFL text. A licence
     # is not customer-facing copy, and "Open Font License, Version 1.1" reads
     # as an unsupported numeric claim to the check below. Excluding it keeps
     # the numeric gate strict everywhere it actually governs what a buyer is
     # told, instead of being loosened to accommodate a licence.
     while IFS= read -r file; do files+=("$file"); done \
-      < <(find "$target" -type f \
+      < <(find "$scan_target" -type f \
             -not -path '*/site/fonts/*' \
             \( -name '*.md' -o -name '*.html' -o -name '*.txt' \))
   else

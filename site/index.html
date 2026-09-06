@@ -1,633 +1,89 @@
-<title>PressTalk</title>
-<!-- Fonts are served from this origin. Loading them from fonts.googleapis.com
-     would send every visitor's IP address to Google before they consented to
-     anything, which German courts have treated as actionable and which flatly
-     contradicts a page arguing that nothing should leave your machine.
-     Regenerate with scripts/presstalk_vendor_webfonts.py. -->
-<link rel="stylesheet" href="fonts/fonts.css">
-
-<style>
-  :root {
-    --ground: #f3f4f6;
-    --raised: #fbfbfc;
-    --ink: #15171c;
-    --muted: #666d7a;
-    --rule: #dbdde2;
-    --live: #c2620b;
-    --live-soft: rgba(194, 98, 11, 0.12);
-    --keycap-face: #fdfdfe;
-    --keycap-edge: #c9ccd3;
-    --shadow: rgba(21, 23, 28, 0.10);
-
-    --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
-    --body: "Source Serif 4", Georgia, "Times New Roman", serif;
-    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #131519;
-      --raised: #1a1d23;
-      --ink: #e8e9ec;
-      --muted: #8b92a0;
-      --rule: #2a2e36;
-      --live: #e8912c;
-      --live-soft: rgba(232, 145, 44, 0.16);
-      --keycap-face: #22262e;
-      --keycap-edge: #0d0f13;
-      --shadow: rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --ground: #131519;
-    --raised: #1a1d23;
-    --ink: #e8e9ec;
-    --muted: #8b92a0;
-    --rule: #2a2e36;
-    --live: #e8912c;
-    --live-soft: rgba(232, 145, 44, 0.16);
-    --keycap-face: #22262e;
-    --keycap-edge: #0d0f13;
-    --shadow: rgba(0, 0, 0, 0.5);
-  }
-
-  * { box-sizing: border-box; }
-
-  body {
-    margin: 0;
-    background: var(--ground);
-    color: var(--ink);
-    font-family: var(--body);
-    font-size: 18px;
-    line-height: 1.62;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .measure { width: min(62ch, calc(100% - 3rem)); margin-inline: auto; }
-  .band { border-block: 1px solid var(--rule); padding-block: clamp(2.5rem, 6vw, 4.5rem); }
-
-  h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
-  h1 { font-size: clamp(2.6rem, 8vw, 4.4rem); font-weight: 800; letter-spacing: -0.035em; line-height: 0.98; }
-  h2 { font-size: clamp(1.5rem, 3.6vw, 2rem); font-weight: 700; letter-spacing: -0.02em; line-height: 1.12; }
-  h3 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
-  p { margin: 0 0 1.1em; }
-  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-
-  .label {
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    text-transform: uppercase;
-    letter-spacing: 0.16em;
-    color: var(--muted);
-    margin: 0 0 1.2rem;
-  }
-
-  /* ---------- masthead ---------- */
-  .masthead { padding: 2rem 0 0; }
-  .masthead-inner { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
-  .wordmark { font-family: var(--display); font-weight: 800; letter-spacing: -0.03em; font-size: 1.1rem; }
-  .masthead .label { margin: 0; }
-
-  /* ---------- hero ---------- */
-  .hero { padding-block: clamp(2.5rem, 7vw, 5rem) clamp(2rem, 5vw, 3.5rem); }
-  .lede {
-    font-size: clamp(1.1rem, 2.4vw, 1.32rem);
-    color: var(--muted);
-    max-width: 46ch;
-    margin-top: 1.4rem;
-  }
-  .lede strong { color: var(--ink); font-weight: 600; }
-
-  /* ---------- the key ---------- */
-  .stage {
-    display: grid;
-    grid-template-columns: auto 1fr;
-    gap: clamp(1.5rem, 4vw, 3rem);
-    align-items: center;
-    width: min(72ch, calc(100% - 3rem));
-    margin-inline: auto;
-  }
-  @media (max-width: 620px) { .stage { grid-template-columns: 1fr; } }
-
-  .keycap {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 148px;
-    height: 148px;
-    border-radius: 18px;
-    border: 1px solid var(--keycap-edge);
-    background: var(--keycap-face);
-    box-shadow: 0 7px 0 var(--keycap-edge), 0 12px 22px var(--shadow);
-    display: grid;
-    place-content: center;
-    gap: 0.35rem;
-    cursor: pointer;
-    color: var(--ink);
-    transition: transform 90ms ease, box-shadow 90ms ease, border-color 140ms ease;
-    touch-action: none;
-    justify-self: center;
-  }
-  .keycap:focus-visible { outline: 2px solid var(--live); outline-offset: 5px; }
-  .keycap .glyph { font-family: var(--display); font-weight: 800; font-size: 2rem; letter-spacing: -0.02em; }
-  .keycap .hint { font-family: var(--mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
-
-  .keycap[data-held="true"] {
-    transform: translateY(6px);
-    box-shadow: 0 1px 0 var(--keycap-edge), 0 3px 8px var(--shadow);
-    border-color: var(--live);
-  }
-  .keycap[data-held="true"] .hint { color: var(--live); }
-
-  .readout { min-width: 0; }
-  .meterline { display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.9rem; }
-
-  .lamp {
-    width: 9px; height: 9px; border-radius: 50%;
-    background: var(--rule);
-    flex: none;
-    transition: background 120ms ease, box-shadow 120ms ease;
-  }
-  .stage[data-live="true"] .lamp { background: var(--live); box-shadow: 0 0 0 4px var(--live-soft); }
-
-  .elapsed { font-family: var(--mono); font-size: 0.78rem; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .stage[data-live="true"] .elapsed { color: var(--live); }
-
-  .meter { display: flex; align-items: flex-end; gap: 3px; height: 30px; flex: 1; }
-  .meter i {
-    display: block; flex: 1; min-width: 2px; height: 3px;
-    background: var(--rule); border-radius: 1px;
-    transition: height 70ms ease, background 120ms ease;
-  }
-  .stage[data-live="true"] .meter i { background: var(--live); }
-
-  .field {
-    border: 1px solid var(--rule);
-    border-radius: 10px;
-    background: var(--raised);
-    padding: 0.9rem 1.05rem;
-    min-height: 5.4rem;
-    font-size: 1rem;
-    line-height: 1.5;
-  }
-  .field .placeholder { color: var(--muted); font-style: italic; }
-  .caret {
-    display: inline-block; width: 2px; height: 1.05em; margin-left: 1px;
-    background: var(--live); vertical-align: text-bottom;
-    animation: blink 1.05s step-end infinite;
-  }
-  @keyframes blink { 50% { opacity: 0; } }
-
-  /* ---------- steps: a real sequence, numbered once ---------- */
-  .steps { list-style: none; padding: 0; margin: 0; display: grid; gap: 1.6rem; }
-  @media (min-width: 760px) { .steps { grid-template-columns: repeat(4, 1fr); gap: 1.4rem; } }
-  .steps li { border-top: 2px solid var(--ink); padding-top: 0.7rem; }
-  .steps .n { font-family: var(--mono); font-size: 0.68rem; letter-spacing: 0.16em; color: var(--muted); display: block; margin-bottom: 0.35rem; }
-  .steps h3 { margin-bottom: 0.2rem; }
-  .steps p { font-size: 0.92rem; color: var(--muted); margin: 0; }
-
-  /* ---------- measurements ---------- */
-  .measurements { width: min(80ch, calc(100% - 3rem)); margin-inline: auto; }
-  .scroller { overflow-x: auto; }
-  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
-  caption { text-align: left; color: var(--muted); font-size: 0.86rem; padding-bottom: 0.9rem; }
-  th, td { text-align: left; padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
-  th { font-family: var(--mono); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 500; }
-  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
-
-  .caveat {
-    font-size: 0.88rem;
-    color: var(--muted);
-    border-left: 2px solid var(--live);
-    padding-left: 1rem;
-    margin-top: 1.6rem;
-  }
-
-  /* ---------- price ---------- */
-  .price { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
-  .price .amount { font-family: var(--display); font-weight: 800; font-size: clamp(2.6rem, 7vw, 3.6rem); letter-spacing: -0.04em; line-height: 1; }
-  .price .unit { font-family: var(--mono); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.16em; color: var(--muted); }
-  .includes { list-style: none; padding: 0; margin: 1.4rem 0 0; display: grid; gap: 0.55rem; font-size: 0.95rem; }
-  .includes li { padding-left: 1.4rem; position: relative; }
-  .includes li::before { content: "—"; position: absolute; left: 0; color: var(--live); }
-
-  .cta {
-    display: inline-block;
-    font-family: var(--display); font-weight: 600; font-size: 0.98rem;
-    background: var(--ink); color: var(--ground);
-    padding: 0.85rem 1.6rem; border-radius: 8px;
-    text-decoration: none; margin-top: 1.8rem;
-    transition: opacity 120ms ease;
-  }
-  .cta:hover { opacity: 0.86; }
-  .cta:focus-visible { outline: 2px solid var(--live); outline-offset: 3px; }
-  .cta-note { font-size: 0.86rem; color: var(--muted); margin-top: 0.9rem; }
-
-  pre {
-    font-family: var(--mono); font-size: 0.82rem;
-    background: var(--raised); border: 1px solid var(--rule); border-radius: 8px;
-    padding: 0.9rem 1.05rem; overflow-x: auto; margin: 0;
-  }
-
-  footer { padding-block: 3rem; font-size: 0.86rem; color: var(--muted); }
-  footer a { color: var(--muted); }
-
-  @media (prefers-reduced-motion: reduce) {
-    * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
-  }
-</style>
-
-<header class="masthead">
-  <div class="measure masthead-inner">
-    <span class="wordmark">PressTalk</span>
-    <p class="label">Dictation for Apple Silicon</p>
-  </div>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hold Fn, say your sentence, let go. PressTalk puts it in the app you’re using. Private Mac dictation. $20 once.">
+  <meta name="theme-color" content="#f8f7f4">
+  <meta name="robots" content="noindex">
+  <title>PressTalk — Think it. Say it. There it is.</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="demo.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header wrap">
+  <a class="brand" href="index.html" aria-label="PressTalk"><span class="brand-symbol" aria-hidden="true">fn</span>PressTalk</a>
+  <nav class="nav" aria-label="Main navigation"><a class="nav-detail" href="#privacy">Privacy</a><a class="nav-detail" href="#pricing">Pricing</a><a class="nav-buy" href="download.html#buy">Buy — $20</a></nav>
 </header>
-
-<section class="hero">
-  <div class="measure">
-    <h1>Your Mac already<br>hears everything<br>you dictate.</h1>
-    <p class="lede">
-      It just usually sends it somewhere first. PressTalk doesn't. Hold
-      <strong>Fn</strong>, speak, let go — the text appears in whatever app you
-      were in, recognised on your own machine. <strong>$20 once.</strong> No
-      subscription, no account, no upload.
-    </p>
-    <p class="lede" style="margin-top:0.8rem;font-size:1rem">
-      It publishes its German word error rate and ships the 144-clip test set,
-      the references and the scorer, so you can re-run the number instead of
-      believing it. I have not found another Mac dictation app that does —
-      send me one and I will link to it here.
-    </p>
+<main id="main">
+<section class="hero wrap" aria-labelledby="hero-title">
+  <div class="hero-copy">
+    <p class="eyebrow">Mac dictation. On your Mac.</p>
+    <h1 id="hero-title">Think it.<br>Say it.<br><span>There it is.</span></h1>
+    <p class="lede">Hold Fn, say your sentence, let go. PressTalk puts it in the app you’re using.</p>
+    <div class="actions"><a class="button" href="download.html">Try PressTalk free<span class="button-arrow" aria-hidden="true">↗</span></a><a class="text-link" href="download.html#buy">Buy PressTalk — $20</a></div>
+    <p class="trial-note">14 days. No card. No account.</p>
+    <p class="trial-note">Apple Silicon · macOS 14+ · about 460 MB during setup</p>
+    <p class="hero-price">$20 once. Every future Mac update included.</p>
+    <a class="see-demo text-link" href="#demo">See it <span aria-hidden="true">↓</span></a>
   </div>
-</section>
-
-<section class="band">
-  <div class="stage" id="stage" data-live="false">
-    <button class="keycap" id="keycap" data-held="false"
-            aria-describedby="keycap-help">
-      <span class="glyph">fn</span>
-      <span class="hint" id="hint">hold</span>
-    </button>
-
-    <div class="readout">
-      <p class="label" id="keycap-help">Press and hold — an illustration, not a live demo</p>
-      <div class="meterline">
-        <span class="lamp" aria-hidden="true"></span>
-        <span class="elapsed" id="elapsed">0.00 s</span>
-        <span class="meter" id="meter" aria-hidden="true"></span>
+  <figure class="product-demo" id="demo">
+    <div class="demo-canvas" data-phase="complete" role="img" aria-label="An illustration: hold Fn, say a sentence, release the key, and the complete sentence appears in an email draft. This page does not access your microphone.">
+      <div aria-hidden="true">
+        <div class="demo-halo"></div>
+        <div class="mail-window">
+          <div class="window-bar"><i class="window-dot"></i><i class="window-dot"></i><i class="window-dot"></i><span class="window-title">New message</span></div>
+          <div class="mail-detail"><span>To</span>Sam</div>
+          <div class="mail-detail"><span>Subject</span>The draft</div>
+          <div class="message-body"><span class="demo-result">I’ll send you the draft this afternoon.</span><span class="demo-caret"></span></div>
+        </div>
+        <div class="speech-bubble"><span class="speech-label">You say</span>“I’ll send you the draft this afternoon.”</div>
+        <div class="gesture-row">
+          <div class="fn-key"><span class="globe"></span><span class="fn-label">fn</span></div>
+          <div class="gesture-status"><div class="voice-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="status-label">Your words. Right there.</span></div>
+        </div>
       </div>
-      <div class="field" id="field" aria-live="polite">
-        <span class="placeholder">Text lands here, the way it lands in whatever app you were already using.</span>
-      </div>
-      <p class="caveat" style="margin-top:1rem">
-        This page cannot hear you. It never asks for your microphone and no audio
-        is captured — the meter is a drawing and the sentences below are samples,
-        shown to convey the rhythm of hold, speak, release. The pause before text
-        appears is the real measured one.
-      </p>
     </div>
+    <figcaption class="demo-caption"><span>Illustration · no microphone access</span><span class="demo-controls" hidden><button type="button" data-demo-replay>Replay</button><button type="button" data-demo-pause disabled>Pause</button></span></figcaption>
+    <div class="gesture-summary" aria-hidden="true">Press<span>→</span>Talk<span>→</span>There it is</div>
+  </figure>
+</section>
+<section class="section wrap" aria-labelledby="contexts-title">
+  <div class="contexts-header"><h2 id="contexts-title">The reply. The note.<br>The next thought.</h2><p class="section-copy">Stay in the app. Say what you were going to type.</p></div>
+  <div class="contexts">
+    <article class="context"><p class="context-label"><span class="context-dot" aria-hidden="true"></span>Mail</p><h3>The reply you owe.</h3><p>Say it while the thought is fresh.</p></article>
+    <article class="context"><p class="context-label"><span class="context-dot" aria-hidden="true"></span>Slack</p><h3>Keep things moving.</h3><p>A quick answer between everything else.</p></article>
+    <article class="context"><p class="context-label"><span class="context-dot" aria-hidden="true"></span>Browser</p><h3>A thought worth keeping.</h3><p>Notes, forms, and the field in front of you.</p></article>
+    <article class="context"><p class="context-label"><span class="context-dot" aria-hidden="true"></span>Xcode</p><h3>The thought behind the code.</h3><p>Explain a change without leaving your editor.</p></article>
   </div>
 </section>
-
-<section class="band">
-  <div class="measure">
-    <p class="label">Why you can believe a stranger on the internet</p>
-    <p style="margin-bottom:2.4rem">
-      I cancelled a $15-a-month dictation subscription and replaced it with this.
-      It is what I use every working day, on two Macs. Over 26 separate days it
-      recorded 174 dictations and lost none of them: no failures, no crashes, no
-      text that went missing. That is not a marketing number, it is the log file,
-      and the arithmetic is on the <a href="https://github.com/subtract0/presstalk/blob/main/docs/MEASUREMENTS.md">measurements page</a>.
-    </p>
-
-    <p class="label">What actually happens</p>
-    <ol class="steps">
-      <li>
-        <span class="n">01</span>
-        <h3>Hold</h3>
-        <p>Fn / Globe by default. Option, Option-Space, F5 or a trackpad hold if you prefer.</p>
-      </li>
-      <li>
-        <span class="n">02</span>
-        <h3>Speak</h3>
-        <p>Recognition runs on the Neural Engine. Nothing is sent anywhere.</p>
-      </li>
-      <li>
-        <span class="n">03</span>
-        <h3>Release</h3>
-        <p>Letting go is the endpoint, not a pause the app has to interpret. It waits a moment for you to finish the word.</p>
-      </li>
-      <li>
-        <span class="n">04</span>
-        <h3>Paste</h3>
-        <p>Into the app you were already in. If it can't paste, it copies rather than losing your words.</p>
-      </li>
-    </ol>
+<section class="section wrap privacy-layout" id="privacy" aria-labelledby="privacy-title">
+  <div class="privacy-art" aria-hidden="true"><div class="laptop"><div class="voice-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><span class="offline"><span class="offline-dot"></span>After setup, Wi-Fi is optional.</span></div>
+  <div class="privacy-copy"><p class="eyebrow">A little more yours.</p><h2 id="privacy-title">Your voice<br>stays with you.</h2><p class="section-copy">Speech recognition happens on your Mac. PressTalk does not upload your audio or dictated text.</p><p class="privacy-points"><span>No account.</span><span>No telemetry.</span></p><p class="section-copy">After setup, Wi-Fi is optional.</p><a class="text-link" href="https://github.com/subtract0/presstalk/blob/main/docs/PRIVACY.md">How privacy works <span aria-hidden="true">↗</span></a></div>
+</section>
+<section class="section pricing wrap" id="pricing" aria-labelledby="pricing-title">
+  <p class="eyebrow">Keep it simple.</p><h2 id="pricing-title">One payment. Your Mac app.</h2>
+  <div class="price"><span class="price-amount">$20</span><span class="price-unit">once</span></div><p class="price-later">Founder price. $39 later.</p>
+  <p class="price-includes">Every future Mac update included.</p><p class="price-note">Every Mac release we make, including major versions. Keep using the version you have.</p>
+  <p class="price-scope">Future releases, indefinite support, and compatibility with future macOS versions are not guaranteed.</p>
+  <div class="actions"><a class="button" href="download.html">Try PressTalk free<span class="button-arrow" aria-hidden="true">↗</span></a><a class="text-link" href="download.html#buy">Buy PressTalk — $20</a></div>
+  <p class="trial-note">14 days. No card. No account.</p>
+  <div class="purchase-notes"><span>14-day refund</span><span>Licence checked on your Mac</span><span>Support from the maker</span></div>
+</section>
+<section class="section wrap faq-layout" aria-labelledby="faq-title">
+  <div><h2 id="faq-title">A few things<br>before you press.</h2><a class="text-link" href="evidence.html">See the tests <span aria-hidden="true">↗</span></a></div>
+  <div class="faq-list">
+    <details><summary>Will it run on my Mac?</summary><p>PressTalk requires an Apple Silicon Mac (M1 or later) with macOS 14 or later. Intel Macs are not supported.</p></details>
+    <details><summary>What happens during setup?</summary><p>Move PressTalk to Applications and open it. Allow Microphone to hear you, Input Monitoring to detect Fn, and Accessibility to put text into your app. The speech model is about 460 MB and needs an internet connection to download. After setup, dictation works offline.</p></details>
+    <details><summary>Can I use it in my usual apps?</summary><p>Use it in text fields in Mail, Slack, your browser, Xcode, and other Mac apps. Click where you want the words, then hold Fn. Secure fields and some apps block insertion. If insertion fails, the text is copied so you can paste it yourself.</p></details>
+    <details><summary>Will it get every word right?</summary><p>You may need to edit. Try your own sentences, names, and everyday vocabulary during the free trial. That is the useful test. <a href="evidence.html">See the tests</a> for the measured results and their limits.</p></details>
+    <details><summary>What does “future updates included” mean?</summary><p>You receive every future Mac release we make, including major versions, with no upgrade charge. There is no promised release schedule or guarantee of compatibility with future macOS versions. You can keep using your compatible version.</p></details>
+    <details><summary>What if I need help, or want a refund?</summary><p>You’ll hear from the person who builds PressTalk. Support is best effort, with no guaranteed response time. If it is not right for you, request a refund within 14 days of purchase. <a href="https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md">Get support or request a refund</a>.</p></details>
   </div>
 </section>
-
-<section class="band">
-  <div class="measurements">
-    <p class="label">What was measured</p>
-    <div class="scroller">
-      <table>
-        <caption>
-          144 German clips replayed through the shipped pipeline, end to end:
-          trigger, capture, recognition, cleanup, delivery.
-        </caption>
-        <thead>
-          <tr><th scope="col">Measurement</th><th scope="col">Result</th><th scope="col">How</th></tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td>Runs that produced text</td>
-            <td class="num">144 / 144</td>
-            <td>Every attempt counted, including failures</td>
-          </tr>
-          <tr>
-            <td>Word error rate, German</td>
-            <td class="num">12.71 %</td>
-            <td>Default settings, against written references</td>
-          </tr>
-          <tr>
-            <td>Release to transcript</td>
-            <td class="num">0.618 s p50 · 0.629 s max</td>
-            <td>M4 Max, default settings</td>
-          </tr>
-          <tr>
-            <td>Recognition speed</td>
-            <td class="num">115× · 62× · 57×</td>
-            <td>Realtime factor: M4 Max, M1 Ultra, M1 Max</td>
-          </tr>
-          <tr>
-            <td>Model download</td>
-            <td class="num">~460 MB</td>
-            <td>During setup, from Hugging Face</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="caveat">
-      Read these honestly. The audio is synthesised speech in three voices, not
-      144 different people in 144 different rooms, so the error rate is a
-      regression baseline rather than a promise about your voice. The timings come
-      from replayed audio on one machine. PressTalk has not been benchmarked
-      against any other dictation app, so this page will not tell you it is
-      quicker or more accurate than one.
-    </p>
-  </div>
-</section>
-
-<section class="band">
-  <div class="measure">
-    <h2>Measured against the dictation you already have</h2>
-    <p>
-      The real alternative is not another paid app. It is the microphone key
-      already on your Mac, which is free and now runs on-device too. So that is
-      what we measured against, on the same 144 German clips, scored by the same
-      function.
-    </p>
-    <div class="scroller">
-      <table>
-        <thead><tr><th scope="col">Engine</th><th scope="col">Word error rate</th></tr></thead>
-        <tbody>
-          <tr><td>Apple's on-device speech engine</td><td class="num">19.38 %</td></tr>
-          <tr><td>PressTalk, as it arrives out of the box</td><td class="num">12.71 %</td></tr>
-        </tbody>
-      </table>
-    </div>
-    <p class="caveat">
-      About a third fewer word errors on this set. Both sides get the same German
-      vocabulary correction, and both numbers are the default configuration, so
-      this is like for like. Three honest limits: the audio is synthesised speech
-      in three voices rather than people in rooms; this compares recognition
-      engines, not the full Dictation experience with its own punctuation and
-      correction behaviour; and most of the brand and technical terms in that
-      vocabulary list also appear in the test sentences, which flatters both
-      scores. A reason to try PressTalk, not a finished proof.
-    </p>
-  </div>
-</section>
-
-<section class="band">
-  <div class="measure">
-    <h2>Why local matters here</h2>
-    <p>
-      Cloud dictation works well and costs about $12–15 every month, forever, and
-      every sentence you dictate goes through somebody's server. For a lot of
-      work that is fine. For the sentence about your health, your salary, or the
-      client you are about to lose, it is a decision you made once and now make
-      every day without noticing.
-    </p>
-    <p>
-      PressTalk removes the decision. Recognition happens on the Neural Engine in
-      your Mac. Turn off Wi-Fi after setup and dictation still works — that is the
-      test, and you should run it.
-    </p>
-    <p>
-      The <a href="https://github.com/subtract0/presstalk">source is public</a>,
-      so the privacy claim is checkable rather than promised. There are two
-      network calls in it and both download models.
-    </p>
-  </div>
-</section>
-
-<section class="band">
-  <div class="measure">
-    <p class="label">Founder licence</p>
-    <div class="price">
-      <span class="amount">$20</span>
-      <span class="unit">once · not per month</span>
-    </div>
-    <p style="color: var(--muted); margin-top: 0.6rem;">
-      Rising to $39 at general release. The subscription I cancelled costs $180 a
-      year, every year. This pays for itself in about six weeks and then stops
-      taking your money.
-    </p>
-    <ul class="includes">
-      <li>Every future Mac update included, major versions too</li>
-      <li>Keep using it indefinitely, on your Macs, offline</li>
-      <li>Verified on your Mac. No account, no activation server, no phoning home</li>
-      <li>14-day refund, no argument</li>
-      <li>Direct support from the person who wrote it</li>
-    </ul>
-    <p class="caveat" style="margin-top:1.4rem">
-      What that does not promise: a release schedule, indefinite support, or
-      compatibility with every future macOS. If development stops you keep the
-      version you have and it goes on working. That is the point of buying rather
-      than renting.
-    </p>
-    <!-- ================================================================
-         CHECKOUT GOES HERE. When the Lemon Squeezy store is live, replace
-         the mailto below with the checkout URL and change the label to
-         "Buy the founder licence — $20". One edit, this line.
-         The in-app buy button reads its own copy from
-         PressTalkOffer.checkoutURLString; update both.
-         ================================================================= -->
-    <a class="cta" href="mailto:petition@alexmonas.com?subject=PressTalk%20founder%20licence">Email me when I can buy it</a>
-    <p class="cta-note">
-      Not on sale yet — the checkout opens once the app is signed by Apple. Say
-      the word and you get the founder price when it does.
-    </p>
-    <p style="margin-top:1.6rem"><a href="#availability">What's the catch?</a></p>
-  </div>
-</section>
-
-<section class="band" id="availability">
-  <div class="measure">
-    <h2>The awkward bits</h2>
-    <p>
-      <strong>Apple hasn't finished checking it yet.</strong> Notarization is paid
-      for and in Apple's queue. Until it clears, macOS shows a warning on first
-      launch and you approve it once in System Settings → Privacy &amp; Security →
-      Open Anyway. The instructions ship with the download. It is a queue, not a
-      verdict.
-    </p>
-    <p>
-      <strong>Apple Silicon and macOS 14 or later.</strong> No Intel build, no
-      Windows, no iPhone. An M1 Air is plenty — the whole point is that it runs on
-      hardware you already own.
-    </p>
-    <p>
-      <strong>I am one person.</strong> Support is me, usually within a day or
-      two. There is no company behind this and no support contract. If that is not
-      enough for your situation, don't buy it yet.
-    </p>
-    <p>For now, install with Homebrew:</p>
-    <pre>brew tap subtract0/presstalk
-brew install --cask presstalk</pre>
-  </div>
-</section>
-
-<footer>
-  <div class="measure">
-    <p>
-      PressTalk · <a href="https://github.com/subtract0/presstalk">Source</a> ·
-      <a href="https://github.com/subtract0/presstalk/blob/main/docs/PRIVACY.md">Privacy</a> ·
-      <a href="https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md">Support</a>
-    </p>
-    <p>Draft page. Prices and availability are not final.</p>
-  </div>
-</footer>
-
-<script>
-  (function () {
-    const stage = document.getElementById("stage");
-    const keycap = document.getElementById("keycap");
-    const hint = document.getElementById("hint");
-    const elapsed = document.getElementById("elapsed");
-    const meter = document.getElementById("meter");
-    const field = document.getElementById("field");
-
-    const BARS = 26;
-    const bars = [];
-    for (let i = 0; i < BARS; i += 1) {
-      const bar = document.createElement("i");
-      meter.appendChild(bar);
-      bars.push(bar);
-    }
-
-    // Samples, cycled so it is obvious they are canned. A single string replayed
-    // on every press reads as a transcriber that is stuck, which is worse than
-    // reading as an illustration. Each is a real sentence from the German
-    // evaluation set, with the transcript PressTalk actually produced for it.
-    const SAMPLES = [
-      "Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.",
-      "Bitte review den Pull Request und schreib mir ein kurzes Feedback.",
-      "Hold the Globe key, say a sentence, and let go.",
-      "Der Termin verschiebt sich auf Donnerstag um Viertel nach zehn.",
-      "Ich deploye das Repository auf den Server und merge den Branch danach.",
-    ];
-    let sampleIndex = -1;
-
-    let held = false;
-    let startedAt = 0;
-    let raf = null;
-    let typing = null;
-
-    function frame() {
-      if (!held) return;
-      const seconds = (performance.now() - startedAt) / 1000;
-      elapsed.textContent = seconds.toFixed(2) + " s";
-      // A plausible speech envelope rather than random noise: syllables have
-      // shape, and a jittering bar chart reads as a loading spinner.
-      for (let i = 0; i < BARS; i += 1) {
-        const phase = seconds * 7 - i * 0.32;
-        const envelope = (Math.sin(phase) * 0.5 + 0.5) * (Math.sin(phase * 0.37) * 0.35 + 0.65);
-        bars[i].style.height = (3 + envelope * 26).toFixed(1) + "px";
-      }
-      raf = requestAnimationFrame(frame);
-    }
-
-    function press(event) {
-      if (event) event.preventDefault();
-      if (held) return;
-      held = true;
-      startedAt = performance.now();
-      stage.dataset.live = "true";
-      keycap.dataset.held = "true";
-      hint.textContent = "held";
-      if (typing) { clearInterval(typing); typing = null; }
-      field.innerHTML = '<span class="placeholder">Holding — in the real app this is when you talk.</span>';
-      raf = requestAnimationFrame(frame);
-    }
-
-    function release() {
-      if (!held) return;
-      held = false;
-      const seconds = (performance.now() - startedAt) / 1000;
-      stage.dataset.live = "false";
-      keycap.dataset.held = "false";
-      hint.textContent = "hold";
-      if (raf) cancelAnimationFrame(raf);
-      bars.forEach((bar) => { bar.style.height = "3px"; });
-
-      if (seconds < 0.25) {
-        field.innerHTML =
-          '<span class="placeholder">Too short — hold it while you talk, then let go.</span>';
-        elapsed.textContent = "0.00 s";
-        return;
-      }
-
-      // 618 ms is the measured p50 from key release to text, default settings.
-      sampleIndex = (sampleIndex + 1) % SAMPLES.length;
-      const sentence = SAMPLES[sampleIndex];
-      field.innerHTML = '<span class="placeholder">Recognising…</span>';
-      window.setTimeout(function () {
-        field.textContent = "";
-        const caret = document.createElement("span");
-        caret.className = "caret";
-        field.appendChild(caret);
-        let index = 0;
-        typing = window.setInterval(function () {
-          index += 1;
-          caret.insertAdjacentText("beforebegin", sentence.charAt(index - 1));
-          if (index >= sentence.length) {
-            clearInterval(typing);
-            typing = null;
-            window.setTimeout(function () {
-              caret.remove();
-              const tag = document.createElement("span");
-              tag.className = "placeholder";
-              tag.textContent = "   — sample sentence";
-              field.appendChild(tag);
-            }, 900);
-          }
-        }, 18);
-      }, 618);
-    }
-
-    keycap.addEventListener("mousedown", press);
-    keycap.addEventListener("touchstart", press, { passive: false });
-    window.addEventListener("mouseup", release);
-    window.addEventListener("touchend", release);
-    keycap.addEventListener("keydown", function (event) {
-      if (event.code === "Space" || event.code === "Enter") press(event);
-    });
-    keycap.addEventListener("keyup", function (event) {
-      if (event.code === "Space" || event.code === "Enter") release();
-    });
-    keycap.addEventListener("blur", release);
-  })();
-</script>
+<section class="section closing wrap" aria-labelledby="closing-title"><h2 id="closing-title">Say your next sentence.</h2><div class="actions"><a class="button" href="download.html">Try PressTalk free<span class="button-arrow" aria-hidden="true">↗</span></a></div><p class="trial-note">14 days. No card. No account.</p></section>
+</main>
+<footer class="site-footer wrap"><div><p>Press. Talk. Back to your day.</p><p class="preview-note">Launch preview · <a href="download.html">Download and checkout in preparation</a></p></div><div class="footer-links"><a href="https://github.com/subtract0/presstalk">Source</a><a href="https://github.com/subtract0/presstalk/blob/main/docs/PRIVACY.md">Privacy</a><a href="https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md">Support</a><a href="evidence.html">See the tests</a><a href="de/index.html" lang="de" hreflang="de">Deutsch</a></div></footer>
+</body>
+</html>

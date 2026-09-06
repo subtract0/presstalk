@@ -1,5 +1,11 @@
 # PressTalk: discovery to a repeated useful action
 
+Historical proposal. The [sales surface and first $500](SALES_SURFACE_2026-09-06.md)
+supersedes this document's positioning, acquisition sequencing and research
+instrumentation. Do not implement the former local usage-summary proposal:
+the owner's current instruction rules out in-app measurement, including opt-in
+research counters.
+
 Design proposal for reconciliation, 6 September 2026. This document does not authorize publication, change prices or existing licence rights, or assert that proposed features have shipped. Product figures supplied in the brief are accepted as supplied, rather than independently remeasured. Channel and provider references were checked during this review.
 
 The decision is to sell a small, repeatable relief: dictate the reply you were about to type, in the app you were already using. Start with German-speaking Mac users who already dictate regularly and dislike paying a subscription. Give them a signed, direct download and a 14-day trial with no account or card. Ask for $20 after they have experienced the result. Do not make people learn to dictate, trust an unsigned binary, and buy unfamiliar software in the same visit.
@@ -316,7 +322,7 @@ A useful report reads: “10 qualified invitations; 6 agreed; 4 confirmed first 
 - Returning buyers voluntarily introduce others: reuse their actual job and words, with permission, in the next demonstration.
 - Downloads rise without replies: installation and retention remain unknown. Ask a new consenting sample; do not deploy hidden analytics to fill the gap.
 
-No new in-app usage counter is necessary for the first ten prospects. If manual recollection becomes the specific limiting issue later, offer an unchecked local-only seven-day summary: number of dictations and days used, no content or destination-app names, no identifiers, and automatic local deletion after the window. Show its contents before “Compose feedback email”; the person must send the email themselves. Explain that counts of text production do not prove correct insertion. This would be an explicit product change and privacy-document addition. It must not introduce a telemetry endpoint, even for opted-in users.
+Withdrawn by the owner's current instruction: do not add local usage summaries, counters or automatic usage exports, even with opt-in. Use consenting observed sessions and volunteered recollections. See the replacement sales-surface plan for the measurement boundary.
 
 ## 6. Assets and build order
 

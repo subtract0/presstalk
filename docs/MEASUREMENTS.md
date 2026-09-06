@@ -213,3 +213,18 @@ bash scripts/presstalk_e2e_harness.sh --fixture <audio> --runs 10 --label warm
 bash scripts/presstalk_fallback_sweep.sh --fixtures <dir> --out <dir>
 python3 scripts/presstalk_score_fallback_sweep.py --sweep <dir> --eval-set <tsv>
 ```
+
+## The download
+
+| | |
+|---|---|
+| Signed, notarized 0.1.11 zip | **4.4 MB** (4,651,266 bytes) |
+| Speech model fetched during setup | about 460 MB |
+
+The zip is small because the speech model is not in it. Someone on a slow
+connection is downloading 460 MB before their first dictation, and quoting only
+the 4.4 MB would describe an install nobody experiences.
+
+Measured from the release artifact itself, so it is checkable:
+`ls -l dist/PressTalk-0.1.11-macos-arm64.zip`. Re-measure it every release --
+a stale size on the download page is the first thing a careful reader tests.

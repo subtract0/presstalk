@@ -55,6 +55,26 @@ lexicon appear verbatim in the evaluation references. The pass is partly being
 scored against its own word list. It is applied to both engines, so the
 comparison stands, but the absolute numbers are optimistic on this corpus.
 
+## Latency in the shipping default (2026-09-05, fixture replay)
+
+Measured after the quality fallback was defaulted off, on the same fixture as the
+runs below, so the before-and-after is comparable.
+
+| | value |
+|---|---|
+| Key release → transcript, p50 | **0.618 s** |
+| Key release → transcript, p95 | 0.628 s |
+| Key release → transcript, max | **0.629 s** |
+| Runs producing text | 6 / 6 |
+
+The interesting figure is the max. With the second recognizer on, the same
+fixture gave a 1.351 s p50 and a 3.312 s worst case; the spread was the fallback
+firing on some runs and not others. Removing it did not merely shift the median,
+it collapsed the variance — 0.618 s to 0.629 s across every run.
+
+Live speech has not been re-measured since the default changed. The live figures
+below were taken with the fallback on.
+
 ## Latency on real speech (2026-09-05, 12 dictations, physical Fn key)
 
 The first numbers from a person actually dictating, rather than replayed audio.

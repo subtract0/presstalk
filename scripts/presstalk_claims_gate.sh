@@ -116,6 +116,55 @@ for file in "${files[@]}"; do
   done
 done
 
+# ---------------------------------------------------------------------------
+# Every measurement printed to a customer must exist in MEASUREMENTS.md.
+#
+# The phrase list above cannot catch a number that is simply stale. It did not
+# catch "11.25 %" sitting in the page's results table next to a price, three
+# commits after MEASUREMENTS.md retracted it in favour of 12.71 % — the figure
+# for the configuration a buyer actually receives. A retracted number beside a
+# buy button is the most expensive kind of wrong.
+#
+# Prices, versions, hardware names and counts are not measurements, so they are
+# exempt by pattern rather than by memory.
+# Numbers a reader never sees are not claims. Stylesheets are full of 1.05 and
+# 3.6, and scripts carry timings and array indices; scanning them buries the one
+# number that matters under forty that do not.
+strip_non_copy() {
+  python3 - "$1" <<'PYEOF'
+import re, sys, pathlib
+text = pathlib.Path(sys.argv[1]).read_text(errors="replace")
+text = re.sub(r"<style\b.*?</style>", " ", text, flags=re.S | re.I)
+text = re.sub(r"<script\b.*?</script>", " ", text, flags=re.S | re.I)
+text = re.sub(r"<!--.*?-->", " ", text, flags=re.S)
+text = re.sub(r'style="[^"]*"', " ", text)
+print(text)
+PYEOF
+}
+
+MEASUREMENTS="$ROOT/docs/MEASUREMENTS.md"
+if [[ -f "$MEASUREMENTS" ]]; then
+  measurement_text="$(cat "$MEASUREMENTS")"
+  for file in "${files[@]}"; do
+    case "$file" in
+      *MEASUREMENTS.md|*MONETIZATION.md|*GO_TO_MARKET.md|*LAUNCH_GATES.md) continue ;;
+    esac
+    while IFS= read -r number; do
+      [[ -z "$number" ]] && continue
+      # Not measurements: money, versions, macOS/chip generations, small counts.
+      case "$number" in
+        20|39|14|1|2|3|4|5|8|10|15|26|30|60|100|460|620|0.1|1.0|2.0) continue ;;
+      esac
+      if ! printf '%s' "$measurement_text" | grep -qF -- "$number"; then
+        echo "FAIL ${file#$ROOT/}"
+        echo "     number: \"${number}\" appears in customer-facing copy"
+        echo "     reason: not present in docs/MEASUREMENTS.md — stale, invented, or the method was never recorded"
+        failures=$((failures + 1))
+      fi
+    done < <(strip_non_copy "$file" | grep -oE '[0-9]+\.[0-9]+' | sort -u)
+  done
+fi
+
 echo
 if [[ "$failures" -gt 0 ]]; then
   echo "$failures unsupported claim(s). Either remove the phrase or produce the evidence." >&2
@@ -125,4 +174,7 @@ fi
 # it caught nothing in "no silence guessing, no waiting", which was plainly false
 # against a capture path that waits for silence. Only a reader who knows the code
 # catches that.
-echo "None of the blocked phrases appear. This does not establish that the claims are true."
+echo "No blocked phrases, and every number appears in MEASUREMENTS.md."
+echo "Neither check establishes that a claim is TRUE: a phrase list cannot see a"
+echo "false ordinary sentence, and a number can be present in MEASUREMENTS.md and"
+echo "still be the wrong one to print next to a price."

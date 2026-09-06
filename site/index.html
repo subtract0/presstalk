@@ -243,10 +243,16 @@
 
 <section class="hero">
   <div class="measure">
-    <h1>Hold a key.<br>Say the thing.<br>Let go.</h1>
+    <h1>Your Mac already<br>hears everything<br>you dictate.</h1>
     <p class="lede">
-      Push-to-talk dictation that runs <strong>on your Mac</strong>. Your voice is
-      not uploaded. Your text is not uploaded. There is no subscription.
+      It just usually sends it somewhere first. PressTalk doesn't. Hold
+      <strong>Fn</strong>, speak, let go — the text appears in whatever app you
+      were in, recognised on your own machine. <strong>$20 once.</strong> No
+      subscription, no account, no upload.
+    </p>
+    <p class="lede" style="margin-top:0.8rem;font-size:1rem">
+      The only Mac dictation app that publishes its German word error rate — and
+      ships the test set and the scorer so you can check it.
     </p>
   </div>
 </section>
@@ -281,6 +287,15 @@
 
 <section class="band">
   <div class="measure">
+    <p class="label">Why you can believe a stranger on the internet</p>
+    <p style="margin-bottom:2.4rem">
+      I cancelled a $15-a-month dictation subscription and replaced it with this.
+      It is what I use every working day, on two Macs. Over 26 separate days it
+      recorded 174 dictations and lost none of them: no failures, no crashes, no
+      text that went missing. That is not a marketing number, it is the log file,
+      and the arithmetic is on the <a href="https://github.com/subtract0/presstalk/blob/main/docs/MEASUREMENTS.md">measurements page</a>.
+    </p>
+
     <p class="label">What actually happens</p>
     <ol class="steps">
       <li>
@@ -327,13 +342,13 @@
           </tr>
           <tr>
             <td>Word error rate, German</td>
-            <td class="num">11.25 %</td>
-            <td>Against written references, text as delivered</td>
+            <td class="num">12.71 %</td>
+            <td>Default settings, against written references</td>
           </tr>
           <tr>
             <td>Release to transcript</td>
-            <td class="num">0.95 s p50 · 1.45 s p95</td>
-            <td>M4 Max, 144 runs</td>
+            <td class="num">0.618 s p50 · 0.629 s max</td>
+            <td>M4 Max, default settings</td>
           </tr>
           <tr>
             <td>Recognition speed</td>
@@ -420,7 +435,11 @@
       <span class="amount">$20</span>
       <span class="unit">once · not per month</span>
     </div>
-    <p style="color: var(--muted); margin-top: 0.6rem;">Rising to $39 at general release.</p>
+    <p style="color: var(--muted); margin-top: 0.6rem;">
+      Rising to $39 at general release. The subscription I cancelled costs $180 a
+      year, every year. This pays for itself in about six weeks and then stops
+      taking your money.
+    </p>
     <ul class="includes">
       <li>Every future Mac update included, major versions too</li>
       <li>Keep using it indefinitely, on your Macs, offline</li>
@@ -452,16 +471,23 @@
 
 <section class="band" id="availability">
   <div class="measure">
-    <h2>Two things to know before you buy</h2>
+    <h2>The awkward bits</h2>
     <p>
-      <strong>It is not notarized by Apple yet.</strong> macOS will warn you that
-      the developer cannot be verified, and you will have to right-click → Open on
-      first launch. That is being fixed, and until it is, this page is not going
-      to pretend otherwise.
+      <strong>Apple hasn't finished checking it yet.</strong> Notarization is paid
+      for and in Apple's queue. Until it clears, macOS shows a warning on first
+      launch and you approve it once in System Settings → Privacy &amp; Security →
+      Open Anyway. The instructions ship with the download. It is a queue, not a
+      verdict.
     </p>
     <p>
       <strong>Apple Silicon and macOS 14 or later.</strong> No Intel build, no
-      Windows, no iPhone.
+      Windows, no iPhone. An M1 Air is plenty — the whole point is that it runs on
+      hardware you already own.
+    </p>
+    <p>
+      <strong>I am one person.</strong> Support is me, usually within a day or
+      two. There is no company behind this and no support contract. If that is not
+      enough for your situation, don't buy it yet.
     </p>
     <p>For now, install with Homebrew:</p>
     <pre>brew tap subtract0/presstalk

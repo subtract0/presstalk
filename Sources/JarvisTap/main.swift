@@ -2858,6 +2858,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         audioEngineStopLock.unlock()
 
+        // The microphone is released, so the system default can go back to
+        // whatever the user had before PressTalk borrowed it. Only ever set
+        // when they explicitly chose a non-default device.
+        restoreDisplacedDefaultInputDevice()
+
         guard let retiredID else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + retiredAudioEngineRetainSeconds) { [weak self] in
             self?.releaseRetiredAudioEngine(id: retiredID)
@@ -4400,6 +4405,41 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    /// Which microphone the user asked for. `.systemDefault` unless they said
+    /// otherwise, so PressTalk behaves like every other app until told not to.
+    private var audioInputPreference: AudioInputPreference {
+        AudioInputPreference(
+            storageValue: UserDefaults.standard.string(forKey: "PressTalk.AudioInputPreference"))
+    }
+
+    /// Set by device selection, read by the capture path. Changing the system
+    /// default input is visible to every application on the Mac, so it happens
+    /// only when the user explicitly asked for a device macOS is not using.
+    private var audioInputPromotionAllowed = false
+
+    /// The default we displaced, so it can be put back. Nothing restored it
+    /// before: dictating once with AirPods connected silently repointed the
+    /// microphone for the whole Mac, permanently, and the user had no idea
+    /// PressTalk had done it.
+    private var displacedDefaultInputDeviceID: AudioDeviceID?
+
+    /// Puts the system default input back the way we found it.
+    func restoreDisplacedDefaultInputDevice() {
+        guard let displaced = displacedDefaultInputDeviceID else { return }
+        displacedDefaultInputDeviceID = nil
+        // Only restore if we are still the reason it changed. If the user
+        // picked something else in System Settings meanwhile, that is now their
+        // choice and putting our value back would be a second act of the same
+        // rudeness this exists to undo.
+        guard coreAudioInputDevices().contains(where: { $0.id == displaced }) else {
+            traceLogger.log("Audio input default restore skipped reason=device_absent")
+            return
+        }
+        let restored = setDefaultCoreAudioInputDeviceID(displaced)
+        traceLogger.log(
+            "Audio input default restored device_id=\(displaced) ok=\(restored ? 1 : 0)")
+    }
+
     private func coreAudioInputDevices() -> [AudioInputDeviceCandidate] {
         var address = AudioObjectPropertyAddress(
             mSelector: kAudioHardwarePropertyDevices,
@@ -4439,12 +4479,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 objectID: deviceID,
                 selector: kAudioDevicePropertyTransportType
             )
+            let uid = coreAudioStringProperty(
+                objectID: deviceID, selector: kAudioDevicePropertyDeviceUID) ?? ""
             return AudioInputDeviceCandidate(
                 id: deviceID,
                 name: name,
                 inputChannels: inputChannels,
                 isDefault: defaultInputID == deviceID,
-                transportType: transportType
+                transportType: transportType,
+                uid: uid
             )
         }
     }
@@ -4467,21 +4510,36 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return $0.selectionScore > $1.selectionScore
         }
+        // The user's preference decides, and the default preference is
+        // "whatever macOS is using". PressTalk used to override any Bluetooth
+        // default with a scored physical device, which meant overruling a
+        // choice the user had already made, and -- because overriding means
+        // promoting -- permanently changing the system default input for every
+        // other application on the Mac.
+        let preference = audioInputPreference
+        let selectorDevices: [AudioInputSelector.Device]
+        if case .preferWired = preference {
+            // Ranking only matters when avoiding Bluetooth leaves a choice.
+            selectorDevices = rankedCandidates.map(\.selectorDevice)
+        } else {
+            selectorDevices = candidates.map(\.selectorDevice)
+        }
+        let choice = AudioInputSelector.choose(
+            preference: preference, devices: selectorDevices)
+
         let selected: AudioInputDeviceCandidate
-        let selectionSource: String
-        if let defaultInput = candidates.first(where: { $0.isDefault }) {
-            if defaultInput.isBluetoothLike,
-               let physicalFallback = rankedCandidates.first(where: { $0.isPhysicalInput }) {
-                selected = physicalFallback
-                selectionSource = "non_bluetooth_fallback"
-            } else {
-                selected = defaultInput
-                selectionSource = "system_default"
-            }
+        let selectionSource = choice.reason
+        if let uid = choice.deviceUID,
+           let match = candidates.first(where: { $0.uid == uid }) {
+            selected = match
+        } else if let defaultInput = candidates.first(where: { $0.isDefault }) {
+            selected = defaultInput
         } else {
             selected = rankedCandidates[0]
-            selectionSource = "generic_fallback"
         }
+        // Only an explicit choice may change the system default. Recorded here
+        // so the capture path cannot decide to promote on its own.
+        audioInputPromotionAllowed = choice.requiresPromotion
         let summary = rankedCandidates.map { candidate in
             "\(candidate.name.replacingOccurrences(of: " ", with: "_")):score=\(candidate.selectionScore):channels=\(candidate.inputChannels):transport=\(candidate.transportDescription):default=\(candidate.isDefault ? 1 : 0)"
         }.joined(separator: ",")
@@ -6509,8 +6567,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return "\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)]"
         } ?? "system default"
-        if let selectedAudioInput, selectedAudioInput.isDefault == false {
+        if let selectedAudioInput, selectedAudioInput.isDefault == false,
+           audioInputPromotionAllowed {
+            let previousDefault = defaultCoreAudioInputDeviceID()
             let promotionSucceeded = setDefaultCoreAudioInputDeviceID(selectedAudioInput.id)
+            if promotionSucceeded, let previousDefault, previousDefault != selectedAudioInput.id {
+                displacedDefaultInputDeviceID = previousDefault
+            }
             // CoreAudio reports the new default device long before it is ready
             // to deliver buffers. On 2026-09-06 a fixed 0.12 s sleep here was
             // followed by an engine that took 1.66 s to start and then captured

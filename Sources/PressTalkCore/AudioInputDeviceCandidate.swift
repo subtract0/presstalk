@@ -7,19 +7,24 @@ public struct AudioInputDeviceCandidate {
     public let inputChannels: UInt32
     public let isDefault: Bool
     public let transportType: UInt32?
+    /// Stable across reboots and replugs, unlike `id`, so this is what a saved
+    /// preference stores.
+    public let uid: String
 
     public init(
         id: AudioDeviceID,
         name: String,
         inputChannels: UInt32,
         isDefault: Bool,
-        transportType: UInt32?
+        transportType: UInt32?,
+        uid: String = ""
     ) {
         self.id = id
         self.name = name
         self.inputChannels = inputChannels
         self.isDefault = isDefault
         self.transportType = transportType
+        self.uid = uid.isEmpty ? "device-\(id)" : uid
     }
 
     public var transportDescription: String {
@@ -55,6 +60,13 @@ public struct AudioInputDeviceCandidate {
         !isBluetoothLike && !isVirtualLike
     }
 
+    /// Ranks devices when the user has asked PressTalk to avoid Bluetooth and
+    /// more than one alternative exists.
+    ///
+    /// This used to run unconditionally, which meant a table of one person's
+    /// hardware opinions silently overruled the microphone every user had
+    /// already chosen in System Settings. It is now reached only through
+    /// `AudioInputPreference.preferWired`, which nobody gets by default.
     public var selectionScore: Int {
         var score = 0
         if transportType == kAudioDeviceTransportTypeUSB { score += 55 }
@@ -64,5 +76,10 @@ public struct AudioInputDeviceCandidate {
         if isDefault { score += isBluetoothLike ? -40 : 20 }
         score += min(Int(inputChannels), 4)
         return score
+    }
+
+    public var selectorDevice: AudioInputSelector.Device {
+        .init(uid: uid, name: name, isDefault: isDefault,
+              isBluetooth: isBluetoothLike, isVirtual: isVirtualLike)
     }
 }

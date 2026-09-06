@@ -28,9 +28,15 @@ require_cmd() {
 }
 
 signature_authority() {
-  local bundle="$1"
-  codesign -dv --verbose=4 "$bundle" 2>&1 |
-    awk -F= '/^Authority=/ { print $2; exit }'
+  # Capture codesign once, then parse. Piping straight into `awk ... { exit }`
+  # closes the pipe on the first match, codesign takes SIGPIPE, and under
+  # `set -o pipefail` the pipeline reports 141. Inside the command
+  # substitution at the call site, `set -e` then killed the whole script
+  # without printing anything -- which is why distribution signing never
+  # produced a package, and why the failure looked like a clean exit.
+  local bundle="$1" report
+  report="$(codesign -dv --verbose=4 "$bundle" 2>&1)" || true
+  printf '%s\n' "$report" | awk -F= '/^Authority=/ { print $2; exit }'
 }
 
 DISTRIBUTION_SIGNING="${PRESSTALK_DISTRIBUTION_SIGNING:-0}"

@@ -37,10 +37,14 @@ jobs:
         run: ./scripts/presstalk_claims_gate.sh
       - name: The page makes no automatic third-party request
         run: python3 scripts/presstalk_site_privacy_gate.py
+      - name: The stated offer matches the offer the app enforces
+        run: python3 scripts/presstalk_offer_consistency_gate.py
+      # A gate is only worth running if it can fail. These prove both can,
+      # on the same runner that just reported the page clean.
       - name: The privacy gate still catches planted defects
-        # A gate is only worth running if it can fail. This proves it can,
-        # on the same runner that just reported the page clean.
         run: python3 scripts/test_presstalk_site_privacy_gate.py
+      - name: The offer gate still catches planted defects
+        run: python3 scripts/test_presstalk_offer_consistency_gate.py
 
   deploy:
     needs: gate

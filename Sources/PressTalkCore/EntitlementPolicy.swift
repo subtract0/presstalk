@@ -17,12 +17,14 @@ public struct EntitlementPolicy {
         case trial(daysRemaining: Int)
         case trialExpired
 
-        /// Advisory only. Nothing in the app calls this yet, and that is
-        /// deliberate rather than an oversight: enforcing expiry before there is
-        /// a way to buy a licence would lock people out of a product they cannot
-        /// pay for. Classifying correctly and enforcing are separate steps, and
-        /// wiring this up is a decision for whoever turns on the checkout.
-        /// Recorded in docs/LAUNCH_GATES.md as an open gate.
+        /// Whether this state permits dictation, considered alone.
+        ///
+        /// Not the enforcement decision. The app asks
+        /// `PressTalkLicenseStore.shouldBlockDictation`, which additionally
+        /// requires that the trial anchor was readable and that a checkout
+        /// exists to buy from. Refusing to dictate while offering no way to pay
+        /// is a broken app rather than a paywall, so while
+        /// `PressTalkOffer.checkoutURLString` is empty this refuses nobody.
         public var allowsDictation: Bool {
             switch self {
             case .grandfathered, .licensed, .trial: return true
@@ -55,7 +57,11 @@ public struct EntitlementPolicy {
 
     public let trialDays: Int
 
-    public init(trialDays: Int = 14) {
+    /// Three days, not fourteen. At $20 this is an impulse purchase, and a
+    /// fortnight does not help someone decide -- it lets them forget. Three days
+    /// covers a couple of real working sessions, which is what the decision
+    /// actually needs.
+    public init(trialDays: Int = 3) {
         self.trialDays = max(0, trialDays)
     }
 

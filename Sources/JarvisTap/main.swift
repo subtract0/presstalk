@@ -5053,6 +5053,78 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// arrive somewhere the user can see, so recording it before insertion made
     /// that claim false, and started the trial clock for someone who might never
     /// have seen a word appear.
+    /// Last time the expiry notice was shown, so holding the key repeatedly
+    /// after the trial ends produces one window rather than one per press.
+    private var lastTrialExpiredNoticeAt: Date?
+
+    /// Tells someone the trial is over and gives them both ways out.
+    ///
+    /// Modal, on the main queue, and throttled. It is reached from the trigger
+    /// handler, which can fire many times a second if a key sticks; without the
+    /// throttle a stuck Fn key would stack modal windows until the app had to be
+    /// force quit, turning an expired trial into a crash report.
+    private func presentTrialExpiredIfNeeded() {
+        let now = Date()
+        if let last = lastTrialExpiredNoticeAt, now.timeIntervalSince(last) < 20 { return }
+        lastTrialExpiredNoticeAt = now
+
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let alert = NSAlert()
+            alert.messageText = "Your PressTalk trial has ended"
+            alert.informativeText = PressTalkOffer.founderSummary
+                + "\n\nThe licence is a signed file this Mac checks on its own. "
+                + "No account, and nothing is sent anywhere."
+            alert.addButton(withTitle: "Buy PressTalk — $\(PressTalkOffer.founderPriceUSD)")
+            alert.addButton(withTitle: "Enter licence key")
+            alert.addButton(withTitle: "Not now")
+
+            switch alert.runModal() {
+            case .alertFirstButtonReturn:
+                if let url = PressTalkOffer.checkoutURL { NSWorkspace.shared.open(url) }
+            case .alertSecondButtonReturn:
+                self.promptForLicenseKey()
+            default:
+                break
+            }
+        }
+    }
+
+    /// The same paste-a-key flow the settings pane offers, reachable from the
+    /// expiry notice so someone who already bought is one click from working
+    /// again rather than hunting through menus.
+    private func promptForLicenseKey() {
+        let alert = NSAlert()
+        alert.messageText = "Enter your licence key"
+        alert.informativeText = "Paste the key from your receipt email. "
+            + "It is checked on this Mac; nothing is sent anywhere."
+        alert.addButton(withTitle: "Activate")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 360, height: 24))
+        field.placeholderString = "PRESSTALK-1.…"
+        alert.accessoryView = field
+        alert.window.initialFirstResponder = field
+
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let outcome = NSAlert()
+        switch licenseStore.importLicense(field.stringValue) {
+        case .success(let license):
+            outcome.messageText = "Licence activated"
+            outcome.informativeText =
+                "\(license.entitlement.capitalized). Dictation is available again."
+            // A key that just verified means the next press must not be
+            // refused by a throttle timestamp from the refusal before it.
+            lastTrialExpiredNoticeAt = nil
+        case .failure(let error):
+            outcome.alertStyle = .warning
+            outcome.messageText = "That licence key did not activate"
+            outcome.informativeText = error.userFacingMessage
+        }
+        outcome.runModal()
+    }
+
     private func recordDelivery(_ transcript: String, reachedTargetApp: Bool) {
         rememberDictation(transcript, deliveryFailed: !reachedTargetApp)
         guard !settingsStore.firstDictationDelivered else { return }
@@ -6335,6 +6407,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         recordTriggerSource(source, phase: .press)
+
+        // Checked before the state lock and before the microphone opens, so an
+        // expired trial never records audio it is not going to transcribe.
+        // `shouldBlockDictation` is false unless the trial genuinely expired,
+        // the anchor reading was trustworthy, and a checkout actually exists to
+        // buy from -- see PressTalkLicenseStore.
+        if licenseStore.shouldBlockDictation {
+            traceLogger.log("Dictation refused reason=trial_expired")
+            presentTrialExpiredIfNeeded()
+            return
+        }
 
         enum PressDecision {
             case ignoreSilently

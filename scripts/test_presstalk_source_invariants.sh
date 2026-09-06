@@ -78,9 +78,40 @@ elif [[ -n "$setup_flag_line" && "$record_line" -gt "$setup_flag_line" ]]; then
     "every new install would be classified as predating paid licensing"
 fi
 
+# An expired trial must be refused before the microphone opens. If the guard
+# ever drifts below `isRecording = true`, a blocked dictation still records
+# audio and still runs recognition -- the user is refused after the app has
+# already listened to them, which is the opposite of what this product sells.
+# Ordering is invisible to a unit test, which calls the check directly.
+# Matches only executable lines. Grepping for the bare string passed when the
+# guard was commented out -- verified here on 2026-09-06 by commenting it out
+# and watching this script report "All source invariants hold". A check that
+# accepts a disabled guard is worse than no check, because it certifies it.
+live_line() { # file, pattern -> first line number that is not a // comment
+  grep -n "$2" "$1" | grep -v '^[0-9]*:[[:space:]]*//' | head -1 | cut -d: -f1 || true
+}
+block_line="$(live_line "$main_swift" 'licenseStore\.shouldBlockDictation')"
+recording_line="$(live_line "$main_swift" 'isRecording = true')"
+if [[ -z "$block_line" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "the trigger handler must consult licenseStore.shouldBlockDictation" \
+    "without it the trial never ends and a licence buys nothing"
+elif [[ -n "$recording_line" && "$block_line" -gt "$recording_line" ]]; then
+  report "Sources/JarvisTap/main.swift:${block_line}" \
+    "the trial check runs after isRecording is set (line ${recording_line})" \
+    "a refused dictation would still have opened the microphone"
+fi
+
+# The refusal must never be reachable without somewhere to buy a licence.
+if [[ -z "$(live_line "$SOURCES/ProductUI.swift" 'PressTalkOffer\.checkoutIsLive')" ]]; then
+  report "Sources/JarvisTap/ProductUI.swift" \
+    "shouldBlockDictation must require checkoutIsLive" \
+    "otherwise an expired trial locks someone out with no way to pay"
+fi
+
 echo
 if [[ "$failures" -gt 0 ]]; then
-  echo "$failures place(s) can write dictated text to a log." >&2
+  echo "$failures source invariant(s) violated." >&2
   exit 1
 fi
 echo "All source invariants hold."

@@ -4,7 +4,7 @@ Prepared drafts, not sent. Lead with the finished sentence and show a real dicta
 Paid acquisition starts in Germany; the optional English community post is a separate
 organic opportunity, not the paid campaign's audience.
 
-The proposed 14-day local trial, working purchase flow, tax-inclusive price and
+The proposed 3-day local trial, working purchase flow, tax-inclusive price and
 notarized download must be shipped and checked before using this launch copy. Publish
 the real recording before linking a demonstration. Replace bracketed deployment
 links with verified public URLs. Do not publish placeholders or imply the trial
@@ -35,7 +35,7 @@ community is not automatically a permitted promotion venue.
 > Nach der ersten Einrichtung funktioniert das auch ohne WLAN. Deine Sprache wird
 > auf deinem Mac erkannt. Keine Audio-Uploads, kein Konto, keine Telemetrie.
 >
-> Für Macs mit Apple Silicon. 14 Tage ausprobieren, ohne Karte. Danach kostet
+> Für Macs mit Apple Silicon. 3 Tage ausprobieren, ohne Karte. Danach kostet
 > PressTalk 20 US-Dollar einmalig, inklusive anwendbarer Steuern und aller
 > zukünftigen Mac-Updates. Kein Abo.
 >
@@ -76,7 +76,7 @@ exists, but that does not establish permission for this account or this draft.
 > Speech recognition stays on your Mac. After the initial setup, dictation works
 > with Wi-Fi off. No audio uploads, no account, no telemetry.
 >
-> Apple Silicon Mac required. Try it for 14 days without a card. It is $20 once,
+> Apple Silicon Mac required. Try it for 3 days without a card. It is $20 once,
 > including applicable tax and every future Mac update. No subscription.
 >
 > I'm the solo developer. Try a sentence you actually need to write. If you want
@@ -151,7 +151,7 @@ or [official imprint](https://www.ifun.de/impressum/), verified for this draft o
 > Die Spracherkennung läuft auf dem Mac. Nach der ersten Einrichtung funktioniert
 > das Diktieren ohne WLAN. Kein Konto, keine Audio-Uploads, keine Telemetrie.
 >
-> PressTalk läuft auf Macs mit Apple Silicon. Es lässt sich 14 Tage ohne Karte
+> PressTalk läuft auf Macs mit Apple Silicon. Es lässt sich 3 Tage ohne Karte
 > ausprobieren und kostet anschließend 20 US-Dollar einmalig, inklusive
 > anwendbarer Steuern und aller zukünftigen Mac-Updates.
 >

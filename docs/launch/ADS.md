@@ -7,7 +7,7 @@ Mac apps. Every paid click goes to `/de`: **Gedacht. Gesagt. Geschrieben.**
 ## Before the first dollar
 
 Ship and personally verify the notarized install, German page, real demonstration,
-proposed 14-day local trial, offline purchase entitlement, and Lemon Squeezy
+proposed 3-day local trial, offline purchase entitlement, and Lemon Squeezy
 checkout. The trial is a launch requirement, not a feature this document establishes
 as shipped. Start it on first successful dictation; require no account or card.
 Do not run the trial ad until it is true.
@@ -127,7 +127,7 @@ all uses of `transkription`, which can describe the intended job.
 | Headline 2 | Diktieren am Mac | 16 / 30 |
 | Headline 3 | 20 US-Dollar. Einmalig. | 23 / 30 |
 | Description 1 | Fn halten, sprechen, loslassen. Dein Text steht in deiner App. Für Macs mit Apple Silicon. | 90 / 90 |
-| Description 2 | Nach der Einrichtung offline diktieren. 14 Tage testen, ohne Konto und ohne Karte. | 82 / 90 |
+| Description 2 | Nach der Einrichtung offline diktieren. 3 Tage testen, ohne Konto und ohne Karte. | 81 / 90 |
 
 Final path `/de`; display path `mac/diktieren`. Pin the Mac headline where supported
 so every served combination describes a Mac product. Do not add an accuracy
@@ -174,7 +174,7 @@ Promoted video title:
 Body:
 
 > Fn halten. Sprechen. Loslassen. Dein Text steht in deiner App. PressTalk für Macs
-> mit Apple Silicon. Nach der Einrichtung offline. 14 Tage testen, ohne Konto und
+> mit Apple Silicon. Nach der Einrichtung offline. 3 Tage testen, ohne Konto und
 > ohne Karte. 20 US-Dollar, einmalig.
 
 CTA: **Download**, or the available platform equivalent.

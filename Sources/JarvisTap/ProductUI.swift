@@ -69,6 +69,9 @@ final class PressTalkLicenseStore {
         static let predatesPaidLicensing = "PressTalk.PredatesPaidLicensing"
         static let hasSeenSetupGuide = "JarvisTap.HasSeenSetupGuide"
         static let firstDictationDelivered = "JarvisTap.FirstDictationDelivered"
+        /// Keychain coordinates for the second copy of the trial start date.
+        static let keychainService = "com.am.presstalk.trial"
+        static let keychainAccount = "trial-started-at"
     }
 
     /// Public keys the app trusts. Rotating means adding a key here and shipping
@@ -88,9 +91,20 @@ final class PressTalkLicenseStore {
     private let overrideEntitlement: String?
     private let verifier: PressTalkLicenseVerifier
 
-    init(defaults: UserDefaults = .standard, env: [String: String] = ProcessInfo.processInfo.environment) {
+    /// The trial start date is recorded in both, and the earliest one wins.
+    /// UserDefaults alone made "3 days" mean "3 days per reinstall".
+    private let anchorStores: [TrialAnchorStore]
+
+    init(defaults: UserDefaults = .standard,
+         env: [String: String] = ProcessInfo.processInfo.environment,
+         anchorStores: [TrialAnchorStore]? = nil) {
         self.defaults = defaults
         self.overrideEntitlement = env["PRESSTALK_ENTITLEMENT_OVERRIDE"]
+        self.anchorStores = anchorStores ?? [
+            UserDefaultsTrialAnchorStore(defaults: defaults, key: Key.trialStartedAt),
+            KeychainTrialAnchorStore(service: Key.keychainService,
+                                     account: Key.keychainAccount),
+        ]
 
         var keys: [String: Curve25519.Signing.PublicKey] = [:]
         for (keyID, encoded) in Self.trustedPublicKeys {
@@ -130,19 +144,58 @@ final class PressTalkLicenseStore {
         return license.entitlement
     }
 
+    /// Reads every anchor store, believes the earliest date, and refills any
+    /// store that came back empty while another still held the date.
+    var trialAnchor: TrialAnchor.Resolution {
+        let resolution = TrialAnchor.resolve(anchorStores.map { $0.read() })
+        if let startedAt = resolution.startedAt {
+            for index in resolution.storesToHeal {
+                anchorStores[index].write(startedAt)
+            }
+        }
+        return resolution
+    }
+
     var state: EntitlementPolicy.State {
         policy.state(
             verifiedEntitlement: verifiedEntitlement,
             priorUse: priorUse,
-            trialStartedAt: defaults.object(forKey: Key.trialStartedAt) as? Date,
+            trialStartedAt: trialAnchor.startedAt,
             now: Date())
+    }
+
+    /// Whether dictation should be refused right now.
+    ///
+    /// Deliberately not `!state.allowsDictation`. Three separate conditions have
+    /// to hold before anyone is locked out, and each one is a way this could go
+    /// wrong for a person who did nothing wrong: the state must actually be
+    /// expired, the anchor reading must be trustworthy (a locked keychain proves
+    /// nothing), and there must be somewhere to buy a licence. Refusing to
+    /// dictate while offering no way to pay is a broken app, not a paywall.
+    var shouldBlockDictation: Bool {
+        guard case .trialExpired = state else { return false }
+        guard TrialAnchor.mayEnforceExpiry(trialAnchor) else { return false }
+        return PressTalkOffer.checkoutIsLive
     }
 
     /// Called after the first successful dictation. The trial starts when the
     /// product first works, not when it was installed.
     func startTrialIfNeeded() {
-        guard defaults.object(forKey: Key.trialStartedAt) == nil else { return }
-        defaults.set(Date(), forKey: Key.trialStartedAt)
+        // Checks every store, not just UserDefaults. Someone who reinstalled
+        // still has a date in the keychain, and starting a new one here would
+        // hand them the fresh trial the anchor exists to prevent.
+        let existing = TrialAnchor.resolve(anchorStores.map { $0.read() })
+        if let startedAt = existing.startedAt {
+            for index in existing.storesToHeal { anchorStores[index].write(startedAt) }
+            return
+        }
+        // An unreadable store may already hold a date. Writing a new one now
+        // could only ever be a later date, and the earliest-wins rule would
+        // discard it -- but writing into a store that could not be read risks
+        // overwriting the real one, so wait for a reading that is trustworthy.
+        guard existing.isTrustworthy else { return }
+        let now = Date()
+        for store in anchorStores { store.write(now) }
     }
 
     /// Verifies before storing. A bad paste must never displace a licence that

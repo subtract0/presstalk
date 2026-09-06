@@ -6511,10 +6511,38 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } ?? "system default"
         if let selectedAudioInput, selectedAudioInput.isDefault == false {
             let promotionSucceeded = setDefaultCoreAudioInputDeviceID(selectedAudioInput.id)
+            // CoreAudio reports the new default device long before it is ready
+            // to deliver buffers. On 2026-09-06 a fixed 0.12 s sleep here was
+            // followed by an engine that took 1.66 s to start and then captured
+            // 37 seconds of digital silence: the default had changed, the
+            // hardware had not finished re-arming.
+            //
+            // Polling until the default actually reports the promoted device is
+            // a better wait than a constant, because it ends as soon as the
+            // switch lands instead of always costing the same. It is still not
+            // proof that audio will flow -- nothing observable here is -- so
+            // CaptureIntegrity remains the backstop that tells the user when it
+            // does not. The observed settle time is logged so the real
+            // distribution can replace this guess with a measurement.
+            var promotedDefaultID: AudioDeviceID?
             if promotionSucceeded {
-                Thread.sleep(forTimeInterval: 0.12)
+                let settleDeadline = Date().addingTimeInterval(0.75)
+                let settleStartedAt = Date()
+                repeat {
+                    promotedDefaultID = defaultCoreAudioInputDeviceID()
+                    if promotedDefaultID == selectedAudioInput.id { break }
+                    Thread.sleep(forTimeInterval: 0.02)
+                } while Date() < settleDeadline
+                traceLogger.log(
+                    "Audio input default promotion settle seconds="
+                    + String(format: "%.3f", Date().timeIntervalSince(settleStartedAt))
+                    + " landed=\(promotedDefaultID == selectedAudioInput.id ? 1 : 0)")
+                // A device that has just been re-armed needs a moment before
+                // its first buffer is real rather than a zero-filled prime.
+                Thread.sleep(forTimeInterval: 0.08)
+            } else {
+                promotedDefaultID = defaultCoreAudioInputDeviceID()
             }
-            let promotedDefaultID = defaultCoreAudioInputDeviceID()
             if promotionSucceeded, promotedDefaultID == selectedAudioInput.id {
                 selectedAudioInputDescription = "system default promoted (\(selectedAudioInput.name) [id=\(selectedAudioInput.id), transport=\(selectedAudioInput.transportDescription), channels=\(selectedAudioInput.inputChannels)])"
                 traceLogger.log(
@@ -6777,7 +6805,30 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 frozenAudioDurationSeconds = 0
             }
 
+            // What arrived, against what was asked for. Runs before any
+            // recognizer sees the audio, because the recognizers are the part
+            // that turns a broken recording into confident words.
+            let captureVerdict = CaptureIntegrity.evaluate(
+                capturedSeconds: frozenAudioDurationSeconds,
+                heldSeconds: captureDurationSeconds,
+                rms: capturedSignalStats.rms,
+                peak: capturedSignalStats.peak)
+            if !captureVerdict.isUsable {
+                traceLogger.log(
+                    "Capture integrity failed verdict=\(captureVerdict) "
+                    + "captured_seconds=\(String(format: "%.2f", frozenAudioDurationSeconds)) "
+                    + "held_seconds=\(String(format: "%.2f", captureDurationSeconds)) "
+                    + "rms=\(String(format: "%.5f", capturedSignalStats.rms)) "
+                    + "peak=\(String(format: "%.5f", capturedSignalStats.peak))")
+            }
+
             func finalizeTranscript() async throws -> String {
+                // A recording that failed integrity is not transcribed at all.
+                // Handing it to the ladder is how "you you" reached a chat
+                // window: every pass after the first is a retry with looser
+                // decoding, so the worse the audio, the harder the app tries to
+                // find words in it.
+                if !captureVerdict.isUsable { return "" }
                 let streamingTranscript = fallbackTranscript()
                 let effectiveCaptureDurationSeconds = max(captureDurationSeconds, frozenAudioDurationSeconds)
                 let acceptedStreamingTranscript = validatedFinalTranscriptCandidate(
@@ -7141,6 +7192,17 @@ let relaxedResults = try await whisperKit.transcribe(
                         print("⚠️ [PressTalk] Audio capture was not ready before release.")
                         fflush(stdout)
                         finishProcessing(reason: "capture_not_ready")
+                        return
+                    }
+                    // A capture that failed integrity gets its own message.
+                    // "I didn't catch any clear speech" blames the speaker for
+                    // a microphone that was never delivering, and the person
+                    // then repeats themselves louder into the same dead input.
+                    if let integrityMessage = captureVerdict.userFacingMessage {
+                        present(.error(integrityMessage))
+                        print("⚠️ [PressTalk] \(integrityMessage)")
+                        fflush(stdout)
+                        finishProcessing(reason: "capture_integrity_failed")
                         return
                     }
                     if captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds {

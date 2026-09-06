@@ -41,6 +41,10 @@ jobs:
         run: python3 scripts/presstalk_offer_consistency_gate.py
       # A gate is only worth running if it can fail. These prove both can,
       # on the same runner that just reported the page clean.
+      - name: Every download and checkout link resolves
+        # A broken download button is invisible from inside the repo, and the
+        # first person to discover it is a stranger who wanted the app.
+        run: python3 scripts/presstalk_download_link_gate.py
       - name: The privacy gate still catches planted defects
         run: python3 scripts/test_presstalk_site_privacy_gate.py
       - name: The offer gate still catches planted defects

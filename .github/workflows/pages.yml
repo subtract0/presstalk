@@ -55,6 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+        # The first run failed here: the repository had never had Pages turned
+        # on, so there was no site to configure and nothing to deploy into.
+        # enablement lets the workflow create it rather than requiring someone
+        # to find the setting, which is how it stayed off for months.
+        with:
+          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

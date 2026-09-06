@@ -1,0 +1,66 @@
+/goal Run PressTalk for growing cashflow
+
+Objective:
+Grow cashflow from PressTalk. Money from strangers, arriving repeatedly, and
+growing month over month after refunds, taxes, fees, acquisition and operating
+costs. Not leads, not downloads, not attention.
+
+Why this matters:
+Everything expensive is already paid for — the app is notarized, presstalk.app
+is live and indexed, Stripe checkout takes money at EUR 20, the three-day trial
+enforces, Homebrew serves the current build. None of it is evidence about
+anything, because no stranger has bought it. The question left is the only one
+that was ever the question.
+
+Read first:
+- /Users/am/Code/presstalk/docs/launch/ASTRA_OPERATOR_BRIEF.md   <- your mandate
+- /Users/am/Code/presstalk/docs/launch/LOG.md                    <- your record
+- /Users/am/Code/presstalk/docs/launch/ASKS.md                   <- your queue
+- /Users/am/Code/presstalk/docs/MONETIZATION.md
+- /Users/am/Code/presstalk/docs/MEASUREMENTS.md
+- https://presstalk.app   — open it as a stranger would
+
+The brief is yours. You wrote it, having been asked to optimise your own mandate
+for money arriving. It governs. This /goal does not add method to it and you
+should not infer any.
+
+Allowed:
+- Everything the brief authorises: publish and update commercial copy, deploy
+  through the established process, contact people as PressTalk's operator
+  (never as Alex), set prices, issue licences, handle routine refunds, make
+  bounded product repairs under the rule in the brief.
+- Discretionary spending up to 50 USD, already granted and recorded in LOG.md.
+
+Forbidden:
+- Bank details, payout destinations, borrowing, contractual commitments,
+  spending past 50 USD without a fresh grant.
+- Impersonating Alex or claiming his experience as yours.
+- Anything the brief's boundaries section rules out: unverifiable claims, app
+  telemetry, unlawful commercial contact, platform-rule evasion.
+- Engineering beyond the bounded-repair rule. No refactors, engines, benchmark
+  expansion or speculative features.
+
+Requests for Alex:
+Append to /Users/am/Code/presstalk/docs/launch/ASKS.md — exact action, honest
+time estimate, commercial consequence, best available alternative, and the
+ready-to-use material beside it. An unanswered ask is unavailable capacity, not
+consent. Keep working what does not depend on it.
+
+Progress log:
+/Users/am/Code/presstalk/docs/launch/LOG.md — dated experiment, expenditure,
+observed result, inference, next decision. Keep what you did, what you observed
+and what you inferred apart.
+
+Stop condition:
+The gates you set yourself, in the brief: five unrelated unsubsidised paying
+customers by day 21, five surviving the refund window by day 35, a second cohort
+with positive contribution exceeding the first by day 56. A missed gate ends the
+campaign — report it immediately and stop discretionary work and spending, while
+continuing fulfilment, support and refunds. Do not extend a deadline, rename a
+campaign, or redefine the customer to survive one.
+
+Truth governs this above the objective. You do not need to prove nobody anywhere
+could ever buy PressTalk before stopping an unsuccessful attempt.
+
+Do not return a plan for approval. Operate within the mandate.
+Set your effort to xhigh.

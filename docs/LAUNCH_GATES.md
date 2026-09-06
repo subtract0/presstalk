@@ -57,6 +57,47 @@ excluded from distribution builds entirely.
 
 Both would have turned certificate day into a debugging day.
 
+## Going live: the three edits
+
+Everything below the surface is done and proven. When the Apple certificate
+arrives and the Lemon Squeezy store is approved, these are the only changes.
+
+**1. Point the app at the checkout.** One line:
+`Sources/PressTalkCore/EntitlementPolicy.swift` → `checkoutURLString`. While it is
+empty the buy button stays hidden, which is honest, because there is nowhere to
+pay. Setting it makes the button appear.
+
+**2. Point the page at the checkout.** One line in `site/index.html`, marked with
+a comment block you cannot miss. Replace the mailto with the checkout URL.
+
+**3. Sign and ship.**
+```bash
+export PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: <name> (<TEAMID>)"
+export PRESSTALK_NOTARYTOOL_PROFILE=presstalk-notary
+PRESSTALK_DISTRIBUTION_SIGNING=1 PRESSTALK_NOTARIZE=1 \
+  bash scripts/package_presstalk_release.sh 0.2.0
+```
+
+### Issuing a licence after a sale
+
+```bash
+.build/debug/presstalk-license issue \
+  --key ~/.presstalk-signing/founder-2026.private.key \
+  --key-id founder-2026 --entitlement founder
+```
+
+Email the buyer that line. They paste it into Settings → Enter Licence Key. No
+server, no account, works offline forever.
+
+**The private key at `~/.presstalk-signing/founder-2026.private.key` is the one
+irreplaceable thing here.** The matching public key ships inside every build, so
+losing the private half means no further licences can be issued that already-sold
+copies will accept. Back it up encrypted, somewhere that is not this Mac. Rotating
+means *adding* a second key to `trustedPublicKeys`, never replacing the first.
+
+Verified end to end on 2026-09-06: a licence issued by that key is accepted by the
+key embedded in the app, and a single altered character is rejected.
+
 ## Yours: the rest of the commercial surface
 
 | | Why it needs you |

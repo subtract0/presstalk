@@ -13,9 +13,21 @@ struct PressTalkCommerceConfig {
     let upgradeURL: URL?
     let plansURL: URL?
 
+    /// Reads the checkout address from `PressTalkOffer`, not from the process
+    /// environment.
+    ///
+    /// It used to be environment-only, which meant both buy buttons were hidden
+    /// in every build a customer could ever run: an app launched from Finder or
+    /// the Dock inherits none of a shell's exported variables. The buttons were
+    /// visible exactly once — in a terminal-launched developer build — and
+    /// invisible in the one place they had to work. The environment still wins
+    /// when set, so a staging checkout can be pointed at without a rebuild.
     init(env: [String: String] = ProcessInfo.processInfo.environment) {
-        upgradeURL = env["PRESSTALK_UPGRADE_URL"].flatMap(URL.init(string:))
+        upgradeURL = (env["PRESSTALK_CHECKOUT_URL"] ?? env["PRESSTALK_UPGRADE_URL"])
+            .flatMap(URL.init(string:))
+            ?? PressTalkOffer.checkoutURL
         plansURL = env["PRESSTALK_PLANS_URL"].flatMap(URL.init(string:))
+            ?? PressTalkOffer.pricingPageURL
     }
 }
 
@@ -63,10 +75,13 @@ final class PressTalkLicenseStore {
     /// an update; licences signed by an older key keep working because the key
     /// id travels with the licence.
     ///
-    /// Empty until the owner runs `presstalk-license generate-key` and pastes the
-    /// public key in. With no trusted keys, imports fail closed with
-    /// "signed by a key this version does not recognise", which is accurate.
-    static let trustedPublicKeys: [String: String] = [:]
+    /// Generated 2026-09-06. The private half lives outside this repository at
+    /// ~/.presstalk-signing/ (mode 600) and must never be committed; only this
+    /// public half ships. Rotating means adding a second entry here, not
+    /// replacing this one, or every licence already sold stops verifying.
+    static let trustedPublicKeys: [String: String] = [
+        "founder-2026": "kRCsB+YLcYSDKFt8u9qGXodXWEHGORTl3dYydLILFE4=",
+    ]
 
     private let defaults: UserDefaults
     private let policy = EntitlementPolicy()

@@ -91,6 +91,27 @@ public struct EntitlementPolicy {
 /// $20 then $39 one-time, and a reviewer's note suggesting euros. Whichever is
 /// right, a product cannot ship all three.
 public enum PressTalkOffer {
+    /// The Lemon Squeezy checkout. **Set this string when the store goes live.**
+    ///
+    /// One line, one place. While it is empty the buy button stays hidden, which
+    /// is honest: there is nowhere to pay. `PRESSTALK_CHECKOUT_URL` overrides it
+    /// for staging.
+    public static let checkoutURLString = ""
+
+    /// Where the offer is described. Empty until a domain exists.
+    public static let pricingPageURLString = ""
+
+    public static var checkoutURL: URL? {
+        checkoutURLString.isEmpty ? nil : URL(string: checkoutURLString)
+    }
+
+    public static var pricingPageURL: URL? {
+        pricingPageURLString.isEmpty ? nil : URL(string: pricingPageURLString)
+    }
+
+    /// Whether anyone can actually buy this right now.
+    public static var checkoutIsLive: Bool { checkoutURL != nil }
+
     public static let founderPriceUSD = 20
     public static let personalPriceUSD = 39
 

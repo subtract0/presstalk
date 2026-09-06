@@ -80,6 +80,79 @@ pause immediately. The existing payment link cannot be deactivated with invalid
 credentials; A1 requests that action. This is an operational dependency failure,
 not evidence of lack of demand.
 
+## 2026-09-07 — first-day result, 01:10 Europe/Berlin
+
+**Commercial finding:** the handover's “live and sellable” claim is not yet
+established. Account access, fulfilment evidence and public business details
+prevent a responsible new purchase ask. This is a sales-readiness/distribution
+dependency failure under the current access constraints, not a demand test.
+The first-day stranger placement is **not achieved**. E1 is prepared and unsent;
+do not count it as reach, interest or a failed buyer response. No gate extension.
+
+**Executed:** website purchase calls to action are paused on all four English/
+German landing/download pages. Downloads and existing licence/update/refund
+promises remain. Corrected “signed by Apple” and “no security warning” claims,
+obsolete support bypass instructions and the promise that the developer always
+answers. Removed the unverified website assertion that Stripe is this offer's
+merchant of record. App source and release binaries were not changed.
+
+The normal Pages workflow deployed the changes in a concurrent owner commit
+`2a2db95290c8cb9d958e87ffa4afb1460a186169`. The operator's isolated-checkout push
+was rejected because that commit advanced main; a fetch and byte comparison
+confirmed it already contained all five intended public files. No overwrite or
+force push. [Successful deployment](https://github.com/subtract0/presstalk/actions/runs/34065952885);
+[four live page checks](receipts/2026-09-07/storefront-live.json).
+
+**Scope of the pause:** the shipped app still links directly to Stripe. The
+payment link was not deactivated because the credentials failed. A1 includes
+deactivating new payments while retaining access to past orders and refunds.
+Do not describe the entire checkout as disabled.
+
+| Customer step | Evidence / current limit |
+|---|---|
+| Find and read offer | Live pages HTTP 200. Compatible hardware, model download, three-day trial and advertised €20/$20 appear. No stranger exposure or search-reach measurement. Current purchase pause is visible. |
+| Download | Public 0.1.11 ZIP hash matches published SHA-256; Homebrew cask names the same version/hash. Operator checks themselves add download requests. No independent installation count inferred. |
+| Authenticity / opening | Deep/strict Developer ID signature passes; attached notarization ticket reported. `spctl` returns an internal signing-subsystem error and `stapler` a LaunchServices error in this environment. These are neither a clean-Mac pass nor proof of a product defect. [Artifact receipt](receipts/2026-09-07/public-artifact.json). |
+| Permissions / model / first insertion | Not physically exercised here; A4 pending. Approximate model size and offline recognition remain documented/source-supported claims, not a measured clean download/offline session. Website demo is an explicitly labelled illustration; no real recording exists in the inspected project. |
+| Trial / grandfathering | 37 existing tests for entitlement, trial anchor and licensing pass using copies of the unchanged core sources in an isolated package. Those core files and relevant app files match the v0.1.11 tag. [Tests](receipts/2026-09-07/core-tests.txt), [source hashes](receipts/2026-09-07/storefront-source-snapshot.json). Not a GUI expiry test. |
+| First-use trial nuance | `recordDelivery` starts the trial even when `reachedTargetApp` is false (clipboard recovery). This is source evidence of a delivery distinction; reproduce during A4 before an app repair. Do not call clipboard recovery successful insertion. |
+| Actual checkout / total / MoR | Unverified. Both configured API credentials fail. No browser backend is available. A checkout URL or code comment is not transaction evidence. EUR/USD price/tax and first-25 restriction must be checked in A1 before reopening. |
+| Licence issuance | Existing private key matches the public key in the downloaded binary. In-memory test issuance/verification accepts future major versions and rejects tampering. No licence was sold or sent. [Key check](receipts/2026-09-07/license-key-check.txt). |
+| Payment → email → app unlock / refund | No test payment made. No authenticated mailbox, delivered licence or app-UI unlock receipt. A1/A2/A4 pending. Existing customer obligations have priority once the inbox/orders are available. |
+| Public commercial disclosures | No Impressum/withdrawal-information link found on the fetched sales pages. A3 requests designated public business details; A1 determines the actual checkout seller. No compliance pass claimed. |
+
+**Verification:** existing claims, site privacy, offer-copy, download-link,
+privacy regression and offer regression gates passed; Pages CI also passed.
+All local HTML pause anchors and support routes checked. These gates do not
+verify actual checkout prices, merchant status or customer experience. No browser
+visual check was possible. No telemetry or acquisition tracking was introduced.
+
+**Cash and effort:** new discretionary commitments/spend **USD 0**; the recorded
+USD 50 cap remains unspent by this turn. Verified independent paying customers:
+**unknown**; gross payments, retained contribution, payouts, unsettled balances,
+refunds, taxes, fees, historical business expenditure and paid agent execution
+cost: **unknown**. [Access/money receipt](receipts/2026-09-07/access-and-money.json).
+Operator elapsed time at the 01:10 snapshot: approximately 13 minutes since goal
+creation, excluding earlier setup; this is elapsed time, not a billable-cost
+estimate. No owner action completed in this session was observed. Owner time
+spent in the concurrent working session is unknown and must also be counted.
+
+**Next decision:** restore designated Stripe/mail access, inspect existing
+customer obligations, publish supplied business details, and close the physical
+and transaction/delivery checks. Then reopen the offer and send one invited
+ifun.de submission for German email dictation, using
+[the prepared E1 packet](DAY1_CHECKS.md#e1--invited-ifunde-editorial-submission-prepared-not-sent).
+Its cash ceiling is zero; review response on 14 September and purchases at the
+27 September gate. No new discretionary spending or promotional sends while
+these dependencies remain unresolved. Highest-value owner request: **A1**, then
+A2 for any existing paid-customer obligations. All requests are in
+[ASKS.md](ASKS.md), a 60–80 minute batch after the customer-support reserve.
+
+First weekly review: **14 September 2026**, including actual money and owner
+time once accessible. The campaign cannot be called successful from this
+turn's repairs, tests or documents. Updated handover text in `GOAL.txt` repeats
+some earlier unverified starting claims; this dated evidence takes precedence.
+
 ## 2026-09-07 — handover
 
 PressTalk is live and sellable: notarized 0.1.11, presstalk.app indexed, Stripe
@@ -117,3 +190,43 @@ Starting position: notarized 0.1.11 downloadable, presstalk.app live and
 indexed, Stripe checkout at EUR 20 taking money, three-day trial enforced,
 Homebrew serving the current build, zero customers, zero known independent
 installations.
+
+## 2026-09-07 01:12 CEST — Hermes takeover verification
+
+**Action:** read the mandate, current log/asks, entitlement source and prior
+receipts. Rechecked all four public English/German landing/download pages over
+HTTP. Ran `codesign --verify --deep --strict`, `spctl --assess --type execute
+--verbose=2` and `xcrun stapler validate` against the previously downloaded
+0.1.11 artifact on studio1, without changing or launching the app.
+
+**Observed:** all four pages return HTTP 200, display the purchase pause and
+contain no Stripe anchor links. Support links point to the GitHub support guide
+and help@presstalk.app; `/support.html` was an assumed path, not the site's
+actual support route. All three artifact checks now exit 0. Gatekeeper reports
+`accepted`, `source=Notarized Developer ID`; stapler reports validation worked.
+This supersedes the earlier environment-error results for these command-line
+checks, not the pending clean-Mac/physical insertion test. No extra artifact
+download, test purchase, licence send, release or promotion was performed.
+
+Chrome browser automation could not connect without owner remote-debugging
+approval. HTTP extraction is not a rendered-browser or checkout verification.
+No fresh account access, public seller details, mailbox designation or clean-Mac
+result has been supplied. Earlier Stripe 401 results were read, not retested;
+no credential files were accessed in this turn.
+
+The old `astra_sales_loop.sh` shell (PID 8064) and its Codex child (PID 8071)
+were still present during takeover; the log also changed concurrently. No
+process was stopped, background job created, commit made or deployment repeated.
+Coordinate a single operator before resuming commercial mutations.
+
+**Inference / decision:** signature/notarization is no longer an unresolved
+command-line check. The gating problems remain lawful offer, transaction access,
+support and end-to-end delivery, not evidence of failed demand. Preserve the
+existing promotion/spend pause; do not multiply channel drafts or engineer
+features around unavailable dependencies. A1/A2 have first priority for existing
+customer obligations. E1 remains prepared, not sent. Campaign dates unchanged.
+
+**Money / time:** this turn committed and spent USD 0 in discretionary funds;
+paid agent execution cost and actual customer money remain unknown. No completed
+owner action observed. Receipt:
+[hermes-takeover-verification.json](receipts/2026-09-07/hermes-takeover-verification.json).

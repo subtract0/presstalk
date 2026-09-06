@@ -1,0 +1,11 @@
+Stripe CLI upgrade receipt — studio1
+Verification timestamp: 2026-09-06T23:45:32Z
+Authorization: Alex said "update" following the recommendation to retain one Homebrew installation.
+Before: /opt/homebrew/bin/stripe, version 1.42.1.
+Command: HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1 brew upgrade stripe/stripe-cli/stripe
+Result: exit 0; upgraded only requested Stripe formula to 1.50.10.
+After: /opt/homebrew/bin/stripe, stripe version 1.50.10.
+Read-only live verification: stripe get /v1/payment_links/plink_1UCjsiJpvh3XLeRlvwQnSfDk --live
+Result: exit 1; "your live mode API key needs to be re-configured. Run `stripe login` to re-authenticate".
+Upgrade completed, but authenticated live operation is blocked after upgrade. No successful API verification claimed. A new owner login is required by the new CLI.
+No npm installation, credential-file inspection/edit, live account mutation, payout change or cleanup performed. Homebrew warned about unrelated untrusted taps; no trust settings changed by the operator.

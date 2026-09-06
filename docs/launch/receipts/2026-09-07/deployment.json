@@ -1,0 +1,25 @@
+{
+  "commit": "17cc80622e4ad5dfd4965f19b785b22fe88e64f9",
+  "files": [
+    "site/index.html",
+    "site/de/index.html",
+    "site/download.html",
+    "site/de/download.html",
+    "docs/SUPPORT.md"
+  ],
+  "status": "LIVE: all five publication files already included by concurrent owner commit; Pages succeeded and four live pages match local source.",
+  "push_exit_code": 1,
+  "remote_commit": "2a2db95290c8cb9d958e87ffa4afb1460a186169",
+  "remote_files_match_local": {
+    "site/index.html": true,
+    "site/de/index.html": true,
+    "site/download.html": true,
+    "site/de/download.html": true,
+    "docs/SUPPORT.md": true
+  },
+  "workflow_run_id": 34065952885,
+  "workflow_url": "https://github.com/subtract0/presstalk/actions/runs/34065952885",
+  "workflow_conclusion": "success",
+  "live_receipt": "storefront-live.json",
+  "verified_at_utc": "2026-09-06T23:10:15.428448+00:00"
+}

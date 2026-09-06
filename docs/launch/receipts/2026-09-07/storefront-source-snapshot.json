@@ -1,0 +1,64 @@
+{
+  "checked_at_utc": "2026-09-06T23:07:33.270246+00:00",
+  "pages": {
+    "index.html": {
+      "http_status": 200,
+      "sha256": "40cd067a0c9ca4a0ecacdf06cb340983e0626e67d51bd1dd8576aea064f45ced",
+      "checkout_link_present": false,
+      "pause_present": true,
+      "impressum_present": false,
+      "withdrawal_information_present": false,
+      "labelled_illustration": true
+    },
+    "de/index.html": {
+      "http_status": 200,
+      "sha256": "ef43726370bb2f6866b8a3767ef0879f83fdf973583290ba970c97850915b3e4",
+      "checkout_link_present": false,
+      "pause_present": true,
+      "impressum_present": false,
+      "withdrawal_information_present": false,
+      "labelled_illustration": true
+    },
+    "download.html": {
+      "http_status": 200,
+      "sha256": "cb38ede02431299500865718007574a0b4245506d28f85e3905ca058c309845f",
+      "checkout_link_present": false,
+      "pause_present": true,
+      "impressum_present": false,
+      "withdrawal_information_present": false,
+      "labelled_illustration": false
+    },
+    "de/download.html": {
+      "http_status": 200,
+      "sha256": "22511b702c80f08d23680989205acb39c2f70f73946176bd9c21800f15044d6c",
+      "checkout_link_present": false,
+      "pause_present": true,
+      "impressum_present": false,
+      "withdrawal_information_present": false,
+      "labelled_illustration": false
+    }
+  },
+  "release_source": {
+    "Sources/PressTalkCore/EntitlementPolicy.swift": {
+      "release_sha256": "4031cdaa94d1bc4f36a6ae3d19f060ef72850477d0ace61796f4660fc557a7ce",
+      "matches_current_tested_source": true
+    },
+    "Sources/PressTalkCore/PressTalkLicense.swift": {
+      "release_sha256": "9192aa13974ac1c9aa85cab1ab562528ddaef74ce01a539ce801a30de0c259c4",
+      "matches_current_tested_source": true
+    },
+    "Sources/PressTalkCore/TrialAnchor.swift": {
+      "release_sha256": "53f81c3c643b5d686247409a07d9dbb3ce8f13d53f72bd1fd1281c4c06b602dd",
+      "matches_current_tested_source": true
+    },
+    "Sources/JarvisTap/ProductUI.swift": {
+      "release_sha256": "caf3ffbb92381c57b5b7d563d22031bb7fc42f8d637ea9dae00466773d642a34",
+      "matches_current_tested_source": true
+    },
+    "Sources/JarvisTap/main.swift": {
+      "release_sha256": "c779bca23bbcf69740e3a247884d7a9b35d8a1df89008fd44e305cae12aefe94",
+      "matches_current_tested_source": true
+    }
+  },
+  "scope": "Snapshot obtained after a concurrent owner commit had already published the working-tree copy. This is not pre-change evidence."
+}

@@ -133,6 +133,20 @@ def main() -> int:
                 f"{path.relative_to(ROOT)}: quotes a dollar price on a German "
                 f"page, which is charged in euros\n        …{quote}…")
 
+    # The Impressum's service address cannot be written by anyone but the
+    # owner: section 5 DDG wants a ladungsfähige Anschrift, a real street
+    # address where post can be served. A placeholder shipped to production
+    # reads as a complete Impressum to everyone except a regulator.
+    imp = ROOT / "site" / "impressum.html"
+    if imp.exists():
+        text = imp.read_text(encoding="utf-8")
+        for marker in ("[Straße und Hausnummer]", "[PLZ Ort]", "[Stra"):
+            if marker in text:
+                failures.append(
+                    "site/impressum.html: service address is still a placeholder; "
+                    "an Impressum without a real postal address is not an Impressum")
+                break
+
     for f in failures:
         print(f"FAIL  {f}")
     print()

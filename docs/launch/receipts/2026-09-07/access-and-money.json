@@ -1,0 +1,26 @@
+{
+  "checked_at_utc": "2026-09-06T23:10:15.428814+00:00",
+  "read_only_stripe_checks": {
+    "live_mode": "HTTP 401 invalid API key",
+    "test_mode": "HTTP 401 api_key_expired",
+    "successful_transactions_verified": null,
+    "merchant_of_record_verified": false,
+    "balances_payouts_verified": false
+  },
+  "browser": "No backend available; agent.browsers.list returned empty",
+  "mailbox": "No authenticated read/send route designated or available in current tool set",
+  "business_disclosures": "No Impressum or withdrawal-information link found on fetched storefront; public provider details requested",
+  "new_discretionary_spend": {
+    "usd": 0
+  },
+  "paid_agent_execution_cost": null,
+  "customer_payments": null,
+  "retained_sales_contribution": null,
+  "cash_paid_out": null,
+  "owner_minutes_observed": 0,
+  "historical_owner_minutes_this_week": null,
+  "external_submissions_sent": 0,
+  "test_payments_made": 0,
+  "app_releases_made": 0,
+  "campaign_decision": "Pause promotion and spending pending A1-A4; fixed commercial gates unchanged."
+}

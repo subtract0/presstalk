@@ -1,0 +1,98 @@
+{
+  "checked_at": "2026-09-07T01:11:36.574844+02:00",
+  "machine": "studio1",
+  "pages": [
+    {
+      "url": "https://presstalk.app/",
+      "status": 200,
+      "sha256": "40cd067a0c9ca4a0ecacdf06cb340983e0626e67d51bd1dd8576aea064f45ced",
+      "pause_visible": true,
+      "stripe_links": [],
+      "support_links": [
+        "mailto:help@presstalk.app",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md"
+      ]
+    },
+    {
+      "url": "https://presstalk.app/de/index.html",
+      "status": 200,
+      "sha256": "ef43726370bb2f6866b8a3767ef0879f83fdf973583290ba970c97850915b3e4",
+      "pause_visible": true,
+      "stripe_links": [],
+      "support_links": [
+        "mailto:help@presstalk.app",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md"
+      ]
+    },
+    {
+      "url": "https://presstalk.app/download.html",
+      "status": 200,
+      "sha256": "cb38ede02431299500865718007574a0b4245506d28f85e3905ca058c309845f",
+      "pause_visible": true,
+      "stripe_links": [],
+      "support_links": [
+        "mailto:help@presstalk.app",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md"
+      ]
+    },
+    {
+      "url": "https://presstalk.app/de/download.html",
+      "status": 200,
+      "sha256": "22511b702c80f08d23680989205acb39c2f70f73946176bd9c21800f15044d6c",
+      "pause_visible": true,
+      "stripe_links": [],
+      "support_links": [
+        "mailto:help@presstalk.app",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md",
+        "https://github.com/subtract0/presstalk/blob/main/docs/SUPPORT.md"
+      ]
+    }
+  ],
+  "artifact_checks": [
+    {
+      "command": [
+        "codesign",
+        "--verify",
+        "--deep",
+        "--strict",
+        "/private/tmp/presstalk-customer-path-uykd1lej/unpacked/PressTalk.app"
+      ],
+      "returncode": 0,
+      "output": ""
+    },
+    {
+      "command": [
+        "spctl",
+        "--assess",
+        "--type",
+        "execute",
+        "--verbose=2",
+        "/private/tmp/presstalk-customer-path-uykd1lej/unpacked/PressTalk.app"
+      ],
+      "returncode": 0,
+      "output": "/private/tmp/presstalk-customer-path-uykd1lej/unpacked/PressTalk.app: accepted\nsource=Notarized Developer ID\n"
+    },
+    {
+      "command": [
+        "xcrun",
+        "stapler",
+        "validate",
+        "/private/tmp/presstalk-customer-path-uykd1lej/unpacked/PressTalk.app"
+      ],
+      "returncode": 0,
+      "output": "Processing: /private/tmp/presstalk-customer-path-uykd1lej/unpacked/PressTalk.app\nThe validate action worked!\n"
+    }
+  ],
+  "limitations": [
+    "Browser session blocked pending Chrome remote-debugging approval; HTTP checks are not rendered-browser checks.",
+    "No new Stripe credentials, transaction exports, mailbox designation, public seller details or clean-Mac evidence supplied. Prior Stripe 401 results were read from receipts, not retested.",
+    "No payment, licence email, app UI unlock, physical Fn insertion or clean first run tested.",
+    "Existing sales-loop processes were observed; no process stopped or background job created."
+  ],
+  "new_discretionary_spend_usd": 0,
+  "external_submissions_sent": 0,
+  "paid_agent_execution_cost": null
+}

@@ -1,0 +1,47 @@
+{
+  "checked_at_utc": "2026-09-06T23:09:33.897577+00:00",
+  "pages": {
+    "index.html": {
+      "url": "https://presstalk.app/index.html",
+      "http_status": 200,
+      "sha256": "40cd067a0c9ca4a0ecacdf06cb340983e0626e67d51bd1dd8576aea064f45ced",
+      "matches_local": true,
+      "purchase_pause_present": true,
+      "checkout_links_removed": true,
+      "support_link_present": true,
+      "download_route_present": true
+    },
+    "de/index.html": {
+      "url": "https://presstalk.app/de/index.html",
+      "http_status": 200,
+      "sha256": "ef43726370bb2f6866b8a3767ef0879f83fdf973583290ba970c97850915b3e4",
+      "matches_local": true,
+      "purchase_pause_present": true,
+      "checkout_links_removed": true,
+      "support_link_present": true,
+      "download_route_present": true
+    },
+    "download.html": {
+      "url": "https://presstalk.app/download.html",
+      "http_status": 200,
+      "sha256": "cb38ede02431299500865718007574a0b4245506d28f85e3905ca058c309845f",
+      "matches_local": true,
+      "purchase_pause_present": true,
+      "checkout_links_removed": true,
+      "support_link_present": true,
+      "download_route_present": true
+    },
+    "de/download.html": {
+      "url": "https://presstalk.app/de/download.html",
+      "http_status": 200,
+      "sha256": "22511b702c80f08d23680989205acb39c2f70f73946176bd9c21800f15044d6c",
+      "matches_local": true,
+      "purchase_pause_present": true,
+      "checkout_links_removed": true,
+      "support_link_present": true,
+      "download_route_present": true
+    }
+  },
+  "visual_browser_check": "unavailable: no browser backend",
+  "scope": "Website purchase pause only; shipped app and direct Stripe link not deactivated."
+}

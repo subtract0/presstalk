@@ -1,0 +1,2 @@
+Probe correction: used an integral-second issuedAt value for exact payload equality after JSON date encoding; the initial equality probe used subsecond precision. No app source changed.
+PASS: signing key matches public key embedded in downloaded 0.1.11; offline issue/verify covers future major versions; tampered payload rejected. Test licence held only in memory, not sold or sent. App UI unlocking and email delivery unverified.

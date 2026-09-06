@@ -102,6 +102,9 @@ live_line() { # file, pattern -> first line number where the pattern is code
   # This also blanks // inside a string literal such as a URL. No invariant
   # matches inside one; if one ever does it reads as absent, which is the safe
   # direction for a check that guards a crash.
+  # grep BRE: \( opens a group, so literal parentheses in a pattern are
+  # written plain. Getting that wrong makes a check silently find nothing,
+  # which reads as "the guard is missing" on a tree where it is present.
   sed 's|//.*||' "$1" | grep -n "$2" | head -1 | cut -d: -f1 || true
 }
 block_line="$(live_line "$main_swift" 'licenseStore\.shouldBlockDictation')"
@@ -127,7 +130,7 @@ fi
 # guards installTapOnBus, which raises an Objective-C exception Swift cannot
 # catch and which killed the app three times in six days. A cache that never
 # misses would turn that guard off without removing a single line.
-if [[ -z "$(live_line "$main_swift" 'Self\.audioInputPreflightFailure\(\)')" ]]; then
+if [[ -z "$(live_line "$main_swift" 'Self\.audioInputPreflightFailure()')" ]]; then
   report "Sources/JarvisTap/main.swift" \
     "the capture path must still be able to run audioInputPreflightFailure" \
     "a cache with no miss path silently disables the crash guard"
@@ -136,6 +139,26 @@ if [[ -z "$(live_line "$main_swift" 'audioPreflightCache\.record')" ]]; then
   report "Sources/JarvisTap/main.swift" \
     "preflight results must be recorded, or the cache never hits" \
     "every press would pay the 52 ms the cache exists to avoid"
+fi
+
+# The indicator must not claim the microphone is live before it is. On key-down
+# it showed the full listening light 168 ms before the engine started, which
+# taught the user to begin speaking into a dead microphone -- the clipped first
+# word was the indicator lying, not the recogniser failing. Key-down presents
+# .arming; .listening waits for the engine to report it started.
+arming_line="$(live_line "$main_swift" 'present(\.arming)')"
+if [[ -z "$arming_line" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "key-down must present .arming, not .listening" \
+    "a full listening light before the engine starts clips the first word"
+fi
+engine_started_line="$(live_line "$main_swift" 'Audio recording engine started mode=direct')"
+listening_after_engine="$(sed 's|//.*||' "$main_swift" | grep -n 'present(.listening(nil))' \
+  | awk -F: -v e="${engine_started_line:-0}" '$1 > e { print $1; exit }')"
+if [[ -n "$engine_started_line" && -z "$listening_after_engine" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "nothing presents .listening after the engine reports it started" \
+    "the indicator would stay dim for the whole dictation"
 fi
 
 echo

@@ -118,6 +118,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private enum PresentationState {
         case warming
         case ready
+        /// The key is down and the microphone is being brought up, but no
+        /// audio is being recorded yet. Shown dim, so the indicator stops
+        /// claiming something that is not true for another 130 ms.
+        case arming
         case listening(String?)
         case processing
         case inserted(String)
@@ -1027,6 +1031,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let uiState: (summary: String, detail: String, symbol: String, hudStyle: PressTalkHUDController.Style, autoHide: TimeInterval?)
 
         switch state {
+        case .arming:
+            // The key is down, the microphone is not live yet. Distinct from
+            // .listening on purpose: the old code showed "Listening" here and
+            // it was not true for another 130 ms.
+            uiState = (appDisplayTitle, "Getting ready…", "hourglass.circle.fill", .warming, nil)
         case .warming:
             uiState = (appDisplayTitle, "Warming up the local speech model…", "hourglass.circle.fill", .warming, nil)
         case .ready:
@@ -1103,6 +1112,27 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         switch state {
+        case .arming:
+            // Acknowledge the press immediately, but at reduced brightness.
+            // The full light used to appear on key-down, 168 ms before the
+            // engine was actually recording, which taught the user to start
+            // speaking into a microphone that was not live yet -- the first
+            // word was clipped because the indicator lied. Dim now, full when
+            // the engine reports it has started. Event-driven rather than a
+            // fixed delay, because the wait is 0.13 s at the median and has
+            // been measured at 2.3 s.
+            if activeTriggerUsesVoiceLight() {
+                traceLogger.log("HUD arming presentation=voice_light")
+                hudController?.showListeningLight(
+                    bands: currentLiveListeningLightBands(),
+                    alpha: Self.armingLightAlpha)
+            } else {
+                traceLogger.log("HUD arming presentation=card")
+                hudController?.show(
+                    title: appDisplayTitle,
+                    detail: "Getting ready…",
+                    style: .warming)
+            }
         case .listening(let partial):
             if activeTriggerUsesVoiceLight() {
                 traceLogger.log("HUD listening presentation=voice_light")
@@ -4461,6 +4491,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// rebuild an AVAudioEngine on every press. See AudioPreflightCache.
     private var audioPreflightCache = AudioPreflightCache()
 
+    /// Brightness of the indicator while the microphone is still coming up.
+    /// Visible enough to confirm the key registered, different enough that it
+    /// does not read as "speak now".
+    private static let armingLightAlpha: CGFloat = 0.35
+
     /// The default we displaced, so it can be put back. Nothing restored it
     /// before: dictating once with AirPods connected silently repointed the
     /// microphone for the whole Mac, permanently, and the user had no idea
@@ -6601,8 +6636,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if announce {
             traceLogger.log(triggerStartLogMessage(for: trigger))
-            present(.listening(nil))
-            print("🎤 [PressTalk] Listening... [trigger=\(trigger.rawValue)]")
+            present(.arming)
+            print("🎤 [PressTalk] Getting ready... [trigger=\(trigger.rawValue)]")
             fflush(stdout)
         } else {
             traceLogger.log("Trackpad prearm capture started")
@@ -6755,6 +6790,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 traceLogger.log(
                     "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", engineStartLatency)) session=\(captureSessionID)"
                 )
+                // The microphone is live now, so the indicator may finally say
+                // so. Guarded on the session still being the active one: a
+                // stale engine finishing its start after the key came up must
+                // not light up for a capture that has already ended.
+                if withStateLock({ isRecording && activeCaptureSessionID == captureSessionID }) {
+                    present(.listening(nil))
+                    print("🎤 [PressTalk] Listening... [trigger=\(trigger.rawValue)]")
+                    fflush(stdout)
+                }
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop()
                 } else if config.streamingTranscriptionEnabled, let whisperKit = self.whisperKit {

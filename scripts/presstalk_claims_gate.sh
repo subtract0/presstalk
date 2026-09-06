@@ -36,7 +36,20 @@ if [[ ${#TARGETS[@]} -eq 0 ]]; then
 fi
 
 # phrase|reason
+# Numbers that are real, are recorded in MEASUREMENTS.md, and are still the
+# wrong ones to print. The numeric check below cannot catch these -- it asks
+# whether a figure has a method, not whether it describes what a buyer gets --
+# and it said so in its own output while README.md quoted the retracted word
+# error rate for a full day. Found by an outside review reading the repository,
+# not by any check in it.
+#
+# 11.25% required forcing the quality fallback on, which a fresh install does
+# not do. 0.95 s and 1.45 s were fixture replays, superseded by 0.618 s and
+# 0.629 s measured on the shipping path.
 FORBIDDEN=(
+  "11.25|superseded: that WER required forcing the quality fallback on; the shipping default is 12.71%"
+  "0.95 s|superseded fixture-replay latency; the shipping path measures 0.618 s p50"
+  "1.45 s|superseded fixture-replay latency; the shipping path measures 0.629 s max"
   "fastest|no competitor comparison has been run"
   "the best |no competitor comparison has been run"
   "most accurate|no competitor comparison has been run"

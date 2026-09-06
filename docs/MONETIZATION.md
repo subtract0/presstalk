@@ -47,3 +47,38 @@ Two commitments the code enforces, not just documents:
 
 Commercial and team licensing are not designed yet. They need inbound demand
 first; see `PRESSTALK_DISTRIBUTION_ROADMAP_V1.md`.
+
+## VoiceInk, and what is actually left of the differentiation
+
+Surfaced 7 September 2026 by an outside review of this repository, not by
+anything in it. Worth writing down because it removes two things we had been
+treating as ours.
+
+[VoiceInk](https://tryvoiceink.com/) is a macOS dictation app that runs
+recognition locally and sells one-time: $25 solo, $39 for two devices, $49 for
+three, at a promotional 50% off. Its own words: "VoiceInk processes all voice
+transcription locally on your device. Your voice data never leaves your Mac."
+
+So neither **local processing** nor **buy it once** distinguishes PressTalk.
+Both were in our copy as though they did. Apple's built-in Dictation also
+processes on device in supported configurations, which removes the third.
+
+What survives, stated narrowly:
+
+- **A published German word error rate with the test set, the references and
+  the scorer.** VoiceInk's site does not mention German at all. This is a real
+  gap, but it is a gap in *their marketing* -- it is not evidence their engine
+  is worse, and nobody has run the comparison.
+- **Price.** €20 against $25 at their promotional rate, more against their list.
+- **The source is public.** Anyone can read what the app does rather than
+  believe a privacy page.
+
+Astra separately retracted the stronger form of this: publishing a benchmark is
+a practice a competitor can copy, and the overlap between our eval set and our
+repair lexicon limits what it establishes about unfamiliar speech. Credibility,
+not a moat.
+
+**Do not write copy that implies local-and-one-time is unusual.** It is the
+category now. If PressTalk wins it will be on German results a buyer can check
+against their own sentences, and that has not been demonstrated to a single
+stranger yet.

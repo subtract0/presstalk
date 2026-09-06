@@ -77,9 +77,15 @@ bash scripts/presstalk_e2e_harness.sh --fixture path/to/audio.wav --runs 10
 ## Measured
 
 144 German clips through the shipped pipeline end to end: 144/144 produced text,
-11.25% word error rate against written references, release-to-transcript 0.95 s
-at p50 and 1.45 s at p95 on an M4 Max. Recognition realtime factor 115× on M4
-Max, 62× on M1 Ultra, 57× on M1 Max.
+12.71% word error rate against written references in the configuration a buyer
+actually receives, release-to-transcript 0.618 s at p50 and 0.629 s at worst on
+an M4 Max. Recognition realtime factor 115× on M4 Max, 62× on M1 Ultra, 57× on
+M1 Max.
+
+Apple's own on-device engine scores 19.38% on the same clips with the same
+vocabulary pass, so PressTalk makes about a third fewer errors here. The test
+set, references and scorer are in `eval/de` -- re-run it rather than believing
+this paragraph.
 
 The audio is synthesised speech in three voices, so treat the error rate as a
 regression baseline rather than a claim about your voice. No comparison against

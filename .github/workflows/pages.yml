@@ -1,0 +1,58 @@
+name: Publish the site
+
+# The landing page had never been reachable by anyone: no Pages site, no
+# workflow, no homepage URL. A page nobody can open sells nothing, so this is
+# the first half of the sales surface actually existing.
+#
+# The gates run BEFORE the deploy and block it. A page that quotes a number
+# with no recorded method, or that fetches a font from Google, cannot reach
+# the public -- the check is a gate, not a report.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'site/**'
+      - 'docs/MEASUREMENTS.md'
+      - 'scripts/presstalk_claims_gate.sh'
+      - 'scripts/presstalk_site_privacy_gate.py'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Every number in customer-facing copy has a recorded method
+        run: ./scripts/presstalk_claims_gate.sh
+      - name: The page makes no automatic third-party request
+        run: python3 scripts/presstalk_site_privacy_gate.py
+      - name: The privacy gate still catches planted defects
+        # A gate is only worth running if it can fail. This proves it can,
+        # on the same runner that just reported the page clean.
+        run: python3 scripts/test_presstalk_site_privacy_gate.py
+
+  deploy:
+    needs: gate
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

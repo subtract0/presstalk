@@ -1,7 +1,12 @@
 # Support
 
-PressTalk is a one-person product. That means slower than a company, and it also
-means the person answering wrote the code.
+PressTalk is built by one developer. Support may be handled by the project's
+operator, who identifies their role when replying.
+
+New purchases are temporarily paused while payment and licence delivery are
+verified. Existing licences, included-update promises and the advertised
+14-day refund promise remain in force. If you have already paid and need a
+licence or refund, contact **help@presstalk.app**.
 
 ## Getting help
 
@@ -21,9 +26,13 @@ it is plain text.
 ## The problems people hit first
 
 **"PressTalk cannot be opened because the developer cannot be verified."**
-The build is not yet notarized by Apple. Right-click the app → Open → Open. You
-only do this once. This will stop being necessary once the app is signed with a
-Developer ID certificate.
+The public 0.1.11 release is signed with Alexander Monas's Developer ID and
+carries a stapled notarization ticket. macOS may still ask you to confirm that
+you want to open an app downloaded from the internet. A damaged-app or
+unverified-developer warning is different: check that you downloaded the current
+[official release](https://github.com/subtract0/presstalk/releases/tag/v0.1.11),
+and contact support with the exact message before proceeding. See
+[Apple's explanation of these prompts](https://support.apple.com/en-us/102445).
 
 **I hold the key and nothing happens.**
 Usually Input Monitoring. Open Settings from the menu bar and check the permission

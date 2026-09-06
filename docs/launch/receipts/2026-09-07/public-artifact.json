@@ -1,0 +1,39 @@
+{
+  "checked_at_utc": "2026-09-06T23:00:18.118012+00:00",
+  "url": "https://github.com/subtract0/presstalk/releases/download/v0.1.11/PressTalk-0.1.11-macos-arm64.zip",
+  "sha256": "be98339c8f8e35811bd529c00589a04bc57647de70afa14ec84f66aace91e6dd",
+  "published_sha256": "be98339c8f8e35811bd529c00589a04bc57647de70afa14ec84f66aace91e6dd",
+  "checksum_match": true,
+  "operator_downloads_added": 1,
+  "checks": {
+    "signature": {
+      "returncode": 0,
+      "output": ""
+    },
+    "authority": {
+      "returncode": 0,
+      "output": "Executable=[temporary artifact directory]/unpacked/PressTalk.app/Contents/MacOS/jarvistap\nIdentifier=com.am.presstalk\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=27740 flags=0x10000(runtime) hashes=856+7 location=embedded\nVersionPlatform=1\nVersionMin=917504\nVersionSDK=1705216\nHash type=sha256 size=32\nCandidateCDHash sha256=7e709a9cc91b34aa1b8e891064f8e51838411b5b\nCandidateCDHashFull sha256=7e709a9cc91b34aa1b8e891064f8e51838411b5ba89bcd858b21d88ac9a4aaaa\nHash choices=sha256\nCMSDigest=7e709a9cc91b34aa1b8e891064f8e51838411b5ba89bcd858b21d88ac9a4aaaa\nCMSDigestType=2\nExecutable Segment base=0\nExecutable Segment limit=6324224\nExecutable Segment flags=0x1\nPage size=16384\nCDHash=7e709a9cc91b34aa1b8e891064f8e51838411b5b\nSignature size=8979\nAuthority=Developer ID Application: Alexander Monas (5HUC5LA94B)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=6. Sep 2026 at 20:20:45\nNotarization Ticket=stapled\nInfo.plist entries=13\nTeamIdentifier=5HUC5LA94B\nRuntime Version=26.5.0\nSealed Resources version=2 rules=13 files=15\nInternal requirements count=1 size=176\n"
+    },
+    "gatekeeper": {
+      "returncode": 1,
+      "output": "[temporary artifact directory]/unpacked/PressTalk.app: internal error in Code Signing subsystem\n"
+    },
+    "stapled_ticket": {
+      "returncode": 66,
+      "output": "File [temporary artifact directory]/unpacked/PressTalk.app does not exist. Error Domain=NSCocoaErrorDomain Code=256 \"The file \u201cPressTalk.app\u201d couldn\u2019t be opened.\" UserInfo={NSURL=file://[temporary artifact directory]/unpacked/PressTalk.app/, NSFilePath=[temporary artifact directory]/unpacked/PressTalk.app, NSUnderlyingError=0xa9ad14480 {Error Domain=NSOSStatusErrorDomain Code=-10813 \"kLSDataUnavailableErr: E.g. no kind string\"}}\n"
+    },
+    "architecture": {
+      "returncode": 0,
+      "output": "[temporary artifact directory]/unpacked/PressTalk.app/Contents/MacOS/jarvistap: Mach-O 64-bit executable arm64\n"
+    }
+  },
+  "bundle": {
+    "CFBundleIdentifier": "com.am.presstalk",
+    "CFBundleShortVersionString": "0.1.11",
+    "LSMinimumSystemVersion": null,
+    "CFBundleExecutable": "jarvistap"
+  },
+  "limitations": [
+    "No GUI launch, fresh permissions, model setup, physical Fn insertion, payment, email or app unlocking tested."
+  ]
+}

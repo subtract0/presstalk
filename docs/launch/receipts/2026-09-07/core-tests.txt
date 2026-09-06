@@ -1,0 +1,111 @@
+Building for debugging...
+[0/7] Write sources
+[2/7] /private/tmp/presstalk-core-check-qn_dzkcv/.build/arm64-apple-macosx/debug/PressTalkCoreCheckPackageTests.derived/runner.swift
+[3/7] Write sources
+[4/7] Write swift-version--58304C5D6DBC2206.txt
+[6/11] Compiling PressTalkCore PressTalkLicense.swift
+[7/11] Compiling PressTalkCore TrialAnchor.swift
+[8/11] Compiling PressTalkCore EntitlementPolicy.swift
+[9/11] Emitting module PressTalkCore
+[10/15] Compiling PressTalkCoreTests EntitlementPolicyTests.swift
+[11/15] Compiling PressTalkCoreTests TrialAnchorTests.swift
+[12/15] Compiling PressTalkCoreTests PressTalkLicenseTests.swift
+[13/15] Emitting module PressTalkCoreTests
+[14/17] Compiling PressTalkCoreCheckPackageTests runner.swift
+[15/17] Emitting module PressTalkCoreCheckPackageTests
+[15/17] Write Objects.LinkFileList
+[16/17] Linking PressTalkCoreCheckPackageTests
+Build complete! (7.41s)
+Test Suite 'All tests' started at 2026-09-07 01:04:26.350.
+Test Suite 'PressTalkCoreCheckPackageTests.xctest' started at 2026-09-07 01:04:26.351.
+Test Suite 'EntitlementPolicyTests' started at 2026-09-07 01:04:26.351.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testANewInstallIsNotGrandfathered]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testANewInstallIsNotGrandfathered]' passed (0.002 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testANewInstallStartsWithAFullTrial]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testANewInstallStartsWithAFullTrial]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAnExistingUserIsNeverTurnedIntoAnExpiredTrial]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAnExistingUserIsNeverTurnedIntoAnExpiredTrial]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAnInstallCarryingOlderStatePredatesLicensing]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAnInstallCarryingOlderStatePredatesLicensing]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAVerifiedLicenceOutranksEverything]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testAVerifiedLicenceOutranksEverything]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testEveryStateReadsAsPlainEnglish]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testEveryStateReadsAsPlainEnglish]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testExistingUsersAreGrandfathered]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testExistingUsersAreGrandfathered]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheLastDayIsStillATrialDay]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheLastDayIsStillATrialDay]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheOfferIsBuyOnceAndSaysWhatItCovers]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheOfferIsBuyOnceAndSaysWhatItCovers]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheTrialCountsDownFromFirstDictation]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheTrialCountsDownFromFirstDictation]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheTrialExpires]' started.
+Test Case '-[PressTalkCoreTests.EntitlementPolicyTests testTheTrialExpires]' passed (0.000 seconds).
+Test Suite 'EntitlementPolicyTests' passed at 2026-09-07 01:04:26.355.
+	 Executed 11 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'PressTalkLicenseTests' started at 2026-09-07 01:04:26.355.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceCoversEarlierMajorVersions]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceCoversEarlierMajorVersions]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceDoesNotCoverALaterMajorVersion]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceDoesNotCoverALaterMajorVersion]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceForAnotherProductIsRejected]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testALicenceForAnotherProductIsRejected]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAnUnknownKeyIdIsRejectedBeforeAnythingElse]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAnUnknownKeyIdIsRejectedBeforeAnythingElse]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAnUnknownSchemaIsRejectedRatherThanGuessed]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAnUnknownSchemaIsRejectedRatherThanGuessed]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testASignatureFromAnotherKeyFails]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testASignatureFromAnotherKeyFails]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testATamperedPayloadFails]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testATamperedPayloadFails]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAValidLicenceRoundTrips]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testAValidLicenceRoundTrips]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testEveryErrorExplainsItselfWithoutJargon]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testEveryErrorExplainsItselfWithoutJargon]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testGarbageIsRejectedWithoutCrashing]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testGarbageIsRejectedWithoutCrashing]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testOversizedInputIsRejectedOnLengthAlone]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testOversizedInputIsRejectedOnLengthAlone]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testSurroundingWhitespaceIsForgiven]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testSurroundingWhitespaceIsForgiven]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testTheEnvelopeKeyIdCannotBeSwapped]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testTheEnvelopeKeyIdCannotBeSwapped]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testThePayloadCarriesNoPersonalData]' started.
+Test Case '-[PressTalkCoreTests.PressTalkLicenseTests testThePayloadCarriesNoPersonalData]' passed (0.000 seconds).
+Test Suite 'PressTalkLicenseTests' passed at 2026-09-07 01:04:26.358.
+	 Executed 14 tests, with 0 failures (0 unexpected) in 0.003 (0.003) seconds
+Test Suite 'TrialAnchorTests' started at 2026-09-07 01:04:26.358.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAFirstRunHealsNothing]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAFirstRunHealsNothing]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAnEmptiedStoreIsHealedFromTheSurvivor]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAnEmptiedStoreIsHealedFromTheSurvivor]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAnUnreadableStoreMakesTheReadingUntrustworthy]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAnUnreadableStoreMakesTheReadingUntrustworthy]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAVerifiedLicenceBeatsAnExpiredAnchor]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testAVerifiedLicenceBeatsAnExpiredAnchor]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testDeletingOneStoreDoesNotRestartTheTrial]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testDeletingOneStoreDoesNotRestartTheTrial]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testEarliestDateWinsRegardlessOfOrder]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testEarliestDateWinsRegardlessOfOrder]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testExpiryIsNeverEnforcedOnAnUntrustworthyReading]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testExpiryIsNeverEnforcedOnAnUntrustworthyReading]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testNoStoreHoldingADateIsAFirstRunNotAnExpiry]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testNoStoreHoldingADateIsAFirstRunNotAnExpiry]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testPriorUseBeatsAnExpiredAnchor]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testPriorUseBeatsAnExpiredAnchor]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testThreeDayTrialExpiresOnTheFourthDay]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testThreeDayTrialExpiresOnTheFourthDay]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testUnavailableIsNotTreatedAsAbsent]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testUnavailableIsNotTreatedAsAbsent]' passed (0.000 seconds).
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testUnreadableStoresAreNeverHealed]' started.
+Test Case '-[PressTalkCoreTests.TrialAnchorTests testUnreadableStoresAreNeverHealed]' passed (0.000 seconds).
+Test Suite 'TrialAnchorTests' passed at 2026-09-07 01:04:26.359.
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.001 (0.001) seconds
+Test Suite 'PressTalkCoreCheckPackageTests.xctest' passed at 2026-09-07 01:04:26.359.
+	 Executed 37 tests, with 0 failures (0 unexpected) in 0.006 (0.008) seconds
+Test Suite 'All tests' passed at 2026-09-07 01:04:26.359.
+	 Executed 37 tests, with 0 failures (0 unexpected) in 0.006 (0.009) seconds
+◇ Test run started.
+↳ Testing Library Version: 1902
+↳ Target Platform: arm64e-apple-macos14.0
+✔ Test run with 0 tests in 0 suites passed after 0.001 seconds.

@@ -354,6 +354,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         appendLiveCapturedAudioSamples(samples)
     }
 
+    private func liveCapturedAudioSampleCount() -> Int {
+        audioCaptureLock.lock()
+        defer { audioCaptureLock.unlock() }
+        return liveCapturedAudioSamples.count
+    }
+
     private func currentLiveCapturedAudioSamples() -> [Float] {
         audioCaptureLock.lock()
         let samples = liveCapturedAudioSamples
@@ -4417,6 +4423,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// only when the user explicitly asked for a device macOS is not using.
     private var audioInputPromotionAllowed = false
 
+    /// How long the audio engine took to start, so the release tail can tell
+    /// audio that is late from audio that is missing.
+    private var activeEngineStartLatencySeconds: Double = 0
+
     /// The default we displaced, so it can be put back. Nothing restored it
     /// before: dictating once with AirPods connected silently repointed the
     /// microphone for the whole Mac, permanently, and the user had no idea
@@ -4876,48 +4886,53 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return fresh
     }
 
-    private func captureSilenceAwareReleaseTail(captureKit: WhisperKit?) async {
+    private func captureSilenceAwareReleaseTail(
+        captureKit: WhisperKit?,
+        heldSeconds: Double,
+        engineStartLatencySeconds: Double
+    ) async {
         let maximumTailSeconds = max(0.15, settingsStore.releaseTailMaxSeconds)
-        let minimumTailSeconds = min(0.10, maximumTailSeconds)
-        let silenceWindowSeconds = min(0.10, maximumTailSeconds)
-        let silenceRMSThreshold = 0.011
         let pollNanoseconds: UInt64 = 25_000_000
+        // How much audio should exist by the moment the key came up. Anything
+        // short of this is still travelling through the tap, not missing.
+        let expectedAtRelease = max(0, heldSeconds - engineStartLatencySeconds)
 
         traceLogger.log(
-            "Applying silence-aware release tail min_seconds=\(String(format: "%.2f", minimumTailSeconds)) max_seconds=\(String(format: "%.2f", maximumTailSeconds)) silence_window_seconds=\(String(format: "%.2f", silenceWindowSeconds)) silence_rms=\(String(format: "%.4f", silenceRMSThreshold))"
-        )
+            "Applying release tail max_seconds=\(String(format: "%.2f", maximumTailSeconds)) "
+            + "expected_at_release_seconds=\(String(format: "%.2f", expectedAtRelease)) "
+            + "held_seconds=\(String(format: "%.2f", heldSeconds)) "
+            + "engine_start_seconds=\(String(format: "%.3f", engineStartLatencySeconds))")
 
         let start = Date()
-        var lastMeasuredRMS = 0.0
+        var lastCapturedCount = liveCapturedAudioSampleCount()
+        var decision = ReleaseTailPolicy.Decision.keepWaiting(reason: "below_minimum")
 
-        while Date().timeIntervalSince(start) < maximumTailSeconds {
+        while true {
             try? await Task.sleep(nanoseconds: pollNanoseconds)
-
-            let elapsed = Date().timeIntervalSince(start)
-            guard elapsed >= minimumTailSeconds else { continue }
             guard captureKit != nil else { break }
 
-            let requiredSamples = Int(Double(WhisperKit.sampleRate) * silenceWindowSeconds)
-            let recentSamples = recentLiveCapturedAudioSamples(maxCount: requiredSamples)
-            let stats = audioLevelStats(for: recentSamples)
-            lastMeasuredRMS = stats.rms
+            let capturedCount = liveCapturedAudioSampleCount()
+            let grew = capturedCount > lastCapturedCount
+            lastCapturedCount = capturedCount
 
-            if !recentSamples.isEmpty, stats.rms <= silenceRMSThreshold {
-                traceLogger.log(
-                    "Release tail silence detected elapsed_seconds=\(String(format: "%.2f", elapsed)) recent_rms=\(String(format: "%.5f", stats.rms))"
-                )
-                break
-            }
+            let requiredSamples = Int(Double(WhisperKit.sampleRate)
+                * ReleaseTailPolicy.minimumSeconds)
+            let recent = recentLiveCapturedAudioSamples(maxCount: requiredSamples)
+
+            decision = ReleaseTailPolicy.decide(
+                .init(elapsedSeconds: Date().timeIntervalSince(start),
+                      capturedSeconds: Double(capturedCount) / Double(WhisperKit.sampleRate),
+                      expectedAtReleaseSeconds: expectedAtRelease,
+                      recentRMS: recent.isEmpty ? 1.0 : audioLevelStats(for: recent).rms,
+                      capturedGrewSinceLastPoll: grew),
+                maximumSeconds: maximumTailSeconds)
+            if decision.shouldStop { break }
         }
 
-        let elapsed = Date().timeIntervalSince(start)
-        if elapsed >= maximumTailSeconds {
-            traceLogger.log(
-                "Release tail hit max_seconds=\(String(format: "%.2f", maximumTailSeconds)) last_recent_rms=\(String(format: "%.5f", lastMeasuredRMS))"
-            )
-        }
-
-        traceLogger.log("Stopping live audio recording after release tail")
+        traceLogger.log(
+            "Release tail finished reason=\(decision.reason) "
+            + "elapsed_seconds=\(String(format: "%.2f", Date().timeIntervalSince(start))) "
+            + "captured_seconds=\(String(format: "%.2f", Double(liveCapturedAudioSampleCount()) / Double(WhisperKit.sampleRate)))")
         safelyStopLiveAudioRecording(captureKit: captureKit, reason: "release_tail")
     }
 
@@ -6672,8 +6687,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     safelyStopLiveAudioRecording(captureKit: captureKit, reason: "stale_capture_start")
                     return
                 }
+                let engineStartLatency = Date().timeIntervalSince(audioStartRequestedAt)
+                withStateLock { activeEngineStartLatencySeconds = engineStartLatency }
                 traceLogger.log(
-                    "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", Date().timeIntervalSince(audioStartRequestedAt))) session=\(captureSessionID)"
+                    "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", engineStartLatency)) session=\(captureSessionID)"
                 )
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop()
@@ -6803,7 +6820,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let normalizedSamples: [Float]
             let capturedSignalStats: (rms: Double, peak: Double)
             let frozenAudioDurationSeconds: Double
-            await captureSilenceAwareReleaseTail(captureKit: captureKit)
+            await captureSilenceAwareReleaseTail(
+                captureKit: captureKit,
+                heldSeconds: captureDurationSeconds,
+                engineStartLatencySeconds: withStateLock { activeEngineStartLatencySeconds })
             if let streamTaskToStop {
                 if config.streamingTranscriptionEnabled {
                     // Do NOT block the paste on stream teardown.

@@ -5,7 +5,7 @@ means the person answering wrote the code.
 
 ## Getting help
 
-Email **petition@alexmonas.com** with:
+Email **help@presstalk.app** with:
 
 1. Your Mac model and macOS version (Apple menu → About This Mac)
 2. How you installed: Homebrew or direct download

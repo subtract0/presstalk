@@ -1,0 +1,1 @@
+Ich habe das über Amazon Pay und Apple Pay abgewickelt, nicht über Stripe.

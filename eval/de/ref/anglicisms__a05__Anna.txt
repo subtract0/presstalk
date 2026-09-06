@@ -1,0 +1,1 @@
+Wir tracken die Latenz und loggen die Fehler im Dashboard.

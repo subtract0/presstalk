@@ -1,0 +1,48 @@
+brands	b01	Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.
+brands	b02	Wir versenden mit DHL, DPD und Hermes, Abholung ist auch möglich.
+brands	b03	Ich habe das über Amazon Pay und Apple Pay abgewickelt, nicht über Stripe.
+brands	b04	Der Termin steht in Google Calendar, die Notiz liegt in Notion.
+brands	b05	Bitte überweise den Betrag per SEPA-Lastschrift oder Sofortüberweisung.
+brands	b06	Wir nutzen Shopify für den Shop und Lexoffice für die Buchhaltung.
+compounds	c01	Kauf auf Rechnung ist für nicht private Personen auf Anfrage möglich.
+compounds	c02	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+compounds	c03	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+compounds	c04	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+compounds	c05	Die Arbeitsunfähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+compounds	c06	Wir brauchen eine Datenschutzgrundverordnung-konforme Einwilligungserklärung.
+anglicisms	a01	Ich deploye das Repository auf den Server und merge den Branch danach.
+anglicisms	a02	Der Prompt ist zu lang, wir müssen den Context Window Limit beachten.
+anglicisms	a03	Bitte review den Pull Request und schreib mir ein kurzes Feedback.
+anglicisms	a04	Das Feature ist im Backlog, aber das Ticket hat keine Priority.
+anglicisms	a05	Wir tracken die Latenz und loggen die Fehler im Dashboard.
+anglicisms	a06	Der Call ist um drei, danach machen wir das Standup und das Retro.
+numbers	n01	Die Rechnung über zweitausendvierhundert Euro ist am fünfzehnten März fällig.
+numbers	n02	Wir starten um neun Uhr dreißig und enden um sechzehn Uhr fünfundvierzig.
+numbers	n03	Der Umsatz stieg um dreiundzwanzig Komma sieben Prozent im dritten Quartal.
+numbers	n04	Meine Nummer ist null eins fünf eins, zwei drei vier fünf sechs sieben.
+numbers	n05	Das Angebot gilt bis zum einunddreißigsten Dezember zweitausendsechsundzwanzig.
+numbers	n06	Bitte überweise eintausendneunhundertneunundneunzig Euro und fünfzig Cent.
+umlauts	u01	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+umlauts	u02	Wir müssen die Verträge ändern, größere Änderungen sind nötig.
+umlauts	u03	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+umlauts	u04	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+umlauts	u05	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+umlauts	u06	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+names	p01	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+names	p02	Die Konferenz findet in Mönchengladbach statt, nicht in Oberammergau.
+names	p03	Alexander Monas schreibt aus Köln an das Büro in Düsseldorf.
+names	p04	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+names	p05	Frau Dr. Yılmaz und Herr Kowalczyk sitzen im Beirat.
+names	p06	Das Treffen ist im Hotel Vier Jahreszeiten am Marienplatz.
+coaching	k01	Okayness heißt, dass du dich nicht ständig reparieren musst.
+coaching	k02	Viele Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+coaching	k03	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+coaching	k04	Wir arbeiten mit dem inneren Kritiker, nicht gegen ihn.
+coaching	k05	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+coaching	k06	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+dictation	d01	Notiz an mich selbst: morgen früh den Vertrag gegenlesen und unterschreiben.
+dictation	d02	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+dictation	d03	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+dictation	d04	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+dictation	d05	Kurze Zusammenfassung: das Modell ist schneller, aber die Genauigkeit fehlt noch.
+dictation	d06	Frage an das Team: können wir den Release auf nächste Woche verschieben?

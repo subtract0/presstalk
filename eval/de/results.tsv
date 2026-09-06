@@ -1,0 +1,433 @@
+backend	category	id	voice	wer	cer	rtfx	transcript
+parakeet-v3-ane	anglicisms	a01	Anna	25.00	8.70	49.51	Ich deckleue das Repository auf den Server und merke den Brunch danach.
+parakeet-v3-ane	anglicisms	a01	Rocko	25.00	5.80	55.01	Ich deplohe das Repository auf den Server und merke den Brosch danach.
+parakeet-v3-ane	anglicisms	a01	Sandy	33.33	17.39	57.09	Ich gebe das Repository auf den Server und merke den Broschann nach.
+parakeet-v3-ane	anglicisms	a02	Anna	8.33	1.49	50.73	Der Prompt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-ane	anglicisms	a02	Rocko	16.67	7.46	56.14	Der Punkt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-ane	anglicisms	a02	Sandy	16.67	7.46	55.82	Der Punkt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-ane	anglicisms	a03	Anna	0.00	0.00	45.55	Bitte review den Pull Request und schreib mir ein kurzes Feedback.
+parakeet-v3-ane	anglicisms	a03	Rocko	27.27	10.77	51.59	Bitte reviv den Pool Request und schreib mir ein kurzes Fehlpack.
+parakeet-v3-ane	anglicisms	a03	Sandy	0.00	0.00	52.06	Bitte review den Pull Request und schreib mir ein kurzes Feedback.
+parakeet-v3-ane	anglicisms	a04	Anna	9.09	3.28	48.70	Das Feature ist im Backlog, aber das Ticket hat keine Priorität.
+parakeet-v3-ane	anglicisms	a04	Rocko	90.91	34.43	51.56	Dust say a tourist imbacklock, aber dust take it at keino priority.
+parakeet-v3-ane	anglicisms	a04	Sandy	18.18	9.84	52.51	Das Seatura ist im Backgrock, aber das Ticket hat keine Priority.
+parakeet-v3-ane	anglicisms	a05	Anna	10.00	1.75	38.44	Wir trecken die Latenz und loggen die Fehler im Dashboard.
+parakeet-v3-ane	anglicisms	a05	Rocko	20.00	12.28	47.46	Wir tracken die Latenz und loggen die Fähre im Daschpoort.
+parakeet-v3-ane	anglicisms	a05	Sandy	10.00	3.51	47.93	Wir tragen die Latenz und loggen die Fehler im Dashboard.
+parakeet-v3-ane	anglicisms	a06	Anna	23.08	7.81	47.79	Der Call ist um 3, danach machen wir das Stand-up und das Retro.
+parakeet-v3-ane	anglicisms	a06	Rocko	46.15	14.06	55.18	Der Kall ist U3, danach machen wir das Stand Up und das Reto.
+parakeet-v3-ane	anglicisms	a06	Sandy	38.46	17.19	54.80	Der Karl ist um 3, danach machen wir das Standhub und das E-To.
+parakeet-v3-ane	brands	b01	Anna	25.00	9.26	49.22	Die Zahlungsarten sind Klarner, Pelpel, Visa und Vorkasse.
+parakeet-v3-ane	brands	b01	Rocko	12.50	3.70	55.01	Die Zahlungsarten sind Plana, Paypal, Visa und Vorkasse.
+parakeet-v3-ane	brands	b01	Sandy	25.00	5.56	53.52	Die Zahlungsarten sind Plana, Paypal, Wisa und Vorkasse.
+parakeet-v3-ane	brands	b02	Anna	0.00	0.00	56.95	Wir versenden mit DHL, dpd und Hermes, Abholung ist auch möglich.
+parakeet-v3-ane	brands	b02	Rocko	9.09	1.61	65.80	Wir versenden mit DAL, DPD und Hermes, Abholung ist auch möglich.
+parakeet-v3-ane	brands	b02	Sandy	0.00	0.00	66.95	Wir versenden mit DHL, DPD und Hermes, Abholung ist auch möglich.
+parakeet-v3-ane	brands	b03	Anna	23.08	6.94	54.52	Ich habe das über Amazon P und Apple P abgewickelt, nicht über Striple.
+parakeet-v3-ane	brands	b03	Rocko	23.08	8.33	60.67	Ich habe das über Amazon Pi und Apple Pi abgewickelt, nicht über Strebe.
+parakeet-v3-ane	brands	b03	Sandy	38.46	12.50	58.81	Ich habe das eben Amazon Pi und Apple Pi abgewickelt, nicht eben Strepe.
+parakeet-v3-ane	brands	b04	Anna	9.09	1.64	51.47	Der Termin steht in Google Kalendar, die Notiz liegt in Notion.
+parakeet-v3-ane	brands	b04	Rocko	27.27	9.84	55.63	Der Termin steht in Rodre Kalendar, die Notiz liegt in Motion.
+parakeet-v3-ane	brands	b04	Sandy	18.18	8.20	55.37	Der Termin steht in Dodre Kalendar, die Notiz liegt in Notion.
+parakeet-v3-ane	brands	b05	Anna	44.44	8.57	52.28	Bitte überweise den Betrag PASEPA-Lastschrift oder Sort Überweisung.
+parakeet-v3-ane	brands	b05	Rocko	55.56	7.14	56.70	Bitte überweise den Betrag der Se-Palastschrift oder Sfort Überweisung.
+parakeet-v3-ane	brands	b05	Sandy	55.56	8.57	58.40	Bitte überweise den Betrag der Seepalastschrift oder Sort Überweisung.
+parakeet-v3-ane	brands	b06	Anna	27.27	9.23	46.37	Wir nutzen Schopifi für den Schock und Lexoffie für die Buchhaltung.
+parakeet-v3-ane	brands	b06	Rocko	27.27	13.85	53.96	Wir nutzen Schobifi für den Schob und Lexophizie für die Buchhaltung.
+parakeet-v3-ane	brands	b06	Sandy	27.27	12.31	49.68	Wir nutzen Schobi-Fee für den Schub und Lexoffice für die Buchhaltung.
+parakeet-v3-ane	coaching	k01	Anna	22.22	8.47	42.99	Oh keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-ane	coaching	k01	Rocko	11.11	6.78	47.09	Keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-ane	coaching	k01	Sandy	11.11	6.78	46.74	Keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-ane	coaching	k02	Anna	0.00	0.00	45.96	Viele Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+parakeet-v3-ane	coaching	k02	Rocko	16.67	6.45	50.70	Faire Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+parakeet-v3-ane	coaching	k02	Sandy	33.33	4.84	51.25	Viele Klinden verwechseln Selbstoptimierung mit Selstannahme.
+parakeet-v3-ane	coaching	k03	Anna	0.00	0.00	52.44	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-ane	coaching	k03	Rocko	0.00	0.00	54.93	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-ane	coaching	k03	Sandy	0.00	0.00	55.46	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-ane	coaching	k04	Anna	0.00	0.00	42.11	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-ane	coaching	k04	Rocko	0.00	0.00	45.55	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-ane	coaching	k04	Sandy	0.00	0.00	48.28	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-ane	coaching	k05	Anna	0.00	0.00	54.56	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-ane	coaching	k05	Rocko	0.00	0.00	56.91	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-ane	coaching	k05	Sandy	0.00	0.00	56.76	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-ane	coaching	k06	Anna	0.00	0.00	60.74	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-ane	coaching	k06	Rocko	0.00	0.00	63.79	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-ane	coaching	k06	Sandy	0.00	0.00	64.71	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-ane	compounds	c01	Anna	27.27	2.94	50.79	Kaufaufrechnung ist für nicht-private Personen auf Anfrage möglich.
+parakeet-v3-ane	compounds	c01	Rocko	54.55	5.88	54.67	Kaufaufrechnung ist für nicht private Personenaufanfrage möglich.
+parakeet-v3-ane	compounds	c01	Sandy	54.55	5.88	52.98	Kaufaufrechnung ist für nicht private Personenaufanfrage möglich.
+parakeet-v3-ane	compounds	c02	Anna	0.00	0.00	59.11	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-ane	compounds	c02	Rocko	0.00	0.00	62.86	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-ane	compounds	c02	Sandy	0.00	0.00	60.35	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-ane	compounds	c03	Anna	0.00	0.00	54.18	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-ane	compounds	c03	Rocko	0.00	0.00	57.74	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-ane	compounds	c03	Sandy	0.00	0.00	58.31	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-ane	compounds	c04	Anna	0.00	0.00	47.67	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-ane	compounds	c04	Rocko	0.00	0.00	54.09	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-ane	compounds	c04	Sandy	0.00	0.00	54.36	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-ane	compounds	c05	Anna	0.00	0.00	54.31	Die Arbeitsunfähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-ane	compounds	c05	Rocko	42.86	4.17	56.14	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-ane	compounds	c05	Sandy	42.86	4.17	55.35	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-ane	compounds	c06	Anna	0.00	0.00	55.39	Wir brauchen eine datenschutzgrundverordnung Konforme Einwilligungserklärung.
+parakeet-v3-ane	compounds	c06	Rocko	0.00	0.00	59.32	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+parakeet-v3-ane	compounds	c06	Sandy	0.00	0.00	60.06	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+parakeet-v3-ane	dictation	d01	Anna	0.00	0.00	56.28	Notiz an mich selbst, morgen früh den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-ane	dictation	d01	Rocko	9.09	2.70	64.52	Notiz an mich selbst. Morgen für den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-ane	dictation	d01	Sandy	0.00	0.00	63.95	Notiz an mich selbst. Morgen früh den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-ane	dictation	d02	Anna	0.00	0.00	51.12	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-ane	dictation	d02	Rocko	0.00	0.00	56.05	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-ane	dictation	d02	Sandy	0.00	0.00	55.32	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-ane	dictation	d03	Anna	0.00	0.00	53.06	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-ane	dictation	d03	Rocko	0.00	0.00	59.36	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-ane	dictation	d03	Sandy	0.00	0.00	60.44	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-ane	dictation	d04	Anna	0.00	0.00	60.09	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-ane	dictation	d04	Rocko	0.00	0.00	59.81	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-ane	dictation	d04	Sandy	0.00	0.00	64.83	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-ane	dictation	d05	Anna	0.00	0.00	58.27	Kurze Zusammenfassung: Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-ane	dictation	d05	Rocko	0.00	0.00	63.17	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-ane	dictation	d05	Sandy	0.00	0.00	60.06	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-ane	dictation	d06	Anna	0.00	0.00	51.27	Frage an das Team, können wir den Release auf nächste Woche verschieben?
+parakeet-v3-ane	dictation	d06	Rocko	8.33	2.86	61.05	Frage an das Team: Können wir den Eliase auf nächste Woche verschieben?
+parakeet-v3-ane	dictation	d06	Sandy	8.33	7.14	59.67	Frage an das Team: Können wir den Brilliage auf nächste Woche verschieben?
+parakeet-v3-ane	names	p01	Anna	0.00	0.00	47.00	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+parakeet-v3-ane	names	p01	Rocko	11.11	1.54	51.36	Herr Müller aus Kaiserslautern trifft Frau Schöder in Regensburg.
+parakeet-v3-ane	names	p01	Sandy	11.11	1.54	50.02	Herr Müller aus Kaiserslautern trifft Frau Schöder in Regensburg.
+parakeet-v3-ane	names	p02	Anna	11.11	1.49	48.24	Die Konferenz findet in Münchengladbach statt, nicht in Oberammergau.
+parakeet-v3-ane	names	p02	Rocko	22.22	10.45	53.39	Die Konferenz findet in Münchengleichbach statt, nicht in Oberauergau.
+parakeet-v3-ane	names	p02	Sandy	22.22	4.48	54.38	Die Konferenz findet in Münchengladbach statt, nicht in Oberauergau.
+parakeet-v3-ane	names	p03	Anna	0.00	0.00	46.76	Alexander Monas schreibt aus Köln an das Büro in Düsseldorf.
+parakeet-v3-ane	names	p03	Rocko	50.00	16.95	47.65	Alexander Womaschreibt aus Köln und das BO in Dissendorf.
+parakeet-v3-ane	names	p03	Sandy	10.00	5.08	47.99	Alexander Woners schreibt aus Köln an das Büro in Düsseldorf.
+parakeet-v3-ane	names	p04	Anna	0.00	0.00	46.04	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-ane	names	p04	Rocko	10.00	2.99	53.75	Wir fahren von Saulbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-ane	names	p04	Sandy	0.00	0.00	54.11	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-ane	names	p05	Anna	22.22	16.00	41.79	Frau Dr., Jilmas und Herr Kowaldschick sitzen im Beirat.
+parakeet-v3-ane	names	p05	Rocko	33.33	14.00	53.07	Frau Dr. Y Marx und Herr Kowalzög sitzen im Beirat.
+parakeet-v3-ane	names	p05	Sandy	33.33	14.00	53.85	Frau Dr. Y Marx und Herr Kowalzig sitzen im Beirat.
+parakeet-v3-ane	names	p06	Anna	11.11	7.02	46.02	Das Treffen ist im Hotel 4 Jahreszeiten am Marienplatz.
+parakeet-v3-ane	names	p06	Rocko	0.00	0.00	50.02	Das Treffen ist im Hotel vier Jahreszeiten am Marienplatz.
+parakeet-v3-ane	names	p06	Sandy	0.00	0.00	50.60	Das Treffen ist im Hotel vier Jahreszeiten am Marienplatz.
+parakeet-v3-ane	numbers	n01	Anna	20.00	43.42	57.52	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-ane	numbers	n01	Rocko	20.00	43.42	63.39	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-ane	numbers	n01	Sandy	20.00	43.42	62.42	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-ane	numbers	n02	Anna	50.00	49.32	55.20	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-ane	numbers	n02	Rocko	50.00	49.32	57.81	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-ane	numbers	n02	Sandy	50.00	49.32	58.23	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-ane	numbers	n03	Anna	36.36	45.95	51.48	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-ane	numbers	n03	Rocko	36.36	45.95	63.59	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-ane	numbers	n03	Sandy	36.36	45.95	63.45	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-ane	numbers	n04	Anna	76.92	73.91	52.41	Meine Nummer ist 0151 234567.
+parakeet-v3-ane	numbers	n04	Rocko	76.92	73.91	59.51	Meine Nummer ist 0151 234567.
+parakeet-v3-ane	numbers	n04	Sandy	76.92	73.91	58.48	Meine Nummer ist 0151 234567.
+parakeet-v3-ane	numbers	n05	Anna	25.00	55.70	63.50	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-ane	numbers	n05	Rocko	25.00	55.70	67.33	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-ane	numbers	n05	Sandy	25.00	55.70	67.24	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-ane	numbers	n06	Anna	71.43	71.23	58.85	Bitte überweise 1999,50 Euro.
+parakeet-v3-ane	numbers	n06	Rocko	57.14	69.86	65.40	Bitte überweise 1999,50 Cent.
+parakeet-v3-ane	numbers	n06	Sandy	71.43	71.23	63.50	Bitte überweise 1999,50 Euro.
+parakeet-v3-ane	umlauts	u01	Anna	0.00	0.00	45.71	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+parakeet-v3-ane	umlauts	u01	Rocko	10.00	5.80	51.05	Die Geschäftsführerin überprüft die Kürse der Räume für die Übergabe.
+parakeet-v3-ane	umlauts	u01	Sandy	0.00	0.00	50.86	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+parakeet-v3-ane	umlauts	u02	Anna	0.00	0.00	48.26	Wir müssen die Verträge ändern, größere Änderungen sind nötig.
+parakeet-v3-ane	umlauts	u02	Rocko	100.00	100.00	57.89	
+parakeet-v3-ane	umlauts	u02	Sandy	11.11	6.56	51.17	Wir müssen die Verträge ändern, Kursere Änderungen sind nötig.
+parakeet-v3-ane	umlauts	u03	Anna	0.00	0.00	44.96	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-ane	umlauts	u03	Rocko	0.00	0.00	52.38	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-ane	umlauts	u03	Sandy	0.00	0.00	52.82	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-ane	umlauts	u04	Anna	0.00	0.00	47.61	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-ane	umlauts	u04	Rocko	10.00	4.92	51.72	Süße Köße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-ane	umlauts	u04	Sandy	0.00	0.00	51.88	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-ane	umlauts	u05	Anna	0.00	0.00	44.02	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+parakeet-v3-ane	umlauts	u05	Rocko	0.00	0.00	49.35	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+parakeet-v3-ane	umlauts	u05	Sandy	0.00	0.00	48.98	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+parakeet-v3-ane	umlauts	u06	Anna	0.00	0.00	45.24	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+parakeet-v3-ane	umlauts	u06	Rocko	0.00	0.00	51.00	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+parakeet-v3-ane	umlauts	u06	Sandy	0.00	0.00	52.50	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+parakeet-v3-gpu	anglicisms	a01	Anna	25.00	8.70	20.16	Ich deckleue das Repository auf den Server und merke den Brunch danach.
+parakeet-v3-gpu	anglicisms	a01	Rocko	25.00	5.80	22.25	Ich deplohe das Repository auf den Server und merke den Brosch danach.
+parakeet-v3-gpu	anglicisms	a01	Sandy	33.33	17.39	22.91	Ich gebe das Repository auf den Server und merke den Broschann nach.
+parakeet-v3-gpu	anglicisms	a02	Anna	8.33	1.49	19.74	Der Prompt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-gpu	anglicisms	a02	Rocko	16.67	7.46	23.94	Der Punkt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-gpu	anglicisms	a02	Sandy	16.67	7.46	22.97	Der Punkt ist zu lang, wir müssen den Kontext Window Limit beachten.
+parakeet-v3-gpu	anglicisms	a03	Anna	0.00	0.00	17.32	Bitte review den Pull Request und schreib mir ein kurzes Feedback.
+parakeet-v3-gpu	anglicisms	a03	Rocko	18.18	7.69	21.26	Bitte reviv den Po-Request und schreib mir ein kurzes Feedback.
+parakeet-v3-gpu	anglicisms	a03	Sandy	0.00	0.00	21.96	Bitte review den Pull-Request und schreib mir ein kurzes Feedback.
+parakeet-v3-gpu	anglicisms	a04	Anna	9.09	3.28	18.58	Das Feature ist im Backlog, aber das Ticket hat keine Priorität.
+parakeet-v3-gpu	anglicisms	a04	Rocko	90.91	34.43	22.46	Dust say a tourist imbacklic, aber dust take it at keino priority.
+parakeet-v3-gpu	anglicisms	a04	Sandy	18.18	9.84	21.33	Das Seatura ist im Backgrock, aber das Ticket hat keine Priority.
+parakeet-v3-gpu	anglicisms	a05	Anna	10.00	1.75	14.59	Wir trecken die Latenz und loggen die Fehler im Dashboard.
+parakeet-v3-gpu	anglicisms	a05	Rocko	20.00	12.28	18.58	Wir tracken die Latenz und loggen die Fähre im Daschpoort.
+parakeet-v3-gpu	anglicisms	a05	Sandy	10.00	3.51	18.43	Wir tragen die Latenz und loggen die Fehler im Dashboard.
+parakeet-v3-gpu	anglicisms	a06	Anna	23.08	7.81	18.82	Der Call ist um 3, danach machen wir das Stand-up und das Retro.
+parakeet-v3-gpu	anglicisms	a06	Rocko	46.15	14.06	21.78	Der Kall ist U3, danach machen wir das Stand Up und das Reto.
+parakeet-v3-gpu	anglicisms	a06	Sandy	38.46	17.19	21.94	Der Karl ist um 3, danach machen wir das Standhub und das E-To.
+parakeet-v3-gpu	brands	b01	Anna	25.00	9.26	18.90	Die Zahlungsarten sind Klarner, Pelpel, Visa und Vorkasse.
+parakeet-v3-gpu	brands	b01	Rocko	12.50	3.70	21.61	Die Zahlungsarten sind Plana, Paypal, Visa und Vorkasse.
+parakeet-v3-gpu	brands	b01	Sandy	25.00	5.56	21.97	Die Zahlungsarten sind Plana, Paypal, Wisa und Vorkasse.
+parakeet-v3-gpu	brands	b02	Anna	0.00	0.00	23.66	Wir versenden mit DHL, dpd und Hermes, Abholung ist auch möglich.
+parakeet-v3-gpu	brands	b02	Rocko	9.09	1.61	28.63	Wir versenden mit DAL, DPD und Hermes, Abholung ist auch möglich.
+parakeet-v3-gpu	brands	b02	Sandy	0.00	0.00	27.56	Wir versenden mit DHL, DPD und Hermes, Abholung ist auch möglich.
+parakeet-v3-gpu	brands	b03	Anna	23.08	6.94	20.67	Ich habe das über Amazon P und Apple P abgewickelt, nicht über Striple.
+parakeet-v3-gpu	brands	b03	Rocko	23.08	8.33	25.34	Ich habe das über Amazon Pi und Apple Pi abgewickelt, nicht über Strebe.
+parakeet-v3-gpu	brands	b03	Sandy	38.46	12.50	23.91	Ich habe das eben Amazon Pi und Apple Pi abgewickelt, nicht eben Strepe.
+parakeet-v3-gpu	brands	b04	Anna	9.09	1.64	19.66	Der Termin steht in Google Kalendar, die Notiz liegt in Notion.
+parakeet-v3-gpu	brands	b04	Rocko	27.27	9.84	22.06	Der Termin steht in Rodre Kalendar, die Notiz liegt in Motion.
+parakeet-v3-gpu	brands	b04	Sandy	18.18	8.20	21.65	Der Termin steht in Dodre Kalendar, die Notiz liegt in Notion.
+parakeet-v3-gpu	brands	b05	Anna	44.44	8.57	20.46	Bitte überweise den Betrag PASEPA-Lastschrift oder Sort Überweisung.
+parakeet-v3-gpu	brands	b05	Rocko	55.56	7.14	23.08	Bitte überweise den Betrag der Se-Palastschrift oder Sfort Überweisung.
+parakeet-v3-gpu	brands	b05	Sandy	55.56	8.57	23.33	Bitte überweise den Betrag der Seepalastschrift oder Sort Überweisung.
+parakeet-v3-gpu	brands	b06	Anna	27.27	9.23	18.45	Wir nutzen Schopifi für den Schock und Lexoffie für die Buchhaltung.
+parakeet-v3-gpu	brands	b06	Rocko	27.27	13.85	22.49	Wir nutzen Schobifi für den Schob und Lexophizie für die Buchhaltung.
+parakeet-v3-gpu	brands	b06	Sandy	27.27	12.31	22.19	Wir nutzen Schobi-Fee für den Schub und Lexoffice für die Buchhaltung.
+parakeet-v3-gpu	coaching	k01	Anna	22.22	8.47	17.38	Oh keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-gpu	coaching	k01	Rocko	11.11	6.78	19.16	Keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-gpu	coaching	k01	Sandy	11.11	6.78	19.00	Keines heißt, dass du dich nicht ständig reparieren musst.
+parakeet-v3-gpu	coaching	k02	Anna	0.00	0.00	18.98	Viele Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+parakeet-v3-gpu	coaching	k02	Rocko	16.67	6.45	21.08	Faire Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+parakeet-v3-gpu	coaching	k02	Sandy	33.33	4.84	21.01	Viele Klinden verwechseln Selbstoptimierung mit Selstannahme.
+parakeet-v3-gpu	coaching	k03	Anna	0.00	0.00	20.97	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-gpu	coaching	k03	Rocko	0.00	0.00	22.78	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-gpu	coaching	k03	Sandy	0.00	0.00	22.12	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+parakeet-v3-gpu	coaching	k04	Anna	0.00	0.00	18.12	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-gpu	coaching	k04	Rocko	0.00	0.00	19.15	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-gpu	coaching	k04	Sandy	0.00	0.00	18.79	Wir arbeiten mit dem Inneren Kritiker, nicht gegen ihn.
+parakeet-v3-gpu	coaching	k05	Anna	0.00	0.00	21.21	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-gpu	coaching	k05	Rocko	0.00	0.00	22.28	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-gpu	coaching	k05	Sandy	0.00	0.00	22.25	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+parakeet-v3-gpu	coaching	k06	Anna	0.00	0.00	23.97	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-gpu	coaching	k06	Rocko	0.00	0.00	26.28	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-gpu	coaching	k06	Sandy	0.00	0.00	26.05	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+parakeet-v3-gpu	compounds	c01	Anna	27.27	2.94	20.41	Kaufaufrechnung ist für nicht-private Personen auf Anfrage möglich.
+parakeet-v3-gpu	compounds	c01	Rocko	54.55	5.88	22.61	Kaufaufrechnung ist für nicht private Personenaufanfrage möglich.
+parakeet-v3-gpu	compounds	c01	Sandy	54.55	5.88	22.33	Kaufaufrechnung ist für nicht private Personenaufanfrage möglich.
+parakeet-v3-gpu	compounds	c02	Anna	0.00	0.00	23.29	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-gpu	compounds	c02	Rocko	0.00	0.00	25.82	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-gpu	compounds	c02	Sandy	0.00	0.00	26.30	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+parakeet-v3-gpu	compounds	c03	Anna	0.00	0.00	22.44	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-gpu	compounds	c03	Rocko	0.00	0.00	24.03	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-gpu	compounds	c03	Sandy	0.00	0.00	23.48	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+parakeet-v3-gpu	compounds	c04	Anna	0.00	0.00	19.35	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-gpu	compounds	c04	Rocko	0.00	0.00	22.33	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-gpu	compounds	c04	Sandy	0.00	0.00	22.19	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+parakeet-v3-gpu	compounds	c05	Anna	0.00	0.00	22.80	Die Arbeitsunfähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-gpu	compounds	c05	Rocko	42.86	4.17	23.03	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-gpu	compounds	c05	Sandy	42.86	4.17	23.65	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+parakeet-v3-gpu	compounds	c06	Anna	0.00	0.00	22.54	Wir brauchen eine datenschutzgrundverordnung Konforme Einwilligungserklärung.
+parakeet-v3-gpu	compounds	c06	Rocko	0.00	0.00	24.36	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+parakeet-v3-gpu	compounds	c06	Sandy	0.00	0.00	24.46	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+parakeet-v3-gpu	dictation	d01	Anna	0.00	0.00	23.50	Notiz an mich selbst, morgen früh den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-gpu	dictation	d01	Rocko	18.18	5.41	26.75	Mutiz an mich selbst. Morgen für den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-gpu	dictation	d01	Sandy	0.00	0.00	25.10	Notiz an mich selbst. Morgen früh den Vertrag gegenlesen und unterschreiben.
+parakeet-v3-gpu	dictation	d02	Anna	0.00	0.00	20.19	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-gpu	dictation	d02	Rocko	0.00	0.00	22.28	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-gpu	dictation	d02	Sandy	0.00	0.00	22.43	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+parakeet-v3-gpu	dictation	d03	Anna	0.00	0.00	21.93	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-gpu	dictation	d03	Rocko	0.00	0.00	24.66	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-gpu	dictation	d03	Sandy	0.00	0.00	24.34	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+parakeet-v3-gpu	dictation	d04	Anna	0.00	0.00	25.49	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-gpu	dictation	d04	Rocko	0.00	0.00	26.69	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-gpu	dictation	d04	Sandy	0.00	0.00	26.86	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+parakeet-v3-gpu	dictation	d05	Anna	0.00	0.00	24.25	Kurze Zusammenfassung: Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-gpu	dictation	d05	Rocko	0.00	0.00	26.89	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-gpu	dictation	d05	Sandy	0.00	0.00	26.16	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+parakeet-v3-gpu	dictation	d06	Anna	0.00	0.00	20.63	Frage an das Team, können wir den Release auf nächste Woche verschieben?
+parakeet-v3-gpu	dictation	d06	Rocko	8.33	2.86	24.87	Frage an das Team: Können wir den Eliase auf nächste Woche verschieben?
+parakeet-v3-gpu	dictation	d06	Sandy	8.33	7.14	23.91	Frage an das Team: Können wir den Brilliage auf nächste Woche verschieben?
+parakeet-v3-gpu	names	p01	Anna	0.00	0.00	18.81	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+parakeet-v3-gpu	names	p01	Rocko	22.22	7.69	20.24	Herr Müller aus Kaiserslautern trifft Fauschwürder in Regensburg.
+parakeet-v3-gpu	names	p01	Sandy	0.00	0.00	20.60	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+parakeet-v3-gpu	names	p02	Anna	11.11	1.49	19.96	Die Konferenz findet in Münchengladbach statt, nicht in Oberammergau.
+parakeet-v3-gpu	names	p02	Rocko	22.22	10.45	21.43	Die Konferenz findet in Münchengleichbach statt, nicht in Oberauergau.
+parakeet-v3-gpu	names	p02	Sandy	22.22	4.48	21.85	Die Konferenz findet in Münchengladbach statt, nicht in Oberauergau.
+parakeet-v3-gpu	names	p03	Anna	0.00	0.00	18.37	Alexander Monas schreibt aus Köln an das Büro in Düsseldorf.
+parakeet-v3-gpu	names	p03	Rocko	50.00	16.95	19.24	Alexander Womaschreibt aus Köln und das BO in Dissendorf.
+parakeet-v3-gpu	names	p03	Sandy	10.00	5.08	19.57	Alexander Woners schreibt aus Köln an das Büro in Düsseldorf.
+parakeet-v3-gpu	names	p04	Anna	0.00	0.00	18.95	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-gpu	names	p04	Rocko	10.00	2.99	22.64	Wir fahren von Saulbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-gpu	names	p04	Sandy	0.00	0.00	21.44	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+parakeet-v3-gpu	names	p05	Anna	22.22	16.00	17.22	Frau Dr., Jilmas und Herr Kowaldschick sitzen im Beirat.
+parakeet-v3-gpu	names	p05	Rocko	33.33	14.00	23.13	Frau Dr. Y Marx und Herr Kowalzög sitzen im Beirat.
+parakeet-v3-gpu	names	p05	Sandy	33.33	14.00	22.28	Frau Dr. Y Marx und Herr Kowalzig sitzen im Beirat.
+parakeet-v3-gpu	names	p06	Anna	11.11	7.02	17.93	Das Treffen ist im Hotel 4 Jahreszeiten am Marienplatz.
+parakeet-v3-gpu	names	p06	Rocko	0.00	0.00	18.64	Das Treffen ist im Hotel vier Jahreszeiten am Marienplatz.
+parakeet-v3-gpu	names	p06	Sandy	0.00	0.00	19.49	Das Treffen ist im Hotel vier Jahreszeiten am Marienplatz.
+parakeet-v3-gpu	numbers	n01	Anna	20.00	43.42	22.41	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-gpu	numbers	n01	Rocko	20.00	43.42	26.32	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-gpu	numbers	n01	Sandy	20.00	43.42	25.04	Die Rechnung über 2400 Euro ist am 15. März fällig.
+parakeet-v3-gpu	numbers	n02	Anna	50.00	49.32	21.42	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-gpu	numbers	n02	Rocko	50.00	49.32	23.35	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-gpu	numbers	n02	Sandy	50.00	49.32	24.63	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+parakeet-v3-gpu	numbers	n03	Anna	36.36	45.95	21.32	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-gpu	numbers	n03	Rocko	36.36	45.95	26.05	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-gpu	numbers	n03	Sandy	36.36	45.95	25.96	Der Umsatz stieg um 23,7% im dritten Quartal.
+parakeet-v3-gpu	numbers	n04	Anna	76.92	73.91	21.02	Meine Nummer ist 0151 234567.
+parakeet-v3-gpu	numbers	n04	Rocko	76.92	73.91	24.23	Meine Nummer ist 0151 234567.
+parakeet-v3-gpu	numbers	n04	Sandy	76.92	73.91	23.80	Meine Nummer ist 0151 234567.
+parakeet-v3-gpu	numbers	n05	Anna	25.00	55.70	25.94	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-gpu	numbers	n05	Rocko	25.00	55.70	27.95	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-gpu	numbers	n05	Sandy	25.00	55.70	27.17	Das Angebot gilt bis zum 31. Dezember 2026.
+parakeet-v3-gpu	numbers	n06	Anna	71.43	71.23	23.61	Bitte überweise 1999,50 Euro.
+parakeet-v3-gpu	numbers	n06	Rocko	57.14	69.86	25.99	Bitte überweise 1999,50 Cent.
+parakeet-v3-gpu	numbers	n06	Sandy	71.43	71.23	25.95	Bitte überweise 1999,50 Euro.
+parakeet-v3-gpu	umlauts	u01	Anna	0.00	0.00	18.44	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+parakeet-v3-gpu	umlauts	u01	Rocko	10.00	5.80	20.86	Die Geschäftsführerin überprüft die Kürse der Räume für die Übergabe.
+parakeet-v3-gpu	umlauts	u01	Sandy	0.00	0.00	20.40	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+parakeet-v3-gpu	umlauts	u02	Anna	0.00	0.00	18.57	Wir müssen die Verträge ändern, größere Änderungen sind nötig.
+parakeet-v3-gpu	umlauts	u02	Rocko	100.00	100.00	21.97	
+parakeet-v3-gpu	umlauts	u02	Sandy	11.11	6.56	20.91	Wir müssen die Verträge ändern, Kursere Änderungen sind nötig.
+parakeet-v3-gpu	umlauts	u03	Anna	0.00	0.00	17.51	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-gpu	umlauts	u03	Rocko	0.00	0.00	21.60	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-gpu	umlauts	u03	Sandy	0.00	0.00	20.90	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+parakeet-v3-gpu	umlauts	u04	Anna	0.00	0.00	19.89	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-gpu	umlauts	u04	Rocko	10.00	4.92	20.92	Süße Köße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-gpu	umlauts	u04	Sandy	0.00	0.00	21.18	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+parakeet-v3-gpu	umlauts	u05	Anna	0.00	0.00	16.99	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+parakeet-v3-gpu	umlauts	u05	Rocko	11.11	6.90	19.75	Das Gebäude hat 5 Stockwerke und einen schönen Innenhof.
+parakeet-v3-gpu	umlauts	u05	Sandy	0.00	0.00	19.22	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+parakeet-v3-gpu	umlauts	u06	Anna	0.00	0.00	16.27	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+parakeet-v3-gpu	umlauts	u06	Rocko	0.00	0.00	20.28	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+parakeet-v3-gpu	umlauts	u06	Sandy	0.00	0.00	21.22	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+stock-v1-gpu	anglicisms	a01	Anna	16.67	7.25	1.01	Ich deklaue das Repositorie auf den Server und merge den Branch danach.
+stock-v1-gpu	anglicisms	a01	Rocko	25.00	10.14	1.66	Ich deproie das Repository auf den Server und merke den Brust danach.
+stock-v1-gpu	anglicisms	a01	Sandy	33.33	13.04	1.79	Ich geb' nur das Repository auf den Server und merke den Brunsch danach.
+stock-v1-gpu	anglicisms	a02	Anna	8.33	1.49	1.51	Der Prompt ist zu lang, wir müssen den Kontext-Window-Limit beachten.
+stock-v1-gpu	anglicisms	a02	Rocko	33.33	16.42	1.74	Der Punkt ist zu rei. Wir müssen den Kontext-Sindor-Limit beachten.
+stock-v1-gpu	anglicisms	a02	Sandy	16.67	7.46	1.79	Der Punkt ist zu lang, wir müssen den Kontext-Window-Limit beachten.
+stock-v1-gpu	anglicisms	a03	Anna	0.00	0.00	1.40	Bitte review den Pull-Request und schreib mir ein kurzes Feedback.
+stock-v1-gpu	anglicisms	a03	Rocko	36.36	10.77	1.53	Bitte reviert den Porequest und schreibt mir ein kurzes Feedback.
+stock-v1-gpu	anglicisms	a03	Sandy	9.09	1.54	1.65	Bitte revief den Pull-Request und schreib mir ein kurzes Feedback.
+stock-v1-gpu	anglicisms	a04	Anna	9.09	3.28	1.47	Das Feature ist im Backlog, aber das Ticket hat keine Priorität.
+stock-v1-gpu	anglicisms	a04	Rocko	0.00	0.00	1.70	Das Feature ist im Backlog, aber das Ticket hat keine Priority.
+stock-v1-gpu	anglicisms	a04	Sandy	18.18	9.84	1.57	Das Theater ist im Backlog, aber das Ticket hat keine Priorität.
+stock-v1-gpu	anglicisms	a05	Anna	10.00	1.75	1.13	Wir trecken die Latenz und loggen die Fehler im Dashboard.
+stock-v1-gpu	anglicisms	a05	Rocko	40.00	17.54	1.45	Wir packen die Ratenz und trocken die Fähre im Dashboard.
+stock-v1-gpu	anglicisms	a05	Sandy	10.00	1.75	1.43	Wir tracken die Lagenz und loggen die Fehler im Dashboard.
+stock-v1-gpu	anglicisms	a06	Anna	15.38	1.56	1.35	Der Call ist um drei, danach machen wir das Stand-Up und das Retro.
+stock-v1-gpu	anglicisms	a06	Rocko	15.38	6.25	1.72	Der Karl ist um drei, danach machen wir das Standhub und das Retro.
+stock-v1-gpu	anglicisms	a06	Sandy	23.08	10.94	1.72	Der Karl ist um drei, danach machen wir das Standhof und das Veto.
+stock-v1-gpu	brands	b01	Anna	12.50	1.85	1.51	Die Zahlungsarten sind Klana, Paypal, Visa und Vorkasse.
+stock-v1-gpu	brands	b01	Rocko	25.00	3.70	1.58	Die Zahlungsarten sind klar nah, PayPal, Visa und Vorkasse.
+stock-v1-gpu	brands	b01	Sandy	12.50	3.70	1.71	Die Zahlungsarten sind klarer, PayPal, Visa und Vorkasse.
+stock-v1-gpu	brands	b02	Anna	0.00	0.00	1.79	Wir versenden mit DHL, DPD und Hermes, Abholung ist auch möglich.
+stock-v1-gpu	brands	b02	Rocko	9.09	1.61	1.98	Wir versenden mit DAL, DPD und Hermes. Abholung ist auch möglich.
+stock-v1-gpu	brands	b02	Sandy	9.09	3.23	2.13	Wir versenden mit DHL, DTT und Hermes. Abholung ist auch möglich.
+stock-v1-gpu	brands	b03	Anna	15.38	5.56	1.67	Ich habe das über Amazon P und Apple P abgewickelt, nicht über Stripe.
+stock-v1-gpu	brands	b03	Rocko	23.08	8.33	1.91	Ich habe das über Amazon Pie und Apple Pie abgewickelt, nicht über Striebe.
+stock-v1-gpu	brands	b03	Sandy	23.08	8.33	1.91	Ich habe das über Amazon Pie und Apple Pie abgewickelt, nicht über Striebe.
+stock-v1-gpu	brands	b04	Anna	0.00	0.00	1.56	Der Termin steht in Google Calendar, die Notiz liegt in Notion.
+stock-v1-gpu	brands	b04	Rocko	36.36	11.48	1.74	Der Termin steht in Godre Kalendar, die Motiv liegt in Motion.
+stock-v1-gpu	brands	b04	Sandy	9.09	1.64	1.73	Der Termin steht in Google-Kalendar, die Notiz liegt in Notion.
+stock-v1-gpu	brands	b05	Anna	0.00	0.00	1.62	Bitte überweise den Betrag per SEPA Lastschrift oder Sofortüberweisung.
+stock-v1-gpu	brands	b05	Rocko	44.44	5.71	1.82	Bitte überweise den Betrag per se, Ballastschrift oder sofort Überweisung.
+stock-v1-gpu	brands	b05	Sandy	55.56	5.71	1.68	Bitte überweise den Betrag der Seepalastschrift oder sofort Überweisung.
+stock-v1-gpu	brands	b06	Anna	18.18	7.69	1.44	Wir nutzen Shopee Fee für den Shop und Lexoffice für die Buchhaltung.
+stock-v1-gpu	brands	b06	Rocko	27.27	7.69	1.70	Wir nutzen Showbify für den Showb und Rexoffice für die Buchhaltung.
+stock-v1-gpu	brands	b06	Sandy	27.27	20.00	1.72	Wir nutzen Showbiz für den Showbund und Lexoviz für die Buchhaltung.
+stock-v1-gpu	coaching	k01	Anna	22.22	8.47	1.34	Oh Keines heißt, dass du dich nicht ständig reparieren musst.
+stock-v1-gpu	coaching	k01	Rocko	22.22	5.08	1.47	Oh, Kainess heißt, dass du dich nicht ständig reparieren musst.
+stock-v1-gpu	coaching	k01	Sandy	22.22	10.17	1.37	Und es heißt, dass du dich nicht ständig reparieren musst.
+stock-v1-gpu	coaching	k02	Anna	0.00	0.00	1.48	Viele Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+stock-v1-gpu	coaching	k02	Rocko	16.67	4.84	1.27	Ihre Klienten verwechseln Selbstoptimierung mit Selbstannahme.
+stock-v1-gpu	coaching	k02	Sandy	33.33	9.68	1.62	Viele Klienten verwechseln Gelsoptimierung mit Gelssannahme.
+stock-v1-gpu	coaching	k03	Anna	0.00	0.00	1.67	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+stock-v1-gpu	coaching	k03	Rocko	0.00	0.00	1.73	Die Frage ist nicht, warum du scheiterst, sondern wofür du das brauchst.
+stock-v1-gpu	coaching	k03	Sandy	8.33	1.45	1.73	Die Frage ist nicht, warum du scheitest, sondern wofür du das brauchst.
+stock-v1-gpu	coaching	k04	Anna	0.00	0.00	1.33	Wir arbeiten mit dem inneren Kritiker, nicht gegen ihn.
+stock-v1-gpu	coaching	k04	Rocko	0.00	0.00	1.45	Wir arbeiten mit dem inneren Kritiker, nicht gegen ihn.
+stock-v1-gpu	coaching	k04	Sandy	0.00	0.00	1.45	Wir arbeiten mit dem inneren Kritiker, nicht gegen ihn.
+stock-v1-gpu	coaching	k05	Anna	0.00	0.00	1.68	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+stock-v1-gpu	coaching	k05	Rocko	0.00	0.00	1.75	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+stock-v1-gpu	coaching	k05	Sandy	0.00	0.00	1.75	Dein Nervensystem lernt Sicherheit durch Wiederholung, nicht durch Einsicht.
+stock-v1-gpu	coaching	k06	Anna	0.00	0.00	1.75	Zwischen Reiz und Reaktion liegt ein Raum, und in diesem Raum liegt die Freiheit.
+stock-v1-gpu	coaching	k06	Rocko	0.00	0.00	2.00	Zwischen Reiz und Reaktion liegt ein Raum und in diesem Raum liegt die Freiheit.
+stock-v1-gpu	coaching	k06	Sandy	0.00	0.00	2.02	Zwischen Reiz und Reaktion liegt ein Raum und in diesem Raum liegt die Freiheit.
+stock-v1-gpu	compounds	c01	Anna	27.27	2.94	1.62	Kaufaufrechnung ist für nicht private Personen auf Anfrage möglich.
+stock-v1-gpu	compounds	c01	Rocko	27.27	2.94	1.78	Kaufaufrechnung ist für nicht private Personen auf Anfrage möglich.
+stock-v1-gpu	compounds	c01	Sandy	27.27	2.94	1.79	Kaufaufrechnung ist für nicht private Personen auf Anfrage möglich.
+stock-v1-gpu	compounds	c02	Anna	0.00	0.00	1.82	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+stock-v1-gpu	compounds	c02	Rocko	0.00	0.00	2.05	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+stock-v1-gpu	compounds	c02	Sandy	0.00	0.00	2.04	Die Krankenversicherungsbeiträge und die Einkommensteuervorauszahlung sind fällig.
+stock-v1-gpu	compounds	c03	Anna	0.00	0.00	1.69	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+stock-v1-gpu	compounds	c03	Rocko	37.50	2.50	1.82	Der Geschäftsführer bespricht die Umsatzsteuer vor Anmeldung mit dem Steuerberater.
+stock-v1-gpu	compounds	c03	Sandy	0.00	0.00	1.83	Der Geschäftsführer bespricht die Umsatzsteuervoranmeldung mit dem Steuerberater.
+stock-v1-gpu	compounds	c04	Anna	0.00	0.00	1.35	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+stock-v1-gpu	compounds	c04	Rocko	28.57	6.45	1.64	Bitte prüfe die Auftragsbestätigung und die Referetermin-Zusage.
+stock-v1-gpu	compounds	c04	Sandy	0.00	0.00	1.70	Bitte prüfe die Auftragsbestätigung und die Lieferterminzusage.
+stock-v1-gpu	compounds	c05	Anna	0.00	0.00	1.68	Die Arbeitsunfähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+stock-v1-gpu	compounds	c05	Rocko	42.86	4.17	1.74	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+stock-v1-gpu	compounds	c05	Sandy	42.86	4.17	1.75	Die Arbeits- und Fähigkeitsbescheinigung muss bis Freitag eingereicht werden.
+stock-v1-gpu	compounds	c06	Anna	0.00	0.00	1.74	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+stock-v1-gpu	compounds	c06	Rocko	0.00	0.00	1.91	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+stock-v1-gpu	compounds	c06	Sandy	0.00	0.00	1.78	Wir brauchen eine Datenschutzgrundverordnung konforme Einwilligungserklärung.
+stock-v1-gpu	dictation	d01	Anna	0.00	0.00	1.77	Notiz an mich selbst, morgen früh den Vertrag gegenlesen und unterschreiben.
+stock-v1-gpu	dictation	d01	Rocko	9.09	2.70	2.08	Motiv an mich selbst. Morgen früh den Vertrag gegenlesen und unterschreiben.
+stock-v1-gpu	dictation	d01	Sandy	18.18	9.46	2.08	und hieß an mich selbst. Morgen früh den Vertrag gegenlesen und unterschreiben.
+stock-v1-gpu	dictation	d02	Anna	0.00	0.00	1.58	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+stock-v1-gpu	dictation	d02	Rocko	0.00	0.00	1.73	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+stock-v1-gpu	dictation	d02	Sandy	0.00	0.00	1.73	Schreib bitte an Thomas, dass der Termin am Dienstag leider ausfällt.
+stock-v1-gpu	dictation	d03	Anna	0.00	0.00	1.72	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+stock-v1-gpu	dictation	d03	Rocko	0.00	0.00	1.91	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+stock-v1-gpu	dictation	d03	Sandy	0.00	0.00	1.75	Neuer Absatz. Das Kapitel braucht ein stärkeres Beispiel am Anfang.
+stock-v1-gpu	dictation	d04	Anna	0.00	0.00	1.87	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+stock-v1-gpu	dictation	d04	Rocko	0.00	0.00	1.99	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+stock-v1-gpu	dictation	d04	Sandy	0.00	0.00	2.03	Erinnere mich daran, die Festplatte zu sichern, bevor ich das System aktualisiere.
+stock-v1-gpu	dictation	d05	Anna	0.00	0.00	1.91	Kurze Zusammenfassung, das Modell ist schneller, aber die Genauigkeit fehlt noch.
+stock-v1-gpu	dictation	d05	Rocko	0.00	0.00	2.08	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+stock-v1-gpu	dictation	d05	Sandy	0.00	0.00	1.91	Kurze Zusammenfassung. Das Modell ist schneller, aber die Genauigkeit fehlt noch.
+stock-v1-gpu	dictation	d06	Anna	0.00	0.00	1.55	Frage an das Team, können wir den Release auf nächste Woche verschieben?
+stock-v1-gpu	dictation	d06	Rocko	8.33	2.86	1.92	Frage an das Team. Können wir den Riliase auf nächste Woche verschieben?
+stock-v1-gpu	dictation	d06	Sandy	8.33	4.29	1.88	Frage an das Team. Können wir den Rehage auf nächste Woche verschieben?
+stock-v1-gpu	names	p01	Anna	0.00	0.00	1.40	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+stock-v1-gpu	names	p01	Rocko	0.00	0.00	1.59	Herr Müller aus Kaiserslautern trifft Frau Schröder in Regensburg.
+stock-v1-gpu	names	p01	Sandy	11.11	1.54	1.47	Herr Müller aus Keiserslautern trifft Frau Schröder in Regensburg.
+stock-v1-gpu	names	p02	Anna	0.00	0.00	1.53	Die Konferenz findet in Mönchengladbach statt, nicht in Oberammergau.
+stock-v1-gpu	names	p02	Rocko	22.22	5.97	1.69	Die Konferenz findet in München-Gladbachstadt, nicht in Oberammergau.
+stock-v1-gpu	names	p02	Sandy	33.33	5.97	1.69	Die Konferenz findet in München-Gladbach statt, nicht in Oberauergau.
+stock-v1-gpu	names	p03	Anna	0.00	0.00	1.41	Alexander Monas schreibt aus Köln an das Büro in Düsseldorf.
+stock-v1-gpu	names	p03	Rocko	10.00	8.47	1.37	Alexander Wunsch schreibt aus Köln an das Büro in Düsseldorf.
+stock-v1-gpu	names	p03	Sandy	30.00	11.86	1.37	Alexander Wunas schreibt aus Köln an der Spiro in Düsseldorf.
+stock-v1-gpu	names	p04	Anna	0.00	0.00	1.32	Wir fahren von Saarbrücken über Karlsruhe nach Freiburg im Breisgau.
+stock-v1-gpu	names	p04	Rocko	10.00	2.99	1.66	Wir fahren von Saubrücken über Karlsruhe nach Freiburg im Breisgau.
+stock-v1-gpu	names	p04	Sandy	10.00	2.99	1.67	Wir fahren von Saubrücken über Karlsruhe nach Freiburg im Breisgau.
+stock-v1-gpu	names	p05	Anna	11.11	2.00	1.28	Frau Dr., Yilmaz und Herr Kowalczyk sitzen im Beirat.
+stock-v1-gpu	names	p05	Rocko	44.44	24.00	1.67	Frau Dr. Özerne-Matz und Herr Kowalck-Züg sitzen im Beirat.
+stock-v1-gpu	names	p05	Sandy	55.56	34.00	1.64	Frau Dr. Öpselon, der Max und Herr Kowalck, Sie sitzen im Beirat.
+stock-v1-gpu	names	p06	Anna	0.00	0.00	1.36	Das Treffen ist im Hotel Vier Jahreszeiten am Marienplatz.
+stock-v1-gpu	names	p06	Rocko	22.22	1.75	1.45	Das Treffen ist im Hotel Vierjahreszeiten am Marienplatz.
+stock-v1-gpu	names	p06	Sandy	0.00	0.00	1.44	Das Treffen ist im Hotel vier Jahreszeiten am Marienplatz.
+stock-v1-gpu	numbers	n01	Anna	20.00	43.42	1.75	Die Rechnung über 2400 Euro ist am 15. März fällig.
+stock-v1-gpu	numbers	n01	Rocko	30.00	47.37	1.81	Die Rechnung über 2400 Euro ist am 15. März fertig.
+stock-v1-gpu	numbers	n01	Sandy	20.00	43.42	1.95	Die Rechnung über 2400 Euro ist am 15. März fällig.
+stock-v1-gpu	numbers	n02	Anna	50.00	49.32	1.73	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+stock-v1-gpu	numbers	n02	Rocko	50.00	49.32	1.82	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+stock-v1-gpu	numbers	n02	Sandy	50.00	49.32	1.84	Wir starten um 9.30 Uhr und enden um 16.45 Uhr.
+stock-v1-gpu	numbers	n03	Anna	27.27	35.14	1.60	Der Umsatz stieg um 23,7 Prozent im dritten Quartal.
+stock-v1-gpu	numbers	n03	Rocko	36.36	45.95	1.96	Der Umsatz stieg um 23,7% im dritten Quartal.
+stock-v1-gpu	numbers	n03	Sandy	45.45	48.65	1.99	Der Umsatz steht um 23,7% im dritten Quartal.
+stock-v1-gpu	numbers	n04	Anna	76.92	73.91	1.52	Meine Nummer ist 0151 234567.
+stock-v1-gpu	numbers	n04	Rocko	76.92	72.46	1.84	Meine Nummer ist 0151, 234 567.
+stock-v1-gpu	numbers	n04	Sandy	76.92	73.91	1.90	Meine Nummer ist 0151 234567.
+stock-v1-gpu	numbers	n05	Anna	25.00	55.70	1.94	Das Angebot gilt bis zum 31. Dezember 2026.
+stock-v1-gpu	numbers	n05	Rocko	25.00	55.70	2.12	Das Angebot gilt bis zum 31. Dezember 2026.
+stock-v1-gpu	numbers	n05	Sandy	25.00	55.70	2.10	Das Angebot gilt bis zum 31. Dezember 2026.
+stock-v1-gpu	numbers	n06	Anna	71.43	71.23	1.71	Bitte überweise 1.999,50 Euro.
+stock-v1-gpu	numbers	n06	Rocko	71.43	71.23	2.05	Bitte überweise 1.999,50 Euro.
+stock-v1-gpu	numbers	n06	Sandy	71.43	71.23	2.03	Bitte überweise 1.999,50 Euro.
+stock-v1-gpu	umlauts	u01	Anna	0.00	0.00	1.30	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+stock-v1-gpu	umlauts	u01	Rocko	0.00	0.00	1.59	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+stock-v1-gpu	umlauts	u01	Sandy	0.00	0.00	1.58	Die Geschäftsführerin überprüft die Größe der Räume für die Übergabe.
+stock-v1-gpu	umlauts	u02	Anna	0.00	0.00	1.45	Wir müssen die Verträge ändern, größere Änderungen sind nötig.
+stock-v1-gpu	umlauts	u02	Rocko	0.00	0.00	1.62	Wir müssen die Verträge ändern. Größere Änderungen sind nötig.
+stock-v1-gpu	umlauts	u02	Sandy	0.00	0.00	1.62	Wir müssen die Verträge ändern. Größere Änderungen sind nötig.
+stock-v1-gpu	umlauts	u03	Anna	0.00	0.00	1.34	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+stock-v1-gpu	umlauts	u03	Rocko	0.00	0.00	1.60	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+stock-v1-gpu	umlauts	u03	Sandy	0.00	0.00	1.48	Die Straße ist gesperrt, deshalb fährt der Bus über die Brücke.
+stock-v1-gpu	umlauts	u04	Anna	0.00	0.00	1.43	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+stock-v1-gpu	umlauts	u04	Rocko	0.00	0.00	1.61	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+stock-v1-gpu	umlauts	u04	Sandy	0.00	0.00	1.60	Süße Grüße aus München, die Öffnungszeiten hängen an der Tür.
+stock-v1-gpu	umlauts	u05	Anna	0.00	0.00	1.30	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+stock-v1-gpu	umlauts	u05	Rocko	0.00	0.00	1.48	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+stock-v1-gpu	umlauts	u05	Sandy	0.00	0.00	1.48	Das Gebäude hat fünf Stockwerke und einen schönen Innenhof.
+stock-v1-gpu	umlauts	u06	Anna	0.00	0.00	1.30	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+stock-v1-gpu	umlauts	u06	Rocko	0.00	0.00	1.51	Er ärgert sich über die Verzögerung und möchte eine Erklärung.
+stock-v1-gpu	umlauts	u06	Sandy	0.00	0.00	1.51	Er ärgert sich über die Verzögerung und möchte eine Erklärung.

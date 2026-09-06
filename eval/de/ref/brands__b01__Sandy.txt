@@ -1,0 +1,1 @@
+Die Zahlungsarten sind Klarna, PayPal, Visa und Vorkasse.

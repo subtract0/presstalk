@@ -87,8 +87,22 @@ fi
 # guard was commented out -- verified here on 2026-09-06 by commenting it out
 # and watching this script report "All source invariants hold". A check that
 # accepts a disabled guard is worse than no check, because it certifies it.
-live_line() { # file, pattern -> first line number that is not a // comment
-  grep -n "$2" "$1" | grep -v '^[0-9]*:[[:space:]]*//' | head -1 | cut -d: -f1 || true
+live_line() { # file, pattern -> first line number where the pattern is code
+  # Blanks everything from // to end of line before matching, rather than
+  # skipping lines that begin with //. Two versions of this check have now been
+  # defeated by a disabled guard: first `// if licenseStore.shouldBlockDictation {`,
+  # then `let failure: String? = nil // Self.audioInputPreflightFailure()`, where
+  # the call survives in a trailing comment on a line that starts with code.
+  # sed emits every line, so grep -n still reports true line numbers.
+  #
+  # sed rather than awk: the awk form needs nested single quotes, and the
+  # version written here first lost sub()'s empty second argument in transit and
+  # silently matched everything it was supposed to filter.
+  #
+  # This also blanks // inside a string literal such as a URL. No invariant
+  # matches inside one; if one ever does it reads as absent, which is the safe
+  # direction for a check that guards a crash.
+  sed 's|//.*||' "$1" | grep -n "$2" | head -1 | cut -d: -f1 || true
 }
 block_line="$(live_line "$main_swift" 'licenseStore\.shouldBlockDictation')"
 recording_line="$(live_line "$main_swift" 'isRecording = true')"
@@ -107,6 +121,21 @@ if [[ -z "$(live_line "$SOURCES/ProductUI.swift" 'PressTalkOffer\.checkoutIsLive
   report "Sources/JarvisTap/ProductUI.swift" \
     "shouldBlockDictation must require checkoutIsLive" \
     "otherwise an expired trial locks someone out with no way to pay"
+fi
+
+# The tap-safety preflight may be cached, but it must still be reachable. It
+# guards installTapOnBus, which raises an Objective-C exception Swift cannot
+# catch and which killed the app three times in six days. A cache that never
+# misses would turn that guard off without removing a single line.
+if [[ -z "$(live_line "$main_swift" 'Self\.audioInputPreflightFailure\(\)')" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "the capture path must still be able to run audioInputPreflightFailure" \
+    "a cache with no miss path silently disables the crash guard"
+fi
+if [[ -z "$(live_line "$main_swift" 'audioPreflightCache\.record')" ]]; then
+  report "Sources/JarvisTap/main.swift" \
+    "preflight results must be recorded, or the cache never hits" \
+    "every press would pay the 52 ms the cache exists to avoid"
 fi
 
 echo

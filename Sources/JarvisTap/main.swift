@@ -4332,6 +4332,36 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return value as String
     }
 
+    private func coreAudioDoubleProperty(
+        objectID: AudioObjectID,
+        selector: AudioObjectPropertySelector
+    ) -> Double? {
+        var address = AudioObjectPropertyAddress(
+            mSelector: selector,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var value: Float64 = 0
+        var size = UInt32(MemoryLayout<Float64>.size)
+        guard AudioObjectGetPropertyData(objectID, &address, 0, nil, &size, &value) == noErr
+        else { return nil }
+        return Double(value)
+    }
+
+    /// Identifies the current input with cheap CoreAudio reads only.
+    ///
+    /// Deliberately does not build an AVAudioEngine: doing that is the 52 ms
+    /// this fingerprint exists to avoid paying on every keypress.
+    private func currentInputFingerprint() -> AudioPreflightCache.DeviceFingerprint? {
+        guard let deviceID = defaultCoreAudioInputDeviceID() else { return nil }
+        let uid = coreAudioStringProperty(
+            objectID: deviceID, selector: kAudioDevicePropertyDeviceUID) ?? "device-\(deviceID)"
+        guard let rate = coreAudioDoubleProperty(
+            objectID: deviceID, selector: kAudioDevicePropertyNominalSampleRate)
+        else { return nil }
+        return .init(deviceUID: uid, sampleRate: rate,
+                     channelCount: coreAudioInputChannelCount(for: deviceID))
+    }
+
     private func coreAudioUInt32Property(
         objectID: AudioObjectID,
         selector: AudioObjectPropertySelector,
@@ -4426,6 +4456,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// How long the audio engine took to start, so the release tail can tell
     /// audio that is late from audio that is missing.
     private var activeEngineStartLatencySeconds: Double = 0
+
+    /// Remembers the tap-safety answer per input device, so the check does not
+    /// rebuild an AVAudioEngine on every press. See AudioPreflightCache.
+    private var audioPreflightCache = AudioPreflightCache()
 
     /// The default we displaced, so it can be put back. Nothing restored it
     /// before: dictating once with AirPods connected silently repointed the
@@ -6653,7 +6687,36 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try await resetFluidTrueStreamingTranscriptState()
                     traceLogger.log("FluidAudio true streaming state reset for capture")
                 }
-                if let failure = Self.audioInputPreflightFailure() {
+                // Cached per device. A miss, or hardware this app has not
+                // fingerprinted, runs the real check -- which is the expensive
+                // one, and the one that keeps installTapOnBus from raising an
+                // exception Swift cannot catch.
+                let preflightFailure: String?
+                if let fingerprint = currentInputFingerprint(),
+                   let cached = audioPreflightCache.cachedResult(for: fingerprint) {
+                    preflightFailure = cached
+                } else {
+                    let measuredAt = Date()
+                    let before = currentInputFingerprint()
+                    let failure = Self.audioInputPreflightFailure()
+                    let after = currentInputFingerprint()
+                    // Only cache when the hardware held still for the whole
+                    // check. If it changed underneath, the answer describes
+                    // neither device, and storing it against either would let a
+                    // stale success through -- which is a crash, not a slow
+                    // start. Not caching costs 52 ms on the next press.
+                    if let before, before == after {
+                        audioPreflightCache.record(failure, for: before)
+                    } else {
+                        audioPreflightCache.invalidate()
+                        traceLogger.log("Audio input preflight not cached reason=device_changed_during_check")
+                    }
+                    traceLogger.log(
+                        "Audio input preflight ran seconds="
+                        + String(format: "%.3f", Date().timeIntervalSince(measuredAt)))
+                    preflightFailure = failure
+                }
+                if let failure = preflightFailure {
                     traceLogger.log("Audio input preflight FAILED: \(failure) -- refusing capture instead of aborting")
                     throw JarvisTapError.audioInputUnavailable(failure)
                 }

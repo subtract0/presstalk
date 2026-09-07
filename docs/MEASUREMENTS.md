@@ -4,7 +4,7 @@ Every number PressTalk publishes has to come from here, with its method attached
 The two ways to get this wrong are quoting a throughput figure as a latency
 figure, and averaging over the runs that worked.
 
-Last run: 2026-09-05, studio1 (M4 Max, 128 GB, macOS 26.6), PressTalk 0.1.7.
+Last ASR benchmark run: 2026-09-05, studio1 (M4 Max, 128 GB, macOS 26.6), PressTalk 0.1.7.
 
 ## End to end, 144 German clips
 
@@ -216,15 +216,19 @@ python3 scripts/presstalk_score_fallback_sweep.py --sweep <dir> --eval-set <tsv>
 
 ## The download
 
+Measured on 2026-09-08 from the final signed, notarized and stapled release ZIP.
+
 | | |
 |---|---|
-| Signed, notarized 0.1.11 zip | **4.4 MB** (4,651,266 bytes) |
+| Signed, notarized 0.1.22 zip | **4.7 MB** (4,716,031 bytes) |
 | Speech model fetched during setup | about 460 MB |
 
-The zip is small because the speech model is not in it. Someone on a slow
-connection is downloading 460 MB before their first dictation, and quoting only
-the 4.4 MB would describe an install nobody experiences.
+Download size uses decimal megabytes (bytes / 1,000,000), rounded to one decimal.
+The speech model is not bundled in the ZIP: setup downloads about 460 MB before
+first dictation, so the ZIP size alone is not the complete setup download.
 
-Measured from the release artifact itself, so it is checkable:
-`ls -l dist/PressTalk-0.1.11-macos-arm64.zip`. Re-measure it every release --
-a stale size on the download page is the first thing a careful reader tests.
+Check the exact byte count with `stat -f %z dist/PressTalk-0.1.22-macos-arm64.zip`.
+The SHA-256 is
+`0127cd40ed029c7a991fe86716b6a3a555a9cd3faeb976d80dc0cdfa494fd0d6`.
+The release signature, notarization and archive audit are recorded in
+[the 0.1.22 artifact receipt](releases/0.1.22-artifact.json).

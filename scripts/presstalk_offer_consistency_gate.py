@@ -13,6 +13,12 @@ So this checks the two independently:
              more days than the code grants produces a support ticket, and one
              promising fewer wastes the trial.
   refund  -- must never be stated as fewer than 14 days anywhere.
+  rails   -- a payment method named on the page must be one the app can
+             actually open. PressTalk gained a second checkout on 2026-09-07,
+             and the failure this prevents is a page offering "Pay with PayPal"
+             months before, or after, the app has a PayPal URL. The website and
+             the binary are edited in different places by different people and
+             nothing else makes them agree.
 """
 from __future__ import annotations
 
@@ -50,6 +56,160 @@ NEAREST = 45
 # charged, which the Preisangabenverordnung does not permit. The claims gate
 # saw nothing, because 20 is 20 in both.
 PRICE_IN_DOLLARS = re.compile(r"(?:US-?Dollar|\$\s?\d)", re.IGNORECASE)
+
+# Payment rails, and the words that constitute OFFERING one on a page. Naming a
+# rail while explaining that purchases are paused is not an offer; a button or a
+# "pay with" phrase is. The distinction matters because the page currently
+# explains the paused state and must be allowed to keep doing so.
+RAIL_OFFER_WORDS = {
+    "paypal": (re.compile(r"(?:pay|bezahl\w*|zahl\w*)[^.<]{0,24}paypal", re.IGNORECASE),
+               re.compile(r"paypal[^.<]{0,24}(?:checkout|button|kasse)", re.IGNORECASE)),
+}
+
+
+def policy_rail_urls() -> dict[str, str]:
+    """The checkout URL the BINARY holds for each rail, keyed by rail name."""
+    text = POLICY.read_text()
+    urls: dict[str, str] = {}
+    for rail, const in (("stripe", "checkoutURLString"),
+                        ("paypal", "paypalCheckoutURLString")):
+        m = re.search(
+            r"public static let " + const + r"\s*=\s*\"([^\"]*)\"", text)
+        if m is None:
+            print(f"FAIL  could not read {const} from {POLICY.relative_to(ROOT)}")
+            raise SystemExit(1)
+        urls[rail] = m.group(1).strip()
+    return urls
+
+
+# HOUSE CONVENTION, not a statement of law. BGB 312j Abs. 3 requires the
+# ordering control to be labelled "zahlungspflichtig bestellen" *or equivalent
+# unambiguous wording*; CJEU C-249/21 (Fuhrmann-2) holds that the label on the
+# control is what counts, and does NOT mandate one literal string or require the
+# click to happen on our own domain. An earlier version of this comment claimed
+# both, and claimed every PayPal SDK label is insufficient -- none of that is
+# supported by the judgment.
+#
+# What the gate can honestly do is hold us to ONE agreed wording so the question
+# is settled once with a lawyer rather than re-litigated per page. Widening the
+# accepted set is a legal decision, not a code decision.
+ORDER_BUTTON_REQUIRED = "zahlungspflichtig bestellen"
+
+# An ordering CONTROL, not prose. The first version matched any occurrence of
+# "kaufen"/"bestellen" anywhere on the page, which failed the sentence
+# "Du kannst derzeit nicht kaufen." -- a true statement, flagged as a missing
+# order button. A gate that cries wolf on correct copy gets switched off.
+ORDER_CONTROL = re.compile(
+    r"<(?:a|button)\b[^>]*>(?P<label>(?:(?!</(?:a|button)>).)*?"
+    r"(?:kaufen|bestellen|checkout|bezahlen)"
+    r"(?:(?!</(?:a|button)>).)*?)</(?:a|button)>",
+    re.IGNORECASE | re.DOTALL)
+
+# The control the page itself nominates as contract-concluding.
+ORDER_BUTTON_MARKED = re.compile(
+    r"<(?:a|button|input)\b[^>]*\bdata-order-button\b[^>]*>"
+    r"((?:(?!</(?:a|button)>).)*?)</(?:a|button)>",
+    re.IGNORECASE | re.DOTALL)
+
+HTML_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+GERMAN_PAGE = re.compile(r'lang\s*=\s*"de"', re.IGNORECASE)
+
+# While Stripe Managed Payments is the only rail, "the contract is with Stripe"
+# is a claim about every sale. It stops being one the moment a PayPal order can
+# happen, and a buyer must be able to tell which entity they are contracting
+# with BEFORE ordering (Art. 246a EGBGB, UWG 5a).
+#
+# This does NOT establish that the sentence is correct today -- who the
+# contracting seller is depends on Stripe's customer terms, and Stripe's own
+# Managed Payments terms say it is "not the seller of record" and is deemed
+# supplier "for Indirect Tax purposes only". That is docs/launch/DAY1_CHECKS.md
+# work, not something a regex settles. All this catches is the sentence
+# surviving unqualified once a second rail exists.
+CONTRACT_WITH_STRIPE = re.compile(
+    r"Kaufvertrag kommt mit\s+Stripe zustande", re.IGNORECASE)
+
+
+def check_rail_legal_wording(pages: list[Path]) -> list[str]:
+    """Wording that must change once we are the seller on SOME transactions."""
+    problems: list[str] = []
+    urls = policy_rail_urls()
+    if not urls.get("paypal"):
+        return problems
+
+    for page in pages:
+        raw = page.read_text()
+        # Comments are not shown to a buyer, so they can neither make a claim
+        # nor satisfy one. A commented-out order button used to pass.
+        visible = HTML_COMMENT.sub(" ", raw)
+        flat = re.sub(r"\s+", " ", visible)
+
+        if CONTRACT_WITH_STRIPE.search(flat):
+            problems.append(
+                f"{page.relative_to(ROOT)} states the contract is with Stripe, "
+                f"unqualified, while a PayPal rail is live -- those orders do "
+                f"not contract with Stripe (Art. 246a EGBGB, UWG 5a)")
+
+        german = "/de/" in str(page).replace("\\", "/") or GERMAN_PAGE.search(visible)
+        if not german:
+            continue
+
+        # A page that links a payment rail must DECLARE which control concludes
+        # the contract, with data-order-button. Nothing in static HTML
+        # distinguishes a final submit labelled "Weiter" from an ordinary
+        # navigation button -- that case passed every keyword rule -- so the
+        # page has to say which one it is rather than the gate guessing.
+        links_a_rail = any(url and url in visible for url in urls.values())
+        if links_a_rail:
+            declared = ORDER_BUTTON_MARKED.findall(visible)
+            if not declared:
+                problems.append(
+                    f"{page.relative_to(ROOT)} links a payment rail but marks "
+                    f"no ordering control; add data-order-button to the control "
+                    f"that concludes the contract so its label can be checked")
+            for label in declared:
+                text = re.sub(r"\s+", " ", TAG.sub(" ", label)).strip()
+                if ORDER_BUTTON_REQUIRED not in text.lower():
+                    problems.append(
+                        f"{page.relative_to(ROOT)} marks an ordering control "
+                        f"labelled {text!r}; house wording is "
+                        f"'{ORDER_BUTTON_REQUIRED}'")
+
+        for m in ORDER_CONTROL.finditer(visible):
+            label = TAG.sub(" ", m.group("label"))
+            label = re.sub(r"\s+", " ", label).strip()
+            if ORDER_BUTTON_REQUIRED not in label.lower():
+                problems.append(
+                    f"{page.relative_to(ROOT)} has a German ordering control "
+                    f"labelled {label!r}; house wording is "
+                    f"'{ORDER_BUTTON_REQUIRED}' (BGB 312j Abs. 3 allows "
+                    f"equivalent wording -- changing it is a lawyer's call)")
+    return problems
+
+
+def check_rails(pages: list[Path]) -> list[str]:
+    """A page may only offer a rail the app can actually open."""
+    problems: list[str] = []
+    urls = policy_rail_urls()
+    for page in pages:
+        raw = page.read_text()
+        for rail, patterns in RAIL_OFFER_WORDS.items():
+            offered = any(pat.search(raw) for pat in patterns)
+            configured = bool(urls.get(rail))
+            if offered and not configured:
+                problems.append(
+                    f"{page.relative_to(ROOT)} offers {rail} but "
+                    f"PressTalkOffer has no {rail} checkout URL")
+            if configured and urls[rail] not in raw and offered:
+                problems.append(
+                    f"{page.relative_to(ROOT)} offers {rail} but does not link "
+                    f"the configured {rail} URL")
+    # And the reverse: a live rail nobody can reach from the site is money left
+    # on the table, but it is not a lie, so it is reported rather than failed.
+    for rail, url in urls.items():
+        if url and not any(url in p.read_text() for p in pages):
+            print(f"note  {rail} checkout is configured in the app but appears "
+                  f"on no page (fine while purchases are paused)")
+    return problems
 
 TAG = re.compile(r"<[^>]+>")
 
@@ -146,6 +306,13 @@ def main() -> int:
                     "site/impressum.html: service address is still a placeholder; "
                     "an Impressum without a real postal address is not an Impressum")
                 break
+
+    # Wired here, not merely defined above. Adding a check function and
+    # forgetting to call it is how this repo produced three fail-open gates in
+    # one afternoon, and the suite reports green either way.
+    html_pages = [p for p in targets if p.suffix == ".html"]
+    failures.extend(check_rails(html_pages))
+    failures.extend(check_rail_legal_wording(html_pages))
 
     for f in failures:
         print(f"FAIL  {f}")

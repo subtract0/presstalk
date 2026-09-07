@@ -8,6 +8,7 @@ let package = Package(
         .macOS(.v14),
     ],
     products: [
+        .executable(name: "presstalk-capture-probe", targets: ["PressTalkCaptureProbe"]),
         .executable(
             name: "jarvistap",
             targets: ["JarvisTap"]
@@ -34,6 +35,12 @@ let package = Package(
         ),
     ],
     targets: [
+        .target(name: "PressTalkHAL", linkerSettings: [
+            .linkedFramework("AudioToolbox"), .linkedFramework("CoreAudio"),
+        ]),
+        .target(name: "PressTalkCapture", dependencies: ["PressTalkHAL"]),
+        .executableTarget(name: "PressTalkCaptureProbe", dependencies: ["PressTalkCapture"]),
+        .testTarget(name: "PressTalkCaptureTests", dependencies: ["PressTalkCapture", "PressTalkHAL"]),
         .target(
             name: "PressTalkCore",
             dependencies: [],
@@ -42,6 +49,7 @@ let package = Package(
         .executableTarget(
             name: "JarvisTap",
             dependencies: [
+                "PressTalkCapture",
                 "PressTalkCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 "WhisperKit",

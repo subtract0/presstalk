@@ -11,10 +11,10 @@ import Foundation
 /// arrived.
 public struct AudioCaptureProbeReport: Codable, Equatable {
     public enum Outcome: String, Codable {
-        /// Frames arrived. The capture path works end to end.
+        /// The production capture adapter retained PCM. Recognition and insertion are untested.
         case captured
-        /// The engine started and no frames arrived. Almost always a missing
-        /// entitlement or a revoked TCC grant, never a hardware fault.
+        /// The engine started and no frames arrived. This alone does not
+        /// distinguish permission, device, driver or capture implementation failures.
         case silentDenial = "silent_denial"
         /// The audio engine refused to start at all.
         case engineFailed = "engine_failed"

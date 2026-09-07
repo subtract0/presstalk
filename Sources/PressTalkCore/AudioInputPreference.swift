@@ -32,7 +32,21 @@ public enum AudioInputPreference: Equatable {
     /// AudioDeviceID, which macOS reassigns across reboots and replugs.
     case specificDevice(uid: String)
 
-    public static let `default` = AudioInputPreference.systemDefault
+    /// Prefer wired, not system default.
+    ///
+    /// This was `.systemDefault`, on the reasoning that PressTalk should follow
+    /// macOS like most applications do. Measurement changed the answer: on this
+    /// hardware AirPods take about 1.2 s to start against a USB microphone's
+    /// 0.33 s, and 1.2 s is five or six syllables gone before recording begins.
+    /// A dictation app silently inheriting that costs the user their first
+    /// words with no explanation.
+    ///
+    /// This is not the old override returning. That one *changed* the system
+    /// default, so every other application on the Mac followed PressTalk's
+    /// opinion. This binds PressTalk's own capture engine and changes nothing
+    /// outside it, and `.systemDefault` remains one click away for anyone who
+    /// wants their headset used.
+    public static let `default` = AudioInputPreference.preferWired
 
     // MARK: persistence
 
@@ -49,12 +63,16 @@ public enum AudioInputPreference: Equatable {
         case "prefer_wired": self = .preferWired
         case let value? where value.hasPrefix("device:"):
             let uid = String(value.dropFirst("device:".count))
-            self = uid.isEmpty ? .systemDefault : .specificDevice(uid: uid)
+            // A device prefix with nothing after it is corruption, not a
+            // choice of system default. It lands on the shipped default like
+            // every other unrecognised value.
+            self = uid.isEmpty ? .default : .specificDevice(uid: uid)
+        case "system_default": self = .systemDefault
         default:
-            // Unknown or absent falls back to the system default rather than to
-            // the old override, so a corrupt preference cannot resurrect the
-            // behaviour this type exists to retire.
-            self = .systemDefault
+            // Absent means never chosen, so the shipped default applies. An
+            // unrecognised value lands here too, which is safe: preferWired
+            // changes nothing outside PressTalk.
+            self = .default
         }
     }
 
@@ -98,10 +116,9 @@ public enum AudioInputSelector {
 
         case .specificDevice(let uid):
             guard let match = devices.first(where: { $0.uid == uid }) else {
-                // The device is unplugged. Falling back to the system default
-                // is better than failing: the user gets a working microphone
-                // and their preference is still there when they replug it.
-                return Choice(deviceUID: nil, reason: "preferred_device_absent",
+                // Preserve identity even when absent. The caller must report
+                // unavailability; substituting another microphone is not consent.
+                return Choice(deviceUID: uid, reason: "preferred_device_absent",
                               requiresPromotion: false)
             }
             return Choice(deviceUID: match.uid,
@@ -114,12 +131,25 @@ public enum AudioInputSelector {
                 return Choice(deviceUID: nil, reason: "no_default_device",
                               requiresPromotion: false)
             }
-            guard current.isBluetooth else {
+            // Continuity counts as a reason to look, not only Bluetooth.
+            // Excluding the phone from being CHOSEN did nothing when the phone
+            // was already the system default: it is not Bluetooth, so this
+            // returned "default_is_already_wired" and kept it. The exclusion
+            // and this test have to agree on what counts as a real microphone
+            // or the exclusion only works in the cases it was tested on.
+            guard current.isBluetooth || current.isContinuity else {
                 return Choice(deviceUID: nil, reason: "default_is_already_wired",
                               requiresPromotion: false)
             }
-            guard let wired = devices.first(where: { !$0.isBluetooth && !$0.isVirtual })
-            else {
+            // Continuity is excluded here, not merely ranked below. An iPhone
+            // is not a wired alternative in any sense a person would accept: it
+            // may be in another room, and it stops being a microphone the
+            // moment they pick it up. Ranking alone still selected it when it
+            // was the only non-Bluetooth device in the list, which on a Mac
+            // Studio with AirPods and a phone on the desk is the common case.
+            guard let wired = devices.first(where: {
+                !$0.isBluetooth && !$0.isVirtual && !$0.isContinuity
+            }) else {
                 // Bluetooth is all there is. Using it beats refusing to record.
                 return Choice(deviceUID: nil, reason: "no_wired_alternative",
                               requiresPromotion: false)
@@ -135,14 +165,19 @@ public enum AudioInputSelector {
         public let isDefault: Bool
         public let isBluetooth: Bool
         public let isVirtual: Bool
+        /// An iPhone or iPad offered over Continuity. Defaulted to false so a
+        /// caller that has not thought about it cannot accidentally mark a real
+        /// microphone as one.
+        public let isContinuity: Bool
 
         public init(uid: String, name: String, isDefault: Bool,
-                    isBluetooth: Bool, isVirtual: Bool) {
+                    isBluetooth: Bool, isVirtual: Bool, isContinuity: Bool = false) {
             self.uid = uid
             self.name = name
             self.isDefault = isDefault
             self.isBluetooth = isBluetooth
             self.isVirtual = isVirtual
+            self.isContinuity = isContinuity
         }
     }
 }

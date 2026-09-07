@@ -24,11 +24,23 @@ public struct AudioPreflightCache {
         public let deviceUID: String
         public let sampleRate: Double
         public let channelCount: UInt32
+        /// The rate the device's input stream is actually RUNNING at, which is
+        /// not always its nominal rate.
+        ///
+        /// Without this the fingerprint could not see the exact change the
+        /// preflight exists to catch: a device whose nominal rate and channel
+        /// count are unchanged, but whose stream has moved to 44100, matches a
+        /// cached success and takes the cached branch -- while a fresh check on
+        /// the same device reports a format mismatch. The cache was answering a
+        /// narrower question than the check it was caching.
+        public let runningSampleRate: Double
 
-        public init(deviceUID: String, sampleRate: Double, channelCount: UInt32) {
+        public init(deviceUID: String, sampleRate: Double, channelCount: UInt32,
+                    runningSampleRate: Double = 0) {
             self.deviceUID = deviceUID
             self.sampleRate = sampleRate
             self.channelCount = channelCount
+            self.runningSampleRate = runningSampleRate
         }
     }
 

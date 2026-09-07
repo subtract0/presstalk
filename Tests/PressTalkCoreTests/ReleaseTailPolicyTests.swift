@@ -5,16 +5,60 @@ import XCTest
 /// sentence, release -- and the closing sentence is missing.
 final class ReleaseTailPolicyTests: XCTestCase {
 
+    /// `stalledFor` defaults to a single poll interval: the ordinary case,
+    /// where the tap simply has not delivered its next 0.1 s buffer yet.
     private func inputs(elapsed: Double, captured: Double, expected: Double,
-                        rms: Double, growing: Bool = true) -> ReleaseTailPolicy.Inputs {
+                        rms: Double, stalledFor: Double = 0.025)
+    -> ReleaseTailPolicy.Inputs {
         .init(elapsedSeconds: elapsed, capturedSeconds: captured,
               expectedAtReleaseSeconds: expected, recentRMS: rms,
-              capturedGrewSinceLastPoll: growing)
+              secondsSinceCapturedGrew: stalledFor)
     }
 
     private func decide(_ i: ReleaseTailPolicy.Inputs,
                         max: Double = 0.35) -> ReleaseTailPolicy.Decision {
         ReleaseTailPolicy.decide(i, maximumSeconds: max)
+    }
+
+    // MARK: one silent poll is not a dead microphone
+
+    /// Real values from the trace, 2026-09-07: expected 3.52 s at release,
+    /// 3.40 s captured, 0.11 s elapsed, and no growth in the most recent poll.
+    /// The old rule read that single quiet poll as a dead tap and stopped,
+    /// discarding 120 ms of speech still in flight -- and it did so on 11 of
+    /// the 13 tails in that log.
+    ///
+    /// The tap delivers one buffer per 0.1 s while this polls every 0.025 s, so
+    /// three polls in four see no growth in perfectly healthy capture. The
+    /// signal was never evidence of anything.
+    func testASinglePollWithoutGrowthIsNotADeadStream() {
+        let decision = decide(inputs(
+            elapsed: 0.11, captured: 3.40, expected: 3.52, rms: 0.0005,
+            stalledFor: 0.025))
+        XCTAssertFalse(decision.shouldStop, "stopped on one quiet poll")
+        XCTAssertEqual(decision.reason, "audio_still_in_flight")
+    }
+
+    /// Nor are two or three of them, which is the ordinary gap between buffers.
+    func testAWholeBufferIntervalWithoutGrowthStillWaits() {
+        for stalled in [0.05, 0.10, 0.20] {
+            let decision = decide(inputs(
+                elapsed: 0.15, captured: 3.40, expected: 3.52, rms: 0.0005,
+                stalledFor: stalled))
+            XCTAssertFalse(decision.shouldStop,
+                           "stopped after only \(stalled)s without growth")
+        }
+    }
+
+    /// The protection that must survive: a tap that has genuinely stopped
+    /// delivering should not hold the tail open to its maximum, because that
+    /// adds latency to a capture that is already broken.
+    func testATrulyStalledTapStillStops() {
+        let decision = decide(inputs(
+            elapsed: 0.30, captured: 3.40, expected: 3.52, rms: 0.0005,
+            stalledFor: 0.30))
+        XCTAssertTrue(decision.shouldStop)
+        XCTAssertEqual(decision.reason, "no_further_audio")
     }
 
     // MARK: the reported bug
@@ -88,7 +132,7 @@ final class ReleaseTailPolicyTests: XCTestCase {
     func testStopsWhenNoFurtherAudioIsArriving() {
         let decision = decide(inputs(
             elapsed: 0.15, captured: 1.70, expected: 37.20, rms: 0.0,
-            growing: false))
+            stalledFor: 0.4))
         XCTAssertTrue(decision.shouldStop)
         XCTAssertEqual(decision.reason, "no_further_audio")
     }

@@ -15,7 +15,6 @@ struct JarvisTapConfig {
     let codexExecutionTimeoutSeconds: TimeInterval
     let memoryStorePath: String
     let whisperModel: String
-    let whisperLanguage: String?
     let whisperComputePreset: String
     let asrBackend: String
     let streamingASRBackend: String?
@@ -25,6 +24,20 @@ struct JarvisTapConfig {
     let qualityFallbackAutoDownload: Bool
     let testHarnessEnabled: Bool
     let fixtureAudioURL: URL?
+    /// Deliver fixture audio at wall-clock pace, in tap-sized chunks, instead
+    /// of appending the whole clip in one call.
+    ///
+    /// Replay existed to make the pipeline repeatable, and it does -- but by
+    /// handing over every sample instantly it makes the recording INSTANTLY
+    /// complete, so the capture is never behind the key release and the tail
+    /// policy's whole reason for existing is never exercised. The two defects
+    /// that cost real words -- a start that arrives late and a tail that stops
+    /// early -- are precisely the two that replay could not reproduce.
+    let fixtureReplayRealtime: Bool
+    /// Seconds to wait before the first fixture chunk, standing in for a
+    /// microphone that takes its time. Measured on this Mac: 0.33 s for the USB
+    /// Shure, about 1.2 s for AirPods.
+    let fixtureEngineStartSeconds: Double
     let harnessResultsURL: URL?
     /// Harness runs do not paste by default. A test that types into whatever
     /// window happens to be focused is a test that damages the operator's work.
@@ -99,10 +112,6 @@ struct JarvisTapConfig {
             env["JARVISTAP_WHISPERKIT_MODEL"] ??
             env["JARVISTAP_WHISPER_MODEL"] ??
             "openai_whisper-large-v3-v20240930_turbo_632MB"
-
-        let whisperLanguage = env["JARVISTAP_WHISPER_LANGUAGE"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
 
         let whisperComputePreset =
             (env["PRESSTALK_WHISPER_COMPUTE"] ??
@@ -212,6 +221,16 @@ struct JarvisTapConfig {
             return URL(fileURLWithPath: path)
         }()
 
+        let fixtureReplayRealtime = testHarnessEnabled
+            && env["PRESSTALK_FIXTURE_REPLAY_REALTIME"] == "1"
+        let fixtureEngineStartSeconds: Double = {
+            guard testHarnessEnabled,
+                  let raw = env["PRESSTALK_FIXTURE_ENGINE_START_SECONDS"],
+                  let value = Double(raw), value > 0
+            else { return 0 }
+            return min(value, 5.0)
+        }()
+
         let harnessResultsURL: URL? = {
             guard testHarnessEnabled,
                   let path = env["PRESSTALK_HARNESS_RESULTS"]?
@@ -269,12 +288,33 @@ struct JarvisTapConfig {
         let enableNativeMicrophoneKey =
             env["PRESSTALK_ENABLE_NATIVE_MICROPHONE_KEY"] == "1" ||
             env["JARVISTAP_ENABLE_NATIVE_MICROPHONE_KEY"] == "1"
+        // Opt-OUT, not opt-in. This was opt-in, and the consequence was that a
+        // person who downloaded the zip from presstalk.app and double-clicked
+        // the app -- the path the whole website sends people down -- got no
+        // onboarding whatsoever. An icon in the menu bar, no permissions
+        // granted, nothing happening when they held the key, and no
+        // explanation. The Homebrew cask set the variable, so the only people
+        // who ever saw guided setup were the ones who installed the way almost
+        // nobody does.
+        //
+        // Finder does not pass a shell environment to a launched app, so any
+        // customer-visible default that lives only in an environment variable
+        // is absent for exactly the people it exists for. That is the same
+        // defect as the checkout URL being env-only, found the same day.
+        //
+        // Every path that genuinely needs silence -- launchd, the bootstrap
+        // installer, the accessibility and insertion probes, the smoke runs --
+        // sets the variable to 0 explicitly, so inverting the default takes
+        // nothing away from them.
         let autoShowSetupWindow =
-            env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "1" ||
-            env["JARVISTAP_AUTO_SHOW_SETUP_WINDOW"] == "1"
+            !(env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "0" ||
+              env["JARVISTAP_AUTO_SHOW_SETUP_WINDOW"] == "0")
+        // Background launchers can suppress automatic setup and permission
+        // prompts. Explicit Settings/setup buttons remain actionable regardless
+        // of this flag; opening a pane on request grants no permission itself.
         let allowPermissionPaneOpen =
-            env["PRESSTALK_OPEN_PERMISSION_PANES"] == "1" ||
-            env["JARVISTAP_OPEN_PERMISSION_PANES"] == "1"
+            !(env["PRESSTALK_OPEN_PERMISSION_PANES"] == "0" ||
+              env["JARVISTAP_OPEN_PERMISSION_PANES"] == "0")
 
         return JarvisTapConfig(
             agentMode: agentMode,
@@ -290,7 +330,6 @@ struct JarvisTapConfig {
             codexExecutionTimeoutSeconds: codexExecutionTimeoutSeconds,
             memoryStorePath: memoryStorePath,
             whisperModel: whisperModel,
-            whisperLanguage: (whisperLanguage?.isEmpty == false) ? whisperLanguage : nil,
             whisperComputePreset: whisperComputePreset,
             asrBackend: asrBackend,
             streamingASRBackend: streamingASRBackend,
@@ -300,6 +339,8 @@ struct JarvisTapConfig {
             qualityFallbackAutoDownload: qualityFallbackAutoDownload,
             testHarnessEnabled: testHarnessEnabled,
             fixtureAudioURL: fixtureAudioURL,
+            fixtureReplayRealtime: fixtureReplayRealtime,
+            fixtureEngineStartSeconds: fixtureEngineStartSeconds,
             harnessResultsURL: harnessResultsURL,
             testHarnessSuppressesInsertion: testHarnessSuppressesInsertion,
             sayVoice: env["JARVISTAP_SAY_VOICE"],

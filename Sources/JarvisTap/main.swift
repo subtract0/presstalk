@@ -9,6 +9,7 @@ import FluidAudio
 import Foundation
 import IOKit.hidsystem
 import PressTalkCore
+import PressTalkCapture
 import WhisperKit
 
 private let fnModifierMask = CGEventFlags(rawValue: UInt64(NX_SECONDARYFNMASK))
@@ -127,6 +128,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         case inserted(String)
         case copied(String)
         case aborted(String)
+        /// A note about the capture that accompanies delivered text rather
+        /// than replacing it -- the words arrived, and this says why they
+        /// begin where they do.
+        case captureNote(String)
+        /// The key was pressed while the previous dictation was still being
+        /// recognised, so nothing was recorded. Said out loud, because the
+        /// alternative is a key that silently does nothing.
+        case busy(String)
         case audioUnavailable(String)
         case error(String)
         case setupRequired(String)
@@ -227,14 +236,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private let shortHoldNoSpeechSuppressionSeconds: TimeInterval = 1.50
     private let trackpadPreviewTickSeconds: TimeInterval = 1.0 / 30.0
     private let nativePointerCancellationWindowSeconds: TimeInterval = 0.20
-    private let retiredAudioEngineRetainSeconds: TimeInterval = 3.0
-    private let retiredAudioEngineLimit = 8
     private let setupRetryIntervalSeconds: TimeInterval = 5.0
     private let inputMethodFailureCooldownSeconds: TimeInterval = 10 * 60
     private let inputMethodDictationEnvKey = "PRESSTALK_ENABLE_EXPERIMENTAL_INPUT_METHOD_DICTATION"
     private let stateLock = NSLock()
     private let audioCaptureLock = NSLock()
-    private let audioEngineStopLock = NSLock()
 
     private var eventTap: CFMachPort?
     private var eventTapInstallSummary = "not_installed"
@@ -242,11 +248,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var registeredHotKeyRef: EventHotKeyRef?
     private var registeredHotKeyEventHandler: EventHandlerRef?
     private var specialKeyMonitor: Any?
-    /// Microphone capture. PressTalk records through WhisperKit's
-    /// `AudioProcessor` no matter which recognizer transcribes, so this instance
-    /// is built with `load: false, download: false`: it costs 2 ms and zero
-    /// bytes on disk, and it is what makes a 461 MB first run possible instead
-    /// of 1.1 GB.
+    /// Lightweight WhisperKit state for existing recognizer integration.
+    /// Microphone I/O belongs exclusively to ownedCapture.
     private var audioCaptureKit: WhisperKit?
 
     /// The full WhisperKit model, ~619 MB on disk. Needed only when WhisperKit
@@ -258,7 +261,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var fluidStreamingAsrManager: (any StreamingAsrManager)?
     private var fluidStreamingFedSampleCount = 0
     private var streamTranscriber: AudioStreamTranscriber?
-    private var retiredAudioEngines: [(id: ObjectIdentifier, engine: AVAudioEngine, retiredAt: Date)] = []
     private var decodingOptions = DecodingOptions(
         verbose: false,
         task: .transcribe,
@@ -284,6 +286,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var liveCapturedAudioSamples: [Float] = []
     private var activeCaptureSessionID: UInt64 = 0
     private var activeCaptureEngineStarted = false
+    private let ownedCapture = HALCapture()
+    private var activeCaptureFailure: String?
+    private var captureSleepObserver: NSObjectProtocol?
     private var lastInputDebugSignature = ""
     private var darwinNotificationObserverInstalled = false
     private var productionInsertionProbeObserverInstalled = false
@@ -299,7 +304,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var amplitudeMonitorTask: Task<Void, Never>?
     private var trackpadPreviewTask: Task<Void, Never>?
     private var presentationState: PresentationState = .warming
+    private var presentationRevision: UInt64 = 0
     private var inputPipelineReady = false
+    private var installedTriggerKey: JarvisTapSettingsStore.TriggerKeyOption?
     private var triggerBridgeTelemetry = TriggerBridgeTelemetry()
     private var karabinerFallbackEnabled = false
     private var nativeCalibrationSession: NativeCalibrationSession?
@@ -313,6 +320,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var microphoneCaptureVerified = false
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
+    private var accessibilityPermissionRequestAttempted = false
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
     private var activeInputMethodPreselection: InputMethodPreselectionSession?
     private var inputMethodHelperWarmupScheduled = false
@@ -346,16 +354,62 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func appendLiveCapturedAudioSamples(_ samples: [Float]) {
         guard !samples.isEmpty else { return }
+        // The first real samples are what clear the crash-breaker marker: this
+        // is the moment the chosen device is proven to work, as opposed to the
+        // moment the tap was installed on it.
+        clearAudioInputAttempt()
         audioCaptureLock.lock()
         liveCapturedAudioSamples.append(contentsOf: samples)
         audioCaptureLock.unlock()
     }
 
     private func appendLiveCapturedAudioSamples(_ samples: [Float], sessionID: UInt64) {
-        guard withStateLock({
-            activeCaptureSessionID == sessionID && (isRecording || isProcessing)
-        }) else { return }
-        appendLiveCapturedAudioSamples(samples)
+        guard !samples.isEmpty, samples.allSatisfy(\.isFinite) else { return }
+        let becameReady = withStateLock { () -> Bool in
+            guard activeCaptureSessionID == sessionID, activeCaptureFailure == nil,
+                  isRecording || isProcessing else { return false }
+            // Admission and retention are atomic with respect to session changes.
+            appendLiveCapturedAudioSamples(samples)
+            guard isRecording, !activeCaptureEngineStarted else { return false }
+            activeCaptureEngineStarted = true
+            activeEngineStartLatencySeconds = activeTriggerStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+            return true
+        }
+        if becameReady {
+            traceLogger.log("Capture ready after retained PCM session=\(sessionID)")
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.withStateLock({ self.isRecording &&
+                    self.activeCaptureSessionID == sessionID && self.activeCaptureFailure == nil }) else { return }
+                self.present(.listening(nil))
+            }
+        }
+    }
+
+    private func captureFailed(_ message: String, sessionID: UInt64) {
+        let report = withStateLock { () -> Bool in
+            guard activeCaptureSessionID == sessionID else { return false }
+            activeCaptureFailure = message
+            activeCaptureEngineStarted = false
+            // Release owns the terminal result if it has already started.
+            guard isRecording else { return false }
+            isRecording = false
+            activeTrigger = nil
+            activeTriggerSource = nil
+            activeTriggerStartedAt = nil
+            streamTask?.cancel()
+            streamTask = nil
+            return true
+        }
+        traceLogger.log("Capture interrupted session=\(sessionID) reason=\(message)")
+        if report {
+            DispatchQueue.main.async { [weak self] in
+                guard let self, self.withStateLock({ self.activeCaptureSessionID == sessionID &&
+                    !self.isRecording && !self.isProcessing }) else { return }
+                self.stopAmplitudeMonitoring()
+                self.restoreInputMethodPreselectionIfNeeded(reason: "capture_interrupted")
+                self.present(.audioUnavailable(message))
+            }
+        }
     }
 
     private func liveCapturedAudioSampleCount() -> Int {
@@ -385,6 +439,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        captureSleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            guard let self else { return }
+            let session = self.withStateLock { self.activeCaptureSessionID }
+            self.captureFailed("Recording was interrupted by sleep. Nothing was inserted.", sessionID: session)
+            self.ownedCapture.invalidate(session: session, reason: "System sleep interrupted capture.")
+        }
         let exitCode = runStartup()
         if exitCode != 0 {
             NSApp.terminate(nil)
@@ -398,6 +460,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         stopSetupRetry()
+        // An orderly quit is not a crash. Without this, quitting or restarting
+        // inside the sub-second window while the engine is starting leaves the
+        // attempt record behind, and the next launch revokes a microphone that
+        // was working perfectly. A crash does not reach this line, which is
+        // exactly the distinction the breaker needs.
+        clearAudioInputAttempt()
         restoreInputMethodPreselectionIfNeeded(reason: "application_terminating")
         if singletonLockFileDescriptor >= 0 {
             flock(singletonLockFileDescriptor, LOCK_UN)
@@ -421,6 +489,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         licenseStore.recordInstallGenerationIfNeeded()
 
         traceLogger.log("Startup initiated trace_log=\(config.traceLogPath)")
+        traceLogger.log("Capture build bundle=\(Bundle.main.bundleIdentifier ?? "unknown") build=\(Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "unknown") executable=\(Bundle.main.executablePath ?? "unknown")")
         guard acquireSingletonLock() else {
             traceLogger.log("Duplicate PressTalk instance detected; exiting secondary process")
             DispatchQueue.main.async {
@@ -428,6 +497,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             return 0
         }
+        // Report an interrupted prior start without changing microphone choice.
+        applyAudioInputCrashBreaker()
         traceLogger.log("Bundle path=\(Bundle.main.bundleURL.path)")
         traceLogger.log("Executable path=\(Bundle.main.executableURL?.path ?? "unknown")")
         traceLogger.log("Agent mode=\(config.agentMode)")
@@ -533,6 +604,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             traceLogger.log("Accessibility permission OK")
         } else {
             traceLogger.log("Accessibility preflight unavailable; paste will use capability probe")
+            requestAccessibilityPermissionIfNeeded()
             if presentFailureStatus {
                 print("Accessibility preflight unavailable; continuing and testing paste when needed.")
                 fflush(stdout)
@@ -560,7 +632,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             installSystemDefinedMonitor()
             inputPipelineReady = true
-            stopSetupRetry()
+            installedTriggerKey = settingsStore.triggerKey
+            // A listen-only tap is a fallback, not an arrival. It installs
+            // without Accessibility, marks the pipeline ready and stops the
+            // retry -- so granting Accessibility afterwards upgraded nothing,
+            // and guided setup waited forever for a writable tap it had already
+            // given up on. Keep retrying until the tap is actually writable.
+            if eventTapInstallSummary.contains("listen_only") {
+                traceLogger.log(
+                    "Input trigger listener is listen-only; keeping retry alive to "
+                    + "upgrade once Accessibility is granted")
+                scheduleSetupRetry()
+            } else {
+                stopSetupRetry()
+            }
             traceLogger.log("Input trigger listeners installed")
             print("Input trigger listeners installed.")
             fflush(stdout)
@@ -568,7 +653,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             print("PressTalk armed. Hold \(settingsStore.triggerKey.displayName) to speak, then release to finalize.")
             print("ASR warmup: background")
             print("ASR model: \(config.whisperModel)")
-            print("ASR language: \(config.whisperLanguage ?? "auto")")
+            print("ASR language: auto")
             print("Agent mode: \(config.agentMode)")
             fflush(stdout)
             scheduleInputMethodHelperWarmupIfNeeded()
@@ -600,14 +685,75 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             (showSetupWindowOnFailure || forcePresentSetupWindow)
     }
 
+    private func accessibilityIsTrusted() -> Bool { AXIsProcessTrusted() }
+
+    private func requestAccessibilityPermissionIfNeeded() {
+        guard config.allowPermissionPaneOpen, settingsStore.pasteAutomatically,
+              !accessibilityPermissionRequestAttempted, !accessibilityIsTrusted() else { return }
+        accessibilityPermissionRequestAttempted = true
+        traceLogger.log("Requesting native Accessibility permission for automatic text insertion")
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        // The system presents the request asynchronously. It is not a grant:
+        // the existing retry still checks trust before enabling insertion.
+        _ = AXIsProcessTrustedWithOptions(options)
+    }
+
+    /// Releases the current event tap so a fresh one can be installed.
+    ///
+    /// Needed because a listen-only tap cannot be promoted in place: macOS
+    /// decides listen-only versus writable when the tap is created, from the
+    /// permissions held at that moment. Granting Accessibility afterwards
+    /// changes nothing about a tap that already exists, which is why the guide
+    /// used to sit on a step that could never complete.
+    @discardableResult
+    private func teardownInputTriggerListener() -> Bool {
+        if let registeredHotKeyRef {
+            let status = UnregisterEventHotKey(registeredHotKeyRef)
+            guard status == noErr else {
+                traceLogger.log("Could not release registered shortcut status=\(status)")
+                return false
+            }
+            self.registeredHotKeyRef = nil
+        }
+        if let registeredHotKeyEventHandler {
+            let status = RemoveEventHandler(registeredHotKeyEventHandler)
+            guard status == noErr else {
+                traceLogger.log("Could not release shortcut handler status=\(status)")
+                return false
+            }
+            self.registeredHotKeyEventHandler = nil
+        }
+        if let runLoopSource {
+            CFRunLoopRemoveSource(CFRunLoopGetCurrent(), runLoopSource, .commonModes)
+            self.runLoopSource = nil
+        }
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
+            self.eventTap = nil
+        }
+        eventTapInstallSummary = ""
+        traceLogger.log("Input trigger listener torn down for reinstall")
+        return true
+    }
+
     private func scheduleSetupRetry() {
         guard setupRetryTimer == nil else { return }
         traceLogger.log("Setup retry timer started interval_seconds=\(String(format: "%.1f", setupRetryIntervalSeconds))")
         let timer = Timer(timeInterval: setupRetryIntervalSeconds, repeats: true) { [weak self] _ in
             guard let self else { return }
-            if self.inputPipelineReady {
+            // Ready with a writable tap is done. Ready with a listen-only tap
+            // is the trap: the old check saw inputPipelineReady, stopped, and
+            // left the user on a step that could never be satisfied.
+            let onlyListening = self.eventTapInstallSummary.contains("listen_only")
+            if self.inputPipelineReady && !onlyListening {
                 self.stopSetupRetry()
                 return
+            }
+            if onlyListening, self.accessibilityIsTrusted() {
+                self.traceLogger.log("Accessibility now granted; reinstalling event tap as writable")
+                self.teardownInputTriggerListener()
+                self.inputPipelineReady = false
             }
             self.completeStartupIfPossible(
                 showSetupWindowOnFailure: false,
@@ -660,23 +806,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func applyWhisperDecodingPreferences() {
-        if let whisperLanguage = settingsStore.preferredLanguage.whisperLanguageCode {
-            decodingOptions.language = whisperLanguage
-            decodingOptions.detectLanguage = false
-        } else {
-            decodingOptions.language = nil
-            decodingOptions.detectLanguage = true
-        }
+        decodingOptions.language = nil
+        decodingOptions.detectLanguage = true
     }
 
     private var appDisplayTitle: String {
+        let name = Bundle.main.infoDictionary?["CFBundleDisplayName"] as? String ?? "PressTalk"
         let version = (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String)?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nonEmpty
         guard let version else {
-            return "PressTalk"
+            return name
         }
-        return "PressTalk \(version)"
+        return "\(name) \(version)"
     }
 
     private func installProductUI() {
@@ -692,6 +834,31 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsWindowController.onRunPhysicalSmoke = { [weak self] in
             self?.runPhysicalSmokeFromSettings()
         }
+        // The picker lists exactly what the capture path enumerates. A second
+        // enumeration in the view could disagree with it, and then someone
+        // selects a microphone the app will never choose.
+        settingsWindowController.onListAudioInputs = { [weak self] in
+            guard let self else { return [] }
+            let latency = self.inputLatencyMemory
+            return self.coreAudioInputDevices().map { candidate in
+                PressTalkSettingsWindowController.AudioInputChoice(
+                    uid: candidate.uid,
+                    name: candidate.name,
+                    isDefault: candidate.isDefault,
+                    isBluetooth: candidate.isBluetoothLike,
+                    startNote: latency.annotation(forDeviceUID: candidate.uid))
+            }
+        }
+        settingsWindowController.onAudioInputPreferenceChanged = { [weak self] in
+            guard let self else { return }
+            // Takes effect on the next hold. Nothing is torn down here: a
+            // change mid-capture would drop audio the user is in the middle of
+            // speaking.
+            self.traceLogger.log(
+                "Audio input preference changed to \(self.audioInputPreference.storageValue)")
+            self.refreshRuntimeStatusUI()
+        }
+
         settingsWindowController.onExportDiagnostics = { [weak self] in
             self?.exportDiagnostics()
         }
@@ -789,9 +956,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         setupCheckItem.target = self
         menu.addItem(setupCheckItem)
 
-        let physicalSmokeItem = NSMenuItem(title: "Run Physical Smoke…", action: #selector(runPhysicalSmokeFromMenu(_:)), keyEquivalent: "")
+        let physicalSmokeItem = NSMenuItem(title: "Test Dictation Shortcut…", action: #selector(runPhysicalSmokeFromMenu(_:)), keyEquivalent: "")
         physicalSmokeItem.target = self
-        physicalSmokeItem.toolTip = "Opens the bundled physical trigger smoke helper without opening privacy panes."
+        physicalSmokeItem.toolTip = "Opens the shortcut test helper."
         menu.addItem(physicalSmokeItem)
 
         let repairSigningItem = NSMenuItem(title: "Repair Signing…", action: #selector(repairLocalSigningFromMenu(_:)), keyEquivalent: "")
@@ -830,10 +997,30 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleSettingsChanged() {
+        if installedTriggerKey != settingsStore.triggerKey {
+            if let previous = installedTriggerKey,
+               withStateLock({ isRecording || isProcessing || trackpadHoldState != nil || nativeCalibrationSession != nil }) {
+                settingsStore.triggerKey = previous
+                settingsWindowController?.reloadFromStore()
+                present(.busy("Finish the current recording or shortcut calibration before changing the shortcut."))
+                return
+            }
+            stopSetupRetry()
+            guard teardownInputTriggerListener() else {
+                if let previous = installedTriggerKey { settingsStore.triggerKey = previous }
+                settingsWindowController?.reloadFromStore()
+                present(.setupRequired("The previous shortcut could not be released. Restart PressTalk before changing it."))
+                return
+            }
+            inputPipelineReady = false
+            installedTriggerKey = nil
+            withStateLock { triggerBridgeTelemetry = TriggerBridgeTelemetry() }
+            completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
+        }
         applyWhisperDecodingPreferences()
         refreshMenuSettingsState()
         traceLogger.log(
-            "Settings updated show_hud=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) abort_popups=\(settingsStore.showAbortPopups ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) language=\(settingsStore.preferredLanguage.rawValue) release_tail_max_seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds)) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)"
+            "Settings updated show_hud=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) abort_popups=\(settingsStore.showAbortPopups ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) language=auto release_tail_max_seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds)) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)"
         )
 
         if !settingsStore.showHUD {
@@ -1019,11 +1206,52 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func present(_ state: PresentationState) {
-        withStateLock {
-            presentationState = state
+        let update = withStateLock { () -> (PresentationState, UInt64)? in
+            var resolvedState = state
+            if case .warming = state {
+                guard !isRecording && !isProcessing else { return nil }
+                // Permission retries continue after the model has loaded. Read
+                // readiness under the same lock as this presentation update so
+                // a retry cannot overwrite Ready with a stale warming message.
+                if case .ready = whisperLoadState { resolvedState = .ready }
+            }
+            if case .listening = resolvedState {
+                guard isRecording && activeCaptureEngineStarted && activeCaptureFailure == nil else { return nil }
+            }
+            presentationState = resolvedState
+            presentationRevision &+= 1
+            return (resolvedState, presentationRevision)
         }
+        guard let (resolvedState, revision) = update else { return }
         DispatchQueue.main.async { [weak self] in
-            self?.applyPresentationState(state)
+            guard let self, self.withStateLock({ () -> Bool in
+                guard self.presentationRevision == revision else { return false }
+                if case .listening = resolvedState {
+                    return self.isRecording && self.activeCaptureEngineStarted && self.activeCaptureFailure == nil
+                }
+                return true
+            }) else { return }
+            self.applyPresentationState(resolvedState)
+        }
+    }
+
+    /// Shown after the delivery confirmation has had its moment, never instead
+    /// of it. The order matters: the text arriving is the good news.
+    private func presentPendingCaptureNoteIfNeeded() {
+        guard let note = pendingCaptureNote else { return }
+        pendingCaptureNote = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.7) { [weak self] in
+            guard let self else { return }
+            // Dropped if anything has started since. Without this check the
+            // note from capture A lands 1.7 s later on top of capture B's
+            // "Listening" state, replacing a live recording indicator with a
+            // warning about a capture that already finished -- while recording
+            // silently continues.
+            guard self.withStateLock({ !self.isRecording && !self.isProcessing }) else {
+                self.traceLogger.log("Capture note dropped reason=newer_capture_active")
+                return
+            }
+            self.present(.captureNote(note))
         }
     }
 
@@ -1040,7 +1268,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             uiState = (appDisplayTitle, "Warming up the local speech model…", "hourglass.circle.fill", .warming, nil)
         case .ready:
             let status = currentRuntimeStatus()
-            if localSigningRepairNeeded(status) {
+            if let notice = pendingAudioInputCrashNotice {
+                // Shown the first time the app reaches ready after the breaker
+                // fired. Held until here on purpose: at the moment the decision
+                // is taken, during startup, there is no window to say it in.
+                pendingAudioInputCrashNotice = nil
+                uiState = (
+                    "Microphone Reset",
+                    notice,
+                    "exclamationmark.triangle.fill",
+                    .warming,
+                    8.0
+                )
+            } else if localSigningRepairNeeded(status) {
                 uiState = (
                     "Paste Repair Needed",
                     "Transcription ready. Click Repair Signing in the menu bar to restore active-field paste.",
@@ -1048,13 +1288,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     .warming,
                     nil
                 )
+            } else if status.triggerRequiresWritableEventTap && !status.writableEventTapInstalled {
+                uiState = (
+                    "Shortcut Not Ready",
+                    "Open PressTalk Settings → Accessibility to enable \(settingsStore.triggerKey.displayName). The speech model is ready, but recording cannot start from this shortcut yet.",
+                    "exclamationmark.triangle.fill",
+                    .warming,
+                    nil
+                )
             } else if settingsStore.pasteAutomatically &&
                 !status.activeFieldInsertionReady {
                 uiState = (
-                    "Paste Fallback Blocked",
-                    (status.inputMethodFallbackStatus == "probe_only" || status.inputMethodFallbackStatus == "ready")
-                        ? "Transcription ready. Auto-insert needs Accessibility; dictation will copy."
-                        : "Transcription ready. Input method status: \(status.inputMethodFallbackStatus).",
+                    "Accessibility Required",
+                    "Speech model ready. Enable PressTalk in System Settings → Privacy & Security → Accessibility to insert text. Until then, dictation copies to the clipboard.",
                     "exclamationmark.triangle.fill",
                     .warming,
                     nil
@@ -1072,6 +1318,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             uiState = ("Copied to Clipboard", transcript, "doc.on.clipboard.fill", .copied, 1.5)
         case .aborted(let message):
             uiState = ("Transcription Aborted", message, "hand.raised.fill", .error, 4.0)
+        case .captureNote(let message):
+            uiState = ("Microphone Started Late", message, "clock.badge.exclamationmark",
+                       .warming, 6.0)
+        case .busy(let message):
+            uiState = ("One Moment", message, "hourglass.circle.fill", .warming, 2.5)
         case .audioUnavailable(let message):
             uiState = ("No Audio Input", message, "mic.slash.fill", .error, 4.0)
         case .error(let message):
@@ -1124,8 +1375,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             if activeTriggerUsesVoiceLight() {
                 traceLogger.log("HUD arming presentation=voice_light")
                 hudController?.showListeningLight(
-                    bands: currentLiveListeningLightBands(),
-                    alpha: Self.armingLightAlpha)
+                    bands: VoiceLightBands(low: 0, mid: 0, high: 0),
+                    alpha: 1,
+                    arming: true)
             } else {
                 traceLogger.log("HUD arming presentation=card")
                 hudController?.show(
@@ -1154,7 +1406,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         case .setupRequired:
             hudController?.hide()
-        case .aborted, .audioUnavailable, .error, .diagnosticStarted:
+        case .aborted, .audioUnavailable, .error, .diagnosticStarted, .captureNote, .busy:
             hudController?.show(
                 title: uiState.summary,
                 detail: uiState.detail,
@@ -1390,7 +1642,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "qualityFallbackStatus": status.qualityFallbackStatus,
                 "realtimePartialTranscriptionEnabled": status.realtimePartialTranscriptionEnabled,
                 "whisperModel": config.whisperModel,
-                "whisperLanguage": config.whisperLanguage ?? "auto",
+                "whisperLanguage": "auto",
                 "traceLogPath": config.traceLogPath,
             ],
             "permissions": [
@@ -1430,36 +1682,45 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func openMicrophonePrivacyPane() {
-        guard config.allowPermissionPaneOpen else {
-            traceLogger.log("Suppressed Microphone privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+        // Called only by an explicit Settings/setup action. Headless launch
+        // flags suppress automatic prompts, never a person's button click.
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"),
+              NSWorkspace.shared.open(url) else {
+            traceLogger.log("Could not open Microphone privacy pane")
+            present(.error("Could not open System Settings. Open Privacy & Security → Microphone manually."))
             return
-        }
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone") {
-            NSWorkspace.shared.open(url)
         }
     }
 
     private func openInputMonitoringPrivacyPane() {
-        guard config.allowPermissionPaneOpen else {
-            traceLogger.log("Suppressed Input Monitoring privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+        // Called only by an explicit Settings/setup action. Headless launch
+        // flags suppress automatic prompts, never a person's button click.
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"),
+              NSWorkspace.shared.open(url) else {
+            traceLogger.log("Could not open Input Monitoring privacy pane")
+            present(.error("Could not open System Settings. Open Privacy & Security → Input Monitoring manually."))
             return
-        }
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") {
-            NSWorkspace.shared.open(url)
         }
     }
 
     private func openAccessibilityPrivacyPane() {
-        guard config.allowPermissionPaneOpen else {
-            traceLogger.log("Suppressed Accessibility privacy pane open because PRESSTALK_OPEN_PERMISSION_PANES is not enabled")
+        // Called only by an explicit Settings/setup action. Headless launch
+        // flags suppress automatic prompts, never a person's button click.
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"),
+              NSWorkspace.shared.open(url) else {
+            traceLogger.log("Could not open Accessibility privacy pane")
+            present(.error("Could not open System Settings. Open Privacy & Security → Accessibility manually."))
             return
-        }
-        if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-            NSWorkspace.shared.open(url)
         }
     }
 
     private func requestAccessibilitySetup() {
+        // This request follows an explicit button click, including managed
+        // launches whose automatic permission prompts are disabled.
+        if !accessibilityIsTrusted() {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            _ = AXIsProcessTrustedWithOptions(options)
+        }
         openAccessibilityPrivacyPane()
         refreshRuntimeStatusUI()
     }
@@ -1526,7 +1787,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             - Last trigger time: \(bridgeDetails.lastTimestamp ?? "none")
             - Agent mode: \(config.agentMode)
             - Whisper model: \(config.whisperModel)
-            - Whisper language: \(config.whisperLanguage ?? "auto")
+            - Whisper language: auto
             - Trigger key: \(settingsStore.triggerKey.rawValue)
             - HUD enabled: \(settingsStore.showHUD ? "yes" : "no")
             - Paste automatically: \(settingsStore.pasteAutomatically ? "yes" : "no")
@@ -1643,16 +1904,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         traceLogger.log("Restart requested from settings")
         present(.setupRequired("Restarting PressTalk to refresh runtime status."))
 
-        let bundlePath = shellQuoted(Bundle.main.bundleURL.path)
-        let launchLabel = "gui/\(getuid())/\(config.launchdLabel)"
+        // Reopen this exact bundle through LaunchServices. A launchd kickstart
+        // can select another installation and inject a headless environment.
+        // Wait for our process to exit so the new instance can take its lock.
         let script = """
-        sleep 0.4
-        /bin/launchctl kickstart -k \(launchLabel) >/dev/null 2>&1 || /usr/bin/open -g \(bundlePath) >/dev/null 2>&1
+        for attempt in {1..50}; do
+            /bin/kill -0 "$1" 2>/dev/null || exec /usr/bin/open -n -g "$2"
+            /bin/sleep 0.1
+        done
+        exit 1
         """
 
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/bash")
-        process.arguments = ["-lc", script]
+        process.arguments = ["-c", script, "presstalk-restart", String(getpid()), Bundle.main.bundleURL.path]
         do {
             try process.run()
         } catch {
@@ -2744,32 +3009,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
     }
 
-    private func parakeetLanguageHint() -> Language? {
-        switch settingsStore.preferredLanguage {
-        case .auto:
-            return nil
-        case .german:
-            return .german
-        case .english:
-            return .english
-        }
-    }
-
     private func transcribeParakeetV3ANE(samples: [Float]) async throws -> ParakeetTranscriptCandidate {
         guard let parakeetAsrManager else {
             throw JarvisTapError.whisperUnavailable
         }
 
         var decoderState = TdtDecoderState.make(decoderLayers: parakeetDecoderLayerCount)
-        let language = parakeetLanguageHint()
         let startedAt = Date()
         let result = try await parakeetAsrManager.transcribe(
             samples,
             decoderState: &decoderState,
-            language: language
+            language: nil
         )
         traceLogger.log(
-            "Parakeet v3 ASR pass completed samples=\(samples.count) inference_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt))) confidence=\(String(format: "%.3f", Double(result.confidence))) language=\(settingsStore.preferredLanguage.rawValue)"
+            "Parakeet v3 ASR pass completed samples=\(samples.count) inference_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt))) confidence=\(String(format: "%.3f", Double(result.confidence))) language=auto"
         )
         return ParakeetTranscriptCandidate(
             text: cleanedTranscriptText(result.text),
@@ -2826,13 +3079,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return buffer
     }
 
-    private func resetStreamingSession() throws {
+    private func resetStreamingSession(stopCapture: Bool = true) throws {
         guard let audioCaptureKit else {
             throw JarvisTapError.whisperUnavailable
         }
 
         traceLogger.log("Resetting Whisper streaming session")
-        safelyStopLiveAudioRecording(captureKit: audioCaptureKit, reason: "reset_streaming_session")
+        if stopCapture { safelyStopLiveAudioRecording(captureKit: audioCaptureKit, reason: "reset_streaming_session") }
         audioCaptureKit.audioProcessor.purgeAudioSamples(keepingLast: 0)
         fluidStreamingFedSampleCount = 0
         // Only the WhisperKit-backed streaming preview needs the full model.
@@ -2850,75 +3103,139 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// read is here. See AudioInputPreflightPolicy for why this guard exists --
     /// short version: installTapOnBus raises an ObjC exception that Swift cannot
     /// catch, and it killed the app three times in six days.
-    private static func audioInputPreflightFailure() -> String? {
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        let hardware = input.inputFormat(forBus: 0)
-        let output = input.outputFormat(forBus: 0)
-        let buildable = AVAudioFormat(commonFormat: output.commonFormat,
-                                      sampleRate: hardware.sampleRate,
-                                      channels: output.channelCount,
-                                      interleaved: output.isInterleaved) != nil
-        return AudioInputPreflightPolicy().failureReason(
-            hardwareSampleRate: hardware.sampleRate,
-            nodeSampleRate: output.sampleRate,
-            nodeChannelCount: output.channelCount,
-            canBuildTapFormat: buildable)
+    ///
+    /// Takes the device capture will actually open. It used to build a bare
+    /// engine and read whatever the *system default* offered, which stopped
+    /// being the same thing the moment a microphone could be chosen in
+    /// Settings. A healthy default then approved a capture on a different
+    /// device, and installTapOnBus raised
+    /// `IsFormatSampleRateAndChannelCountValid(format)` -- an Objective-C
+    /// exception Swift cannot catch, so the process took SIGABRT and the app
+    /// vanished with no message. That is exactly the failure this guard exists
+    /// to prevent, checking the wrong thing.
+    /// Everything needed to tell the causes of a failed capture apart, recorded
+    /// at the moment of binding.
+    ///
+    /// Written because `'!obj'` at kAUStartIO was diagnosed by inference. It
+    /// means an invalid AudioObject, not "device busy", and nothing in the log
+    /// said which object, whether the device was alive, whether the binding
+    /// took, or what formats the node reported. Each line below is one of those
+    /// questions answered instead of guessed.
+    private func traceInputBindingDetail(
+        deviceID: AudioDeviceID?, context: String, sessionID: UInt64
+    ) {
+        var fields: [String] = ["context=\(context)", "session=\(sessionID)"]
+
+        guard let deviceID else {
+            traceLogger.log(
+                "Audio input binding detail context=\(context) session=\(sessionID) "
+                + "device=system_default_unresolved")
+            return
+        }
+        fields.append("device_id=\(deviceID)")
+        fields.append("uid=\(coreAudioStringProperty(objectID: deviceID, selector: kAudioDevicePropertyDeviceUID) ?? "?")")
+        fields.append("name=\(coreAudioStringProperty(objectID: deviceID, selector: kAudioObjectPropertyName)?.replacingOccurrences(of: " ", with: "_") ?? "?")")
+
+        func flag(_ selector: AudioObjectPropertySelector, _ scope: AudioObjectPropertyScope, _ label: String) {
+            var address = AudioObjectPropertyAddress(
+                mSelector: selector, mScope: scope, mElement: kAudioObjectPropertyElementMain)
+            var value: UInt32 = 0
+            var size = UInt32(MemoryLayout<UInt32>.size)
+            let status = AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &value)
+            fields.append("\(label)=\(status == noErr ? String(value) : "err\(status)")")
+        }
+        flag(kAudioDevicePropertyDeviceIsAlive, kAudioObjectPropertyScopeGlobal, "alive")
+        flag(kAudioDevicePropertyDeviceIsRunningSomewhere, kAudioObjectPropertyScopeGlobal, "running_somewhere")
+        flag(kAudioDevicePropertyMute, kAudioObjectPropertyScopeInput, "device_mute")
+
+        // Hog mode is a pid, or -1 for nobody. This is the property that would
+        // actually establish exclusive ownership, which "Zoom is using it" does
+        // not.
+        var hogAddress = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyHogMode, mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var hog: pid_t = -1
+        var hogSize = UInt32(MemoryLayout<pid_t>.size)
+        let hogStatus = AudioObjectGetPropertyData(deviceID, &hogAddress, 0, nil, &hogSize, &hog)
+        // -1 is nobody. Anything else is a pid, and it being ours is a very
+        // different fact from it being another application's.
+        fields.append("hog_pid=\(hogStatus == noErr ? String(hog) : "err\(hogStatus)")")
+        fields.append("hog_is_us=\(hogStatus == noErr && hog == getpid() ? 1 : 0)")
+        fields.append("our_pid=\(getpid())")
+
+        // No engine is created here. The first version bound a scratch
+        // AVAudioEngine and reported whether *that* binding took, which is the
+        // same mistake as the preflight reading the system default: measuring
+        // one object and treating it as evidence about another. WhisperKit
+        // creates its own engine, logs an assignment failure and continues, so
+        // a scratch binding_took=1 could sit directly above a real assignment
+        // that failed.
+        //
+        // Creating and tearing down an engine is also active audio setup
+        // immediately before capture does the same thing. That it perturbs the
+        // timing of the fault is certain; whether it can cause it is unproven,
+        // and a probe that might cause what it observes is not a probe.
+        //
+        // What remains is CoreAudio property state, which is about the device
+        // and true regardless of which engine asks. The real binding is read
+        // back after startRecordingLive returns.
+        traceLogger.log("Audio input binding detail " + fields.joined(separator: " "))
     }
 
-    private func safelyStopLiveAudioRecording(captureKit: WhisperKit?, reason: String) {
-        guard let audioProcessor = captureKit?.audioProcessor else { return }
+    // MARK: - Crash breaker for microphone start
 
-        var retiredID: ObjectIdentifier?
+    private static let pendingAudioAttemptKey = "PressTalk.AudioInputPendingAttempt"
+    /// The device the previous run died on, skipped for one session.
+    private static let avoidAudioDeviceKey = "PressTalk.AudioInputAvoidUID"
 
-        audioEngineStopLock.lock()
-        if let processor = audioProcessor as? AudioProcessor,
-           let engine = processor.audioEngine {
-            retiredID = ObjectIdentifier(engine)
-            traceLogger.log("Stopping live audio recording safely reason=\(reason)")
-            processor.audioBufferCallback = nil
+    /// Records the microphone about to be opened, so that a process that does
+    /// not come back can be attributed to it. Written synchronously: the whole
+    /// point is that it survives a SIGABRT arriving microseconds later.
+    private func recordAudioInputAttempt(deviceUID: String?, deviceName: String) {
+        guard let deviceUID, !deviceUID.isEmpty else { return }
+        let defaults = UserDefaults.standard
+        defaults.set("\(deviceUID)\u{1F}\(deviceName)", forKey: Self.pendingAudioAttemptKey)
+        defaults.synchronize()
+    }
 
-            engine.inputNode.removeTap(onBus: 0)
-            for node in engine.attachedNodes {
-                node.removeTap(onBus: 0)
+    private func clearAudioInputAttempt() {
+        let defaults = UserDefaults.standard
+        guard defaults.string(forKey: Self.pendingAudioAttemptKey) != nil else { return }
+        defaults.removeObject(forKey: Self.pendingAudioAttemptKey)
+        defaults.synchronize()
+    }
+
+    /// Runs once at startup. A record still present means the previous run died
+    /// while opening that microphone.
+    private func applyAudioInputCrashBreaker() {
+        let defaults = UserDefaults.standard
+        guard let stored = defaults.string(forKey: Self.pendingAudioAttemptKey) else { return }
+        defaults.removeObject(forKey: Self.pendingAudioAttemptKey)
+        defaults.synchronize()
+
+        let parts = stored.components(separatedBy: "\u{1F}")
+        let attempt = AudioInputCrashBreaker.Attempt(
+            deviceUID: parts.first ?? "",
+            deviceName: parts.count > 1 ? parts[1] : "")
+        let outcome = AudioInputCrashBreaker().evaluate(unfinishedAttempt: attempt)
+        guard outcome.revertToSystemDefault else { return }
+
+        traceLogger.log("Previous microphone start was interrupted uid=\(attempt.deviceUID); preserving microphone preference")
+        if outcome.userMessage != nil {
+            pendingAudioInputCrashNotice = "The previous microphone start was interrupted. Your selected microphone has been kept."
+        }
+    }
+
+    private func safelyStopLiveAudioRecording(captureKit: WhisperKit?, reason: String, sessionID: UInt64? = nil) {
+        let session = sessionID ?? withStateLock { activeCaptureSessionID }
+        guard let receipt = ownedCapture.stop(session: session) else { return }
+        if !receipt.complete {
+            withStateLock {
+                if activeCaptureSessionID == session {
+                    activeCaptureFailure = receipt.failure ?? "The microphone recording was incomplete. Nothing was inserted."
+                }
             }
-            engine.disconnectNodeInput(engine.inputNode)
-            engine.stop()
-            engine.reset()
-
-            retiredAudioEngines.append((id: ObjectIdentifier(engine), engine: engine, retiredAt: Date()))
-            pruneRetiredAudioEnginesLocked()
-            processor.audioEngine = nil
-        } else {
-            audioProcessor.stopRecording()
         }
-        audioEngineStopLock.unlock()
-
-        // The microphone is released, so the system default can go back to
-        // whatever the user had before PressTalk borrowed it. Only ever set
-        // when they explicitly chose a non-default device.
-        restoreDisplacedDefaultInputDevice()
-
-        guard let retiredID else { return }
-        DispatchQueue.main.asyncAfter(deadline: .now() + retiredAudioEngineRetainSeconds) { [weak self] in
-            self?.releaseRetiredAudioEngine(id: retiredID)
-        }
-    }
-
-    private func pruneRetiredAudioEnginesLocked(now: Date = Date()) {
-        retiredAudioEngines.removeAll {
-            now.timeIntervalSince($0.retiredAt) >= retiredAudioEngineRetainSeconds
-        }
-        if retiredAudioEngines.count > retiredAudioEngineLimit {
-            retiredAudioEngines.removeFirst(retiredAudioEngines.count - retiredAudioEngineLimit)
-        }
-    }
-
-    private func releaseRetiredAudioEngine(id: ObjectIdentifier) {
-        audioEngineStopLock.lock()
-        retiredAudioEngines.removeAll { $0.id == id }
-        pruneRetiredAudioEnginesLocked()
-        audioEngineStopLock.unlock()
     }
 
     private func localWhisperModelFolder(for model: String) -> String? {
@@ -3287,7 +3604,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
             let eventKind = GetEventKind(eventRef)
             DispatchQueue.main.async { [weak app] in
-                guard let app else { return }
+                guard let app, app.settingsStore.triggerKey == .optionSpace else { return }
                 if eventKind == UInt32(kEventHotKeyPressed) {
                     app.handlePress(.configuredKey, source: .registeredHotKey)
                 } else if eventKind == UInt32(kEventHotKeyReleased) {
@@ -3717,7 +4034,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         if recordingStarted {
             traceLogger.log(triggerStartLogMessage(for: .trackpadHold))
-            present(.listening(nil))
+            present(withStateLock { activeCaptureEngineStarted } ? .listening(nil) : .arming)
             startAmplitudeMonitoring()
         } else {
             handlePress(.trackpadHold, source: .trackpadHold)
@@ -4130,14 +4447,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func isLikelySilenceHallucination(
         _ text: String,
-        signalStats: (rms: Double, peak: Double),
-        captureDurationSeconds: TimeInterval
+        signalStats: (rms: Double, peak: Double)
     ) -> Bool {
         transcriptTextPolicy.isLikelySilenceHallucination(
             text,
             signalRMS: signalStats.rms,
-            signalPeak: signalStats.peak,
-            captureDurationSeconds: captureDurationSeconds
+            signalPeak: signalStats.peak
         )
     }
 
@@ -4152,8 +4467,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         if isLikelySilenceHallucination(
             cleaned,
-            signalStats: signalStats,
-            captureDurationSeconds: captureDurationSeconds
+            signalStats: signalStats
         ) {
             traceLogger.log(
                 "Rejected likely silence hallucination context=\(context) transcript=\(TranscriptRedaction.loggable(cleaned)) rms=\(String(format: "%.5f", signalStats.rms)) peak=\(String(format: "%.5f", signalStats.peak)) duration_seconds=\(String(format: "%.2f", captureDurationSeconds))"
@@ -4381,15 +4695,42 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     ///
     /// Deliberately does not build an AVAudioEngine: doing that is the 52 ms
     /// this fingerprint exists to avoid paying on every keypress.
-    private func currentInputFingerprint() -> AudioPreflightCache.DeviceFingerprint? {
-        guard let deviceID = defaultCoreAudioInputDeviceID() else { return nil }
-        let uid = coreAudioStringProperty(
-            objectID: deviceID, selector: kAudioDevicePropertyDeviceUID) ?? "device-\(deviceID)"
-        guard let rate = coreAudioDoubleProperty(
-            objectID: deviceID, selector: kAudioDevicePropertyNominalSampleRate)
-        else { return nil }
-        return .init(deviceUID: uid, sampleRate: rate,
-                     channelCount: coreAudioInputChannelCount(for: deviceID))
+    /// Whether the current input device reports its own mute engaged, and its
+    /// name. A Shure MV7i's touch panel, an interface's physical switch: the
+    /// samples are indistinguishable from an unplugged device, and the fix is
+    /// somewhere macOS cannot show you.
+    func inputDeviceIsMuted(_ deviceID: AudioDeviceID) -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioDevicePropertyMute,
+            mScope: kAudioObjectPropertyScopeInput,
+            mElement: kAudioObjectPropertyElementMain)
+        var muted: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        guard AudioObjectGetPropertyData(deviceID, &address, 0, nil, &size, &muted) == noErr
+        else { return false }
+        return muted == 1
+    }
+
+    /// Whether macOS is muting every audio input this process receives.
+    ///
+    /// Unlike kAudioDevicePropertyMute, this says something the app can act on:
+    /// it is about this process, not about an AudioMuteControl on an element
+    /// whose relationship to a physical switch is device-specific. Reading the
+    /// device property and calling it "your microphone is muted" told the owner
+    /// his Shure was muted while Zoom was recording from it.
+    private func inputIsMutedForThisProcess() -> Bool {
+        var address = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyProcessInputMute,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var muted: UInt32 = 0
+        var size = UInt32(MemoryLayout<UInt32>.size)
+        // Unsupported or failing reads are not a mute.
+        guard AudioObjectGetPropertyData(
+            AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &muted) == noErr
+        else { return false }
+        // The SDK defines any nonzero value as muted, not specifically 1.
+        return muted != 0
     }
 
     private func coreAudioUInt32Property(
@@ -4414,30 +4755,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             objectID: AudioObjectID(kAudioObjectSystemObject),
             selector: kAudioHardwarePropertyDefaultInputDevice
         ).map { AudioDeviceID($0) }
-    }
-
-    @discardableResult
-    private func setDefaultCoreAudioInputDeviceID(_ deviceID: AudioDeviceID) -> Bool {
-        var address = AudioObjectPropertyAddress(
-            mSelector: kAudioHardwarePropertyDefaultInputDevice,
-            mScope: kAudioObjectPropertyScopeGlobal,
-            mElement: kAudioObjectPropertyElementMain
-        )
-        var mutableDeviceID = deviceID
-        let status = AudioObjectSetPropertyData(
-            AudioObjectID(kAudioObjectSystemObject),
-            &address,
-            0,
-            nil,
-            UInt32(MemoryLayout<AudioDeviceID>.size),
-            &mutableDeviceID
-        )
-        guard status == noErr else {
-            traceLogger.log("Audio input default promotion failed status=\(status) device_id=\(deviceID)")
-            return false
-        }
-        traceLogger.log("Audio input default promotion requested device_id=\(deviceID)")
-        return true
     }
 
     private func coreAudioInputChannelCount(for deviceID: AudioDeviceID) -> UInt32 {
@@ -4473,51 +4790,51 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     /// Which microphone the user asked for. `.systemDefault` unless they said
     /// otherwise, so PressTalk behaves like every other app until told not to.
+    /// Which application had focus when the key went down.
+    ///
+    /// The target is otherwise resolved at INSERTION time, so switching windows
+    /// while recognition runs sends the text wherever focus landed instead of
+    /// where it was dictated. This records the intended destination so the
+    /// mismatch can be counted before delivery behaviour is changed on top of
+    /// it -- rerouting or refusing a paste is a change that can stop insertion
+    /// working altogether, and it should be made against evidence rather than
+    /// against a plausible story.
+    private var captureStartFocusedPID: pid_t?
+
+    /// A capture note waiting for the delivery confirmation to finish, so the
+    /// text lands first and the explanation follows it.
+    private var pendingCaptureNote: String?
+
+    /// Set by the crash breaker at startup, shown once the UI can speak.
+    private var pendingAudioInputCrashNotice: String?
+
     private var audioInputPreference: AudioInputPreference {
         AudioInputPreference(
             storageValue: UserDefaults.standard.string(forKey: "PressTalk.AudioInputPreference"))
     }
 
-    /// Set by device selection, read by the capture path. Changing the system
-    /// default input is visible to every application on the Mac, so it happens
-    /// only when the user explicitly asked for a device macOS is not using.
-    private var audioInputPromotionAllowed = false
-
     /// How long the audio engine took to start, so the release tail can tell
     /// audio that is late from audio that is missing.
     private var activeEngineStartLatencySeconds: Double = 0
 
-    /// Remembers the tap-safety answer per input device, so the check does not
-    /// rebuild an AVAudioEngine on every press. See AudioPreflightCache.
-    private var audioPreflightCache = AudioPreflightCache()
+    /// How long each microphone has taken to start on this Mac. Read and
+    /// written through UserDefaults so the picker can say what a device costs
+    /// rather than quoting a number measured on somebody else's hardware.
+    private var inputLatencyMemory: InputLatencyMemory {
+        get { InputLatencyMemory(storageValue: UserDefaults.standard.object(forKey: "PressTalk.AUHALInputLatency")) }
+        set { UserDefaults.standard.set(newValue.storageValue, forKey: "PressTalk.AUHALInputLatency") }
+    }
 
     /// Brightness of the indicator while the microphone is still coming up.
-    /// Visible enough to confirm the key registered, different enough that it
-    /// does not read as "speak now".
-    private static let armingLightAlpha: CGFloat = 0.35
-
-    /// The default we displaced, so it can be put back. Nothing restored it
-    /// before: dictating once with AirPods connected silently repointed the
-    /// microphone for the whole Mac, permanently, and the user had no idea
-    /// PressTalk had done it.
-    private var displacedDefaultInputDeviceID: AudioDeviceID?
-
-    /// Puts the system default input back the way we found it.
-    func restoreDisplacedDefaultInputDevice() {
-        guard let displaced = displacedDefaultInputDeviceID else { return }
-        displacedDefaultInputDeviceID = nil
-        // Only restore if we are still the reason it changed. If the user
-        // picked something else in System Settings meanwhile, that is now their
-        // choice and putting our value back would be a second act of the same
-        // rudeness this exists to undo.
-        guard coreAudioInputDevices().contains(where: { $0.id == displaced }) else {
-            traceLogger.log("Audio input default restore skipped reason=device_absent")
-            return
-        }
-        let restored = setDefaultCoreAudioInputDeviceID(displaced)
-        traceLogger.log(
-            "Audio input default restored device_id=\(displaced) ok=\(restored ? 1 : 0)")
-    }
+    ///
+    /// Was 0.35, and the owner reported not being able to see the difference at
+    /// all -- while the log showed a full second of arming on AirPods. A
+    /// slightly dimmer glow reads as "the light", not as "not ready". At 0.12
+    /// it reads as off, and the moment it snaps to full is unmistakable, which
+    /// is the whole job: the difference has to be visible in peripheral vision
+    /// while someone is looking at the text field they are about to dictate
+    /// into, not on inspection.
+    private static let armingLightAlpha: CGFloat = 0.12
 
     private func coreAudioInputDevices() -> [AudioInputDeviceCandidate] {
         var address = AudioObjectPropertyAddress(
@@ -4577,9 +4894,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func preferredAudioInputDevice() -> AudioInputSelection? {
-        let candidates = coreAudioInputDevices()
-        guard !candidates.isEmpty else {
+        let allCandidates = coreAudioInputDevices()
+        guard !allCandidates.isEmpty else {
             traceLogger.log("Audio input selection unavailable reason=no_input_devices")
+            return nil
+        }
+
+        let candidates = allCandidates
+        if case .specificDevice(let uid) = audioInputPreference,
+           !candidates.contains(where: { $0.uid == uid }) {
+            traceLogger.log("Audio input selection unavailable reason=preferred_device_absent uid=\(uid)")
             return nil
         }
 
@@ -4618,7 +4942,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         // Only an explicit choice may change the system default. Recorded here
         // so the capture path cannot decide to promote on its own.
-        audioInputPromotionAllowed = choice.requiresPromotion
+        // Deliberately ignores choice.requiresPromotion. The selector still
+        // reports whether a device differs from the system default, which is
+        // useful information, but PressTalk no longer acts on it by moving the
+        // default. The engine is bound to selectedAudioInput.id directly.
         let summary = rankedCandidates.map { candidate in
             "\(candidate.name.replacingOccurrences(of: " ", with: "_")):score=\(candidate.selectionScore):channels=\(candidate.inputChannels):transport=\(candidate.transportDescription):default=\(candidate.isDefault ? 1 : 0)"
         }.joined(separator: ",")
@@ -4722,7 +5049,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lastPrintedPartial = cleaned
             cleanedToLog = cleaned
             shouldPrintPartial = config.printPartials
-            shouldPresentPartial = isRecording
+            shouldPresentPartial = isRecording && activeCaptureEngineStarted && activeCaptureFailure == nil
         }
 
         guard let cleanedToLog else { return }
@@ -4958,7 +5285,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func captureSilenceAwareReleaseTail(
         captureKit: WhisperKit?,
         heldSeconds: Double,
-        engineStartLatencySeconds: Double
+        engineStartLatencySeconds: Double,
+        sessionID: UInt64
     ) async {
         let maximumTailSeconds = max(0.15, settingsStore.releaseTailMaxSeconds)
         let pollNanoseconds: UInt64 = 25_000_000
@@ -4974,6 +5302,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let start = Date()
         var lastCapturedCount = liveCapturedAudioSampleCount()
+        var lastGrowthAt = start
         var decision = ReleaseTailPolicy.Decision.keepWaiting(reason: "below_minimum")
 
         while true {
@@ -4981,7 +5310,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             guard captureKit != nil else { break }
 
             let capturedCount = liveCapturedAudioSampleCount()
-            let grew = capturedCount > lastCapturedCount
+            let now = Date()
+            if capturedCount > lastCapturedCount { lastGrowthAt = now }
             lastCapturedCount = capturedCount
 
             let requiredSamples = Int(Double(WhisperKit.sampleRate)
@@ -4989,11 +5319,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             let recent = recentLiveCapturedAudioSamples(maxCount: requiredSamples)
 
             decision = ReleaseTailPolicy.decide(
-                .init(elapsedSeconds: Date().timeIntervalSince(start),
+                .init(elapsedSeconds: now.timeIntervalSince(start),
                       capturedSeconds: Double(capturedCount) / Double(WhisperKit.sampleRate),
                       expectedAtReleaseSeconds: expectedAtRelease,
                       recentRMS: recent.isEmpty ? 1.0 : audioLevelStats(for: recent).rms,
-                      capturedGrewSinceLastPoll: grew),
+                      secondsSinceCapturedGrew: now.timeIntervalSince(lastGrowthAt)),
                 maximumSeconds: maximumTailSeconds)
             if decision.shouldStop { break }
         }
@@ -5002,7 +5332,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "Release tail finished reason=\(decision.reason) "
             + "elapsed_seconds=\(String(format: "%.2f", Date().timeIntervalSince(start))) "
             + "captured_seconds=\(String(format: "%.2f", Double(liveCapturedAudioSampleCount()) / Double(WhisperKit.sampleRate)))")
-        safelyStopLiveAudioRecording(captureKit: captureKit, reason: "release_tail")
+        safelyStopLiveAudioRecording(captureKit: captureKit, reason: "release_tail", sessionID: sessionID)
     }
 
     /// Wall-clock ceiling for the whole Whisper retry chain, shared across the
@@ -5103,7 +5433,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let task = Task(priority: .userInitiated) { [self] in
             do {
                 traceLogger.log("ASR backend=\(config.asrBackend)")
-                traceLogger.log("Whisper decode language=\(settingsStore.preferredLanguage.whisperLanguageCode ?? "auto")")
+                traceLogger.log("Whisper decode language=auto")
 
                 // Capture first, and cheaply. Everything below is a recognizer.
                 try await loadAudioCaptureEngine()
@@ -5217,17 +5547,33 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             alert.informativeText = PressTalkOffer.founderSummary
                 + "\n\nThe licence is a signed file this Mac checks on its own. "
                 + "No account, and nothing is sent anywhere."
-            alert.addButton(withTitle: "Buy PressTalk — $\(PressTalkOffer.founderPriceUSD)")
+            // One button per live payment route, named so the choice is visible
+            // before it is made rather than after. A single "Buy" that silently
+            // picks a rail would decide for the person which company they are
+            // buying from -- and the two are not equivalent: on one of them
+            // PressTalk is the seller and on the other it is not.
+            let rails = PressTalkOffer.liveCheckoutRails
+            for rail in rails {
+                alert.addButton(
+                    withTitle: rails.count == 1
+                        ? "Buy PressTalk — $\(PressTalkOffer.founderPriceUSD)"
+                        : "Buy with \(rail.displayName) — $\(PressTalkOffer.founderPriceUSD)")
+            }
             alert.addButton(withTitle: "Enter licence key")
             alert.addButton(withTitle: "Not now")
 
-            switch alert.runModal() {
-            case .alertFirstButtonReturn:
-                if let url = PressTalkOffer.checkoutURL { NSWorkspace.shared.open(url) }
-            case .alertSecondButtonReturn:
+            // Indexed off the rail count instead of hard-coded button
+            // positions, which would silently mean something else the moment a
+            // second rail went live.
+            let response = alert.runModal()
+            let index = response.rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+            if index >= 0, index < rails.count {
+                if let url = PressTalkOffer.checkoutURL(for: rails[index]) {
+                    self.traceLogger.log("Checkout opened rail=\(rails[index].rawValue)")
+                    NSWorkspace.shared.open(url)
+                }
+            } else if index == rails.count {
                 self.promptForLicenseKey()
-            default:
-                break
             }
         }
     }
@@ -5384,9 +5730,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         controller.onVerifyMicrophone = { [weak self] in
-            let report = AudioCaptureProbe.run()
-            self?.microphoneCaptureVerified = report.isUsable
-            self?.traceLogger.log(
+            guard let self, let selected = self.preferredAudioInputDevice()?.candidate else {
+                return AudioCaptureProbeReport(outcome: .noInputDevice, authorizationStatus: "unknown",
+                    sampleRate: 0, channelCount: 0, framesCaptured: 0, peakAmplitude: 0,
+                    durationSeconds: 0, detail: "The selected microphone is unavailable.")
+            }
+            let report = AudioCaptureProbe.run(deviceID: selected.id)
+            self.microphoneCaptureVerified = report.isUsable
+            self.traceLogger.log(
                 "Setup microphone probe outcome=\(report.outcome.rawValue) frames=\(report.framesCaptured) authorization=\(report.authorizationStatus)")
             return report
         }
@@ -5395,7 +5746,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self?.openInputMonitoringPrivacyPane()
         }
         controller.onOpenAccessibilitySettings = { [weak self] in
-            self?.openAccessibilityPrivacyPane()
+            self?.requestAccessibilitySetup()
         }
         controller.onDownloadSpeechModel = { [weak self] in
             self?.startWhisperWarmupIfNeeded()
@@ -6378,6 +6729,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         if let focusedPID = focusedApplicationProcessID() {
+            if let intended = captureStartFocusedPID, intended != focusedPID {
+                // Not yet acted on. Counting first: how often this happens in
+                // real use decides whether the right answer is to reroute, to
+                // copy instead, or to leave it alone.
+                traceLogger.log(
+                    "Insertion target changed since capture start "
+                    + "intended_pid=\(intended) actual_pid=\(focusedPID)")
+            }
             postPasteSequence { event in
                 event.postToPid(focusedPID)
             }
@@ -6579,6 +6938,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             lastPrintedPartial = ""
             activeCaptureSessionID &+= 1
             activeCaptureEngineStarted = false
+            activeCaptureFailure = nil
+            activeEngineStartLatencySeconds = 0
             activeTrigger = trigger
             activeTriggerSource = source
             isRecording = true
@@ -6594,10 +6955,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             traceLogger.log("Trigger ignored trigger=\(trigger.rawValue) reason=still_processing")
             print("⏳ [PressTalk] Still processing the previous dictation. Ignoring trigger.")
             fflush(stdout)
+            // Said on screen, not only to a log nobody is reading. A key that
+            // does nothing and explains nothing is indistinguishable from a
+            // key that is broken, and the second dictation someone tries to
+            // dash off is exactly when they press again quickly.
+            present(.busy("PressTalk is still finishing your last dictation. "
+                          + "Press again in a moment."))
             return
         case .start(let sessionID):
             captureSessionID = sessionID
         }
+        captureStartFocusedPID = focusedApplicationProcessID()
         resetLiveCapturedAudioSamples()
 
         if let readinessMessage = currentWhisperReadinessMessage() {
@@ -6618,7 +6986,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         do {
-            try resetStreamingSession()
+            try resetStreamingSession(stopCapture: false)
         } catch {
             withStateLock {
                 isRecording = false
@@ -6645,71 +7013,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let selectedAudioInputSelection = preferredAudioInputDevice()
         let selectedAudioInput = selectedAudioInputSelection?.candidate
-        var selectedAudioInputDescription = selectedAudioInput.map {
+        let selectedAudioInputDescription = selectedAudioInput.map {
             if $0.isDefault {
                 return "system default (\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)])"
             }
             return "\($0.name) [id=\($0.id), transport=\($0.transportDescription), channels=\($0.inputChannels)]"
         } ?? "system default"
-        if let selectedAudioInput, selectedAudioInput.isDefault == false,
-           audioInputPromotionAllowed {
-            let previousDefault = defaultCoreAudioInputDeviceID()
-            let promotionSucceeded = setDefaultCoreAudioInputDeviceID(selectedAudioInput.id)
-            if promotionSucceeded, let previousDefault, previousDefault != selectedAudioInput.id {
-                displacedDefaultInputDeviceID = previousDefault
-            }
-            // CoreAudio reports the new default device long before it is ready
-            // to deliver buffers. On 2026-09-06 a fixed 0.12 s sleep here was
-            // followed by an engine that took 1.66 s to start and then captured
-            // 37 seconds of digital silence: the default had changed, the
-            // hardware had not finished re-arming.
-            //
-            // Polling until the default actually reports the promoted device is
-            // a better wait than a constant, because it ends as soon as the
-            // switch lands instead of always costing the same. It is still not
-            // proof that audio will flow -- nothing observable here is -- so
-            // CaptureIntegrity remains the backstop that tells the user when it
-            // does not. The observed settle time is logged so the real
-            // distribution can replace this guess with a measurement.
-            var promotedDefaultID: AudioDeviceID?
-            if promotionSucceeded {
-                let settleDeadline = Date().addingTimeInterval(0.75)
-                let settleStartedAt = Date()
-                repeat {
-                    promotedDefaultID = defaultCoreAudioInputDeviceID()
-                    if promotedDefaultID == selectedAudioInput.id { break }
-                    Thread.sleep(forTimeInterval: 0.02)
-                } while Date() < settleDeadline
-                traceLogger.log(
-                    "Audio input default promotion settle seconds="
-                    + String(format: "%.3f", Date().timeIntervalSince(settleStartedAt))
-                    + " landed=\(promotedDefaultID == selectedAudioInput.id ? 1 : 0)")
-                // A device that has just been re-armed needs a moment before
-                // its first buffer is real rather than a zero-filled prime.
-                Thread.sleep(forTimeInterval: 0.08)
-            } else {
-                promotedDefaultID = defaultCoreAudioInputDeviceID()
-            }
-            if promotionSucceeded, promotedDefaultID == selectedAudioInput.id {
-                selectedAudioInputDescription = "system default promoted (\(selectedAudioInput.name) [id=\(selectedAudioInput.id), transport=\(selectedAudioInput.transportDescription), channels=\(selectedAudioInput.inputChannels)])"
-                traceLogger.log(
-                    "Audio input default promotion verified source=\(selectedAudioInputSelection?.source ?? "unknown") device_id=\(selectedAudioInput.id)"
-                )
-            } else {
-                traceLogger.log(
-                    "Audio input default promotion not active source=\(selectedAudioInputSelection?.source ?? "unknown") selected_device_id=\(selectedAudioInput.id) current_default_id=\(promotedDefaultID.map(String.init) ?? "none")"
-                )
-                if let currentDefault = coreAudioInputDevices().first(where: { $0.isDefault }) {
-                    selectedAudioInputDescription = "system default (\(currentDefault.name) [id=\(currentDefault.id), transport=\(currentDefault.transportDescription), channels=\(currentDefault.inputChannels)])"
-                }
-            }
-        }
+        // Resolve once per press; AUHAL binds only its own unit to this device.
         withStateLock {
             activeAudioInputDeviceDescription = selectedAudioInputDescription
         }
         let captureKit = self.audioCaptureKit
         let traceLogger = self.traceLogger
-        let audioStartRequestedAt = Date()
         let task = Task(priority: .userInitiated) { [self] in
             guard let captureKit else { return }
             do {
@@ -6722,39 +7037,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     try await resetFluidTrueStreamingTranscriptState()
                     traceLogger.log("FluidAudio true streaming state reset for capture")
                 }
-                // Cached per device. A miss, or hardware this app has not
-                // fingerprinted, runs the real check -- which is the expensive
-                // one, and the one that keeps installTapOnBus from raising an
-                // exception Swift cannot catch.
-                let preflightFailure: String?
-                if let fingerprint = currentInputFingerprint(),
-                   let cached = audioPreflightCache.cachedResult(for: fingerprint) {
-                    preflightFailure = cached
-                } else {
-                    let measuredAt = Date()
-                    let before = currentInputFingerprint()
-                    let failure = Self.audioInputPreflightFailure()
-                    let after = currentInputFingerprint()
-                    // Only cache when the hardware held still for the whole
-                    // check. If it changed underneath, the answer describes
-                    // neither device, and storing it against either would let a
-                    // stale success through -- which is a crash, not a slow
-                    // start. Not caching costs 52 ms on the next press.
-                    if let before, before == after {
-                        audioPreflightCache.record(failure, for: before)
-                    } else {
-                        audioPreflightCache.invalidate()
-                        traceLogger.log("Audio input preflight not cached reason=device_changed_during_check")
-                    }
-                    traceLogger.log(
-                        "Audio input preflight ran seconds="
-                        + String(format: "%.3f", Date().timeIntervalSince(measuredAt)))
-                    preflightFailure = failure
-                }
-                if let failure = preflightFailure {
-                    traceLogger.log("Audio input preflight FAILED: \(failure) -- refusing capture instead of aborting")
-                    throw JarvisTapError.audioInputUnavailable(failure)
-                }
                 if let fixtureURL = Self.resolveFixtureAudioURL(config.fixtureAudioURL) {
                     // Replay mode. Everything downstream of capture -- freezing,
                     // recognition, cleanup, insertion, the latency spans -- runs
@@ -6764,11 +7046,64 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     let samples = try Self.loadFixtureAudioSamples(at: fixtureURL)
                     traceLogger.log(
                         "Fixture audio loaded path=\(fixtureURL.path) samples=\(samples.count) seconds=\(String(format: "%.2f", Double(samples.count) / Double(WhisperKit.sampleRate)))")
-                    appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
-                } else {
-                    try captureKit.audioProcessor.startRecordingLive(inputDeviceID: nil) { [weak self] samples in
-                        self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                    if config.fixtureReplayRealtime {
+                        // Paced like a real tap: one 0.1 s buffer at a time,
+                        // after an optional wake-up delay. Appending the whole
+                        // clip at once made the recording complete before the
+                        // key was even released, so a capture could never be
+                        // "behind" and the release tail never had anything to
+                        // wait for. Both of the defects that cost real words
+                        // were invisible to replay for exactly that reason.
+                        if config.fixtureEngineStartSeconds > 0 {
+                            traceLogger.log(
+                                "Fixture simulating slow engine start seconds="
+                                + String(format: "%.2f", config.fixtureEngineStartSeconds))
+                            try? await Task.sleep(nanoseconds:
+                                UInt64(config.fixtureEngineStartSeconds * 1_000_000_000))
+                        }
+                        // Detached, so the samples keep arriving while the key
+                        // is still held -- which is what makes this a
+                        // reproduction of live capture rather than a faster
+                        // version of the same instant append.
+                        Task.detached(priority: .userInitiated) { [weak self] in
+                            let chunk = Int(Double(WhisperKit.sampleRate) * 0.1)
+                            var offset = 0
+                            while offset < samples.count {
+                                guard let self else { return }
+                                let end = min(offset + chunk, samples.count)
+                                self.appendLiveCapturedAudioSamples(
+                                    Array(samples[offset..<end]), sessionID: captureSessionID)
+                                offset = end
+                                try? await Task.sleep(nanoseconds: 100_000_000)
+                            }
+                        }
+                    } else {
+                        appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
                     }
+                } else {
+                    guard let selectedAudioInput else {
+                        throw JarvisTapError.audioInputUnavailable("The selected microphone is unavailable. Reconnect it or choose another microphone.")
+                    }
+                    traceInputBindingDetail(deviceID: selectedAudioInput.id,
+                                            context: "before_start", sessionID: captureSessionID)
+                    self.recordAudioInputAttempt(deviceUID: selectedAudioInput.uid,
+                                                 deviceName: selectedAudioInputDescription)
+                    try ownedCapture.start(session: captureSessionID,
+                        deviceID: selectedAudioInput.id, deviceUID: selectedAudioInput.uid,
+                        onSamples: { [weak self] samples in
+                            self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
+                        }, onReceipt: { [weak self] receipt in
+                            if let self, receipt.complete, let latency = receipt.firstConvertedSeconds {
+                                var history = self.inputLatencyMemory
+                                history.record(seconds: latency, forDeviceUID: receipt.deviceUID)
+                                self.inputLatencyMemory = history
+                            }
+                            if let data = try? JSONEncoder().encode(receipt) {
+                                self?.traceLogger.log("AUHAL capture receipt " + String(decoding: data, as: UTF8.self))
+                            }
+                        }, onFailure: { [weak self] message in
+                            self?.captureFailed(message, sessionID: captureSessionID)
+                        })
                 }
                 let shouldContinue = withStateLock { () -> Bool in
                     guard activeCaptureSessionID == captureSessionID,
@@ -6777,28 +7112,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     else {
                         return false
                     }
-                    activeCaptureEngineStarted = true
                     return true
                 }
+                // Deliberately NOT cleared here. `startRecordingLive` returning
+                // means the tap was installed, not that the device delivered
+                // anything -- and my own comment here used to claim "audio is
+                // flowing", which was simply false. It is cleared from the
+                // first sample callback instead, which is the event that
+                // actually exonerates the device.
                 guard shouldContinue, !Task.isCancelled else {
                     traceLogger.log("Audio recording engine started after session ended; stopping stale capture session=\(captureSessionID)")
-                    safelyStopLiveAudioRecording(captureKit: captureKit, reason: "stale_capture_start")
+                    safelyStopLiveAudioRecording(captureKit: captureKit, reason: "stale_capture_start", sessionID: captureSessionID)
                     return
                 }
-                let engineStartLatency = Date().timeIntervalSince(audioStartRequestedAt)
-                withStateLock { activeEngineStartLatencySeconds = engineStartLatency }
-                traceLogger.log(
-                    "Audio recording engine started mode=direct start_latency_seconds=\(String(format: "%.3f", engineStartLatency)) session=\(captureSessionID)"
-                )
-                // The microphone is live now, so the indicator may finally say
-                // so. Guarded on the session still being the active one: a
-                // stale engine finishing its start after the key came up must
-                // not light up for a capture that has already ended.
-                if withStateLock({ isRecording && activeCaptureSessionID == captureSessionID }) {
-                    present(.listening(nil))
-                    print("🎤 [PressTalk] Listening... [trigger=\(trigger.rawValue)]")
-                    fflush(stdout)
-                }
+                traceLogger.log("Audio unit started session=\(captureSessionID); readiness requires retained PCM")
                 if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop()
                 } else if config.streamingTranscriptionEnabled, let whisperKit = self.whisperKit {
@@ -6814,8 +7141,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     traceLogger.log("Audio recording wait loop stopped mode=direct streaming=0")
                 }
             } catch {
+                withStateLock {
+                    if activeCaptureSessionID == captureSessionID { activeCaptureFailure = String(describing: error) }
+                }
                 let shouldReportFailure = self.withStateLock { () -> Bool in
-                    guard self.activeCaptureSessionID == captureSessionID else { return false }
+                    guard self.activeCaptureSessionID == captureSessionID, !self.isProcessing else { return false }
                     self.isRecording = false
                     self.activeTrigger = nil
                     self.activeTriggerSource = nil
@@ -6832,7 +7162,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.restoreInputMethodPreselectionIfNeeded(reason: "audio_recording_failed")
                 self.stopAmplitudeMonitoring()
                 if announce {
-                    self.present(.error("The audio capture stream failed."))
+                    self.present(.audioUnavailable(String(describing: error)))
                     fputs("[PressTalk] Audio recording failed: \(error)\n", stderr)
                 }
             }
@@ -6909,6 +7239,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     }
                 }
                 self.restoreInputMethodPreselectionIfNeeded(reason: reason)
+                // Every delivery path funnels through here, so the note is
+                // attached once rather than at each of the four call sites --
+                // three of which would have been easy to add and one easy to
+                // forget, which is how the message came to be written and never
+                // shown in the first place.
+                self.presentPendingCaptureNoteIfNeeded()
                 traceLogger.log("Processing task finished reason=\(reason) state_reset=true")
                 if let spokenText {
                     speaker.speak(spokenText)
@@ -6930,7 +7266,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             await captureSilenceAwareReleaseTail(
                 captureKit: captureKit,
                 heldSeconds: captureDurationSeconds,
-                engineStartLatencySeconds: withStateLock { activeEngineStartLatencySeconds })
+                engineStartLatencySeconds: withStateLock { activeEngineStartLatencySeconds },
+                sessionID: releasedCaptureSessionID)
             if let streamTaskToStop {
                 if config.streamingTranscriptionEnabled {
                     // Do NOT block the paste on stream teardown.
@@ -6995,6 +7332,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 frozenAudioDurationSeconds = 0
             }
 
+            if let failure = withStateLock({ activeCaptureFailure }) {
+                present(.audioUnavailable(failure))
+                finishProcessing(reason: "capture_interrupted")
+                return
+            }
+
             // What arrived, against what was asked for. Runs before any
             // recognizer sees the audio, because the recognizers are the part
             // that turns a broken recording into confident words.
@@ -7002,7 +7345,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 capturedSeconds: frozenAudioDurationSeconds,
                 heldSeconds: captureDurationSeconds,
                 rms: capturedSignalStats.rms,
-                peak: capturedSignalStats.peak)
+                peak: capturedSignalStats.peak,
+                inputMutedForThisProcess: inputIsMutedForThisProcess(),
+                engineStartSeconds: withStateLock { activeEngineStartLatencySeconds })
             if !captureVerdict.isUsable {
                 traceLogger.log(
                     "Capture integrity failed verdict=\(captureVerdict) "
@@ -7051,6 +7396,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     return acceptedStreamingTranscript
                 }
 
+                var primaryOutcome: TranscriptFallback.PrimaryOutcome = .notAttempted
                 var acceptedParakeetTranscriptForFallback: String?
                 var whisperCandidateDeferredForRecall = false
                 if usesParakeetFinalBackend, !capturedAudioSamples.isEmpty {
@@ -7059,6 +7405,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         var parakeetAcceptedForQualityFallback = false
                         let finalInferenceStartedAt = Date()
                         let parakeetCandidate = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                        primaryOutcome = .completed
                         traceLogger.log(
                             "latency span=final_inference seconds=\(String(format: "%.3f", Date().timeIntervalSince(finalInferenceStartedAt)))")
                         traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetCandidate.text)
@@ -7100,18 +7447,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                             traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
                         }
                     } catch {
+                        primaryOutcome = .failed(error)
                         traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
                     }
                 }
 
                 guard let whisperKit else {
-                    if let acceptedParakeetTranscriptForFallback {
-                        traceLogger.log("Whisper unavailable; using accepted Parakeet v3 ANE transcript fallback")
-                        return acceptedParakeetTranscriptForFallback
-                    }
-                    if let acceptedStreamingTranscript {
-                        traceLogger.log("Whisper unavailable; using streaming transcript fallback")
-                        return acceptedStreamingTranscript
+                    if let transcript = try TranscriptFallback.withoutSecondary(
+                        acceptedPrimary: acceptedParakeetTranscriptForFallback,
+                        acceptedStreaming: acceptedStreamingTranscript,
+                        primary: primaryOutcome
+                    ) {
+                        traceLogger.log("Primary recognition resolved without optional Whisper; empty=\(transcript.isEmpty)")
+                        return transcript
                     }
                     throw JarvisTapError.whisperUnavailable
                 }
@@ -7368,7 +7716,7 @@ let relaxedResults = try await whisperKit.transcribe(
                         traceLogger.log(
                             "No speech captured because selected audio input produced no buffers input_device=\(audioInputDescription) held_seconds=\(String(format: "%.2f", captureDurationSeconds))"
                         )
-                        present(.audioUnavailable("No audio received from \(audioInputDescription). Check the macOS input device."))
+                        present(.audioUnavailable("No audio arrived from the selected microphone. Reconnect it or choose another microphone in PressTalk."))
                         print("⚠️ [PressTalk] No audio buffers captured from \(audioInputDescription).")
                         fflush(stdout)
                         finishProcessing(reason: "audio_no_buffers")
@@ -7388,20 +7736,17 @@ let relaxedResults = try await whisperKit.transcribe(
                     // "I didn't catch any clear speech" blames the speaker for
                     // a microphone that was never delivering, and the person
                     // then repeats themselves louder into the same dead input.
-                    if let integrityMessage = captureVerdict.userFacingMessage {
+                    if let integrityMessage = captureVerdict.userFacingMessage,
+                       !captureVerdict.isUsable {
                         present(.error(integrityMessage))
                         print("⚠️ [PressTalk] \(integrityMessage)")
                         fflush(stdout)
                         finishProcessing(reason: "capture_integrity_failed")
                         return
                     }
-                    if captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds {
-                        present(.error("I didn’t catch any clear speech."))
-                    } else {
-                        traceLogger.log("Short no-speech hold suppressed; returning presentation to ready")
-                        present(.ready)
-                    }
-                    print("⚠️ [PressTalk] No speech captured.")
+                    traceLogger.log("Recognition completed without clear speech; returning presentation to ready")
+                    present(.ready)
+                    print("[PressTalk] No speech captured.")
                     fflush(stdout)
                     finishProcessing(
                         reason: captureDurationSeconds >= shortHoldNoSpeechSuppressionSeconds ? "no_speech" : "no_speech_suppressed_short_hold"
@@ -7409,6 +7754,19 @@ let relaxedResults = try await whisperKit.transcribe(
                     return
                 }
 
+                if case .startedLate(let lost) = captureVerdict {
+                    traceLogger.log(
+                        "Capture started late seconds=\(String(format: "%.2f", lost)) "
+                        + "recording began after the key went down")
+                    // Held until the text has been delivered, then shown in its
+                    // own right. This branch used to only log: the verdict was
+                    // computed, the message was written, and the only code that
+                    // presented it required !isUsable -- which .startedLate is
+                    // not. The person got their text with no idea why it began
+                    // mid-sentence, which is the entire thing the verdict exists
+                    // to explain.
+                    pendingCaptureNote = captureVerdict.userFacingMessage
+                }
                 traceLogger.log("📝 Transkription abgeschlossen: \(TranscriptRedaction.loggable(transcript))")
                 print("🗣️ [PressTalk recognized] \(TranscriptRedaction.loggable(transcript))")
                 fflush(stdout)
@@ -7539,7 +7897,9 @@ let relaxedResults = try await whisperKit.transcribe(
 
         guard let cleanedToLog else { return }
         traceLogger.log("Partial transcript: \(TranscriptRedaction.loggable(cleanedToLog))")
-        present(.listening(cleanedToLog))
+        if withStateLock({ isRecording && activeCaptureEngineStarted && activeCaptureFailure == nil }) {
+            present(.listening(cleanedToLog))
+        }
         if shouldPrintPartial {
             print("📝 [PressTalk partial] \(TranscriptRedaction.loggable(cleanedToLog))")
             fflush(stdout)
@@ -7603,10 +7963,6 @@ let relaxedResults = try await whisperKit.transcribe(
     }
 
     private func finalizeTranscript(preferFallbackTranscript: Bool) async throws -> String {
-        guard let whisperKit else {
-            throw JarvisTapError.whisperUnavailable
-        }
-
         if preferFallbackTranscript {
             traceLogger.log("Skipping offline Whisper finalize because live stream shutdown timed out")
             return validatedFinalTranscriptCandidate(
@@ -7618,8 +7974,7 @@ let relaxedResults = try await whisperKit.transcribe(
         }
 
         let capturedSamples = currentLiveCapturedAudioSamples()
-        let whisperLadderStartedAt = Date()
-            traceLogger.log("Finalizing offline Whisper transcript samples=\(capturedSamples.count)")
+        traceLogger.log("Finalizing offline transcript samples=\(capturedSamples.count)")
         if capturedSamples.isEmpty {
             traceLogger.log("No captured audio samples; using filtered fallback transcript")
             return validatedFinalTranscriptCandidate(
@@ -7662,6 +8017,7 @@ let relaxedResults = try await whisperKit.transcribe(
             }
         }
 
+        var primaryOutcome: TranscriptFallback.PrimaryOutcome = .notAttempted
         var acceptedParakeetTranscriptForFallback: String?
         var whisperCandidateDeferredForRecall = false
         if usesParakeetFinalBackend {
@@ -7669,6 +8025,7 @@ let relaxedResults = try await whisperKit.transcribe(
             do {
                 var parakeetAcceptedForQualityFallback = false
                 let parakeetCandidate = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                primaryOutcome = .completed
                 traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetCandidate.text)
                 if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
                     parakeetCandidate.text,
@@ -7708,8 +8065,21 @@ let relaxedResults = try await whisperKit.transcribe(
                     traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
                 }
             } catch {
+                primaryOutcome = .failed(error)
                 traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
             }
+        }
+
+        guard let whisperKit else {
+            if let transcript = try TranscriptFallback.withoutSecondary(
+                acceptedPrimary: acceptedParakeetTranscriptForFallback,
+                acceptedStreaming: acceptedStreamingTranscript,
+                primary: primaryOutcome
+            ) {
+                traceLogger.log("Primary recognition resolved without optional Whisper; empty=\(transcript.isEmpty)")
+                return transcript
+            }
+            throw JarvisTapError.whisperUnavailable
         }
 
         let primaryResults = try await whisperKit.transcribe(audioArray: normalizedSamples, decodeOptions: decodingOptions)

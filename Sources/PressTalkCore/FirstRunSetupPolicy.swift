@@ -65,12 +65,22 @@ public struct FirstRunSetupPolicy {
 
     /// The steps this configuration actually needs. A trigger that does not use
     /// an event tap must not make someone grant Input Monitoring for nothing.
+    /// Accessibility comes before Input Monitoring, and the order is not
+    /// cosmetic.
+    ///
+    /// The Fn trigger needs a *writable* event tap so the key's normal
+    /// behaviour can be suppressed, and macOS grants a writable tap on
+    /// Accessibility, not on Input Monitoring. Asking for Input Monitoring
+    /// first produced a step that could not be satisfied: the guide waited for
+    /// a writable tap that could not exist until a permission it had not yet
+    /// requested was granted. A person following the guide in order reached a
+    /// dead end with no way forward.
     public func steps(for conditions: Conditions) -> [Step] {
-        var steps: [Step] = [.microphone]
+        var steps: [Step] = [.microphone, .accessibility]
         if conditions.triggerRequiresInputMonitoring {
             steps.append(.inputMonitoring)
         }
-        steps.append(contentsOf: [.accessibility, .speechModel, .firstDictation])
+        steps.append(contentsOf: [.speechModel, .firstDictation])
         return steps
     }
 

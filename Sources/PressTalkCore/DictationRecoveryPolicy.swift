@@ -75,6 +75,18 @@ public struct DictationRecoveryPolicy {
 /// Retained audio is the sharpest edge in this file. It is the raw recording,
 /// held in memory, and the only defensible reasons to keep it are that the last
 /// attempt failed and the user might immediately want another go.
+///
+/// NOT WIRED UP. As of 2026-09-07 this type has no callers anywhere in the
+/// app: only its own tests, which pass. The live behaviour is unchanged --
+/// `resetLiveCapturedAudioSamples()` discards the recording on the next press,
+/// so a failed recognition cannot be retried and this policy decides nothing.
+///
+/// It is recorded here rather than deleted because the gap it describes is
+/// real: "I didn't catch any clear speech" with no way to try the same audio
+/// again is a bad answer, and the decision of what to keep is the hard half.
+/// But a tested type with no callers reads as a shipped feature, and that
+/// misreading is worse than an empty space. Wire it or delete it; do not leave
+/// it looking finished.
 public struct RetainedAudioPolicy {
     public enum Disposition: String, Equatable {
         /// The attempt failed and a retry could still succeed.

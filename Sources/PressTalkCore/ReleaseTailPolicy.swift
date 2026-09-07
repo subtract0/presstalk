@@ -34,18 +34,21 @@ public enum ReleaseTailPolicy {
         public let expectedAtReleaseSeconds: Double
         /// RMS of the most recently delivered window.
         public let recentRMS: Double
-        /// False when a poll produced no new samples at all, which means the
-        /// tap has gone quiet as a source rather than the room being quiet.
-        public let capturedGrewSinceLastPoll: Bool
+        /// How long the captured length has stood still. A single poll seeing
+        /// no growth means nothing: the tap hands over one buffer per 0.1 s
+        /// while the loop polls every 0.025 s, so three polls in four
+        /// legitimately see no new samples. Only a gap materially longer than
+        /// one buffer says the tap has stopped delivering.
+        public let secondsSinceCapturedGrew: Double
 
         public init(elapsedSeconds: Double, capturedSeconds: Double,
                     expectedAtReleaseSeconds: Double, recentRMS: Double,
-                    capturedGrewSinceLastPoll: Bool) {
+                    secondsSinceCapturedGrew: Double) {
             self.elapsedSeconds = elapsedSeconds
             self.capturedSeconds = capturedSeconds
             self.expectedAtReleaseSeconds = expectedAtReleaseSeconds
             self.recentRMS = recentRMS
-            self.capturedGrewSinceLastPoll = capturedGrewSinceLastPoll
+            self.secondsSinceCapturedGrew = secondsSinceCapturedGrew
         }
     }
 
@@ -67,6 +70,15 @@ public enum ReleaseTailPolicy {
     /// counts as caught up. One tap buffer's worth of slack, so a capture that
     /// will never quite converge does not hold the tail open to its maximum.
     public static let catchUpToleranceSeconds = 0.05
+    /// How long the capture may stand still before the tap counts as dead.
+    ///
+    /// Two and a half buffers. WhisperKit installs its tap with a 0.1 s buffer
+    /// (`minBufferLength`), so at a 0.025 s poll interval the common case is
+    /// three consecutive polls with no growth, entirely normally. The previous
+    /// rule stopped on the FIRST of those, which is why 11 of 13 tails in the
+    /// trace ended as `no_further_audio` while still 90-280 ms behind the key
+    /// release -- the end of the sentence, thrown away as a dead stream.
+    public static let stalledStreamSeconds = 0.25
 
     public static func decide(_ input: Inputs, maximumSeconds: Double) -> Decision {
         if input.elapsedSeconds >= maximumSeconds {
@@ -84,9 +96,9 @@ public enum ReleaseTailPolicy {
             //
             // Unless nothing is arriving any more: then waiting cannot help and
             // holding on only adds latency to a capture that is already broken.
-            return input.capturedGrewSinceLastPoll
-                ? .keepWaiting(reason: "audio_still_in_flight")
-                : .stop(reason: "no_further_audio")
+            return input.secondsSinceCapturedGrew >= stalledStreamSeconds
+                ? .stop(reason: "no_further_audio")
+                : .keepWaiting(reason: "audio_still_in_flight")
         }
 
         if input.recentRMS <= silenceRMSThreshold {

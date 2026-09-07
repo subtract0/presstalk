@@ -35,7 +35,7 @@ final class FirstRunSetupWindowController: NSWindowController {
 
     init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -80,6 +80,10 @@ final class FirstRunSetupWindowController: NSWindowController {
         detailLabel.font = .systemFont(ofSize: 11)
         detailLabel.textColor = .secondaryLabelColor
         detailLabel.preferredMaxLayoutWidth = 460
+        stepBodyLabel.maximumNumberOfLines = 0
+        detailLabel.maximumNumberOfLines = 0
+        stepBodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
+        detailLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         primaryButton.target = self
         primaryButton.action = #selector(primaryTapped(_:))
@@ -109,6 +113,8 @@ final class FirstRunSetupWindowController: NSWindowController {
             stack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor),
             buttonRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
             progressBar.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
+            stepBodyLabel.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
+            detailLabel.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
         ])
     }
 
@@ -194,7 +200,8 @@ final class FirstRunSetupWindowController: NSWindowController {
             // "authorized" and no audio arrives.
             return probe.userFacingSummary
         case .inputMonitoring, .accessibility:
-            return "Find PressTalk in the list and switch it on. This window updates by itself."
+            let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "PressTalk"
+            return "Enable \(name). This window checks the running app's permission automatically. If it is missing or an older entry stays enabled without working, use + to add this copy: \(Bundle.main.bundleURL.path)."
         case .speechModel:
             return conditions.speechModelReady
                 ? "Ready."

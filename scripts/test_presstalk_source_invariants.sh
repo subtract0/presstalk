@@ -126,40 +126,50 @@ if [[ -z "$(live_line "$SOURCES/ProductUI.swift" 'PressTalkOffer\.checkoutIsLive
     "otherwise an expired trial locks someone out with no way to pay"
 fi
 
-# The tap-safety preflight may be cached, but it must still be reachable. It
-# guards installTapOnBus, which raises an Objective-C exception Swift cannot
-# catch and which killed the app three times in six days. A cache that never
-# misses would turn that guard off without removing a single line.
-if [[ -z "$(live_line "$main_swift" 'Self\.audioInputPreflightFailure()')" ]]; then
-  report "Sources/JarvisTap/main.swift" \
-    "the capture path must still be able to run audioInputPreflightFailure" \
-    "a cache with no miss path silently disables the crash guard"
+# AUHAL replaced the engine tap and its scratch preflight. The new guard checks
+# executable wiring, readiness and failure propagation and attacks its own checks.
+if ! python3 "$ROOT/scripts/presstalk_capture_contract_gate.py" --self-test; then
+  report "capture contract" "owned capture wiring failed"
 fi
-if [[ -z "$(live_line "$main_swift" 'audioPreflightCache\.record')" ]]; then
+# The receiver, and the anchors, are the whole check. Written as bare names
+# these three patterns also matched each function's own `private func` line, so
+# commenting out all three call sites still reported "All source invariants
+# hold" -- the precise failure this file exists to prevent, reintroduced one
+# edit after the comment above warning about it. Injecting each defect and
+# watching the gate fire is the only thing that established these work.
+# The crash breaker is a matched pair and it is dangerous half-present.
+# Without the record, a crash during microphone start is never attributed and
+# the app reopens the same device on every launch. Without the clear, every
+# successful start leaves the record behind and the NEXT launch revokes a
+# microphone that works. Both directions are silent, so both are pinned here.
+if [[ -z "$(live_line "$main_swift" 'self\.recordAudioInputAttempt(')" ]]; then
   report "Sources/JarvisTap/main.swift" \
-    "preflight results must be recorded, or the cache never hits" \
-    "every press would pay the 52 ms the cache exists to avoid"
+    "the capture path must record the device before opening it" \
+    "without the record a crash during start is attributed to nothing"
 fi
-
-# The indicator must not claim the microphone is live before it is. On key-down
-# it showed the full listening light 168 ms before the engine started, which
-# taught the user to begin speaking into a dead microphone -- the clipped first
-# word was the indicator lying, not the recogniser failing. Key-down presents
-# .arming; .listening waits for the engine to report it started.
-arming_line="$(live_line "$main_swift" 'present(\.arming)')"
-if [[ -z "$arming_line" ]]; then
+if [[ -z "$(live_line "$main_swift" '^ *clearAudioInputAttempt()$')" ]]; then
   report "Sources/JarvisTap/main.swift" \
-    "key-down must present .arming, not .listening" \
-    "a full listening light before the engine starts clips the first word"
+    "a started engine must clear the recorded attempt" \
+    "an uncleared record revokes a working microphone on the next launch"
 fi
-engine_started_line="$(live_line "$main_swift" 'Audio recording engine started mode=direct')"
-listening_after_engine="$(sed 's|//.*||' "$main_swift" | grep -n 'present(.listening(nil))' \
-  | awk -F: -v e="${engine_started_line:-0}" '$1 > e { print $1; exit }')"
-if [[ -n "$engine_started_line" && -z "$listening_after_engine" ]]; then
+if [[ -z "$(live_line "$main_swift" '^ *applyAudioInputCrashBreaker()$')" ]]; then
   report "Sources/JarvisTap/main.swift" \
-    "nothing presents .listening after the engine reports it started" \
-    "the indicator would stay dim for the whole dictation"
+    "startup must run the audio input crash breaker" \
+    "a recorded crash that is never evaluated is a crash loop"
 fi
+# Bundle.module runs a SwiftPM-generated closure that calls fatalError when the
+# bundle is not in one of two hardcoded places, and the shipped app puts it in a
+# third. Touching the property at all can abort the process, so the fix is not
+# "handle the nil" -- it is never to read it. Reached from the first transcript,
+# it killed the app on a customer's first dictation.
+module_line="$(live_line "$SOURCES/../PressTalkCore/GermanVocabularyPolicy.swift" 'Bundle\.module' 2>/dev/null || true)"
+for f in "$ROOT"/Sources/PressTalkCore/*.swift "$ROOT"/Sources/JarvisTap/*.swift; do
+  if [[ -n "$(live_line "$f" '\.module\b')" ]]; then
+    report "${f#$ROOT/}" \
+      "reads Bundle.module, which fatalErrors when the bundle is not where SwiftPM guessed" \
+      "use PressTalkResources.bundle, which returns nil instead of killing the app"
+  fi
+done
 
 echo
 if [[ "$failures" -gt 0 ]]; then

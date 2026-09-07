@@ -37,12 +37,17 @@ final class FirstRunSetupPolicyTests: XCTestCase {
             guardrail += 1
             seen.append(step)
             switch step {
+            // Each case grants only what its own step asks for. The previous
+            // version granted inputMonitoring while satisfying accessibility,
+            // which made the Input Monitoring step disappear from the walk
+            // entirely and hid the ordering it was meant to assert.
             case .microphone:
                 conditions = self.conditions(microphone: true)
-            case .inputMonitoring:
-                conditions = self.conditions(microphone: true, inputMonitoring: true)
             case .accessibility:
-                conditions = self.conditions(microphone: true, inputMonitoring: true, accessibility: true)
+                conditions = self.conditions(microphone: true, accessibility: true)
+            case .inputMonitoring:
+                conditions = self.conditions(
+                    microphone: true, inputMonitoring: true, accessibility: true)
             case .speechModel:
                 conditions = self.conditions(
                     microphone: true, inputMonitoring: true, accessibility: true, speechModel: true)
@@ -52,7 +57,10 @@ final class FirstRunSetupPolicyTests: XCTestCase {
                     speechModel: true, firstDictation: true)
             }
         }
-        XCTAssertEqual(seen, [.microphone, .inputMonitoring, .accessibility, .speechModel, .firstDictation])
+        // Accessibility precedes Input Monitoring: the writable event tap the
+        // Fn trigger needs is granted by Accessibility, so the old order left
+        // the user on a step nothing they could do would satisfy.
+        XCTAssertEqual(seen, [.microphone, .accessibility, .inputMonitoring, .speechModel, .firstDictation])
         XCTAssertNil(policy.currentStep(for: conditions))
     }
 

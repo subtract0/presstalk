@@ -32,6 +32,13 @@ def percentile(values: list[float], fraction: float) -> float | None:
     return ordered[low] + (ordered[high] - ordered[low]) * (position - low)
 
 
+def normalize(text: str) -> str:
+    """Case and punctuation folded, so "Danke." and "danke" compare equal."""
+    return " ".join(
+        "".join(c for c in text.lower() if c.isalnum() or c.isspace()).split()
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--results", required=True)
@@ -54,6 +61,30 @@ def main() -> int:
     attempted = len(records)
     produced = [r for r in records if r.get("transcript")]
     empty = attempted - len(produced)
+
+    # Text production is not success, and reporting it as though it were is how
+    # a hallucination-safety run passes. Handed a negative case whose transcript
+    # was an invented "Thanks", this reported 100% and nothing else -- the
+    # metric cannot tell a correct transcript from a fabricated one, because it
+    # only ever asked whether SOMETHING came out.
+    #
+    # A record may now carry "expected". An empty string means silence was
+    # expected, and any transcript for it is an invention, which is the single
+    # worst outcome a dictation app can have: text the person never said,
+    # inserted into their document.
+    scored = [r for r in records if "expected" in r]
+    invented, correct, wrong, missed = [], [], [], []
+    for r in scored:
+        expected = normalize(r.get("expected") or "")
+        actual = normalize(r.get("transcript") or "")
+        if not expected:
+            (invented if actual else correct).append(r)
+        elif not actual:
+            missed.append(r)
+        elif actual == expected:
+            correct.append(r)
+        else:
+            wrong.append(r)
 
     spans: dict[str, list[float]] = {}
     for line in Path(args.trace).read_text(errors="replace").splitlines():
@@ -84,6 +115,18 @@ def main() -> int:
         # thing this harness is unable to check.
         "textProducedRate": round(len(produced) / attempted, 3) if attempted else None,
         "insertionExercised": False,
+        # Only meaningful when the run supplied "expected" per record. Absent
+        # otherwise, rather than defaulted to something reassuring.
+        "scoredRuns": len(scored),
+        "correct": len(correct),
+        "wrong": len(wrong),
+        "missed": len(missed),
+        # Text produced where silence was expected. Never fold this into a
+        # success rate: it is the one failure that puts words the person never
+        # said into their document.
+        "invented": len(invented),
+        "inventedTranscripts": [r.get("transcript", "") for r in invented],
+        "accuracy": round(len(correct) / len(scored), 3) if scored else None,
         "keyupToTranscriptSeconds": {
             "count": len(end_to_end),
             "min": round(min(end_to_end), 3) if end_to_end else None,
@@ -106,7 +149,19 @@ def main() -> int:
     print(f"produced text        {len(produced)}")
     print(f"produced nothing     {empty}")
     if report["textProducedRate"] is not None:
-        print(f"produced-text rate   {report['textProducedRate']:.1%}  (insertion not exercised)")
+        print(f"produced-text rate   {report['textProducedRate']:.1%}  (not a success rate)")
+    if scored:
+        print(f"scored runs          {len(scored)}")
+        print(f"  correct            {len(correct)}")
+        print(f"  wrong text         {len(wrong)}")
+        print(f"  missed (silent)    {len(missed)}")
+        print(f"  INVENTED           {len(invented)}"
+              + ("   <-- text where silence was expected" if invented else ""))
+        for r in invented:
+            print(f"      invented: {r.get('transcript','')!r}")
+        print(f"  accuracy           {report['accuracy']:.1%}")
+    else:
+        print("scored runs          0  (no 'expected' field: this run cannot judge correctness)")
     if end_to_end:
         k = report["keyupToTranscriptSeconds"]
         print(f"keyup -> transcript  p50 {k['p50']}s  p95 {k['p95']}s  max {k['max']}s")

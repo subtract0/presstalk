@@ -39,8 +39,18 @@ require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_PARAKEET_MIN_CONFIDENCE"]' "ru
 require_contains "$CONFIG_SOURCE" '0.96' "runtime must keep the default Parakeet confidence threshold"
 require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_TRIGGER_KEY"]' "runtime must read the trigger key setting"
 require_contains "$CONFIG_SOURCE" '"fn"' "runtime must default to Fn / Globe trigger"
-require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_OPEN_PERMISSION_PANES"] == "1"' "runtime must keep permission pane opening explicitly opt-in"
-require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "1"' "runtime setup window must remain explicitly opt-in"
+# Also opt-out. Guided setup's buttons cannot open System Settings without it,
+# and the setup window itself is gated on this flag AND the one below. Asserting
+# opt-in here enforced a setup window with dead buttons.
+require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_OPEN_PERMISSION_PANES"] == "0"' \
+  "permission panes must be opt-out, or guided setup's buttons do nothing"
+# Guided setup must appear for a Finder-launched app, which is how customers
+# start it. This previously asserted the opposite -- that the window stay
+# explicitly opt-in -- and so enforced the defect: Finder passes no shell
+# environment, so opt-in meant no onboarding for anyone who did not install via
+# Homebrew. The managed paths that need silence all set the variable to 0.
+require_contains "$CONFIG_SOURCE" 'env["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] == "0"' \
+  "guided setup must be opt-out, so a Finder launch with no environment shows it"
 require_contains "$SOURCE" "Parakeet v3 ANE transcript accepted but quality fallback requested" "runtime must log accepted Parakeet quality fallback"
 require_contains "$SOURCE" "Using accepted Parakeet v3 ANE transcript fallback after Whisper candidates were empty, implausible, or too short" "runtime must preserve accepted Parakeet transcript when Whisper fallback is unusable or truncated"
 require_contains "$RECALL_SOURCE" "Parakeet v3 ANE transcript accepted but shorter than streaming recall" "runtime must reject prefix-truncated high-confidence Parakeet candidates"

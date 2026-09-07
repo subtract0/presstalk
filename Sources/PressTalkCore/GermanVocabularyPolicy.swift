@@ -314,8 +314,15 @@ public struct GermanVocabularyPolicy {
     }
 
     /// Loads the shipped user-vocabulary guard list.
+    ///
+    /// Deliberately does not use `Bundle.module`. Reading that property runs a
+    /// generated closure that calls `fatalError` when the bundle is not in one
+    /// of two hardcoded places, and the shipped app puts it in a third. This is
+    /// reached on the first transcript, so it terminated the app on a
+    /// customer's first dictation. See PressTalkResources.
     public static func loadUserVocabulary() -> Set<String> {
-        loadUserVocabulary(bundle: .module)
+        guard let bundle = PressTalkResources.bundle else { return [] }
+        return loadUserVocabulary(bundle: bundle)
     }
 
     public static func loadUserVocabulary(bundle: Bundle) -> Set<String> {

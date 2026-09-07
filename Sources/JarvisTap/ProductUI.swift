@@ -23,9 +23,15 @@ struct PressTalkCommerceConfig {
     /// invisible in the one place they had to work. The environment still wins
     /// when set, so a staging checkout can be pointed at without a rebuild.
     init(env: [String: String] = ProcessInfo.processInfo.environment) {
+        // Falls back to the FIRST LIVE RAIL, not to Stripe specifically. Reading
+        // PressTalkOffer.checkoutURL here meant Settings lost its purchase
+        // button entirely in a configuration the rest of the app considers
+        // sellable -- PayPal configured, Stripe not -- because that property is
+        // the Stripe rail by name.
         upgradeURL = (env["PRESSTALK_CHECKOUT_URL"] ?? env["PRESSTALK_UPGRADE_URL"])
             .flatMap(URL.init(string:))
-            ?? PressTalkOffer.checkoutURL
+            ?? PressTalkOffer.liveCheckoutRails.first
+                .flatMap { PressTalkOffer.checkoutURL(for: $0) }
         plansURL = env["PRESSTALK_PLANS_URL"].flatMap(URL.init(string:))
             ?? PressTalkOffer.pricingPageURL
     }
@@ -223,6 +229,15 @@ final class PressTalkLicenseStore {
 }
 
 private final class VoiceLightView: NSView {
+    /// True while the microphone is still coming up.
+    ///
+    /// Arming is drawn as a small dim core and nothing else. Dimming the full
+    /// glow was not enough: the owner reported the light appearing "almost
+    /// instantly" and only brightening when he spoke louder, while the log
+    /// showed a full second of arming on AirPods. A slightly fainter version of
+    /// the same shape reads as the same shape. A dot that is not the shape, and
+    /// then the shape, reads as two states.
+    private var isArming = false
     private var displayedLow: CGFloat = 0.06
     private var displayedMid: CGFloat = 0.05
     private var displayedHigh: CGFloat = 0.05
@@ -239,7 +254,21 @@ private final class VoiceLightView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    func setArming(_ arming: Bool) {
+        guard isArming != arming else { return }
+        isArming = arming
+        if arming {
+            // Start from the floor so the first live band expands outward from
+            // the core rather than snapping down to it.
+            displayedLow = 0.0; displayedMid = 0.0; displayedHigh = 0.0
+        }
+        needsDisplay = true
+    }
+
     func setBands(_ bands: VoiceLightBands) {
+        // Bands arriving while arming would animate a light that is not
+        // listening yet, which is the misinformation this state exists to stop.
+        guard !isArming else { return }
         let low = CGFloat(max(0.0, min(1.0, bands.low)))
         let mid = CGFloat(max(0.0, min(1.0, bands.mid)))
         let high = CGFloat(max(0.0, min(1.0, bands.high)))
@@ -276,6 +305,16 @@ private final class VoiceLightView: NSView {
         context.setBlendMode(.screen)
         context.setAllowsAntialiasing(true)
         context.setShouldAntialias(true)
+
+        if isArming {
+            // About 9 mm across on a standard display. Present enough to say
+            // the key registered, small and still enough that nobody could
+            // mistake it for the listening state, which fills the circle.
+            drawSoftGlow(in: context, center: center, radius: 15,
+                         xScale: 1.0, yScale: 1.0, alpha: 0.30)
+            context.restoreGState()
+            return
+        }
 
         drawSoftGlow(
             in: context,
@@ -425,46 +464,12 @@ private final class FlippedView: NSView {
     }
 }
 
+private final class CaptureHUDPanel: NSPanel {
+    override var canBecomeKey: Bool { false }
+    override var canBecomeMain: Bool { false }
+}
+
 final class JarvisTapSettingsStore {
-    enum LanguageOption: String, CaseIterable {
-        case auto
-        case german
-        case english
-
-        var displayName: String {
-            switch self {
-            case .auto:
-                return "Auto"
-            case .german:
-                return "German"
-            case .english:
-                return "English"
-            }
-        }
-
-        var whisperLanguageCode: String? {
-            switch self {
-            case .auto:
-                return nil
-            case .german:
-                return "de"
-            case .english:
-                return "en"
-            }
-        }
-
-        static func fromWhisperLanguage(_ language: String?) -> LanguageOption {
-            switch language?.lowercased() {
-            case "de":
-                return .german
-            case "en":
-                return .english
-            default:
-                return .auto
-            }
-        }
-    }
-
     enum InsertionSuffixOption: String, CaseIterable {
         case none
         case space
@@ -527,7 +532,6 @@ final class JarvisTapSettingsStore {
         static let showHUD = "JarvisTap.ShowHUD"
         static let pasteAutomatically = "JarvisTap.PasteAutomatically"
         static let showAbortPopups = "JarvisTap.ShowAbortPopups"
-        static let preferredLanguage = "JarvisTap.PreferredLanguage"
         static let releaseTailMaxSeconds = "JarvisTap.ReleaseTailMaxSeconds"
         static let insertionSuffix = "JarvisTap.InsertionSuffix"
         static let triggerKey = "JarvisTap.TriggerKey"
@@ -541,11 +545,12 @@ final class JarvisTapSettingsStore {
 
     init(config: JarvisTapConfig, defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        // Language detection is automatic for every installation, including upgrades.
+        defaults.removeObject(forKey: "JarvisTap.PreferredLanguage")
         defaults.register(defaults: [
             Key.showHUD: true,
             Key.pasteAutomatically: config.agentMode == "dictation",
             Key.showAbortPopups: true,
-            Key.preferredLanguage: LanguageOption.fromWhisperLanguage(config.whisperLanguage).rawValue,
             Key.releaseTailMaxSeconds: config.releaseTailPaddingSeconds,
             Key.insertionSuffix: InsertionSuffixOption.space.rawValue,
             Key.triggerKey: config.triggerKey.rawValue,
@@ -568,15 +573,6 @@ final class JarvisTapSettingsStore {
     var showAbortPopups: Bool {
         get { defaults.bool(forKey: Key.showAbortPopups) }
         set { defaults.set(newValue, forKey: Key.showAbortPopups) }
-    }
-
-    var preferredLanguage: LanguageOption {
-        get {
-            LanguageOption(rawValue: defaults.string(forKey: Key.preferredLanguage) ?? "") ?? .auto
-        }
-        set {
-            defaults.set(newValue.rawValue, forKey: Key.preferredLanguage)
-        }
     }
 
     var releaseTailMaxSeconds: TimeInterval {
@@ -699,7 +695,7 @@ final class PressTalkHUDController {
     private let voiceLightView = VoiceLightView(frame: NSRect(x: 0, y: 0, width: 760, height: 440))
     private let liveTranscriptField = NSTextField(wrappingLabelWithString: "")
     private let iconView = NSImageView()
-    private let titleField = NSTextField(labelWithString: "")
+    private let titleField = NSTextField(wrappingLabelWithString: "")
     private let detailField = NSTextField(wrappingLabelWithString: "")
     private var hideWorkItem: DispatchWorkItem?
     private var mode: Mode = .none
@@ -709,7 +705,7 @@ final class PressTalkHUDController {
     private let liveTranscriptMaxCharacters = 220
 
     init() {
-        panel = NSPanel(
+        panel = CaptureHUDPanel(
             contentRect: NSRect(x: 0, y: 0, width: 460, height: 112),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
@@ -762,12 +758,19 @@ final class PressTalkHUDController {
 
         titleField.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
         titleField.textColor = .labelColor
-        titleField.lineBreakMode = .byTruncatingTail
+        titleField.lineBreakMode = .byWordWrapping
+        titleField.maximumNumberOfLines = 0
 
         detailField.font = NSFont.systemFont(ofSize: 14, weight: .regular)
         detailField.textColor = .secondaryLabelColor
-        detailField.maximumNumberOfLines = 2
-        detailField.lineBreakMode = .byTruncatingTail
+        detailField.maximumNumberOfLines = 0
+        detailField.lineBreakMode = .byWordWrapping
+        for field in [titleField, detailField] {
+            field.cell?.wraps = true
+            field.cell?.isScrollable = false
+            field.cell?.usesSingleLineMode = false
+            field.setContentCompressionResistancePriority(.required, for: .vertical)
+        }
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         titleField.translatesAutoresizingMaskIntoConstraints = false
@@ -800,6 +803,8 @@ final class PressTalkHUDController {
             textStack.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 14),
             textStack.trailingAnchor.constraint(equalTo: cardContainer.trailingAnchor, constant: -20),
             textStack.centerYAnchor.constraint(equalTo: cardContainer.centerYAnchor),
+            titleField.widthAnchor.constraint(equalTo: textStack.widthAnchor),
+            detailField.widthAnchor.constraint(equalTo: textStack.widthAnchor),
         ])
 
         if let contentView = panel.contentView {
@@ -839,10 +844,23 @@ final class PressTalkHUDController {
         detailField.stringValue = detail ?? ""
         detailField.isHidden = detail?.isEmpty ?? true
 
-        panel.setContentSize(NSSize(width: 460, height: 112))
+        let cardWidth: CGFloat = 460
+        let textWidth = cardWidth - 20 - 28 - 14 - 20
+        titleField.preferredMaxLayoutWidth = textWidth
+        detailField.preferredMaxLayoutWidth = textWidth
+        // Transcript confirmations are previews. Instructions and errors get
+        // the height needed for the complete message, including long device names.
+        detailField.maximumNumberOfLines = (style == .inserted || style == .copied) ? 4 : 0
+        func wrappedHeight(_ field: NSTextField) -> CGFloat {
+            guard !field.isHidden else { return 0 }
+            let bounds = NSRect(x: 0, y: 0, width: textWidth, height: .greatestFiniteMagnitude)
+            return ceil(field.cell?.cellSize(forBounds: bounds).height ?? field.intrinsicContentSize.height)
+        }
+        let contentHeight = wrappedHeight(titleField) + (detailField.isHidden ? 0 : 4 + wrappedHeight(detailField))
+        panel.setContentSize(NSSize(width: cardWidth, height: max(112, contentHeight + 44)))
+        panel.contentView?.layoutSubtreeIfNeeded()
         positionPanel()
         panel.alphaValue = 1
-        NSApp.unhide(nil)
         panel.orderFrontRegardless()
 
         if let autoHideAfter {
@@ -859,7 +877,8 @@ final class PressTalkHUDController {
         anchorPoint: CGPoint? = nil,
         verticalLift: CGFloat = 0,
         alpha: CGFloat = 1,
-        transcript: String? = nil
+        transcript: String? = nil,
+        arming: Bool = false
     ) {
         hideWorkItem?.cancel()
         mode = .light
@@ -869,11 +888,11 @@ final class PressTalkHUDController {
         panel.setContentSize(NSSize(width: 820, height: 470))
         setLightAnchor(anchorPoint, verticalLift: verticalLift)
         setLiveTranscript(transcript)
+        voiceLightView.setArming(arming)
         voiceLightView.setBands(bands)
         positionPanel()
         panel.contentView?.layoutSubtreeIfNeeded()
         panel.alphaValue = alpha
-        NSApp.unhide(nil)
         panel.orderFrontRegardless()
     }
 
@@ -1007,7 +1026,7 @@ final class PressTalkHUDController {
     }
 }
 
-final class PressTalkSettingsWindowController: NSWindowController {
+final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegate {
     var onSettingsChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
     var onRunPhysicalSmoke: (() -> Void)?
@@ -1030,8 +1049,34 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let showHUDCheckbox = NSButton(checkboxWithTitle: "Show compact HUD", target: nil, action: nil)
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
     private let triggerKeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let languagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let insertionSuffixPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    /// What the picker lists. Supplied by the app so CoreAudio stays out of
+    /// the view, and so the list is whatever the capture path would actually
+    /// see rather than a second enumeration that can disagree with it.
+    struct AudioInputChoice {
+        let uid: String
+        let name: String
+        let isDefault: Bool
+        let isBluetooth: Bool
+        /// What this device has actually cost on this Mac, or nil if it has
+        /// never been used or is fast. Measured, never assumed.
+        let startNote: String?
+    }
+    var onListAudioInputs: (() -> [AudioInputChoice])?
+    var onAudioInputPreferenceChanged: (() -> Void)?
+
+    private let microphonePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let microphoneHintLabel = NSTextField(wrappingLabelWithString: "")
+    /// The devices currently listed, so selecting one can say what it costs.
+    private var microphoneChoices: [AudioInputChoice] = []
+    static let microphoneHintDefault =
+        "Choose the microphone PressTalk uses. This does not change your Mac's "
+        + "default input. A new choice applies to your next recording."
+
+    /// Device UID per menu index, so a choice survives the AudioDeviceID being
+    /// reassigned. Observed on this machine: the same Shure moved from id 156
+    /// to 157 across a reconnect.
+    private var microphoneMenuUIDs: [String?] = []
     private let releaseTailSlider = NSSlider(value: 0.35, minValue: 0.15, maxValue: 0.90, target: nil, action: nil)
     private let releaseTailValueLabel = NSTextField(labelWithString: "")
     private let currentPlanValueLabel = NSTextField(labelWithString: "")
@@ -1047,7 +1092,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let speechModelValueLabel = NSTextField(labelWithString: "")
     private let f5BridgeValueLabel = NSTextField(labelWithString: "")
     private let runSetupCheckButton = NSButton(title: "Run Setup Check", target: nil, action: nil)
-    private let runPhysicalSmokeButton = NSButton(title: "Run Physical Smoke", target: nil, action: nil)
+    private let runPhysicalSmokeButton = NSButton(title: "Test Dictation Shortcut", target: nil, action: nil)
     private let restartAppButton = NSButton(title: "Restart PressTalk", target: nil, action: nil)
     private let repairLocalSigningButton = NSButton(title: "Repair Signing", target: nil, action: nil)
     private let exportDiagnosticsButton = NSButton(title: "Export Diagnostics", target: nil, action: nil)
@@ -1055,11 +1100,13 @@ final class PressTalkSettingsWindowController: NSWindowController {
     private let microphoneSettingsButton = NSButton(title: "Microphone", target: nil, action: nil)
     private let inputMonitoringSettingsButton = NSButton(title: "Input Monitoring", target: nil, action: nil)
     private let accessibilitySettingsButton = NSButton(title: "Accessibility", target: nil, action: nil)
+    private let revealAppButton = NSButton(title: "Show This App", target: nil, action: nil)
     private let disableSystemDictationButton = NSButton(title: "Disable Apple Dictation Key", target: nil, action: nil)
     private let calibrateNativeF5Button = NSButton(title: "Calibrate Native F5", target: nil, action: nil)
     private let clearNativeCalibrationButton = NSButton(title: "Clear Native Calibration", target: nil, action: nil)
     private let enableF5FallbackButton = NSButton(title: "Enable F5 Fallback", target: nil, action: nil)
     private let disableF5FallbackButton = NSButton(title: "Disable F5 Fallback", target: nil, action: nil)
+    private var legacyShortcutRows: [NSView] = []
 
     init(
         settingsStore: JarvisTapSettingsStore,
@@ -1090,6 +1137,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     func present() {
+        // Rebuilt on every open. Devices come and go -- a Shure moved from id
+        // 156 to 157 across a reconnect on this machine -- and a list built
+        // once at construction is both stale and empty, because the app wires
+        // onListAudioInputs after the window is created.
+        rebuildMicrophoneMenu()
         reloadFromStore()
         window?.center()
         showWindow(nil)
@@ -1106,12 +1158,13 @@ final class PressTalkSettingsWindowController: NSWindowController {
         showHUDCheckbox.state = settingsStore.showHUD ? .on : .off
         pasteAutomaticallyCheckbox.state = settingsStore.pasteAutomatically ? .on : .off
         triggerKeyPopup.selectItem(at: JarvisTapSettingsStore.TriggerKeyOption.allCases.firstIndex(of: settingsStore.triggerKey) ?? 0)
-        languagePopup.selectItem(at: JarvisTapSettingsStore.LanguageOption.allCases.firstIndex(of: settingsStore.preferredLanguage) ?? 0)
         insertionSuffixPopup.selectItem(at: JarvisTapSettingsStore.InsertionSuffixOption.allCases.firstIndex(of: settingsStore.insertionSuffix) ?? 0)
         releaseTailSlider.doubleValue = settingsStore.releaseTailMaxSeconds
         currentPlanValueLabel.stringValue = licenseStore.currentPlanName
         planSummaryLabel.stringValue = licenseStore.planSummary
         pricingSummaryLabel.stringValue = licenseStore.pricingSummary
+        pricingSummaryLabel.isHidden = !pricingSummaryLabel.stringValue.isEmpty &&
+            planSummaryLabel.stringValue.contains(pricingSummaryLabel.stringValue)
         plansButton.isHidden = commerceConfig.plansURL == nil
         upgradeButton.isHidden = commerceConfig.upgradeURL == nil
         refreshReleaseTailLabel()
@@ -1124,7 +1177,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let titleLabel = NSTextField(labelWithString: "Hold a key. Speak. Release.")
         titleLabel.font = NSFont.systemFont(ofSize: 20, weight: .semibold)
 
-        let subtitleLabel = NSTextField(wrappingLabelWithString: "PressTalk stays local. Hold Fn / Globe to show the recording indicator, speak, then release to paste cleaned dictation into the focused app. Option + Space, bare Option, trackpad hold, and F5 / Mic remain available. These settings apply immediately.")
+        let subtitleLabel = NSTextField(wrappingLabelWithString: "Hold your chosen shortcut, speak, then release. PressTalk transcribes on this Mac and detects your language automatically.")
         subtitleLabel.font = NSFont.systemFont(ofSize: 13)
         subtitleLabel.textColor = .secondaryLabelColor
 
@@ -1146,31 +1199,26 @@ final class PressTalkSettingsWindowController: NSWindowController {
         pricingSummaryLabel.font = NSFont.systemFont(ofSize: 12)
         pricingSummaryLabel.textColor = .secondaryLabelColor
 
-        let languageLabel = NSTextField(labelWithString: "Language")
-        languageLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
-
         let triggerKeyLabel = NSTextField(labelWithString: "Trigger")
         triggerKeyLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         triggerKeyPopup.addItems(withTitles: JarvisTapSettingsStore.TriggerKeyOption.allCases.map(\.displayName))
 
-        languagePopup.addItems(withTitles: JarvisTapSettingsStore.LanguageOption.allCases.map(\.displayName))
+        let microphoneLabel = NSTextField(labelWithString: "Microphone")
+        microphoneLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        rebuildMicrophoneMenu()
 
         let insertionSuffixLabel = NSTextField(labelWithString: "After insertion")
         insertionSuffixLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         insertionSuffixPopup.addItems(withTitles: JarvisTapSettingsStore.InsertionSuffixOption.allCases.map(\.displayName))
 
-        let tailLabel = NSTextField(labelWithString: "Release tail")
+        let tailLabel = NSTextField(labelWithString: "Finish speaking after release")
         tailLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
-        let tailHintLabel = NSTextField(labelWithString: "Keeps listening briefly after key-up so the last syllables are not clipped.")
+        let tailHintLabel = NSTextField(wrappingLabelWithString: "Maximum time to keep listening after you release the shortcut. Recording can end sooner when speech has finished.")
         tailHintLabel.font = NSFont.systemFont(ofSize: 12)
         tailHintLabel.textColor = .secondaryLabelColor
-
-        let footerLabel = NSTextField(labelWithString: "Install with Homebrew: brew install --cask presstalk")
-        footerLabel.font = NSFont.systemFont(ofSize: 12)
-        footerLabel.textColor = .secondaryLabelColor
 
         let plansRow = NSStackView(views: [planLabel, currentPlanValueLabel])
         plansRow.orientation = .horizontal
@@ -1180,7 +1228,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         plansButton.bezelStyle = .rounded
         upgradeButton.bezelStyle = .rounded
 
-        let commerceButtonsRow = NSStackView(views: [plansButton, upgradeButton])
+        let commerceButtonsRow = NSStackView(views: [plansButton, upgradeButton, enterLicenseButton])
         commerceButtonsRow.orientation = .horizontal
         commerceButtonsRow.alignment = .centerY
         commerceButtonsRow.spacing = 8
@@ -1194,6 +1242,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
             microphoneSettingsButton,
             inputMonitoringSettingsButton,
             accessibilitySettingsButton,
+            revealAppButton,
             disableSystemDictationButton,
             calibrateNativeF5Button,
             clearNativeCalibrationButton,
@@ -1208,10 +1257,15 @@ final class PressTalkSettingsWindowController: NSWindowController {
         setupButtonsRow.alignment = .centerY
         setupButtonsRow.spacing = 8
 
-        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, restartAppButton, repairLocalSigningButton, exportDiagnosticsButton, enterLicenseButton])
+        let diagnosticsButtonsRow = NSStackView(views: [runSetupCheckButton, exportDiagnosticsButton])
         diagnosticsButtonsRow.orientation = .horizontal
         diagnosticsButtonsRow.alignment = .centerY
         diagnosticsButtonsRow.spacing = 8
+
+        let maintenanceButtonsRow = NSStackView(views: [restartAppButton, repairLocalSigningButton, revealAppButton])
+        maintenanceButtonsRow.orientation = .horizontal
+        maintenanceButtonsRow.alignment = .centerY
+        maintenanceButtonsRow.spacing = 8
 
         let physicalSmokeButtonsRow = NSStackView(views: [runPhysicalSmokeButton])
         physicalSmokeButtonsRow.orientation = .horizontal
@@ -1232,6 +1286,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         fallbackButtonsRow.orientation = .horizontal
         fallbackButtonsRow.alignment = .centerY
         fallbackButtonsRow.spacing = 8
+        legacyShortcutRows = [nativeButtonsRow, fallbackButtonsRow]
 
         let inputMonitoringRow = makeStatusRow(title: "Input Monitoring", valueLabel: inputMonitoringValueLabel)
         let microphoneRow = makeStatusRow(title: "Microphone", valueLabel: microphoneValueLabel)
@@ -1240,17 +1295,25 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let speechModelRow = makeStatusRow(title: "Speech model", valueLabel: speechModelValueLabel)
         let f5BridgeRow = makeStatusRow(title: "Trigger path", valueLabel: f5BridgeValueLabel)
 
-        let languageRow = NSStackView(views: [languageLabel, languagePopup])
-        languageRow.orientation = .horizontal
-        languageRow.alignment = .centerY
-        languageRow.distribution = .fillProportionally
-        languageRow.spacing = 12
-
         let triggerKeyRow = NSStackView(views: [triggerKeyLabel, triggerKeyPopup])
         triggerKeyRow.orientation = .horizontal
         triggerKeyRow.alignment = .centerY
         triggerKeyRow.distribution = .fillProportionally
         triggerKeyRow.spacing = 12
+
+        // Named for the picker, not the permission status row above, which is
+        // already called microphoneRow.
+        let microphonePickerRow = NSStackView(views: [microphoneLabel, microphonePopup])
+        microphonePickerRow.orientation = .horizontal
+        microphonePickerRow.alignment = .centerY
+        microphonePickerRow.distribution = .fillProportionally
+        microphonePickerRow.spacing = 12
+
+        microphoneHintLabel.stringValue = Self.microphoneHintDefault
+        microphoneHintLabel.font = NSFont.systemFont(ofSize: 12)
+        microphoneHintLabel.textColor = .secondaryLabelColor
+        microphoneHintLabel.lineBreakMode = .byWordWrapping
+        microphoneHintLabel.maximumNumberOfLines = 0
 
         let insertionSuffixRow = NSStackView(views: [insertionSuffixLabel, insertionSuffixPopup])
         insertionSuffixRow.orientation = .horizontal
@@ -1266,6 +1329,15 @@ final class PressTalkSettingsWindowController: NSWindowController {
         let stack = NSStackView(views: [
             titleLabel,
             subtitleLabel,
+            triggerKeyRow,
+            microphonePickerRow,
+            microphoneHintLabel,
+            showHUDCheckbox,
+            pasteAutomaticallyCheckbox,
+            insertionSuffixRow,
+            tailHeaderRow,
+            releaseTailSlider,
+            tailHintLabel,
             setupLabel,
             setupHintLabel,
             inputMonitoringRow,
@@ -1276,6 +1348,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
             f5BridgeRow,
             setupButtonsRow,
             diagnosticsButtonsRow,
+            maintenanceButtonsRow,
             physicalSmokeButtonsRow,
             dictationButtonsRow,
             nativeButtonsRow,
@@ -1284,20 +1357,31 @@ final class PressTalkSettingsWindowController: NSWindowController {
             planSummaryLabel,
             pricingSummaryLabel,
             commerceButtonsRow,
-            showHUDCheckbox,
-            pasteAutomaticallyCheckbox,
-            triggerKeyRow,
-            languageRow,
-            insertionSuffixRow,
-            tailHeaderRow,
-            releaseTailSlider,
-            tailHintLabel,
-            footerLabel,
         ])
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
+
+        // Constrain wrapped text and rows to the viewport, including at the
+        // minimum window width. Intrinsic text width must not widen the page.
+        for view in [subtitleLabel, microphoneHintLabel, tailHintLabel, setupHintLabel,
+                     planSummaryLabel, pricingSummaryLabel, triggerKeyRow,
+                     microphonePickerRow, insertionSuffixRow, tailHeaderRow,
+                     releaseTailSlider, inputMonitoringRow, microphoneRow,
+                     accessibilityRow, systemDictationRow, speechModelRow,
+                     f5BridgeRow, plansRow] {
+            view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        for field in [subtitleLabel, microphoneHintLabel, tailHintLabel, setupHintLabel,
+                      planSummaryLabel, pricingSummaryLabel] {
+            field.maximumNumberOfLines = 0
+            field.lineBreakMode = .byWordWrapping
+            field.cell?.wraps = true
+            field.cell?.isScrollable = false
+            field.cell?.usesSingleLineMode = false
+            field.setContentCompressionResistancePriority(.required, for: .vertical)
+        }
 
         let scrollView = NSScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -1306,7 +1390,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = false
 
-        let documentView = NSView()
+        let documentView = FlippedView()
         documentView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.documentView = documentView
 
@@ -1336,9 +1420,6 @@ final class PressTalkSettingsWindowController: NSWindowController {
         triggerKeyPopup.target = self
         triggerKeyPopup.action = #selector(changeTriggerKey(_:))
 
-        languagePopup.target = self
-        languagePopup.action = #selector(changeLanguage(_:))
-
         insertionSuffixPopup.target = self
         insertionSuffixPopup.action = #selector(changeInsertionSuffix(_:))
 
@@ -1356,6 +1437,11 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         runPhysicalSmokeButton.target = self
         runPhysicalSmokeButton.action = #selector(runPhysicalSmoke(_:))
+        let smokeHelpers = ["presstalk-manual-fn-smoke", "presstalk-manual-fn-smoke.swift"]
+        runPhysicalSmokeButton.isHidden = !smokeHelpers.contains { name in
+            guard let path = Bundle.main.resourceURL?.appendingPathComponent(name).path else { return false }
+            return FileManager.default.isExecutableFile(atPath: path)
+        }
 
         restartAppButton.target = self
         restartAppButton.action = #selector(restartApp(_:))
@@ -1376,6 +1462,9 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
         accessibilitySettingsButton.target = self
         accessibilitySettingsButton.action = #selector(openAccessibilitySettings(_:))
+        revealAppButton.target = self
+        revealAppButton.action = #selector(revealApp(_:))
+        revealAppButton.toolTip = Bundle.main.bundleURL.path
 
         disableSystemDictationButton.target = self
         disableSystemDictationButton.action = #selector(disableSystemDictationHotkey(_:))
@@ -1398,16 +1487,27 @@ final class PressTalkSettingsWindowController: NSWindowController {
         titleLabel.font = NSFont.systemFont(ofSize: 12, weight: .medium)
 
         valueLabel.font = NSFont.systemFont(ofSize: 12, weight: .semibold)
-        valueLabel.lineBreakMode = .byTruncatingTail
+        valueLabel.lineBreakMode = .byWordWrapping
+        valueLabel.maximumNumberOfLines = 0
+        valueLabel.cell?.wraps = true
+        valueLabel.cell?.isScrollable = false
+        valueLabel.cell?.usesSingleLineMode = false
+        valueLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         let row = NSStackView(views: [titleLabel, valueLabel])
         row.orientation = .horizontal
-        row.alignment = .centerY
-        row.distribution = .equalSpacing
+        row.alignment = .top
+        row.distribution = .fill
+        row.spacing = 12
+        titleLabel.widthAnchor.constraint(equalToConstant: 140).isActive = true
         return row
     }
 
     private func applyRuntimeStatus() {
+        for row in legacyShortcutRows { row.isHidden = settingsStore.triggerKey != .f5 }
+        clearNativeCalibrationButton.isEnabled = settingsStore.nativeTriggerCalibration != nil
+        disableSystemDictationButton.isHidden = runtimeStatus.systemDictationHotkeyDisabled ||
+            (settingsStore.triggerKey != .fn && settingsStore.triggerKey != .f5)
         configureInputMonitoringLabel(inputMonitoringValueLabel)
         configureMicrophoneLabel(microphoneValueLabel)
         configureAccessibilityLabel(accessibilityValueLabel)
@@ -1429,15 +1529,20 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func configurePermissionPaneButtons() {
-        let enabled = runtimeStatus.permissionPaneOpeningAllowed
-        let tooltip = enabled ? nil : "System Settings opening is disabled for this run. Export diagnostics instead of re-granting repeatedly."
+        // Manual controls must work even when background launch settings
+        // suppress automatic permission prompts.
+        let enabled = true
+        let tooltip: String? = nil
         let microphoneNeedsPane = !runtimeStatus.microphoneGranted
+        let shortcutNeedsAccessibility = runtimeStatus.triggerRequiresWritableEventTap &&
+            !runtimeStatus.accessibilityGranted
         let inputMonitoringNeedsPane = !runtimeStatus.inputMonitoringEffective &&
             !runtimeStatus.triggerUsesRegisteredHotKey &&
+            !shortcutNeedsAccessibility &&
             !runtimeStatus.localSigningRepairNeeded
-        let accessibilityNeedsPane = runtimeStatus.pasteAutomatically &&
-            !runtimeStatus.activeFieldInsertionReady &&
-            !runtimeStatus.localSigningRepairNeeded
+        let accessibilityNeedsPane = shortcutNeedsAccessibility ||
+            (runtimeStatus.pasteAutomatically && !runtimeStatus.activeFieldInsertionReady &&
+             !runtimeStatus.localSigningRepairNeeded)
 
         configurePermissionPaneButton(
             microphoneSettingsButton,
@@ -1495,66 +1600,25 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     private func permissionHintText() -> String {
-        let identity = "\(runtimeStatus.bundleIdentifier), \(runtimeStatus.codeSignatureSummary)"
-        let noPaneSuffix = runtimeStatus.permissionPaneOpeningAllowed
-            ? ""
-            : " This no-pane run will not open System Settings."
-
-        if runtimeStatus.permissionPaneOpeningAllowed && !runtimeStatus.readyWithoutPermissionPaneWork {
-            return "Approve the missing rows below: Microphone, Input Monitoring, and Accessibility. When they are ready, PressTalk can listen and paste into the focused field."
-        }
-
+        let help = " Use the permission buttons below. If macOS already shows this app enabled, use Show This App to locate the running copy before replacing its stale entry with the + button."
         if !runtimeStatus.microphoneGranted {
-            if runtimeStatus.microphoneAuthorizationStatus == "denied" {
-                return "Microphone preflight denies \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
-            }
-            if runtimeStatus.microphoneAuthorizationStatus == "not_determined" {
-                return "Microphone has no approval record for \(identity). Approve the native PressTalk microphone prompt; do not open privacy panes repeatedly.\(noPaneSuffix)"
-            }
-            if runtimeStatus.adHocSigned {
-                return "Microphone preflight is unavailable to this ad-hoc build (\(identity)). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
-            }
-            return "Microphone preflight is unavailable to \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            return "Microphone access is needed to record your voice." + help
         }
-
         if !runtimeStatus.inputMonitoringEffective {
-            if runtimeStatus.triggerRequiresWritableEventTap && runtimeStatus.inputListenerInstalled {
-                return "\(runtimeStatus.inputMonitoringPermissionLabel.text) for \(identity). Modifier-only Option/Fn triggers need a writable event tap; this run only has \(runtimeStatus.inputListenerStatus). Export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            if runtimeStatus.triggerRequiresWritableEventTap && !runtimeStatus.accessibilityGranted {
+                return "Your selected shortcut needs Accessibility permission." + help
             }
-            return "Input listener is not ready for \(identity). If macOS already shows PressTalk enabled, export diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+            return "The selected shortcut is not ready. Check Input Monitoring, then run Setup Check." + help
         }
-
-        if runtimeStatus.readyWithoutPermissionPaneWork {
-            return "PressTalk is ready for \(identity): trigger listener, microphone, and insertion path are working. No permission pane changes are needed.\(noPaneSuffix)"
+        if runtimeStatus.pasteAutomatically && !runtimeStatus.accessibilityGranted {
+            return "Accessibility permission is needed to insert text into another app. Until then, dictation copies to the clipboard." + help
         }
-
-        if !runtimeStatus.accessibilityGranted && runtimeStatus.pasteAutomatically {
-            if runtimeStatus.inputMethodFallbackStatus == "ready" {
-                return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app. The input method can be probed, but real-field auto-insert now requires Accessibility; PressTalk will copy instead of repeatedly selecting the input source.\(noPaneSuffix)"
-            }
-            if runtimeStatus.inputMethodFallbackStatus == "probe_only" {
-                return "Input listener and microphone are ready for \(identity). The input-method route is probe-only after real-field client failures; real auto-insert needs Accessibility. PressTalk will copy instead of repeatedly selecting the input source.\(noPaneSuffix)"
-            }
-            if runtimeStatus.inputMethodFallbackStatus == "client_unavailable" {
-                return "Input listener and microphone are ready for \(identity). The input method is enabled, but its last real insertion could not attach to the focused text field. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility.\(noPaneSuffix)"
-            }
-            if runtimeStatus.inputMethodFallbackStatus == "ack_timeout" {
-                return "Input listener and microphone are ready for \(identity). The input method is enabled, but the helper did not acknowledge the last insertion request. PressTalk will copy instead of repeatedly selecting the input source; active-field insertion needs Accessibility.\(noPaneSuffix)"
-            }
-            if runtimeStatus.localSigningRepairNeeded {
-                return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but has not enabled it for this PressTalk signing state. Run the logged-in desktop signing repair helper, then the production insertion probe; do not re-grant Microphone, Input Monitoring, or Accessibility repeatedly.\(noPaneSuffix)"
-            }
-            if runtimeStatus.inputMethodFallbackStatus == "recognized_disabled" {
-                return "Input listener and microphone are ready for \(identity). macOS recognizes the PressTalk input method but leaves it disabled for this signed app. This is not a Microphone, Input Monitoring, or signing problem; use the Accessibility handoff/probe path. If PressTalk is already listed in Accessibility but off, turn on that existing entry only.\(noPaneSuffix)"
-            }
-            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, and the input method fallback status is \(runtimeStatus.inputMethodFallbackStatus). PressTalk will copy if insertion is unavailable; run diagnostics instead of re-granting repeatedly.\(noPaneSuffix)"
+        if runtimeStatus.speechModelStatus != "Ready" {
+            return "Permissions are set. Speech model: \(runtimeStatus.speechModelStatus)."
         }
-
-        if !runtimeStatus.accessibilityGranted {
-            return "Input listener and microphone are ready for \(identity). AXIsProcessTrusted=false for this exact signed app, but copy-only mode does not need Accessibility until auto-paste is enabled.\(noPaneSuffix)"
-        }
-
-        return "PressTalk is ready for \(identity)."
+        return runtimeStatus.pasteAutomatically
+            ? "Permissions are set. Dictate a sentence in another app to check recording and insertion."
+            : "Dictation copies to the clipboard. Use ⌘V to paste it into another app."
     }
 
     private func configureDetailLabel(_ label: NSTextField, text: String) {
@@ -1582,19 +1646,113 @@ final class PressTalkSettingsWindowController: NSWindowController {
     }
 
     @objc private func changeTriggerKey(_ sender: NSPopUpButton) {
-        let index = max(0, sender.indexOfSelectedItem)
+        let index = sender.indexOfSelectedItem
+        guard JarvisTapSettingsStore.TriggerKeyOption.allCases.indices.contains(index) else { return }
         settingsStore.triggerKey = JarvisTapSettingsStore.TriggerKeyOption.allCases[index]
         onSettingsChanged?()
     }
 
-    @objc private func changeLanguage(_ sender: NSPopUpButton) {
-        let index = max(0, sender.indexOfSelectedItem)
-        settingsStore.preferredLanguage = JarvisTapSettingsStore.LanguageOption.allCases[index]
-        onSettingsChanged?()
+    /// Rebuilt every time Settings opens, because devices come and go and a
+    /// stale list is how someone ends up selecting a microphone that is no
+    /// longer plugged in.
+    func rebuildMicrophoneMenu() {
+        let previous = AudioInputPreference(
+            storageValue: UserDefaults.standard.string(forKey: "PressTalk.AudioInputPreference"))
+        microphonePopup.removeAllItems()
+        microphoneMenuUIDs = []
+
+        microphonePopup.addItem(withTitle: "System default")
+        microphoneMenuUIDs.append(nil)
+        microphonePopup.addItem(withTitle: "Prefer wired or built-in")
+        microphoneMenuUIDs.append("")
+
+        microphoneChoices = onListAudioInputs?() ?? []
+        for device in microphoneChoices {
+            // No mute annotation. It came from kAudioDevicePropertyMute, whose
+            // meaning on a given device cannot be established from one read --
+            // it labelled a Shure "muted" while Zoom was recording from it.
+            // Showing a conclusion in a picker that the app withdrew from its
+            // error messages would just move the wrong claim somewhere quieter.
+            let mutedNote = ""
+            let defaultNote = device.isDefault ? " (current default)" : ""
+            microphonePopup.addItem(withTitle: "\(device.name)\(defaultNote)\(mutedNote)")
+            microphoneMenuUIDs.append(device.uid)
+        }
+
+        switch previous {
+        case .systemDefault: microphonePopup.selectItem(at: 0)
+        case .preferWired: microphonePopup.selectItem(at: 1)
+        case .specificDevice(let uid):
+            if let index = microphoneMenuUIDs.firstIndex(of: uid) {
+                microphonePopup.selectItem(at: index)
+            } else {
+                // Chosen device is unplugged. Show that rather than silently
+                // reverting, so nobody wonders why their choice stopped
+                // applying.
+                microphonePopup.addItem(withTitle: "Chosen microphone (not connected)")
+                microphoneMenuUIDs.append(uid)
+                microphonePopup.selectItem(at: microphonePopup.numberOfItems - 1)
+            }
+        }
+        microphonePopup.target = self
+        microphonePopup.action = #selector(changeMicrophone(_:))
+        microphonePopup.menu?.delegate = self
+        updateMicrophoneHint(for: previous)
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === microphonePopup.menu { rebuildMicrophoneMenu() }
+    }
+
+    @objc private func changeMicrophone(_ sender: NSPopUpButton) {
+        let index = sender.indexOfSelectedItem
+        guard index >= 0, index < microphoneMenuUIDs.count else { return }
+        let preference: AudioInputPreference
+        switch microphoneMenuUIDs[index] {
+        case .none: preference = .systemDefault
+        case .some(let uid) where uid.isEmpty: preference = .preferWired
+        case .some(let uid): preference = .specificDevice(uid: uid)
+        }
+        UserDefaults.standard.set(preference.storageValue,
+                                  forKey: "PressTalk.AudioInputPreference")
+        // Choosing a microphone withdraws the crash breaker's skip. It told
+        // this person a device had failed and to pick it again here if they
+        // wanted it; continuing to skip it after they did would make the
+        // instruction a lie.
+        UserDefaults.standard.removeObject(forKey: "PressTalk.AudioInputAvoidUID")
+        onAudioInputPreferenceChanged?()
+
+        updateMicrophoneHint(for: preference)
+    }
+
+    private func updateMicrophoneHint(for preference: AudioInputPreference) {
+        let selectedDevice: MicrophoneSelectionHint.Device?
+        if case .specificDevice(let uid) = preference,
+           let choice = microphoneChoices.first(where: { $0.uid == uid }) {
+            selectedDevice = .init(name: choice.name,
+                                   isBluetooth: choice.isBluetooth,
+                                   startNote: choice.startNote)
+        } else {
+            selectedDevice = nil
+        }
+        let fallback: String
+        switch preference {
+        case .systemDefault:
+            fallback = "Uses the Mac's current default microphone when each recording starts. PressTalk does not change that default."
+        case .preferWired:
+            fallback = "Chooses an available wired or built-in microphone first, otherwise another available input. PressTalk does not change the Mac's default."
+        case .specificDevice:
+            fallback = selectedDevice == nil
+                ? "Your chosen microphone is not connected. Reconnect it or choose another microphone; PressTalk will not switch silently."
+                : Self.microphoneHintDefault
+        }
+        microphoneHintLabel.stringValue = MicrophoneSelectionHint.text(
+            forSelected: selectedDevice, default: fallback)
     }
 
     @objc private func changeInsertionSuffix(_ sender: NSPopUpButton) {
-        let index = max(0, sender.indexOfSelectedItem)
+        let index = sender.indexOfSelectedItem
+        guard JarvisTapSettingsStore.InsertionSuffixOption.allCases.indices.contains(index) else { return }
         settingsStore.insertionSuffix = JarvisTapSettingsStore.InsertionSuffixOption.allCases[index]
         onSettingsChanged?()
     }
@@ -1658,8 +1816,7 @@ final class PressTalkSettingsWindowController: NSWindowController {
                 ? "\(license.entitlement.capitalized). Every future Mac update included."
                 : "\(license.entitlement.capitalized). Covers updates through \(license.maxMajorVersion).x."
             confirmation.runModal()
-            currentPlanValueLabel.stringValue = licenseStore.currentPlanName
-            planSummaryLabel.stringValue = licenseStore.planSummary
+            reloadFromStore()
         case .failure(let error):
             let failure = NSAlert()
             failure.alertStyle = .warning
@@ -1680,6 +1837,10 @@ final class PressTalkSettingsWindowController: NSWindowController {
 
     @objc private func openInputMonitoringSettings(_ sender: Any?) {
         onOpenInputMonitoringSettings?()
+    }
+
+    @objc private func revealApp(_ sender: Any?) {
+        NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
     }
 
     @objc private func openAccessibilitySettings(_ sender: Any?) {

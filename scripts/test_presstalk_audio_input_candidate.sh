@@ -7,6 +7,11 @@ TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-audio-input-candidate-test.X
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 cp "$REPO_ROOT/Sources/PressTalkCore/AudioInputDeviceCandidate.swift" "$TEST_TMPDIR/AudioInputDeviceCandidate.swift"
+# AudioInputPreference too: the candidate maps itself into an
+# AudioInputSelector.Device, so compiling it alone fails with "cannot find type
+# AudioInputSelector in scope". This check had stopped compiling, which means it
+# had stopped being a check.
+cp "$REPO_ROOT/Sources/PressTalkCore/AudioInputPreference.swift" "$TEST_TMPDIR/AudioInputPreference.swift"
 cat > "$TEST_TMPDIR/main.swift" <<'SWIFT'
 import CoreAudio
 import Darwin
@@ -52,6 +57,15 @@ let usbInput = AudioInputDeviceCandidate(
     isDefault: false,
     transportType: kAudioDeviceTransportTypeUSB
 )
+// Two input channels and no microphone attached: exactly what an idle audio
+// interface looks like from CoreAudio, and indistinguishable from a live one.
+let builtInInput = AudioInputDeviceCandidate(
+    id: 12,
+    name: "MacBook Pro Microphone",
+    inputChannels: 1,
+    isDefault: false,
+    transportType: kAudioDeviceTransportTypeBuiltIn
+)
 let virtualInput = AudioInputDeviceCandidate(
     id: 11,
     name: "Virtual Microphone",
@@ -78,11 +92,16 @@ expect(usbInput.isPhysicalInput, "USB input must be treated as physical")
 expect(!virtualInput.isPhysicalInput, "Virtual input must not be treated as physical")
 expect(!defaultBluetoothInput.isPhysicalInput, "Bluetooth input must not be treated as physical")
 expect(defaultUSBInput.selectionScore > defaultBluetoothInput.selectionScore, "Default USB input must outrank default Bluetooth input")
+// Built-in outranks USB in the AUTOMATIC choice: a USB interface reports its
+// channels whether or not a microphone is plugged into them, so an idle
+// interface used to win and deliver silence. Nothing here overrides a device
+// the person selected by name.
+expect(builtInInput.selectionScore > usbInput.selectionScore, "Built-in input must outrank a USB interface that may have no microphone attached")
 expect(defaultUSBInput.selectionScore > virtualInput.selectionScore, "Default USB input must outrank virtual input")
 expect(defaultBluetoothInput.selectionScore < virtualInput.selectionScore, "Bluetooth input must remain lower priority than virtual input")
 SWIFT
 
-swiftc "$TEST_TMPDIR/AudioInputDeviceCandidate.swift" "$TEST_TMPDIR/main.swift" -o "$TEST_TMPDIR/audio-input-candidate-test"
+swiftc "$TEST_TMPDIR/AudioInputDeviceCandidate.swift" "$TEST_TMPDIR/AudioInputPreference.swift" "$TEST_TMPDIR/main.swift" -o "$TEST_TMPDIR/audio-input-candidate-test"
 "$TEST_TMPDIR/audio-input-candidate-test"
 
 echo "PASS audio_input_candidate"

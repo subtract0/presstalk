@@ -69,4 +69,22 @@ final class AudioPreflightCacheTests: XCTestCase {
         cache.record(nil, for: shure)
         XCTAssertNotNil(cache.cachedResult(for: shure))
     }
+
+    /// Reproduced in review: nominal rate and channel count unchanged, but the
+    /// stream has moved to 44100. The cache returned the old success while a
+    /// fresh check on the same device reported a format mismatch -- so the
+    /// cache was answering a narrower question than the check it cached.
+    func testAChangedRunningRateInvalidatesACachedSuccess() {
+        var cache = AudioPreflightCache()
+        let before = AudioPreflightCache.DeviceFingerprint(
+            deviceUID: "usb", sampleRate: 48000, channelCount: 2, runningSampleRate: 48000)
+        cache.record(nil, for: before)
+        XCTAssertNotNil(cache.cachedResult(for: before), "the cache should hit on an identical device")
+
+        let after = AudioPreflightCache.DeviceFingerprint(
+            deviceUID: "usb", sampleRate: 48000, channelCount: 2, runningSampleRate: 44100)
+        XCTAssertNil(cache.cachedResult(for: after),
+                     "a changed running rate must force the real check")
+    }
+
 }

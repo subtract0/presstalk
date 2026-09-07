@@ -4,3 +4,6 @@ dist/
 .DS_Store
 __pycache__/
 metrics/
+
+# Local capture builds, measurements and scratch orchestration.
+.local/

@@ -140,18 +140,74 @@ public struct TranscriptTextPolicy {
         return true
     }
 
+    /// The phrases a recogniser emits when handed silence.
+    ///
+    /// Hoisted to the type because the loop check now needs it BEFORE the audio
+    /// gate: an unbounded "any word repeated" rule threw away emphatic speech,
+    /// so repetition is only treated as a loop when the repeated word is one of
+    /// these.
+    static let silenceHallucinationStems: Set<String> = [
+            "you", "thank you", "thanks", "thank you very much",
+            "thank you so much", "bye", "okay", "so",
+            "untertitel der amara org community", "untertitelung des zdf",
+            "vielen dank", "danke",
+    ]
+
+    /// Whether this text is what a recogniser produces from silence.
+    ///
+    /// WHAT DURATION HAS TO DO WITH IT: nothing, deliberately.
+    ///
+    /// This used to reject on `weakAudio || shortCapture`, so a SHORT capture
+    /// entered the denylist however loud and clear it was -- and the denylist
+    /// contains "danke", "okay", "vielen dank", "bye" and "so". Someone
+    /// answering a message with "Danke" got nothing, with no error, which reads
+    /// as the app being broken rather than as a filter doing its job.
+    ///
+    /// Duration was dropped on measurement, not taste. Across 1,624 captures in
+    /// this Mac's own trace logs, short captures (<1.2 s) have a median RMS of
+    /// 0.00047 and peak of 0.0022 -- deep inside `weakAudio` -- so `weakAudio`
+    /// alone still catches 139 of the 209 short silent ones. What the duration
+    /// term added was the other 70: short captures carrying RMS 0.027-0.060 and
+    /// peaks of 0.15-0.42, which is speech by any reading. The term cost real
+    /// short replies and bought no protection that the energy test was not
+    /// already providing.
     public func isLikelySilenceHallucination(
         _ text: String,
         signalRMS: Double,
-        signalPeak: Double,
-        captureDurationSeconds: TimeInterval
+        signalPeak: Double
     ) -> Bool {
         let normalized = normalizedPhrase(text)
         guard !normalized.isEmpty else { return false }
 
-        let weakAudio = signalRMS < 0.0035 && signalPeak < 0.045
-        let shortCapture = captureDurationSeconds < shortHoldNoSpeechSuppressionSeconds
-        guard weakAudio || shortCapture else { return false }
+        let allWords = normalized.split(separator: " ").map(String.init)
+
+        // Checked before the audio test, because a decoder looping on one token
+        // says nothing about the microphone. On 2026-09-06 "you you" was pasted
+        // from a capture this function had already cleared.
+        //
+        // Restricted to the known stems, and to three or more. The first
+        // version of this rule caught ANY word repeated three times, on the
+        // reasoning that "nobody says a word three times" -- which is plainly
+        // false. "Nein, nein, nein!" is ordinary emphatic speech and was being
+        // thrown away. A decoder looping produces the stems it always produces;
+        // a person repeating themselves does not.
+        if allWords.count >= 3, Set(allWords).count == 1,
+           let only = allWords.first, Self.silenceHallucinationStems.contains(only) {
+            return true
+        }
+
+        // RMS only. This was `rms < 0.0035 && peak < 0.045`, so ANY transient
+        // defeated the gate: one sample at 0.1 in an otherwise silent second
+        // gives RMS 0.00079 and peak 0.1, which read as "not weak" and let the
+        // denylist be bypassed entirely. A click is precisely what maximises
+        // peak while leaving RMS at the floor, so peak is the wrong statistic
+        // for "was anyone speaking". Sustained energy is the question.
+        //
+        // This does not separate speech from a sustained non-speech tone of the
+        // same energy -- 125 ms at amplitude 0.2 measures like a short word --
+        // and no amplitude statistic can. That residual is real and unmeasured.
+        let weakAudio = signalRMS < 0.0035
+        guard weakAudio else { return false }
 
         // Silence cannot produce speech, so on genuinely dead audio nothing is
         // acceptable and no phrase list is needed.
@@ -169,23 +225,17 @@ public struct TranscriptTextPolicy {
             return true
         }
 
-        let words = normalized.split(separator: " ").map(String.init)
+        let words = allWords
 
-        // A single distinct word repeated is the shape of a decoder looping on
-        // noise, whatever the word happens to be.
+        // On audio this weak, two is already a loop: there was nothing there to
+        // say twice.
         if words.count >= 2, Set(words).count == 1 { return true }
 
-        let silenceHallucinationStems: Set<String> = [
-            "you", "thank you", "thanks", "thank you very much",
-            "thank you so much", "bye", "okay", "so",
-            "untertitel der amara org community", "untertitelung des zdf",
-            "vielen dank", "danke",
-        ]
-        if silenceHallucinationStems.contains(normalized) { return true }
+        if Self.silenceHallucinationStems.contains(normalized) { return true }
 
         // Repeats of a known stem: "you you", "thanks thanks", and the rest of
         // an unbounded family the list can never finish naming.
-        for stem in silenceHallucinationStems {
+        for stem in Self.silenceHallucinationStems {
             let stemWords = stem.split(separator: " ").map(String.init)
             guard !stemWords.isEmpty, words.count % stemWords.count == 0,
                   words.count > stemWords.count else { continue }

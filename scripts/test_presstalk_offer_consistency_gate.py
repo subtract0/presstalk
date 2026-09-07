@@ -72,6 +72,13 @@ MUST_PASS = {
 }
 
 
+# The rails the fixture policy declares. Stripe live and PayPal empty mirrors
+# the real configuration today, so the dormant PayPal checks stay dormant here
+# too and the existing cases keep testing what they were written to test.
+FIXTURE_STRIPE_URL = "https://buy.stripe.com/fixture"
+FIXTURE_PAYPAL_URL = ""
+
+
 def run(filename: str, body: str) -> int:
     with tempfile.TemporaryDirectory() as d:
         site = Path(d) / "site"
@@ -79,8 +86,17 @@ def run(filename: str, body: str) -> int:
         (site / filename).write_text(f"<title>t</title>{body}", encoding="utf-8")
         (Path(d) / "docs" / "launch").mkdir(parents=True)
         (Path(d) / "Sources" / "PressTalkCore").mkdir(parents=True)
+        # The fixture policy has to declare everything the gate reads, not only
+        # the trial days. When the gate learned to read the checkout rails this
+        # fixture did not, so policy_rail_urls() exited 1 on every case and all
+        # nine valid pages "failed" -- which also broke deployment, because
+        # .github/workflows/pages.yml runs this suite before publishing.
+        # A regression suite whose fixture drifts from the real file tests
+        # nothing and blocks everything.
         (Path(d) / "Sources/PressTalkCore/EntitlementPolicy.swift").write_text(
-            f"public init(trialDays: Int = {POLICY_DAYS}) {{}}")
+            f"public init(trialDays: Int = {POLICY_DAYS}) {{}}\n"
+            f'    public static let checkoutURLString = "{FIXTURE_STRIPE_URL}"\n'
+            f'    public static let paypalCheckoutURLString = "{FIXTURE_PAYPAL_URL}"\n')
         patched = GATE.read_text().replace(
             "ROOT = Path(__file__).resolve().parent.parent",
             f"ROOT = Path({str(d)!r})")

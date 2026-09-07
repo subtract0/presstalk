@@ -1,0 +1,22 @@
+{
+  "bundleIdentifier": "com.am.presstalk",
+  "bundleVersion": "0.1.22",
+  "bundleBuild": "22.2",
+  "zipSHA256": "0127cd40ed029c7a991fe86716b6a3a555a9cd3faeb976d80dc0cdfa494fd0d6",
+  "codeSignatureAuthority": "Developer ID Application: Alexander Monas (5HUC5LA94B)",
+  "codeSignatureCDHash": "6d07212a41b5b10c917803fe20cfbdcfce21bfd8",
+  "codeSignatureFlags": "0x10000(runtime)",
+  "hardenedRuntime": true,
+  "notarized": "true",
+  "distributionReady": true,
+  "passed": true,
+  "zipName": "PressTalk-0.1.22-macos-arm64.zip",
+  "zipBytes": 4716031,
+  "builtFromCommit": "7fd414c",
+  "notarizationID": "9bdb50c8-a9f1-44c8-92e7-0744e0dd965d",
+  "notarizationStatus": "Accepted",
+  "gatekeeper": "accepted: Notarized Developer ID",
+  "originalIdentityRequirement": "verified",
+  "swiftTestsPassed": 218,
+  "auditRegressionTestsPassed": 7
+}

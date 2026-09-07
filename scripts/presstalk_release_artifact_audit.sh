@@ -175,7 +175,13 @@ set -e
 authority="$(awk -F= '/^Authority=/ { print $2; exit }' "$codesign_details")"
 cdhash="$(awk -F= '/^CDHash=/ { print $2; exit }' "$codesign_details")"
 identifier="$(awk -F= '/^Identifier=/ { print $2; exit }' "$codesign_details")"
-flags="$(awk -F= '/^flags=/ { print $2; exit }' "$codesign_details")"
+# Current codesign puts flags inside its CodeDirectory line. Accept that and
+# the standalone form, never an unrelated occurrence elsewhere in the report.
+flags="$(awk '/^CodeDirectory / || /^flags=/ {
+  for (i = 1; i <= NF; i++) if ($i ~ /^flags=/) {
+    sub(/^flags=/, "", $i); print $i; exit
+  }
+}' "$codesign_details")"
 timestamp="$(awk -F= '/^Timestamp=/ { print $2; exit }' "$codesign_details")"
 developer_id=false
 hardened_runtime=false

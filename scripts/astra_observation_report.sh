@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-# Gathers everything a supervisor needs to judge whether Astra is on track.
+# Gathers the facts about what Astra is doing, for explaining to Alex.
 #
-# Deliberately does no judging. It answers questions that have factual answers,
-# so the judgement is made against evidence rather than against a feeling about
-# how the transcript reads. A supervisor that intervenes on vibes will supply
-# method, and supplying method to an Astra-class model is the mistake the whole
-# handover exists to avoid.
+# An observer's tool, not a supervisor's. Nothing here writes to Astra, and
+# nothing that reads it should either: Alex asked for observation and
+# explanation, not steering, and a second party correcting a self-directed
+# model mid-run is how you get two operators and one confused repository.
+#
+# It answers questions that have factual answers so an explanation rests on
+# evidence rather than on how a transcript reads. If something in here looks
+# alarming, it goes to Alex. He decides whether it reaches Astra.
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 STATE="$HOME/.presstalk-sales"
 cd "$ROOT" || exit 1
 
 echo "=============================================================="
-echo "ASTRA SUPERVISION REPORT · $(date '+%Y-%m-%d %H:%M %Z')"
+echo "ASTRA OBSERVATION REPORT · $(date '+%Y-%m-%d %H:%M %Z')"
 echo "=============================================================="
 
 echo

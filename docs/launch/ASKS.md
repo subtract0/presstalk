@@ -4,6 +4,20 @@ One queue, maintained by the PressTalk operator. Unanswered requests are
 unavailable capacity, never consent. Access, lawful sales and physical testing
 can have real blockers. Campaign deadlines in [LOG.md](LOG.md) do not move.
 
+## Current owner status — A1–A4 closed by Alex
+
+Alex's latest instruction: "consider a1-a4 done". A1–A4 are closed as owner
+requests on that confirmation; older pending/partial labels below are history.
+The operator owns verification and must not repeat the original setup batch.
+This records owner-reported completion, not invented test measurements or a
+claim that every customer-path check has independently passed.
+
+In particular, the preceding entry recorded a missing service address and an
+Impressum deployment guard. Locate the completed disclosure and any supplied
+test evidence before relying on them; preserve the guard if the address is
+still a placeholder. Escalate only a specific remaining blocker that cannot
+be resolved from available access and artifacts. Campaign gates are unchanged.
+
 ## 2026-09-07 — one owner session, 60–80 minutes estimated
 
 Reserve **60 of the 180 weekly minutes for existing customer obligations first**.

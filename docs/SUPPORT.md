@@ -26,20 +26,22 @@ it is plain text.
 ## The problems people hit first
 
 **"PressTalk cannot be opened because the developer cannot be verified."**
-The public 0.1.11 release is signed with Alexander Monas's Developer ID and
+The current public release is signed with Alexander Monas's Developer ID and
 carries a stapled notarization ticket. macOS may still ask you to confirm that
 you want to open an app downloaded from the internet. A damaged-app or
 unverified-developer warning is different: check that you downloaded the current
-[official release](https://github.com/subtract0/presstalk/releases/tag/v0.1.11),
+[official release](https://github.com/subtract0/presstalk/releases/latest),
 and contact support with the exact message before proceeding. See
 [Apple's explanation of these prompts](https://support.apple.com/en-us/102445).
 
 **I hold the key and nothing happens.**
-Usually Input Monitoring. Open Settings from the menu bar and check the permission
-rows; they say which one is missing. If macOS already shows PressTalk as enabled
-and the app disagrees, do not keep toggling it — that means the app's signature
-changed and macOS is tracking a different identity. Export diagnostics and email
-them.
+Open **Run Setup Check** from PressTalk's menu bar menu or Settings. Follow the
+highlighted step. Fn / Globe needs Accessibility to detect and suppress the key,
+and recording needs Microphone access. Other shortcuts may also need Input
+Monitoring; the setup check identifies the permission needed for your shortcut.
+If macOS already shows PressTalk as enabled and the app still cannot use it,
+quit and reopen the app. If the check still disagrees, export diagnostics and
+email them instead of repeatedly toggling permissions.
 
 **Text goes to the clipboard instead of the app.**
 Accessibility permission is missing, or the target app does not accept programmatic

@@ -25,6 +25,7 @@ struct PTHAL {
     _Atomic int32_t status;
     _Atomic uint64_t callbacks, renderedFrames, retainedFrames, consumedFrames, droppedFrames;
     _Atomic double firstPCMAt, lastPCMAt;
+    _Atomic double discontinuityExpectedSampleTime, discontinuityObservedSampleTime;
 };
 static mach_timebase_info_data_t timebase;
 __attribute__((constructor)) static void init_clock(void) { mach_timebase_info(&timebase); }
@@ -62,6 +63,8 @@ static void retain_pcm(PTHAL *c, const float *pcm, uint32_t frames, double sampl
     if (frames > c->maximumFrames) { fail(c, PT_CAPACITY, 0); return; }
     if (!isfinite(sampleTime)) { fail(c, PT_TIMESTAMP, 0); return; }
     if (c->haveSampleTime && fabs(sampleTime - c->expectedSampleTime) > 0.5) {
+        atomic_store(&c->discontinuityExpectedSampleTime, c->expectedSampleTime);
+        atomic_store(&c->discontinuityObservedSampleTime, sampleTime);
         fail(c, PT_DISCONTINUITY, 0); return;
     }
     c->expectedSampleTime = sampleTime + frames;
@@ -242,7 +245,8 @@ PTStats pt_stats(PTHAL *c) {
         c->sampleRate, c->requestedAt, c->startedAt,
         atomic_load(&c->firstPCMAt), atomic_load(&c->lastPCMAt),
         atomic_load(&c->callbacks), atomic_load(&c->renderedFrames), atomic_load(&c->retainedFrames),
-        atomic_load(&c->consumedFrames), atomic_load(&c->droppedFrames)};
+        atomic_load(&c->consumedFrames), atomic_load(&c->droppedFrames),
+        atomic_load(&c->discontinuityExpectedSampleTime), atomic_load(&c->discontinuityObservedSampleTime)};
 }
 PTHAL *pt_test_create(double rate, uint32_t maximumFrames) {
     PTHAL *c = calloc(1, sizeof(PTHAL));

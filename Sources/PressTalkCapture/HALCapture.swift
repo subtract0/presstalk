@@ -24,7 +24,21 @@ public struct CaptureReceipt: Codable {
     public var firstConvertedSeconds: Double?
     public var stopSeconds: Double?
     public var failure: String?
+    public var captureFailureCode: UInt32?
+    public var captureStatus: Int32?
+    public var discontinuityExpectedSampleTime: Double?
+    public var discontinuityObservedSampleTime: Double?
     public var complete: Bool = false
+
+    mutating func recordTransportFailure(_ stats: PTStats) {
+        guard stats.failure != UInt32(PT_OK) else { return }
+        captureFailureCode = stats.failure
+        captureStatus = stats.status
+        if stats.failure == UInt32(PT_DISCONTINUITY) {
+            discontinuityExpectedSampleTime = stats.discontinuityExpectedSampleTime
+            discontinuityObservedSampleTime = stats.discontinuityObservedSampleTime
+        }
+    }
 }
 
 /// Owns one AUHAL per press. All control, conversion and delivery runs on one
@@ -152,7 +166,7 @@ public final class HALCapture {
         for _ in 0..<64 {
             let stats = pt_stats(context)
             guard stats.failure == 0 else {
-                throw CaptureError.failed("Microphone capture interrupted (reason \(stats.failure), status \(stats.status)). Nothing was inserted.")
+                throw CaptureError.failed(Self.transportFailureMessage(stats.failure))
             }
             let count = scratch.withUnsafeMutableBufferPointer { pt_read(context, $0.baseAddress, UInt32($0.count)) }
             if count == 0 { return }
@@ -199,6 +213,7 @@ public final class HALCapture {
                 if receipt?.failure == nil, let converter { deliverLocked(try converter.finish()) }
             } catch { recordFailure(String(describing: error)) }
             let stats = pt_stats(context)
+            receipt?.recordTransportFailure(stats)
             receipt?.boundDeviceID = stats.boundDevice
             receipt?.nativeRate = stats.sampleRate
             receipt?.channels = stats.channels
@@ -210,7 +225,7 @@ public final class HALCapture {
             receipt?.convertedFrames = converter?.outputFrames ?? 0
             receipt?.droppedFrames = stats.droppedFrames
             if stats.firstPCMAt > 0 { receipt?.firstPCMSeconds = stats.firstPCMAt - requestedAt }
-            if stats.failure != 0 { recordFailure("Capture failure \(stats.failure), status \(stats.status).") }
+            if stats.failure != 0 { recordFailure(Self.transportFailureMessage(stats.failure)) }
             if stats.retainedFrames == 0 { recordFailure("No audio arrived from the selected microphone.") }
             if stats.retainedFrames != stats.consumedFrames { recordFailure("Microphone audio was not fully consumed.") }
             if !pt_destroy(context) {
@@ -239,6 +254,13 @@ public final class HALCapture {
         let callback = onReceipt
         onReceipt = nil
         if let receipt { callback?(receipt) }
+    }
+
+    static func transportFailureMessage(_ reason: UInt32) -> String {
+        if reason == UInt32(PT_TEARDOWN) {
+            return "The microphone could not stop safely. Restart PressTalk before recording again. Nothing was inserted."
+        }
+        return "The microphone audio was interrupted. Release the key, wait a moment, then try again. Nothing was inserted."
     }
 
     private func validateDeviceLocked() throws {

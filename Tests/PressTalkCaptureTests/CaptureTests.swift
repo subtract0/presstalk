@@ -3,6 +3,32 @@ import PressTalkHAL
 @testable import PressTalkCapture
 
 final class CaptureTests: XCTestCase {
+    func testTimestampJumpKeepsDiagnosticValuesAndRejectsPartialAudio() throws {
+        for observed in [0.0, 103.0, 105.0, 48000.0] {
+            let c = try XCTUnwrap(pt_test_create(24000, 8))
+            defer { XCTAssertTrue(pt_destroy(c)) }
+            let samples: [Float] = [0.1, 0.2, 0.3, 0.4]
+            samples.withUnsafeBufferPointer { pt_test_push(c, $0.baseAddress, 4, 100) }
+            samples.withUnsafeBufferPointer { pt_test_push(c, $0.baseAddress, 4, observed) }
+            // Later callbacks cannot overwrite the first discontinuity.
+            samples.withUnsafeBufferPointer { pt_test_push(c, $0.baseAddress, 4, 99999) }
+            let stats = pt_stats(c)
+            XCTAssertEqual(stats.failure, UInt32(PT_DISCONTINUITY))
+            XCTAssertEqual(stats.retainedFrames, 4)
+            var output = [Float](repeating: 0, count: 8)
+            XCTAssertEqual(output.withUnsafeMutableBufferPointer { pt_read(c, $0.baseAddress, 8) }, 0)
+            var receipt = CaptureReceipt(session: 1, deviceUID: "fixture", deviceID: 0, channel: 0)
+            receipt.recordTransportFailure(stats)
+            let decoded = try JSONDecoder().decode(CaptureReceipt.self, from: JSONEncoder().encode(receipt))
+            XCTAssertEqual(decoded.captureFailureCode, UInt32(PT_DISCONTINUITY))
+            XCTAssertEqual(decoded.captureStatus, 0)
+            XCTAssertEqual(decoded.discontinuityExpectedSampleTime, 104)
+            XCTAssertEqual(decoded.discontinuityObservedSampleTime, observed)
+            XCTAssertFalse(decoded.complete)
+            XCTAssertTrue(HALCapture.transportFailureMessage(stats.failure).contains("try again"))
+        }
+    }
+
     func testTransientUnitBindingChangeInvalidatesPreviouslyRetainedAudio() throws {
         let c = try XCTUnwrap(pt_test_create(48000, 8))
         defer { XCTAssertTrue(pt_destroy(c)) }

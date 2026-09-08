@@ -83,3 +83,20 @@ focused live retest of the resulting fix. Settings staying behind the target
 window was arranged but not independently established by this document. The
 production purchase deployment and public release remain pending. Existing
 live checkout remains active.
+
+## Follow-up diagnostics
+
+The next capture candidate preserves the first discontinuity's expected and
+observed sample times, together with the raw capture reason and OSStatus. The
+customer message explains how to retry; the numerical details stay in the
+local receipt. The half-frame continuity check and rejection of partial audio
+are unchanged. This is better failure evidence, not a fix for the unobserved
+cause of the first AirPods interruption.
+
+All 227 Swift tests pass. A deterministic fixture injects a timestamp reset,
+a one-frame overlap, a one-frame gap and a larger jump into the real C queue.
+It checks rejection of the partial audio, preservation of the first fault,
+and serialization of the diagnostic values. The capture wiring gate also
+rejects removal of either the production receipt call or the discontinuity
+failure call; all 22 wiring mutations are rejected. These are fixture and
+source checks, not an additional live AirPods speech test.

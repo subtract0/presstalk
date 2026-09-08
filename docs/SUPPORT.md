@@ -3,10 +3,12 @@
 PressTalk is built by one developer. Support may be handled by the project's
 operator, who identifies their role when replying.
 
-New purchases are temporarily paused while payment and licence delivery are
-verified. Existing licences, included-update promises and the advertised
-14-day refund promise remain in force. If you have already paid and need a
-licence or refund, contact **help@presstalk.app**.
+Your purchase confirmation includes an activation button and a downloadable
+licence file. Double-click the file to activate PressTalk. Keep a copy; your
+licence works offline and has no expiry. If you need it again, use
+[licence recovery](https://presstalk-licenses.presstalk.workers.dev/recover)
+with the email address you used at checkout. For purchase or refund questions,
+contact **help@presstalk.app**. The advertised 14-day refund promise applies.
 
 ## Getting help
 

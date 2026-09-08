@@ -168,6 +168,7 @@ details[open] summary::after { content: "−"; }
 .document .measurement { font: 600 44px/1.1 var(--display); letter-spacing: -0.045em; color: var(--ink); margin-bottom: 15px; }
 .document .measurement small { font-size: 17px; letter-spacing: 0; }
 .document .detail { font-size: 14px; }
+.document .checkout-note { margin: 12px 0 32px; }
 
 @media (min-width: 1400px) { .hero { min-height: 640px; } }
 @media (max-width: 1000px) {

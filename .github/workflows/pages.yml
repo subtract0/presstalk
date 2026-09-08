@@ -49,6 +49,8 @@ jobs:
         run: python3 scripts/test_presstalk_site_privacy_gate.py
       - name: The offer gate still catches planted defects
         run: python3 scripts/test_presstalk_offer_consistency_gate.py
+      - name: Missing checkout pages and failed purchase redirects cannot pass
+        run: python3 scripts/test_presstalk_download_link_gate.py
 
   deploy:
     needs: gate

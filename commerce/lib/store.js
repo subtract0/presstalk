@@ -1,5 +1,5 @@
 export class Store {
-  constructor(db,clock={now:'now()',lease:"now()+interval '90 seconds'",retry:"now()+interval '60 seconds'",hourAgo:"now()-interval '1 hour'"}) { this.db = db;this.clock=clock; }
+  constructor(db,clock={now:'now()',lease:"now()+interval '90 seconds'",retry:"now()+($4 * interval '1 second')",hourAgo:"now()-interval '1 hour'",dayAgo:"now()-interval '1 day'"}) { this.db = db;this.clock=clock; }
   async putOrder(order) {
     const { rows } = await this.db.query(`INSERT INTO orders
       (session_id,payment_intent_id,email,email_hash,license,livemode)
@@ -29,13 +29,17 @@ export class Store {
     await this.db.query(`UPDATE deliveries SET state='sent',provider_id=$3,sent_at=${this.clock.now},
       lease_until=NULL,last_error=NULL WHERE id=$1 AND attempts=$2 AND state='sending'`,[id,attempt,providerID]);
   }
-  async failed(id, attempt, code) {
+  async failed(id, attempt, code, retrySeconds=60) {
     await this.db.query(`UPDATE deliveries SET state='pending',lease_until=NULL,last_error=$3,
-      next_attempt_at=${this.clock.retry} WHERE id=$1 AND attempts=$2 AND state='sending'`,[id,attempt,code]);
+      next_attempt_at=${this.clock.retry} WHERE id=$1 AND attempts=$2 AND state='sending'`,[id,attempt,code,retrySeconds]);
   }
   async pending(limit=20) {
-    return (await this.db.query(`SELECT id FROM deliveries WHERE next_attempt_at<=${this.clock.now}
+    return (await this.db.query(`SELECT id FROM deliveries WHERE state IN ('pending','sending') AND next_attempt_at<=${this.clock.now}
       AND (state='pending' OR (state='sending' AND lease_until<${this.clock.now})) ORDER BY next_attempt_at LIMIT $1`,[limit])).rows;
+  }
+  async pruneRecoveryLimits() {
+    await this.db.query(`DELETE FROM recovery_limits WHERE key IN
+      (SELECT key FROM recovery_limits WHERE window_start<${this.clock.dayAgo} ORDER BY window_start LIMIT 1000)`);
   }
   async block(paymentIntentID) {
     await this.db.query('UPDATE orders SET blocked=true WHERE payment_intent_id=$1',[paymentIntentID]);

@@ -16,6 +16,12 @@ export function d1Adapter(binding) {
 export class D1Store extends Store {
   constructor(binding) {
     super(d1Adapter(binding),{now:"datetime('now')",lease:"datetime('now','+90 seconds')",
-      retry:"datetime('now','+60 seconds')",hourAgo:"datetime('now','-1 hour')"});
+      retry:"datetime('now','+' || $4 || ' seconds')",hourAgo:"datetime('now','-1 hour')",dayAgo:"datetime('now','-1 day')"});
+  }
+  async health() {
+    await super.health();
+    const names=['deliveries_ready','deliveries_session','recovery_limits_window'];
+    const {rows}=await this.db.query("SELECT name FROM sqlite_master WHERE type='index' AND name IN ($1,$2,$3)",names);
+    if(rows.length!==names.length) throw new Error('Missing delivery capacity migration');
   }
 }

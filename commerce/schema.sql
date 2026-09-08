@@ -26,3 +26,6 @@ CREATE TABLE IF NOT EXISTS recovery_limits (
   window_start TIMESTAMPTZ NOT NULL DEFAULT now(),
   attempts INTEGER NOT NULL DEFAULT 1
 );
+CREATE INDEX IF NOT EXISTS deliveries_ready ON deliveries(next_attempt_at) WHERE state IN ('pending','sending');
+CREATE INDEX IF NOT EXISTS deliveries_session ON deliveries(session_id);
+CREATE INDEX IF NOT EXISTS recovery_limits_window ON recovery_limits(window_start);

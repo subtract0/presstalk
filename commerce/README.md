@@ -20,18 +20,23 @@ binding, periodic activation check or remote licence revocation is added.
 
 - Cloudflare Workers with D1 is the selected production host. `wrangler.jsonc`
   pins the authorized account and existing EU `presstalk-orders` database.
-  Migration `0001_orders.sql` is applied and the remote schema was verified.
-  The isolated acceptance Worker is deployed against a separate EU database.
-  Production deployment and purchase acceptance remain outstanding.
+  Migrations `0001_orders.sql` and `0002_delivery_capacity.sql` are applied and
+  the remote schema and required indexes were verified. The production Worker
+  is deployed with new sales disabled and its new Stripe webhook staged.
+  The isolated acceptance Worker uses a separate EU database. The owner has
+  completed test Checkout, received the licence, and dictated with the whole
+  Mac app offline. Final public release and checkout cutover remain outstanding.
 - The Node 24/PostgreSQL adapter remains an alternative runtime. The prepared
   Vercel Hobby project is unused; no hosting plan upgrade is needed for the
   selected Cloudflare route.
 - Resend for purchase receipts, with open/click tracking disabled. Its accepted
   send response is not proof that a person received the email.
 - Signature-checked Stripe webhooks retry transient failures. The durable outbox
-  also has a fallback cron (every five minutes on Cloudflare, daily on the
+  also has a fallback cron (every minute on Cloudflare, daily on the
   prepared Vercel configuration) and can be processed through the authorized
-  `/api/retry` endpoint. The paid receipt remains available during mail outages.
+  `/api/retry` endpoint. Receipt downloads and recovery forms never wait for an
+  email send. The signed payment webhook sends the purchase receipt; cron also
+  handles purchase retries and queued recovery receipts.
 - `SALES_ENABLED=false` pauses `/buy` while preserving all existing receipt and
   recovery routes. Older app versions contain the direct Stripe Payment Link
   and bypass this switch. The owner explicitly requested that the existing
@@ -55,10 +60,27 @@ payment session IDs and receipt links are bearer credentials and must not be
 logged or sent to analytics. Responses are private/no-store/no-referrer with a
 restricted Content Security Policy. Logging excludes email, session IDs and keys.
 
-Fallback delivery waits for the next scheduled run after Stripe's own retries
-are exhausted. Each run processes up to five pending jobs. Monitor pending and
-failed deliveries, and distinguish provider acceptance from delivery. Do not
-silently add a paid plan to increase throughput.
+Each scheduled run considers up to 50 jobs, paces them at 250 ms intervals, and
+stops starting new jobs after 20 seconds. An in-flight request can finish after
+that budget. Transient failures back off from one minute to one hour, and honour
+the email provider's Retry-After delay up to 24 hours. Claims and provider
+idempotency remain in force. Old recovery-rate-limit records are pruned in
+bounded batches without resetting current limits.
+
+The production Worker sends only allowlisted route/status/timing and retry
+counters through a private `MONITOR` service binding. Logs and sampled traces
+are enabled on that service. Automatic request logs and traces stay disabled on
+the purchase Worker because incoming receipt URLs and outgoing Stripe URLs
+contain bearer identifiers. Customer addresses, licence keys, raw URLs, headers,
+bodies and provider errors do not cross the monitoring binding. A compiled
+workerd test covers the actual binding call, and a live marker probe checks its
+output. The monitoring service has no public route.
+
+Distinguish provider acceptance from delivery. The current provider plan's
+quotas are separate from database capacity: a free Resend account is limited to
+100 emails per day and 3,000 per month. Verify and increase commercial quotas
+before that volume is reached; do not silently add a paid plan. Paid owners'
+installed apps do not generate recurring licence-server requests.
 
 ## Tests
 
@@ -75,6 +97,15 @@ verification and the native fetch function's global receiver must be retained.
 Set `PRESSTALK_WORKER_TEST_BUNDLE` to an absolute bundle path to verify a separate
 deployment artifact. For the readiness script, use `--wrangler-config PATH`
 with `--cloudflare` to verify that deployment's actual database binding.
+
+`node scripts/check-order-capacity.js 500000` creates 500,000 fixture orders and
+deliveries in local workerd/D1, then calls the actual store's pending-job query.
+Selecting 20 jobs from a 37-job backlog read 20 rows; removing the production
+index made it read 500,037. The absent-index control must fail the capacity
+condition. This is a queue-query/storage test, not a claim about simultaneous
+purchases, provider quotas or email throughput. D1 checkout health also rejects
+the missing migration. `npm run build:monitor` builds the private monitoring
+service; deploy that service before the purchase Worker.
 
 Test-mode deployments require a random `STRIPE_TEST_REFERENCE` of at least
 32 URL-safe characters. Include it as `client_reference_id` only in the private

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {readFile,readdir} from 'node:fs/promises';
 import {Miniflare,convertV4MiniflareOptions} from 'miniflare';
 import Stripe from 'stripe';
 
@@ -11,7 +11,7 @@ test('compiled Worker receives a signed payment, issues the Mac-compatible key a
     payment_status:'paid',currency:'eur',amount_total:2000,customer_details:{email:'buyer@example.test'},
     payment_intent:{id:'pi_test',status:'succeeded',latest_charge:{id:'ch_test',refunded:false,disputed:false,amount_refunded:0}}};
   const outgoing=[],traffic=[];
-  const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,
+  const primary={name:'commerce',modules:true,serviceBindings:{MONITOR:'monitor-spy'},
     // Load the exact compiled bytes. Miniflare 5's V4 path converter failed
     // before module evaluation for this bundle; inline module loading does not.
     script:await readFile(process.env.PRESSTALK_WORKER_TEST_BUNDLE || new URL('../../.local/commerce/worker-bundle/worker.js',import.meta.url),'utf8'),
@@ -33,11 +33,22 @@ test('compiled Worker receives a signed payment, issues the Mac-compatible key a
       }
       throw new Error('Unexpected outgoing request in isolated runtime test');
     },
-  }));
+  };
+  const runtime=new Miniflare(convertV4MiniflareOptions({workers:[primary,{
+    name:'monitor-spy',modules:true,compatibilityDate:'2026-09-08',d1Databases:['OBSERVATIONS'],
+    script:`import {WorkerEntrypoint} from 'cloudflare:workers';
+      export default class extends WorkerEntrypoint {
+        async record(value) {await this.env.OBSERVATIONS.prepare('INSERT INTO observations (value) VALUES (?)').bind(JSON.stringify(value)).run();}
+      }`,
+  }]}));
   try {
-    const db=await runtime.getD1Database('ORDERS');
-    const schema=await readFile(new URL('../migrations/0001_orders.sql',import.meta.url),'utf8');
-    for(const sql of schema.split(';').filter(x=>x.trim()))await db.prepare(sql).run();
+    const db=await runtime.getD1Database('ORDERS','commerce');
+    const observations=await runtime.getD1Database('OBSERVATIONS','monitor-spy');
+    await observations.prepare('CREATE TABLE observations(value TEXT)').run();
+    for(const name of (await readdir(new URL('../migrations/',import.meta.url))).filter(x=>x.endsWith('.sql')).sort()) {
+      const schema=await readFile(new URL('../migrations/'+name,import.meta.url),'utf8');
+      for(const sql of schema.split(';').filter(x=>x.trim()))await db.prepare(sql).run();
+    }
     const body=JSON.stringify({livemode:false,type:'checkout.session.completed',data:{object:session}});
     const sdk=new Stripe('sk_test_fixture');
     const signature=sdk.webhooks.generateTestHeaderString({payload:body,secret:'whsec_fixture'});
@@ -61,5 +72,22 @@ test('compiled Worker receives a signed payment, issues the Mac-compatible key a
       method:'POST',headers:{'stripe-signature':'bad'},body,
     });
     assert.equal(invalid.status,400);assert.equal(outgoing.length,1);
+    const sentinel='PRESSTALK_PRIVATE_SENTINEL';
+    await runtime.dispatchFetch('https://licenses.example.test/'+sentinel+'?session_id='+sentinel,{
+      headers:{authorization:sentinel},
+    });
+    let recorded=[];
+    const deadline=Date.now()+2000;
+    do {
+      recorded=(await observations.prepare('SELECT value FROM observations').all()).results.map(x=>JSON.parse(x.value));
+      if(recorded.length>=5)break;
+      await new Promise(resolve=>setTimeout(resolve,10));
+    }while(Date.now()<deadline);
+    assert.equal(recorded.length,5,'the actual Worker did not send its observations through the service binding');
+    assert(recorded.some(x=>x.route==='receipt'&&x.status===200));
+    assert(recorded.some(x=>x.route==='stripe_webhook'&&x.status===400));
+    assert(recorded.some(x=>x.route==='other'&&x.status===404));
+    const logged=JSON.stringify(recorded);
+    for(const privateValue of [sentinel,id,fixture.license,session.customer_details.email])assert(!logged.includes(privateValue));
   }finally{await runtime.dispose();}
 });

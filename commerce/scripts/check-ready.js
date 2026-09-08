@@ -26,7 +26,7 @@ try {
   const price=await stripe.prices.retrieve(config.priceID,{expand:['currency_options']});
   if(!config.currencies.every(currency=>price.currency_options?.[currency]?.unit_amount>0)) throw new Error('Checkout currencies are not configured');
   if(cloudflare) {
-    const sql='SELECT o.session_id,o.license,o.blocked,d.id,d.state,d.lease_until,d.provider_id,r.key,r.window_start,r.attempts FROM orders o,deliveries d,recovery_limits r LIMIT 0';
+    const sql="SELECT o.session_id,o.license,o.blocked,d.id,d.state,d.lease_until,d.provider_id,r.key,r.window_start,r.attempts FROM orders o,deliveries d,recovery_limits r LIMIT 0; SELECT COUNT(*) AS required_indexes FROM sqlite_master WHERE type='index' AND name IN ('deliveries_ready','deliveries_session','recovery_limits_window')";
     try {
       const output=execFileSync('npx',['wrangler','d1','execute','ORDERS','--remote','--json',
         ...(configPath?['--config',resolve(configPath)]:[]),'--command',sql],
@@ -34,6 +34,7 @@ try {
           env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
       const result=JSON.parse(output);
       if(!Array.isArray(result)||!result.length||result.some(x=>x.success!==true)) throw new Error('Remote D1 schema did not verify');
+      if(result[1]?.results?.[0]?.required_indexes!==3) throw new Error('Remote D1 delivery capacity migration did not verify');
     } catch {throw new Error('Cannot verify deployed Cloudflare database');}
   } else {
     pool=new pg.Pool({connectionString:config.databaseURL,max:1,connectionTimeoutMillis:5000});

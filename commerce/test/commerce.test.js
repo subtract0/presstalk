@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile,readdir } from 'node:fs/promises';
 import { createPublicKey,verify } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import Stripe from 'stripe';
@@ -17,13 +17,16 @@ const publicKey='6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=';
 const key=signingKey(seed.toString('base64'),publicKey);
 const stripeSDK=new Stripe('sk_test_fixture');
 const sessionID='cs_test_0123456789abcdef';
+const storedTime=value=>value instanceof Date?value.getTime():Date.parse(value.replace(' ','T')+'Z');
 async function fixture() {
   let db,makeStore;
   if(process.env.TEST_STORE==='d1') {
     const runtime=new Miniflare(convertV4MiniflareOptions({modules:true,script:'export default { fetch() { return new Response("test fixture"); } }',d1Databases:['ORDERS']}));
     const binding=await runtime.getD1Database('ORDERS');
-    const schema=await readFile(new URL('../migrations/0001_orders.sql',import.meta.url),'utf8');
-    for(const sql of schema.split(';').filter(x=>x.trim())) await binding.prepare(sql).run();
+    for(const name of (await readdir(new URL('../migrations/',import.meta.url))).filter(x=>x.endsWith('.sql')).sort()) {
+      const schema=await readFile(new URL('../migrations/'+name,import.meta.url),'utf8');
+      for(const sql of schema.split(';').filter(x=>x.trim())) await binding.prepare(sql).run();
+    }
     db={...d1Adapter(binding),close:()=>runtime.dispose()};
     makeStore=()=>new D1Store(binding);
   } else {
@@ -44,7 +47,7 @@ async function fixture() {
     paymentLinks:{retrieve:async()=>({active:true,livemode:false,url:'https://buy.stripe.com/test'})},webhooks:stripeSDK.webhooks};
   const sends=[];
   const mailer={send:async(order,id)=>{sends.push({order,id});return 'email_1';}};
-  const store=makeStore(),commerce=new Commerce({stripe,store,mailer,config,key});
+  const store=makeStore(),commerce=new Commerce({stripe,store,mailer,config,key,pause:async()=>{}});
   return {db,config,session,items,stripe,store,makeStore,commerce,mailer,sends,serve:handler(commerce,config,stripe)};
 }
 const counts=async db=>{
@@ -76,6 +79,20 @@ test('all three existing checkout currencies are accepted without changing price
       assert(order.license.startsWith('PRESSTALK-1.'));
     }finally{await f.db.close();}
   }
+});
+test('live mode fulfils the exact paid product without an acceptance capability',async()=>{
+  const f=await fixture();try {
+    f.config.liveMode=true;delete f.config.testReference;
+    f.session.id='cs_live_0123456789abcdef';f.session.livemode=true;
+    delete f.session.client_reference_id;
+    await f.commerce.event({livemode:true,type:'checkout.session.completed',data:{object:f.session}});
+    const state=await counts(f.db);
+    assert.equal(state.orders.length,1);assert.equal(state.orders[0].session_id,f.session.id);
+    assert.equal(Boolean(state.orders[0].livemode),true);assert.equal(f.sends.length,1);
+    assert.equal(state.deliveries[0].state,'sent');
+    await assert.rejects(f.commerce.event({livemode:false,type:'checkout.session.completed',data:{object:f.session}}),Unavailable);
+    assert.equal(f.sends.length,1);
+  }finally{await f.db.close();}
 });
 test('a paid sandbox order without the private acceptance reference cannot issue or send a licence',async()=>{
   const f=await fixture();try {
@@ -161,6 +178,10 @@ test('recovery sends the original licence only to its stored buyer and is limite
     await f.commerce.recover('BUYER@example.test','127.0.0.1');
     await f.commerce.recover('buyer@example.test','127.0.0.1');
     await f.commerce.recover('buyer@example.test','127.0.0.1');
+    assert.equal(f.sends.length,0,'recovery must not wait on mail before returning');
+    // The original purchase and the recovery job are separate receipts.
+    await f.db.query("UPDATE deliveries SET state='sent' WHERE id=$1",['purchase/'+sessionID]);
+    await f.commerce.retry();
     assert.equal(f.sends.length,1);assert.equal(f.sends[0].order.email,'buyer@example.test');
     assert.equal(f.sends[0].order.license,order.license);
   }finally{await f.db.close();}
@@ -181,7 +202,8 @@ test('invalid webhook signature, altered body and stale timestamp cause no fulfi
 });
 test('receipt never caches licences and remains available while mail is down',async()=>{
   const f=await fixture();try{
-    f.mailer.send=async()=>{throw new Error('outage');};
+    let attemptedMail=false;
+    f.mailer.send=async()=>{attemptedMail=true;throw new Error('outage');};
     const response=await f.serve(new Request(f.config.origin+'/thanks?session_id='+sessionID));
     assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store, private');
     assert.equal(response.headers.get('referrer-policy'),'no-referrer');
@@ -189,6 +211,7 @@ test('receipt never caches licences and remains available while mail is down',as
     assert(!html.includes('buyer@example.test'));assert(html.includes('Download your licence file'));
     const file=await f.serve(new Request(f.config.origin+'/api/license?session_id='+sessionID));
     assert.equal(file.status,200);assert((await file.text()).startsWith('PRESSTALK-1.'));
+    assert.equal(attemptedMail,false,'licence access must not wait for the mail provider');
   }finally{await f.db.close();}
 });
 test('anonymous cron and cross-origin recovery cannot send mail; sales can be paused independently',async()=>{
@@ -221,5 +244,79 @@ test('the actual mail adapter sends the saved licence attachment with stable ret
     assert.equal(Buffer.from(mail.attachments[0].content,'base64').toString().trim(),order.license);
     assert.deepEqual(mail.to,['buyer@example.test']);assert.equal(mail.reply_to,'help@example.test');
     assert(receipt(order,f.config).text.includes('No account or subscription'));
+  }finally{await f.db.close();}
+});
+
+test('provider Retry-After and repeated failures delay durable retries without changing the licence',async()=>{
+  const f=await fixture();try {
+    const {order,deliveryID}=await f.commerce.fulfill(sessionID);
+    f.commerce.mailer=new ResendMailer(f.config,async()=>new Response('',{status:429,headers:{'retry-after':'900'}}));
+    await assert.rejects(f.commerce.deliver(deliveryID));
+    const row=(await counts(f.db)).deliveries[0];
+    const due=storedTime(row.next_attempt_at);
+    assert(due-Date.now()>890000,'the provider delay was ignored');
+    assert.equal(row.state,'pending');assert.equal(row.attempts,1);
+    assert.equal((await f.store.pending()).length,0);
+    assert.equal((await f.store.order(sessionID)).license,order.license);
+    await f.db.query(`UPDATE deliveries SET attempts=6,next_attempt_at=${process.env.TEST_STORE==='d1'?"datetime('now','-1 minute')":"now()-interval '1 minute'"}`);
+    f.commerce.mailer={send:async()=>{throw new Error('still unavailable');}};
+    await assert.rejects(f.commerce.deliver(deliveryID));
+    const later=(await counts(f.db)).deliveries[0];
+    assert.equal(later.attempts,7);
+    assert(storedTime(later.next_attempt_at)-Date.now()>3590000,'repeated failures must back off');
+    assert.equal((await f.store.pending()).length,0);
+  }finally{await f.db.close();}
+});
+
+test('recovery form queues a receipt without contacting the mail provider',async()=>{
+  const f=await fixture();try {
+    await f.commerce.fulfill(sessionID);
+    f.mailer.send=async()=>assert.fail('public recovery waited for an external provider');
+    const response=await f.serve(new Request(f.config.origin+'/api/recover',{method:'POST',
+      headers:{origin:f.config.origin,'content-type':'application/x-www-form-urlencoded'},body:'email=buyer%40example.test'}));
+    assert.equal(response.status,202);
+    const jobs=(await counts(f.db)).deliveries;
+    assert.equal(jobs.filter(x=>x.id.startsWith('recovery/')).length,1);
+    assert(jobs.every(x=>x.state==='pending'&&x.attempts===0));
+  }finally{await f.db.close();}
+});
+
+test('backlog retries are paced, bounded and leave unfinished jobs durable',async()=>{
+  const f=await fixture();try {
+    await f.commerce.fulfill(sessionID);
+    for(let i=0;i<70;i++) await f.store.queue('backlog/'+i,sessionID);
+    let time=0;const pauses=[];
+    f.commerce.now=()=>time;
+    f.commerce.pause=async ms=>{pauses.push(ms);time+=ms;};
+    assert.deepEqual(await f.commerce.retry(),{attempted:50,sent:50});
+    assert.equal(pauses.length,50);assert(pauses.every(ms=>ms>=250));
+    assert.equal((await f.store.pending(100)).length,21);
+    f.mailer.send=async()=>{time+=2500;return 'slow-mail';};
+    const next=await f.commerce.retry();
+    assert(next.attempted>0&&next.attempted<21,'slow providers escaped the run budget');
+    assert.equal(next.sent,next.attempted);
+    assert.equal((await f.store.pending(100)).length,21-next.sent);
+  }finally{await f.db.close();}
+});
+
+test('old recovery limits are pruned without resetting active abuse limits',async()=>{
+  const f=await fixture();try {
+    assert.equal(await f.store.allowRecovery('active',1),true);
+    await f.store.allowRecovery('expired',1);
+    await f.db.query(`UPDATE recovery_limits SET window_start=${process.env.TEST_STORE==='d1'?"datetime('now','-2 days')":"now()-interval '2 days'"} WHERE key='expired'`);
+    await f.store.pruneRecoveryLimits();
+    const rows=(await f.db.query('SELECT key FROM recovery_limits')).rows;
+    assert.deepEqual(rows.map(x=>x.key),['active']);
+    assert.equal(await f.store.allowRecovery('active',1),false);
+  }finally{await f.db.close();}
+});
+
+test('D1 checkout health rejects a missing delivery-capacity migration',{skip:process.env.TEST_STORE!=='d1'},async()=>{
+  const f=await fixture();try {
+    await f.store.health();
+    await f.db.query('DROP INDEX deliveries_ready');
+    await assert.rejects(f.store.health(),/Missing delivery capacity migration/);
+    f.config.salesEnabled=true;
+    assert.equal((await f.serve(new Request(f.config.origin+'/buy'))).status,503);
   }finally{await f.db.close();}
 });

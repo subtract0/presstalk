@@ -71,7 +71,8 @@ export function handler(commerce,config,stripe) {
           if(error instanceof Unavailable) return response(error.message==='payment_pending'?pages.pending():pages.unavailable(),error.message==='payment_pending'?202:404);
           throw error;
         }
-        try { await commerce.deliver(result.deliveryID); } catch {}
+        // The signed webhook and cron deliver email. The buyer can obtain
+        // their already-issued licence immediately even if mail is slow.
         if(path==='/api/license') return response(result.order.license+'\n',200,{
           'content-type':'application/octet-stream','content-disposition':'attachment; filename="PressTalk.presstalk-license"',
         });

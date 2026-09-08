@@ -2,6 +2,13 @@ import { activationURL } from './license.js';
 
 export const escapeHTML = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
+export class MailDeliveryError extends Error {
+  constructor(status,retryAfterSeconds=0) {
+    super(`mail_http_${status}`);
+    this.retryAfterSeconds=retryAfterSeconds;
+  }
+}
+
 export function receipt(order,config) {
   const receiptURL=`${config.origin}/thanks?session_id=${encodeURIComponent(order.session_id)}`;
   const activate=activationURL(order.license);
@@ -22,7 +29,12 @@ export class ResendMailer {
       headers:{authorization:`Bearer ${this.config.resendKey}`,'content-type':'application/json','Idempotency-Key':idempotencyKey},
       body:JSON.stringify(receipt(order,this.config)),
     });
-    if (!response.ok) throw new Error(`mail_http_${response.status}`);
+    if (!response.ok) {
+      const value=response.headers.get('retry-after');
+      const seconds=value && /^\d+$/.test(value) ? Number(value)
+        : value ? Math.ceil((Date.parse(value)-Date.now())/1000) : 0;
+      throw new MailDeliveryError(response.status,Number.isFinite(seconds)?Math.max(0,Math.min(seconds,86400)):0);
+    }
     const data=await response.json();
     if (!data.id) throw new Error('mail_missing_receipt');
     return data.id;

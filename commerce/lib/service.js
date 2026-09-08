@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { issueLicense } from './license.js';
+import { MailDeliveryError } from './mail.js';
 
 export class Unavailable extends Error {}
 const idOf = value => typeof value === 'string' ? value : value?.id;
@@ -10,8 +11,9 @@ const sameReference=(actual,expected)=>{
 };
 
 export class Commerce {
-  constructor({ stripe, store, mailer, config, key }) {
-    Object.assign(this,{ stripe,store,mailer,config,key });
+  constructor({ stripe, store, mailer, config, key,
+    now=()=>performance.now(),pause=ms=>new Promise(resolve=>setTimeout(resolve,ms)) }) {
+    Object.assign(this,{ stripe,store,mailer,config,key,now,pause });
   }
   emailHash(email) {
     return createHmac('sha256',this.config.recoveryPepper).update(email.trim().toLowerCase()).digest('hex');
@@ -66,7 +68,9 @@ export class Commerce {
       await this.store.sent(id,job.attempts,providerID);
       return true;
     } catch(error) {
-      await this.store.failed(id,job.attempts,error instanceof Unavailable ? error.message : 'delivery_retry');
+      const backoff=Math.min(3600,60*2**Math.min(job.attempts-1,6));
+      const retrySeconds=Math.max(backoff,error instanceof MailDeliveryError?error.retryAfterSeconds:0);
+      await this.store.failed(id,job.attempts,error instanceof Unavailable ? error.message : 'delivery_retry',retrySeconds);
       throw error;
     }
   }
@@ -100,16 +104,25 @@ export class Commerce {
     for (const order of orders) {
       const id=`recovery/${order.session_id}/${Math.floor(Date.now()/3600000)}`;
       await this.store.queue(id,order.session_id);
-      // The job is durable even if email is temporarily unavailable.
-      try { await this.deliver(id); } catch {}
+      // The cron sends this durable job. Waiting on Stripe and email here
+      // would disclose matching buyers through response time and hold the form
+      // open during a provider outage.
     }
   }
   async retry() {
-    const jobs=await this.store.pending(5);
+    await this.store.pruneRecoveryLimits();
+    const jobs=await this.store.pending(50);
+    const deadline=this.now()+20000;
     let sent=0;
+    let attempted=0;
     for (const {id} of jobs) {
+      if(this.now()>=deadline) break;
+      attempted++;
       try { if (await this.deliver(id)) sent++; } catch {}
+      // Pace backlog recovery below the provider's default five requests/sec.
+      // Live webhooks share that quota; any 429 remains durably queued.
+      await this.pause(250);
     }
-    return {attempted:jobs.length,sent};
+    return {attempted,sent};
   }
 }

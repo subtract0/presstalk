@@ -31,11 +31,11 @@ async function fixture() {
     await db.exec(await readFile(new URL('../schema.sql',import.meta.url),'utf8'));
     makeStore=()=>new Store(db);
   }
-  const config={liveMode:false,paymentLinkID:'plink_test',priceID:'price_test',currencies:['eur','usd','cad'],
+  const config={liveMode:false,testReference:'acceptance-fixture-'.repeat(3),paymentLinkID:'plink_test',priceID:'price_test',currencies:['eur','usd','cad'],
     keyID:'test-only',recoveryPepper:'test-pepper',origin:'https://licenses.example.test',
     mailFrom:'PressTalk <license@example.test>',mailReplyTo:'help@example.test',
     webhookSecret:'whsec_fixture',cronSecret:'cron_fixture',salesEnabled:false};
-  const session={id:sessionID,created:1788820000,livemode:false,mode:'payment',payment_link:'plink_test',
+  const session={id:sessionID,created:1788820000,livemode:false,mode:'payment',payment_link:'plink_test',client_reference_id:config.testReference,
     status:'complete',payment_status:'paid',currency:'eur',amount_total:2000,
     customer_details:{email:'buyer@example.test'},
     payment_intent:{id:'pi_test',status:'succeeded',latest_charge:{id:'ch_test',refunded:false,disputed:false,amount_refunded:0}}};
@@ -76,6 +76,21 @@ test('all three existing checkout currencies are accepted without changing price
       assert(order.license.startsWith('PRESSTALK-1.'));
     }finally{await f.db.close();}
   }
+});
+test('a paid sandbox order without the private acceptance reference cannot issue or send a licence',async()=>{
+  const f=await fixture();try {
+    let lookedUp=false;
+    f.stripe.checkout.sessions.retrieve=async()=>{lookedUp=true;return structuredClone(f.session);};
+    f.session.client_reference_id='unrelated-test-checkout';
+    await assert.rejects(f.commerce.fulfill(sessionID),Unavailable);
+    assert.equal(lookedUp,true);
+    assert.equal((await counts(f.db)).orders.length,0);
+    assert.equal(f.sends.length,0);
+    delete f.config.testReference;
+    lookedUp=false;
+    await assert.rejects(f.commerce.fulfill(sessionID),Unavailable);
+    assert.equal(lookedUp,false);
+  }finally{await f.db.close();}
 });
 test('concurrent landing pages and duplicate webhooks issue and email once',async()=>{
   const f=await fixture();try {

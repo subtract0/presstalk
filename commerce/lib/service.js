@@ -1,8 +1,13 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import { issueLicense } from './license.js';
 
 export class Unavailable extends Error {}
 const idOf = value => typeof value === 'string' ? value : value?.id;
+const sameReference=(actual,expected)=>{
+  if(typeof actual!=='string'||typeof expected!=='string'||!expected) return false;
+  const a=Buffer.from(actual),b=Buffer.from(expected);
+  return a.length===b.length && timingSafeEqual(a,b);
+};
 
 export class Commerce {
   constructor({ stripe, store, mailer, config, key }) {
@@ -13,7 +18,9 @@ export class Commerce {
   }
   async paidSession(id) {
     if (!/^cs_(test|live)_[A-Za-z0-9]{8,240}$/.test(id)) throw new Unavailable('invalid_order');
+    if (!this.config.liveMode && !this.config.testReference) throw new Unavailable('wrong_order');
     const session = await this.stripe.checkout.sessions.retrieve(id,{expand:['payment_intent.latest_charge']});
+    if (!this.config.liveMode && !sameReference(session.client_reference_id,this.config.testReference)) throw new Unavailable('wrong_order');
     if (session.livemode !== this.config.liveMode || session.mode !== 'payment' ||
         idOf(session.payment_link) !== this.config.paymentLinkID) throw new Unavailable('wrong_order');
     if (session.status !== 'complete' || session.payment_status !== 'paid') throw new Unavailable('payment_pending');

@@ -18,13 +18,14 @@ binding, periodic activation check or remote licence revocation is added.
 
 ## Runtime
 
-- Node 24. An isolated Vercel `presstalk-licenses` project is prepared, but the
-  current team is Hobby, which does not permit commercial hosting. A commercial
-  hosting route must be selected before production (Vercel Pro or Cloudflare
-  Workers on its free plan). `worker.js` and the tested D1 adapter are ready for
-  the latter. `wrangler.jsonc` needs the real account/database binding and secrets.
-- PostgreSQL for orders, email attempts and recovery limits. Apply `schema.sql`
-  with `npm run migrate`; configuration/secrets are runtime environment variables.
+- Cloudflare Workers with D1 is the selected production host. `wrangler.jsonc`
+  pins the authorized account and existing EU `presstalk-orders` database.
+  Migration `0001_orders.sql` is applied and the remote schema was verified.
+  The isolated acceptance Worker is deployed against a separate EU database.
+  Production deployment and purchase acceptance remain outstanding.
+- The Node 24/PostgreSQL adapter remains an alternative runtime. The prepared
+  Vercel Hobby project is unused; no hosting plan upgrade is needed for the
+  selected Cloudflare route.
 - Resend for purchase receipts, with open/click tracking disabled. Its accepted
   send response is not proof that a person received the email.
 - Signature-checked Stripe webhooks retry transient failures. The durable outbox
@@ -32,8 +33,9 @@ binding, periodic activation check or remote licence revocation is added.
   prepared Vercel configuration) and can be processed through the authorized
   `/api/retry` endpoint. The paid receipt remains available during mail outages.
 - `SALES_ENABLED=false` pauses `/buy` while preserving all existing receipt and
-  recovery routes. The Stripe link's `active` flag independently protects old
-  app versions that still contain the direct link.
+  recovery routes. Older app versions contain the direct Stripe Payment Link
+  and bypass this switch. The owner explicitly requested that the existing
+  Stripe link remain active during setup; do not deactivate it.
 - The new Mac app opens the stable, user-owned `https://presstalk.app/buy.html`.
   That page stays paused until the service passes acceptance, then redirects to
   its verified `/buy` URL. Changing hosts will not require another Mac release.
@@ -70,6 +72,16 @@ rate limits, protected retry access and real mail payload construction.
 worker in workerd, with intercepted Stripe/Resend HTTP. This caught two issues
 that Node tests could not: the edge runtime needs asynchronous webhook signature
 verification and the native fetch function's global receiver must be retained.
+Set `PRESSTALK_WORKER_TEST_BUNDLE` to an absolute bundle path to verify a separate
+deployment artifact. For the readiness script, use `--wrangler-config PATH`
+with `--cloudflare` to verify that deployment's actual database binding.
+
+Test-mode deployments require a random `STRIPE_TEST_REFERENCE` of at least
+32 URL-safe characters. Include it as `client_reference_id` only in the private
+acceptance Payment Link URL. Other sandbox payments cannot issue a licence,
+even when they use the same product and otherwise appear paid. Keep this value
+and the private test URL out of public pages, source control and logs. Live mode
+does not require a test reference.
 
 `node scripts/review-pages.js` renders labelled local fixtures at desktop and
 phone sizes; set `CHROMIUM_PATH` if using an existing browser binary. These
@@ -102,6 +114,7 @@ future major version. Invalid imports cannot displace a working licence.
 6. Record actual order/email/activation receipts privately. Never call isolated
    tests, preview screenshots, or free owner transactions verified customer sales.
 
-Rollback new purchases with both `SALES_ENABLED=false` and the exact link's
-`active=false`. Keep the service and its keys/database available for existing
+`SALES_ENABLED=false` stops purchases through the service. The direct Stripe
+link is independent; leave it active under the owner's current instruction.
+Keep receipt/recovery routes and their keys/database available for existing
 customers. Do not delete orders or replace trusted signing keys during rollback.

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import Stripe from 'stripe';
 import pg from 'pg';
 import { configuration } from '../lib/config.js';
@@ -10,6 +11,9 @@ import { signingKey } from '../lib/license.js';
 let pool;
 try {
   const cloudflare=process.argv.includes('--cloudflare');
+  const configArgument=process.argv.indexOf('--wrangler-config');
+  const configPath=configArgument<0 ? null : process.argv[configArgument+1];
+  if(configArgument>=0 && (!configPath||configPath.startsWith('--'))) throw new Error('Invalid Wrangler config path');
   const config=configuration(process.env,{database:cloudflare?'d1':'postgres'});
   signingKey(config.privateKey,config.publicKey);
   const app=await readFile(new URL('../../Sources/JarvisTap/ProductUI.swift',import.meta.url),'utf8');
@@ -24,7 +28,8 @@ try {
   if(cloudflare) {
     const sql='SELECT o.session_id,o.license,o.blocked,d.id,d.state,d.lease_until,d.provider_id,r.key,r.window_start,r.attempts FROM orders o,deliveries d,recovery_limits r LIMIT 0';
     try {
-      const output=execFileSync('npx',['wrangler','d1','execute','ORDERS','--remote','--json','--command',sql],
+      const output=execFileSync('npx',['wrangler','d1','execute','ORDERS','--remote','--json',
+        ...(configPath?['--config',resolve(configPath)]:[]),'--command',sql],
         {cwd:new URL('..',import.meta.url),encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:30000,
           env:{...process.env,WRANGLER_SEND_METRICS:'false'}});
       const result=JSON.parse(output);

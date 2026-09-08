@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "presstalk-licenses",
+  "account_id": "cbcced21185315aff602a2938ac194ee",
   "main": "worker.js",
   "compatibility_date": "2026-09-08",
   "compatibility_flags": ["nodejs_compat"],
@@ -10,8 +11,8 @@
   "d1_databases": [{
     "binding": "ORDERS",
     "database_name": "presstalk-orders",
+    "database_id": "f4ee6ffd-a0ef-45c5-b240-381724cb3f53",
     "migrations_dir": "migrations"
   }]
-  // Add the real D1 database_id returned by provisioning before deployment.
   // Runtime secrets and exact test/live configuration are supplied separately.
 }

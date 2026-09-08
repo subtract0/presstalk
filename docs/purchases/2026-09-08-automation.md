@@ -1,7 +1,8 @@
 # Automatic purchase delivery — 2026-09-08
 
-Status: implementation and local verification complete; **not deployed or open
-for sales**. Account authorization and live acceptance remain required.
+Status: implementation, local verification and the remote D1 schema are complete;
+the **purchase service is not deployed or open for sales**. Email DNS, persistent
+Stripe access and live acceptance remain required.
 
 ## Implemented
 
@@ -34,6 +35,7 @@ for sales**. Account authorization and live acceptance remain required.
 | Cross-language licence | Actual JavaScript issuer matches the Swift fixture; CryptoKit accepts it, new store/defaults instances retain it, expired trial and future major 99 remain licensed. Not yet a customer app relaunch. |
 | PostgreSQL | 14 purchase/delivery/recovery tests passed using real PGlite SQL. |
 | Cloudflare D1 | The same 14 tests passed in the D1 runtime, including concurrent duplicate delivery and missing-schema rejection. |
+| Remote D1 | `presstalk-orders` created with EU jurisdiction in account `cbcced21185315aff602a2938ac194ee`; migration `0001_orders.sql` applied and actual required columns verified remotely. Empty purchase store, no buyer transaction. |
 | Compiled Worker | Actual Wrangler bundle ran in workerd: signed webhook → stored licence → outgoing HTTP receipt attachment → receipt page. HTTP payment/email providers are intercepted local fixtures. Invalid signature and duplicate-page checks pass. |
 | Runtime defects found | Switched to asynchronous Stripe webhook verification; retained native fetch's global receiver. Both defects escaped the Node-only tests and failed the compiled-worker test first. |
 | Visuals | Receipt/recovery controls verified at 1100px desktop and 390px phone widths. Screenshots reviewed; no horizontal clipping. Local fixtures only. |
@@ -46,15 +48,15 @@ artifact has been published or installed. Public 0.1.22 remains the live release
 
 ## External setup and actual blockers
 
-1. **Hosting:** authenticated Vercel team `alexs-projects-fae123bd` is Hobby.
-   Hobby excludes commercial hosting. The isolated `presstalk-licenses` project
-   was created, but has no deployment. Vercel Pro ($20/month plus usage) needs a
-   spending decision; Cloudflare Workers/D1 is the prepared free alternative.
-   Cloudflare OAuth timed out without authorization. Its login launcher is in
-   Downloads; no Cloudflare database or deployment exists yet.
-2. **Database:** the Neon Free/Frankfurt provisioning attempt timed out waiting
-   for account terms acceptance; no database was created. This step is unnecessary
-   on Cloudflare, where the tested D1 migration replaces it.
+1. **Hosting:** the owner completed Wrangler authorization. Account
+   `cbcced21185315aff602a2938ac194ee` is pinned in the Worker configuration.
+   No Worker has been deployed and no plan upgrade was made. The existing Vercel
+   Hobby project remains unused; its commercial-plan limitation does not block
+   the selected Cloudflare route.
+2. **Database:** D1 `presstalk-orders`, ID
+   `f4ee6ffd-a0ef-45c5-b240-381724cb3f53`, now exists with EU jurisdiction.
+   `0001_orders.sql` applied successfully and the remote schema contract passed.
+   Neon provisioning is unnecessary for this route.
 3. **Email:** Resend Free resource `presstalk-receipts` was provisioned through
    Vercel and connected to the isolated project. Domain `presstalk.app`, ID
    `81e788ea-1a6e-4351-b8ce-eeba31b7f691`, awaits DKIM plus sending-subdomain
@@ -84,6 +86,15 @@ User-facing setup files are in Downloads:
 `Authorize PressTalk Hosting.command`.
 The launcher saves the Stripe restricted key without displaying it. The HTML
 contains the exact public DNS records, current blockers and host choices.
+
+Cloudflare agent setup is also installed locally: 14 official skills under
+`~/.codex/skills/` and the five requested MCP connections in
+`~/.codex/config.toml`. Main Cloudflare and bindings OAuth succeeded; public docs
+passed an actual initialize/tools-list protocol check. Builds and observability
+are registered but unauthenticated after their initial callback timeouts; they
+can request OAuth when used. Restart Codex to load the new tools. Existing Codex
+settings were preserved. Setup and remote database receipts are in
+`.local/commerce/cloudflare-agent-setup/`.
 
 ## Required operational finish
 

@@ -61,7 +61,8 @@ let package = Package(
         ),
         .testTarget(
             name: "PressTalkCoreTests",
-            dependencies: ["PressTalkCore"]
+            dependencies: ["PressTalkCore"],
+            exclude: ["Fixtures"]
         ),
         .executableTarget(
             name: "PressTalkLicenseTool",

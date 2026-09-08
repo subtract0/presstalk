@@ -72,7 +72,7 @@ public struct EntitlementPolicy {
     public func state(
         verifiedEntitlement: String?,
         priorUse: PriorUseEvidence,
-        trialStartedAt: Date?,
+        trialStartedAt: @autoclosure () -> Date?,
         now: Date
     ) -> State {
         if let verifiedEntitlement {
@@ -81,7 +81,9 @@ public struct EntitlementPolicy {
         if priorUse.indicatesPriorUse {
             return .grandfathered
         }
-        guard let trialStartedAt else {
+        // The app's anchor includes Keychain access. A paid or early-user
+        // licence must return above without reading an irrelevant trial record.
+        guard let trialStartedAt = trialStartedAt() else {
             return .trial(daysRemaining: trialDays)
         }
         let elapsedDays = now.timeIntervalSince(trialStartedAt) / 86_400
@@ -136,8 +138,10 @@ public enum PressTalkOffer {
         }
     }
 
-    /// The Stripe Managed Payments checkout, live since 2026-09-06.
-    public static let checkoutURLString = "https://buy.stripe.com/eVq9AU7Egdf55cc345cs80c"
+    /// The purchase service checks sales readiness before opening the existing
+    /// Stripe Managed Payments checkout. Receipts and recovery remain available
+    /// when new sales are paused.
+    public static let checkoutURLString = "https://presstalk.app/buy.html"
 
     /// Direct PayPal checkout against the business account
     /// `connect@alexmonas.com`. **Empty until the owner creates the button.**
@@ -149,7 +153,7 @@ public enum PressTalkOffer {
     public static let paypalCheckoutURLString = ""
 
     /// Where the offer is described. Empty until a domain exists.
-    public static let pricingPageURLString = ""
+    public static let pricingPageURLString = "https://presstalk.app/download.html#buy"
 
     public static func checkoutURLString(for rail: CheckoutRail) -> String {
         switch rail {
@@ -198,7 +202,7 @@ public enum PressTalkOffer {
     /// it. So the offer includes every future release and promises no schedule,
     /// and the disclaimer is part of the offer rather than buried in a FAQ.
     public static let founderSummary =
-        "PressTalk Founder — $\(founderPriceUSD) once. Every future Mac update included, major versions too. No subscription."
+        "PressTalk Founder — €20 / US$20 / CA$28 once. Every future Mac update included, major versions too. No subscription."
     public static let personalSummary =
         "PressTalk Personal — $\(personalPriceUSD) once. Every future Mac update included, major versions too. No subscription."
     public static let updateDisclaimer =

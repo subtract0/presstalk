@@ -458,6 +458,36 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         false
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        // Opening a purchase link is an explicit request to activate the app.
+        // Do not log the URL or key; both are private purchase receipts.
+        guard let url = urls.first else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let alert = NSAlert()
+            do {
+                let encoded = try LicenseActivation.encodedLicense(from: url)
+                switch self.licenseStore.importLicense(encoded) {
+                case .success:
+                    self.lastTrialExpiredNoticeAt = nil
+                    self.settingsWindowController?.reloadFromStore()
+                    alert.messageText = "PressTalk is activated"
+                    alert.informativeText = "Your licence is saved on this Mac. You can keep dictating offline after the trial."
+                case .failure(let error):
+                    alert.alertStyle = .warning
+                    alert.messageText = "That licence could not be activated"
+                    alert.informativeText = error.userFacingMessage
+                }
+            } catch {
+                alert.alertStyle = .warning
+                alert.messageText = "That licence could not be opened"
+                alert.informativeText = "Open the original licence file or activation link from your PressTalk receipt. You can also paste the key into Settings → Enter Licence Key."
+            }
+            NSApp.activate(ignoringOtherApps: true)
+            alert.runModal()
+        }
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         stopSetupRetry()
         // An orderly quit is not a crash. Without this, quitting or restarting
@@ -5556,8 +5586,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             for rail in rails {
                 alert.addButton(
                     withTitle: rails.count == 1
-                        ? "Buy PressTalk — $\(PressTalkOffer.founderPriceUSD)"
-                        : "Buy with \(rail.displayName) — $\(PressTalkOffer.founderPriceUSD)")
+                        ? "Buy PressTalk…"
+                        : "Buy with \(rail.displayName)…")
             }
             alert.addButton(withTitle: "Enter licence key")
             alert.addButton(withTitle: "Not now")

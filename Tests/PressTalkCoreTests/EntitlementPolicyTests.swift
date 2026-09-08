@@ -93,6 +93,19 @@ final class EntitlementPolicyTests: XCTestCase {
             .licensed(entitlement: "founder"))
     }
 
+    func testOwnersNeverReadTheTrialAnchor() {
+        var reads = 0
+        func readAnchor() -> Date? { reads += 1; return now.addingTimeInterval(-100 * 86400) }
+        XCTAssertEqual(policy.state(verifiedEntitlement: "founder", priorUse: evidence(),
+            trialStartedAt: readAnchor(), now: now), .licensed(entitlement: "founder"))
+        XCTAssertEqual(policy.state(verifiedEntitlement: nil, priorUse: evidence(predates: true),
+            trialStartedAt: readAnchor(), now: now), .grandfathered)
+        XCTAssertEqual(reads, 0, "owning the app must not access the trial Keychain record")
+        XCTAssertEqual(policy.state(verifiedEntitlement: nil, priorUse: evidence(),
+            trialStartedAt: readAnchor(), now: now), .trialExpired)
+        XCTAssertEqual(reads, 1, "a real trial must still read its actual anchor")
+    }
+
     // Three documents said three different prices. There is now one source, and
     // no subscription anywhere in it.
     func testTheOfferIsBuyOnceAndSaysWhatItCovers() {

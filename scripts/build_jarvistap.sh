@@ -167,6 +167,28 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>$APP_BUILD</string>
   <key>LSUIElement</key>
   <true/>
+  <key>CFBundleURLTypes</key>
+  <array><dict>
+    <key>CFBundleURLName</key><string>com.am.presstalk.activation</string>
+    <key>CFBundleURLSchemes</key><array><string>presstalk</string></array>
+    <key>CFBundleTypeRole</key><string>Viewer</string>
+  </dict></array>
+  <key>CFBundleDocumentTypes</key>
+  <array><dict>
+    <key>CFBundleTypeName</key><string>PressTalk Licence</string>
+    <key>CFBundleTypeRole</key><string>Viewer</string>
+    <key>LSHandlerRank</key><string>Owner</string>
+    <key>LSItemContentTypes</key><array><string>com.am.presstalk.license</string></array>
+  </dict></array>
+  <key>UTExportedTypeDeclarations</key>
+  <array><dict>
+    <key>UTTypeIdentifier</key><string>com.am.presstalk.license</string>
+    <key>UTTypeDescription</key><string>PressTalk Licence</string>
+    <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
+    <key>UTTypeTagSpecification</key><dict>
+      <key>public.filename-extension</key><array><string>presstalk-license</string></array>
+    </dict>
+  </dict></array>
   <key>NSMicrophoneUsageDescription</key>
   <string>PressTalk needs microphone access to capture your voice commands.</string>
   <key>NSAccessibilityUsageDescription</key>

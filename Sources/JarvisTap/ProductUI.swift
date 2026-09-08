@@ -69,7 +69,6 @@ struct PressTalkNativeTriggerCalibration: Codable, Hashable {
 /// can check on its own forever.
 final class PressTalkLicenseStore {
     private enum Key {
-        static let licenseString = "PressTalk.License"
         static let trialStartedAt = "PressTalk.TrialStartedAt"
         /// Recorded once, at the first launch of a licensing-aware build.
         static let predatesPaidLicensing = "PressTalk.PredatesPaidLicensing"
@@ -84,18 +83,22 @@ final class PressTalkLicenseStore {
     /// an update; licences signed by an older key keep working because the key
     /// id travels with the licence.
     ///
-    /// Generated 2026-09-06. The private half lives outside this repository at
+    /// The original founder key was generated 2026-09-06. Its private half lives outside this repository at
     /// ~/.presstalk-signing/ (mode 600) and must never be committed; only this
     /// public half ships. Rotating means adding a second entry here, not
     /// replacing this one, or every licence already sold stops verifying.
+    /// The separate commerce key is held only by the purchase service. Adding
+    /// it preserves every licence issued before automatic delivery existed.
     static let trustedPublicKeys: [String: String] = [
         "founder-2026": "kRCsB+YLcYSDKFt8u9qGXodXWEHGORTl3dYydLILFE4=",
+        "commerce-2026": "JDwkjz0hZtenKwfUoAF1N0FH03WSruCxlrwkZpfYqtE=",
     ]
 
     private let defaults: UserDefaults
     private let policy = EntitlementPolicy()
     private let overrideEntitlement: String?
     private let verifier: PressTalkLicenseVerifier
+    private lazy var paidLicense = OfflineLicenseStore(defaults: defaults, verifier: verifier)
 
     /// The trial start date is recorded in both, and the earliest one wins.
     /// UserDefaults alone made "3 days" mean "3 days per reinstall".
@@ -145,9 +148,7 @@ final class PressTalkLicenseStore {
 
     private var verifiedEntitlement: String? {
         if let overrideEntitlement { return overrideEntitlement }
-        guard let stored = defaults.string(forKey: Key.licenseString) else { return nil }
-        guard case .success(let license) = verifier.verify(stored) else { return nil }
-        return license.entitlement
+        return paidLicense.license?.entitlement
     }
 
     /// Reads every anchor store, believes the earliest date, and refills any
@@ -187,6 +188,7 @@ final class PressTalkLicenseStore {
     /// Called after the first successful dictation. The trial starts when the
     /// product first works, not when it was installed.
     func startTrialIfNeeded() {
+        guard verifiedEntitlement == nil, !priorUse.indicatesPriorUse else { return }
         // Checks every store, not just UserDefaults. Someone who reinstalled
         // still has a date in the keychain, and starting a new one here would
         // hand them the fresh trial the anchor exists to prevent.
@@ -208,11 +210,7 @@ final class PressTalkLicenseStore {
     /// was working.
     @discardableResult
     func importLicense(_ encoded: String) -> Result<PressTalkLicense, PressTalkLicenseError> {
-        let result = verifier.verify(encoded)
-        if case .success = result {
-            defaults.set(encoded.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.licenseString)
-        }
-        return result
+        paidLicense.importLicense(encoded)
     }
 
     var currentPlanName: String {

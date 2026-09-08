@@ -60,5 +60,8 @@ Private logs, manifest, signed app, ZIP and installation receipt are under
 and `PressTalk Release Test.html`. Old 23.1/23.2 installers were preserved in
 `~/Downloads/PressTalk Previous Setup/` to prevent accidental rollback.
 
-Public 0.1.22 is unchanged. Whole-app offline dictation, the AirPods transition,
-and production purchase service/publication remain separate acceptance work.
+Public 0.1.22 is unchanged. The subsequent [owner offline dictation test](2026-09-09-owner-offline-dictation.md)
+confirmed live offline insertion through the Shure and AirPods, while exposing
+one interrupted AirPods attempt. That interruption and production purchase
+service/publication remain open; the later observation supersedes the earlier
+pending offline-test status.

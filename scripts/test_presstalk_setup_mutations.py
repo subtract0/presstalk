@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Require the UI/wiring tests to reject removed production callback calls."""
-from concurrent.futures import ThreadPoolExecutor
 import json
 import os
 from pathlib import Path
@@ -22,6 +21,8 @@ cases = [
      'real delivery observer or confirmation callback is disconnected', app_command),
     ('model_action', ui, 'onDownloadSpeechModel?()', 'PRESSTALK_TEST_SETUP_UI_SOURCE',
      'Model button does not start or show preparation', ['bash', 'scripts/test_presstalk_setup_controls.sh']),
+    ('edit_menu_installation', main, 'installApplicationMenu()', 'PRESSTALK_TEST_APP_SOURCE',
+     'The actual app Command-V route did not paste the complete sentence', app_command),
 ]
 with tempfile.TemporaryDirectory(prefix='presstalk-setup-mutations-') as directory:
     def run(case):
@@ -37,8 +38,9 @@ with tempfile.TemporaryDirectory(prefix='presstalk-setup-mutations-') as directo
             for line in output.splitlines())
         if not rejected: print(output)
         return {'mutation': name, 'rejectedByBehavior': rejected}
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        results = list(executor.map(run, cases))
+    # The real application menu tests share macOS focus and the clipboard.
+    # Serial execution prevents one fixture from stealing another's responder.
+    results = [run(case) for case in cases]
     print(json.dumps(results, indent=2))
     assert all(r['rejectedByBehavior'] for r in results), 'A removed call site escaped the behavioral assertions'
-print('PASS: all four removed production callbacks fail behavioral tests')
+print('PASS: all five removed production calls fail behavioral tests')

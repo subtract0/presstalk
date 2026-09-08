@@ -3,7 +3,9 @@
 
 The fixture replaces only the app's top-level run loop and opens private access
 for assertions. Functional method bodies and all other app sources are unchanged.
-It does not run startup, request permissions, load models or use a real Keychain.
+It runs the actual UI installation and AppKit event loop so keyboard commands
+reach the focused text responder. It does not run capture startup, request
+permissions, load models or use a real Keychain. Requires a macOS GUI session.
 """
 import os
 import json

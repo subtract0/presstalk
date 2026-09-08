@@ -1,5 +1,10 @@
 # PressTalk 0.1.23 release review — 2026-09-08
 
+Latest: corrected build **23.3 is notarized and installed**. A real keyboard-paste
+failure in the setup field was subsequently reproduced and repaired; see
+`2026-09-08-setup-paste-repair.md` for the current result and remaining limits.
+The preparation history below describes the earlier 23.2 stage.
+
 The owner requested a thorough native app review after completing the real
 sandbox purchase. Installed 0.1.23 / 23.1 contains the valid downloaded commerce
 licence. Public 0.1.22 remains unchanged while the corrected candidate is tested.

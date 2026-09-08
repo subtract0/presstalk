@@ -6,7 +6,12 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
     guard condition() else { print("FAIL: \(message)"); exit(1) }
 }
 func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
-func spin() { RunLoop.current.run(until: Date().addingTimeInterval(0.03)) }
+func spin(until condition: () -> Bool) {
+    let deadline = Date().addingTimeInterval(2)
+    while !condition() && Date() < deadline {
+        RunLoop.current.run(until: Date().addingTimeInterval(0.03))
+    }
+}
 let app = NSApplication.shared
 app.setActivationPolicy(.prohibited)
 let guide = FirstRunSetupWindowController()
@@ -45,7 +50,7 @@ require(!primary.isEnabled && primary.title.contains("Checking"), "No visible in
 require(text("setup.detail").contains("Speak normally"), "No instruction during microphone check")
 primary.performClick(nil)
 require(probeCalls == 1, "Repeated clicks started concurrent checks")
-probeCompletion!(report(.engineFailed)); spin()
+probeCompletion!(report(.engineFailed)); spin(until: { primary.isEnabled })
 require(primary.isEnabled && text("setup.step") == "Microphone", "Failed capture advanced setup")
 require(text("setup.detail").contains("disconnected"), "Capture error was hidden")
 var permissionClicks = 0
@@ -59,7 +64,8 @@ details.recordingOrProcessing = true; guide.refresh()
 require(!primary.isEnabled && text("setup.detail").contains("Finish"), "Check can interrupt a dictation")
 details.recordingOrProcessing = false; guide.refresh()
 primary.performClick(nil)
-microphone = true; probeCompletion!(report(.captured, frames: 19200)); spin()
+microphone = true; probeCompletion!(report(.captured, frames: 19200))
+spin(until: { primary.isEnabled && text("setup.step") != "Microphone" })
 require(text("setup.step") == "Pasting into apps", "Successful mic did not advance to permission")
 require(skip.isHidden, "Fn setup offers an impossible Accessibility skip")
 var accessibilityClicks = 0

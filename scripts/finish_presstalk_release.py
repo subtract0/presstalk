@@ -36,6 +36,10 @@ def verify_prepared(manifest):
     return app
 
 
+def release_label(manifest):
+    return manifest['metadata']['CFBundleShortVersionString'] + ' / ' + manifest['metadata']['CFBundleVersion']
+
+
 def check_metadata(app, manifest):
     info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
     for key, value in manifest['metadata'].items():
@@ -100,7 +104,7 @@ def install(app, manifest, receipt):
     if target.exists():
         backup_root = Path.home() / 'Library/Application Support/PressTalk Install Backups'
         backup_root.mkdir(parents=True, exist_ok=True)
-        backup = Path(tempfile.mkdtemp(prefix='before-23.2-', dir=backup_root)) / 'PressTalk.app'
+        backup = Path(tempfile.mkdtemp(prefix='before-' + manifest['metadata']['CFBundleVersion'] + '-', dir=backup_root)) / 'PressTalk.app'
         target.rename(backup)
     try:
         staged.rename(target)
@@ -111,7 +115,7 @@ def install(app, manifest, receipt):
     stage_root.rmdir()
     receipt['installedApp'] = str(target)
     receipt['previousApp'] = str(backup) if backup else None
-    print('Installed verified PressTalk 0.1.23 / 23.2.', flush=True)
+    print('Installed verified PressTalk ' + release_label(manifest) + '.', flush=True)
     if backup:
         print(f'Previous app preserved at: {backup}', flush=True)
 
@@ -125,7 +129,7 @@ def main():
     os.umask(0o077)
     manifest = json.loads(args.manifest.read_text())
     prepared = verify_prepared(manifest)
-    print('Verified the complete reviewed PressTalk 0.1.23 / 23.2 artifact.', flush=True)
+    print('Verified the complete reviewed PressTalk ' + release_label(manifest) + ' artifact.', flush=True)
     if args.verify_prepared:
         return
     output = Path(manifest['outputDirectory'])
@@ -180,7 +184,7 @@ def main():
         run(['/usr/bin/xcrun', 'stapler', 'staple', app], job / 'staple.log')
         verify_signed(app, manifest, notarized=True)
         run(['/bin/bash', manifest['readinessScript']['path'], '--app', app, '--require-developer-id', '--json-output', job / 'readiness.json'], job / 'readiness.log')
-        archive = output / 'PressTalk-0.1.23-23.2.zip'
+        archive = output / ('PressTalk-' + release_label(manifest).replace(' / ', '-') + '.zip')
         run(['/usr/bin/ditto', '-c', '-k', '--keepParent', app, archive])
         receipt = {'manifestSHA256': sha(args.manifest), 'app': str(app), 'signedFiles': inventory(app),
                    'binarySHA256': sha(app / 'Contents/MacOS/jarvistap'), 'archive': str(archive),

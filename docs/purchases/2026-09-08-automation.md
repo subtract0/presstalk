@@ -8,7 +8,11 @@ The saved licence matches the downloaded file. Apple notarization credentials
 are now validated. A broader Mac setup/release review is in progress; full-app
 offline relaunch and production publication remain outstanding. Corrected build
 23.2 is frozen and hash-bound; the Downloads release finisher is ready because
-codesign's secure timestamp step fails in the agent session.
+codesign's secure timestamp step failed in the earlier agent session. The owner
+installed that candidate; a real native paste failure was then repaired. Build
+**23.3 is now notarized and installed**, with the licence and permissions
+preserved. See `2026-09-08-setup-paste-repair.md` for the current artifact and
+verification boundaries. Public 0.1.22 remains unchanged.
 
 ## Implemented
 
@@ -136,17 +140,17 @@ Setup and remote database receipts are in
 
 Apple notarization credentials are now validated in the explicit login Keychain
 under profile `presstalk-notary`. The owner completed the secure Downloads
-launcher and a real `notarytool history` request succeeds. The corrected binary
-still requires its own submission and stapled ticket. Never use the old 0.1.22
-ticket for a changed binary, access the protected original signing directory or
-retry the failed local-development keychain password.
+launcher and a real `notarytool history` request succeeds. Corrected build 23.3
+has since received its own Accepted result and stapled ticket and is installed.
+Never use an older ticket for a changed binary, access the protected original
+signing directory or retry the failed local-development keychain password.
 
-Run `~/Downloads/Finish PressTalk Release.command` for the reviewed corrected
-0.1.23 / 23.2 artifact. It requires a secure timestamp, Apple's Accepted result,
-stapled ticket and Gatekeeper acceptance before installation. It preserves the
-old app and stops on ambiguous process detection. The full procedure and current
-verification limits are in `2026-09-08-release-review.md`. The prior notarization
-authorization launcher has completed and does not need to run again.
+No new installation or authorization is required. If needed later,
+`~/Downloads/Install PressTalk Release Candidate.command` reinstalls the verified
+0.1.23 / 23.3 artifact with a backup. `Test PressTalk Offline.command` targets the
+same exact installed build. Both reject changed artifacts or ambiguous process
+checks. Earlier installers are preserved under `~/Downloads/PressTalk Previous
+Setup/`. Current verification limits are in `2026-09-08-setup-paste-repair.md`.
 
 Use `commerce/README.md` for the acceptance sequence. Keep the original offline
 license promise. The email provider's successful API response is acceptance for

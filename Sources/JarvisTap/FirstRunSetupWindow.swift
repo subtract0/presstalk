@@ -1,134 +1,189 @@
 import AppKit
 import PressTalkCore
 
-/// The window a new user sees on first launch: one step at a time, each
-/// explained in terms of what they get, ending with text they can actually see.
-///
-/// Deliberately not a wall of switches. macOS grants microphone, input
-/// monitoring, and accessibility independently, and asking for all three at once
-/// stacks three system dialogs, which is three chances to say no and no
-/// explanation of why any of them was needed.
-final class FirstRunSetupWindowController: NSWindowController {
-    /// Runs the real microphone capture probe. Reported by frames captured, not
-    /// by permission status.
-    var onVerifyMicrophone: (() -> AudioCaptureProbeReport)?
+private final class SetupDocumentView: NSView {
+    override var isFlipped: Bool { true }
+}
+
+/// A check ends with a real dictation, and every action shows what happens next.
+final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate {
+    enum ModelState { case idle, loading, ready, failed }
+    struct Details {
+        var microphoneAuthorization = "not_determined"
+        var microphoneName = "Selected microphone"
+        var triggerName = "your trigger key"
+        var modelState: ModelState = .idle
+        var modelStatus = ""
+        var recordingOrProcessing = false
+        var pasteAutomatically = true
+        var shortcutUsesRegisteredHotKey = false
+    }
+
+    var onVerifyMicrophone: ((@escaping (AudioCaptureProbeReport) -> Void) -> Void)?
     var onRequestMicrophoneAccess: ((@escaping (Bool) -> Void) -> Void)?
+    var onOpenMicrophoneSettings: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenAccessibilitySettings: (() -> Void)?
+    var onRetryShortcut: (() -> Bool)?
     var onReadConditions: (() -> FirstRunSetupPolicy.Conditions)?
+    var onReadDetails: (() -> Details)?
     var onDownloadSpeechModel: (() -> Void)?
+    var onConfirmDictation: (() -> Void)?
     var onFinish: (() -> Void)?
 
     private let policy = FirstRunSetupPolicy()
     private var pollTimer: Timer?
     private var lastProbe: AudioCaptureProbeReport?
+    private var microphoneMessage = ""
+    private var shortcutMessage = ""
+    private var checkingMicrophone = false
+    private var expectedDictation: String?
+    private var practiceBeforeDictation = ""
+    private var practiceSelectionBeforeDictation = NSRange(location: 0, length: 0)
+    private var confirmedDictation = false
     private var skippedSteps: Set<FirstRunSetupPolicy.Step> = []
-
     private let progressBar = NSProgressIndicator()
     private let progressLabel = NSTextField(labelWithString: "")
     private let stepTitleLabel = NSTextField(labelWithString: "")
     private let stepBodyLabel = NSTextField(wrappingLabelWithString: "")
     private let detailLabel = NSTextField(wrappingLabelWithString: "")
     private let primaryButton = NSButton(title: "Continue", target: nil, action: nil)
-    private let skipButton = NSButton(title: "Skip for now", target: nil, action: nil)
+    private let skipButton = NSButton(title: "Use clipboard instead", target: nil, action: nil)
     private let stepListStack = NSStackView()
+    private let practiceScrollView = NSScrollView()
+    private let practiceTextView = NSTextView()
 
     init() {
-        let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 520, height: 520),
-            styleMask: [.titled, .closable],
-            backing: .buffered,
-            defer: false
-        )
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 550, height: 610),
+            styleMask: [.titled, .closable, .resizable], backing: .buffered, defer: false)
         window.title = "Set up PressTalk"
+        window.isReleasedWhenClosed = false
+        window.minSize = NSSize(width: 520, height: 480)
         window.center()
         super.init(window: window)
+        window.delegate = self
         buildLayout()
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
 
     private func buildLayout() {
         guard let contentView = window?.contentView else { return }
-
-        let heading = NSTextField(labelWithString: "Three permissions, then you dictate.")
-        heading.font = .systemFont(ofSize: 17, weight: .semibold)
-
+        let heading = NSTextField(labelWithString: "Let’s check your dictation setup.")
+        heading.font = .systemFont(ofSize: 19, weight: .semibold)
         let subheading = NSTextField(wrappingLabelWithString:
-            "Speech recognition runs on this Mac. Your audio and your text are not uploaded.")
+            "Check your microphone and shortcut, then dictate a sentence. Your audio and text stay on this Mac.")
         subheading.textColor = .secondaryLabelColor
         subheading.font = .systemFont(ofSize: 12)
-
         progressBar.isIndeterminate = false
         progressBar.minValue = 0
         progressBar.maxValue = 1
         progressBar.controlSize = .small
-
         progressLabel.font = .systemFont(ofSize: 11)
         progressLabel.textColor = .secondaryLabelColor
-
+        progressLabel.setAccessibilityIdentifier("setup.progress")
         stepListStack.orientation = .vertical
         stepListStack.alignment = .leading
         stepListStack.spacing = 4
-
-        stepTitleLabel.font = .systemFont(ofSize: 14, weight: .semibold)
-        stepBodyLabel.font = .systemFont(ofSize: 12)
-        stepBodyLabel.preferredMaxLayoutWidth = 460
-        detailLabel.font = .systemFont(ofSize: 11)
+        stepTitleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
+        stepTitleLabel.setAccessibilityIdentifier("setup.step")
+        stepBodyLabel.font = .systemFont(ofSize: 13)
+        detailLabel.font = .systemFont(ofSize: 12)
         detailLabel.textColor = .secondaryLabelColor
-        detailLabel.preferredMaxLayoutWidth = 460
-        stepBodyLabel.maximumNumberOfLines = 0
-        detailLabel.maximumNumberOfLines = 0
-        stepBodyLabel.setContentCompressionResistancePriority(.required, for: .vertical)
-        detailLabel.setContentCompressionResistancePriority(.required, for: .vertical)
-
+        detailLabel.setAccessibilityIdentifier("setup.detail")
         primaryButton.target = self
         primaryButton.action = #selector(primaryTapped(_:))
+        primaryButton.bezelStyle = .rounded
         primaryButton.keyEquivalent = "\r"
+        primaryButton.setAccessibilityIdentifier("setup.primary")
         skipButton.target = self
         skipButton.action = #selector(skipTapped(_:))
         skipButton.bezelStyle = .inline
-
+        skipButton.setAccessibilityIdentifier("setup.skip")
+        practiceTextView.isRichText = false
+        practiceTextView.font = .systemFont(ofSize: 14)
+        practiceTextView.textContainerInset = NSSize(width: 10, height: 10)
+        practiceTextView.isHorizontallyResizable = false
+        practiceTextView.isVerticallyResizable = true
+        practiceTextView.autoresizingMask = [.width]
+        practiceTextView.textContainer?.widthTracksTextView = true
+        practiceTextView.setAccessibilityIdentifier("setup.practice")
+        practiceTextView.setAccessibilityLabel("Try dictation here")
+        practiceScrollView.documentView = practiceTextView
+        practiceScrollView.hasVerticalScroller = true
+        practiceScrollView.borderType = .bezelBorder
+        practiceScrollView.heightAnchor.constraint(equalToConstant: 100).isActive = true
         let buttonRow = NSStackView(views: [skipButton, NSView(), primaryButton])
         buttonRow.orientation = .horizontal
-        buttonRow.distribution = .fill
-
-        let stack = NSStackView(views: [
-            heading, subheading, progressBar, progressLabel,
-            stepListStack, stepTitleLabel, stepBodyLabel, detailLabel, buttonRow,
-        ])
+        let stack = NSStackView(views: [heading, subheading, progressBar, progressLabel,
+            stepListStack, stepTitleLabel, stepBodyLabel, detailLabel, practiceScrollView, buttonRow])
         stack.orientation = .vertical
         stack.alignment = .leading
-        stack.spacing = 10
-        stack.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
+        stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(stack)
+        for field in [subheading, stepBodyLabel, detailLabel] {
+            field.maximumNumberOfLines = 0
+            field.lineBreakMode = .byWordWrapping
+            field.cell?.isScrollable = false
+            field.cell?.usesSingleLineMode = false
+            field.setContentCompressionResistancePriority(.required, for: .vertical)
+        }
+        for view in [subheading, progressBar, stepBodyLabel, detailLabel, practiceScrollView, buttonRow] {
+            view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
+        }
+        let document = SetupDocumentView()
+        document.translatesAutoresizingMaskIntoConstraints = false
+        document.addSubview(stack)
+        let scroll = NSScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.drawsBackground = false
+        scroll.documentView = document
+        contentView.addSubview(scroll)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            stack.topAnchor.constraint(equalTo: contentView.topAnchor),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor),
-            buttonRow.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
-            progressBar.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
-            stepBodyLabel.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
-            detailLabel.widthAnchor.constraint(equalTo: stack.widthAnchor, constant: -48),
+            scroll.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            scroll.topAnchor.constraint(equalTo: contentView.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            document.widthAnchor.constraint(equalTo: scroll.contentView.widthAnchor),
+            stack.leadingAnchor.constraint(equalTo: document.leadingAnchor, constant: 24),
+            stack.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -24),
+            stack.topAnchor.constraint(equalTo: document.topAnchor, constant: 20),
+            stack.bottomAnchor.constraint(equalTo: document.bottomAnchor, constant: -20),
         ])
     }
 
     func present() {
+        expectedDictation = nil
+        confirmedDictation = false
         refresh()
-        // Permissions are granted in System Settings, in another window. Polling
-        // is what lets the step tick over by itself instead of making someone
-        // come back and press a button to be told what macOS already knows.
         pollTimer?.invalidate()
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.refresh()
         }
         window?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func beginDictation() {
+        practiceBeforeDictation = practiceTextView.string
+        practiceSelectionBeforeDictation = practiceTextView.selectedRange()
+        expectedDictation = nil
+    }
+
+    func observeDictation(_ transcript: String) {
+        let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return }
+        expectedDictation = text
+        refresh()
+    }
+
+    private func confirmDictation() {
+        guard !confirmedDictation else { return }
+        confirmedDictation = true
+        onConfirmDictation?()
     }
 
     func close(finished: Bool) {
@@ -138,124 +193,212 @@ final class FirstRunSetupWindowController: NSWindowController {
         if finished { onFinish?() }
     }
 
-    private func refresh() {
-        guard let base = onReadConditions?() else { return }
-        // The window owns the skip decisions; the app only reports the facts.
-        let conditions = FirstRunSetupPolicy.Conditions(
-            microphoneCaptureVerified: base.microphoneCaptureVerified,
+    func windowWillClose(_ notification: Notification) {
+        pollTimer?.invalidate()
+        pollTimer = nil
+    }
+
+    private func conditions() -> FirstRunSetupPolicy.Conditions? {
+        guard let base = onReadConditions?() else { return nil }
+        return .init(microphoneCaptureVerified: base.microphoneCaptureVerified,
             inputMonitoringGranted: base.inputMonitoringGranted,
-            accessibilityGranted: base.accessibilityGranted,
-            speechModelReady: base.speechModelReady,
+            accessibilityGranted: base.accessibilityGranted, speechModelReady: base.speechModelReady,
             firstDictationDelivered: base.firstDictationDelivered,
             triggerRequiresInputMonitoring: base.triggerRequiresInputMonitoring,
-            skippedSteps: skippedSteps)
-        let steps = policy.steps(for: conditions)
-        let current = policy.currentStep(for: conditions)
+            triggerRequiresAccessibility: base.triggerRequiresAccessibility, skippedSteps: skippedSteps)
+    }
 
-        progressBar.doubleValue = policy.progress(conditions)
-        let satisfied = steps.filter { policy.state(of: $0, given: conditions) == .satisfied }.count
-        progressLabel.stringValue = "\(satisfied) of \(steps.count) done"
-
-        stepListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        for step in steps {
-            let done = policy.state(of: step, given: conditions) == .satisfied
-            let marker = done ? "✓" : (step == current ? "▸" : "·")
-            let row = NSTextField(labelWithString: "\(marker)  \(step.title)")
-            row.font = .systemFont(ofSize: 12, weight: step == current ? .semibold : .regular)
-            row.textColor = done ? .secondaryLabelColor : .labelColor
-            stepListStack.addArrangedSubview(row)
+    /// Also used by the AppKit interaction tests with real controls and isolated state.
+    func refresh() {
+        if let expectedDictation, newlyInsertedPracticeText()?.contains(expectedDictation) == true {
+            confirmDictation()
         }
-
-        guard let current else {
-            stepTitleLabel.stringValue = "You are set up."
-            stepBodyLabel.stringValue = "Hold your trigger key anywhere on this Mac and start talking."
-            detailLabel.stringValue = ""
-            primaryButton.title = "Done"
-            skipButton.isHidden = true
+        guard let conditions = conditions(), let details = onReadDetails?() else {
+            detailLabel.stringValue = "Setup could not read the app’s status. Close this window and try again."
+            primaryButton.isEnabled = false
             return
         }
-
+        let steps = policy.steps(for: conditions)
+        let current = policy.currentStep(for: conditions)
+        progressBar.doubleValue = policy.progress(conditions)
+        let resolved = steps.filter {
+            let state = policy.state(of: $0, given: conditions)
+            return state == .satisfied || state == .skipped
+        }.count
+        progressLabel.stringValue = "\(resolved) of \(steps.count) checks complete"
+        stepListStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for step in steps {
+            let state = policy.state(of: step, given: conditions)
+            let marker = state == .satisfied ? "✓" : (state == .skipped ? "–" : (step == current ? "▸" : "·"))
+            let suffix = state == .skipped ? " (using clipboard)" : ""
+            let row = NSTextField(labelWithString: "\(marker)  \(step.title)\(suffix)")
+            row.font = .systemFont(ofSize: 12, weight: step == current ? .semibold : .regular)
+            stepListStack.addArrangedSubview(row)
+        }
+        primaryButton.isEnabled = !checkingMicrophone
+        skipButton.isHidden = current.map { !policy.canSkip($0, given: conditions) } ?? true
+        practiceScrollView.isHidden = current != .firstDictation && current != nil
+        guard let current else {
+            stepTitleLabel.stringValue = "Your dictation setup works."
+            stepBodyLabel.stringValue = "You have captured audio and delivered a dictation. Hold \(details.triggerName) in any text field to keep going."
+            detailLabel.stringValue = details.pasteAutomatically && conditions.accessibilityGranted
+                ? "Your text is inserted automatically."
+                : "Your text is copied to the clipboard. Press ⌘V to paste it."
+            primaryButton.title = "Done"
+            return
+        }
         stepTitleLabel.stringValue = current.title
         stepBodyLabel.stringValue = current.explanation
-        skipButton.isHidden = !current.isOptional
-        primaryButton.title = primaryButtonTitle(for: current)
-        detailLabel.stringValue = detailText(for: current, conditions: conditions)
-    }
-
-    private func primaryButtonTitle(for step: FirstRunSetupPolicy.Step) -> String {
-        switch step {
-        case .microphone: return "Allow microphone"
-        case .inputMonitoring: return "Open Input Monitoring settings"
-        case .accessibility: return "Open Accessibility settings"
-        case .speechModel: return "Download the speech model"
-        case .firstDictation: return "I dictated something"
-        }
-    }
-
-    private func detailText(for step: FirstRunSetupPolicy.Step, conditions: FirstRunSetupPolicy.Conditions) -> String {
-        switch step {
+        switch current {
         case .microphone:
-            guard let probe = lastProbe else { return "" }
-            // Says what actually happened, including the case macOS calls
-            // "authorized" and no audio arrives.
-            return probe.userFacingSummary
-        case .inputMonitoring, .accessibility:
-            let name = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "PressTalk"
-            return "Enable \(name). This window checks the running app's permission automatically. If it is missing or an older entry stays enabled without working, use + to add this copy: \(Bundle.main.bundleURL.path)."
+            stepBodyLabel.stringValue = "Microphone: \(details.microphoneName). We’ll record a short audio check, then you’ll try a sentence."
+            if checkingMicrophone {
+                primaryButton.title = "Checking microphone…"
+                detailLabel.stringValue = "Speak normally for a moment. This check stays on your Mac and is not saved."
+            } else if details.recordingOrProcessing {
+                primaryButton.title = "Test microphone"
+                primaryButton.isEnabled = false
+                detailLabel.stringValue = "Finish your current dictation first. The microphone check will then be available."
+            } else {
+                switch details.microphoneAuthorization {
+                case "denied", "restricted":
+                    primaryButton.title = "Open Microphone Settings"
+                    detailLabel.stringValue = "Microphone access is off. Enable PressTalk in Microphone Settings, then return here to test it."
+                    return
+                case "authorized": primaryButton.title = "Test microphone"
+                default: primaryButton.title = "Allow microphone"
+                }
+                detailLabel.stringValue = microphoneMessage.isEmpty
+                    ? (lastProbe.flatMap { $0.isUsable ? nil : $0.userFacingSummary }
+                        ?? "The check tests the selected microphone without changing your Mac’s default input.")
+                    : microphoneMessage
+            }
+        case .accessibility:
+            primaryButton.title = "Open Accessibility Settings"
+            if conditions.triggerRequiresAccessibility {
+                stepBodyLabel.stringValue = "Your \(details.triggerName) shortcut needs Accessibility permission so PressTalk can respond to the key. It also lets PressTalk insert text into other apps."
+            }
+            detailLabel.stringValue = permissionInstructions
+        case .inputMonitoring:
+            primaryButton.title = details.shortcutUsesRegisteredHotKey
+                ? "Retry shortcut" : "Open Input Monitoring Settings"
+            detailLabel.stringValue = details.shortcutUsesRegisteredHotKey
+                ? (shortcutMessage.isEmpty
+                    ? "PressTalk could not register this shortcut. Retry it, or choose a different shortcut in Settings if another app uses it."
+                    : shortcutMessage)
+                : permissionInstructions
         case .speechModel:
-            return conditions.speechModelReady
-                ? "Ready."
-                : "About 460 MB, downloaded once. Dictation works offline afterwards."
+            switch details.modelState {
+            case .idle: primaryButton.title = "Prepare speech model"
+            case .loading:
+                primaryButton.title = "Preparing speech model…"
+                primaryButton.isEnabled = false
+            case .failed: primaryButton.title = "Retry speech model"
+            case .ready: primaryButton.title = "Check model status"
+            }
+            detailLabel.stringValue = details.modelStatus.isEmpty
+                ? "The first run may need a model download. Once prepared, speech recognition works offline."
+                : details.modelStatus
         case .firstDictation:
-            return "Open any text field, hold the trigger key, say a short sentence, then let go."
+            primaryButton.title = expectedDictation == nil ? "Try dictation here" : "Confirm full sentence"
+            stepBodyLabel.stringValue = "Click the box below, hold \(details.triggerName), say a sentence, and release. You can also use a text field in another app."
+            if expectedDictation != nil {
+                detailLabel.stringValue = "A sentence was recognised. If you used this box, paste with ⌘V if needed. If you used another app, confirm only after checking that the whole sentence appeared there."
+            } else {
+                detailLabel.stringValue = details.pasteAutomatically && conditions.accessibilityGranted
+                    ? "The check completes when the full recognised sentence appears here. Typing alone does not count as dictation."
+                    : "After dictating, press ⌘V to paste the copied words."
+            }
         }
+    }
+
+    private func newlyInsertedPracticeText() -> String? {
+        let before = practiceBeforeDictation as NSString
+        let after = practiceTextView.string as NSString
+        let selection = practiceSelectionBeforeDictation
+        guard after != before, selection.location != NSNotFound,
+              NSMaxRange(selection) <= before.length else { return nil }
+        let prefix = before.substring(to: selection.location)
+        let suffix = before.substring(from: NSMaxRange(selection))
+        let prefixLength = (prefix as NSString).length
+        let suffixLength = (suffix as NSString).length
+        guard after.length >= prefixLength + suffixLength,
+              (prefix.isEmpty || after.hasPrefix(prefix)),
+              (suffix.isEmpty || after.hasSuffix(suffix)) else { return nil }
+        // Check only the new insertion. An old matching sentence elsewhere in
+        // the field cannot compensate for a missing or truncated new paste.
+        return after.substring(with: NSRange(location: prefixLength,
+            length: after.length - prefixLength - suffixLength))
+    }
+
+    private var permissionInstructions: String {
+        "Enable PressTalk in System Settings, then return here. This window checks automatically. If PressTalk is missing, use + to add this copy: \(Bundle.main.bundleURL.path)."
     }
 
     @objc private func primaryTapped(_ sender: Any?) {
-        guard let current = currentStepIncludingSkips() else {
+        guard let conditions = conditions(), let details = onReadDetails?() else { return }
+        guard let current = policy.currentStep(for: conditions) else {
             close(finished: true)
             return
         }
-
         switch current {
         case .microphone:
-            onRequestMicrophoneAccess? { [weak self] _ in
-                DispatchQueue.main.async {
-                    // Granting is not the same as working, so verify by capture.
-                    self?.lastProbe = self?.onVerifyMicrophone?()
-                    self?.refresh()
+            guard !checkingMicrophone, !details.recordingOrProcessing else { return }
+            if ["denied", "restricted"].contains(details.microphoneAuthorization) {
+                onOpenMicrophoneSettings?()
+                return
+            }
+            checkingMicrophone = true
+            microphoneMessage = ""
+            lastProbe = nil
+            refresh()
+            if details.microphoneAuthorization == "authorized" {
+                verifyMicrophone()
+            } else {
+                onRequestMicrophoneAccess? { [weak self] granted in
+                    DispatchQueue.main.async {
+                        guard let self else { return }
+                        if granted { self.verifyMicrophone() }
+                        else {
+                            self.checkingMicrophone = false
+                            self.microphoneMessage = "Microphone access wasn’t granted. Enable PressTalk in Microphone Settings, then try again."
+                            self.refresh()
+                        }
+                    }
                 }
             }
         case .inputMonitoring:
-            onOpenInputMonitoringSettings?()
-        case .accessibility:
-            onOpenAccessibilitySettings?()
+            if details.shortcutUsesRegisteredHotKey {
+                let ready = onRetryShortcut?() ?? false
+                shortcutMessage = ready ? "Shortcut is ready."
+                    : "The shortcut is still unavailable. Choose another shortcut in PressTalk Settings, then run this check again."
+                refresh()
+            } else { onOpenInputMonitoringSettings?() }
+        case .accessibility: onOpenAccessibilitySettings?()
         case .speechModel:
             onDownloadSpeechModel?()
-        case .firstDictation:
             refresh()
+        case .firstDictation:
+            if expectedDictation != nil { confirmDictation(); refresh() }
+            else { window?.makeFirstResponder(practiceTextView) }
+        }
+    }
+
+    private func verifyMicrophone() {
+        onVerifyMicrophone? { [weak self] report in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.lastProbe = report
+                self.checkingMicrophone = false
+                self.refresh()
+            }
         }
     }
 
     @objc private func skipTapped(_ sender: Any?) {
-        guard let current = currentStepIncludingSkips(), current.isOptional else { return }
-        // Recorded, not just announced. Changing the label without recording the
-        // choice left the same step selected, so "Skip for now" did nothing.
+        guard let conditions = conditions(), let current = policy.currentStep(for: conditions),
+              policy.canSkip(current, given: conditions) else { return }
         skippedSteps.insert(current)
         refresh()
-        detailLabel.stringValue =
-            "Skipped. PressTalk will copy dictated text to the clipboard so you can paste it yourself."
-    }
-
-    private func currentStepIncludingSkips() -> FirstRunSetupPolicy.Step? {
-        guard let base = onReadConditions?() else { return nil }
-        return policy.currentStep(for: FirstRunSetupPolicy.Conditions(
-            microphoneCaptureVerified: base.microphoneCaptureVerified,
-            inputMonitoringGranted: base.inputMonitoringGranted,
-            accessibilityGranted: base.accessibilityGranted,
-            speechModelReady: base.speechModelReady,
-            firstDictationDelivered: base.firstDictationDelivered,
-            triggerRequiresInputMonitoring: base.triggerRequiresInputMonitoring,
-            skippedSteps: skippedSteps))
     }
 }

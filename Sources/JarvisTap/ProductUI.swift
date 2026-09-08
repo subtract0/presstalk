@@ -1043,6 +1043,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let settingsStore: JarvisTapSettingsStore
     private let licenseStore: PressTalkLicenseStore
     private let commerceConfig: PressTalkCommerceConfig
+    private let audioInputDefaults: UserDefaults
     private var runtimeStatus: PressTalkRuntimeStatus = .placeholder
     private let showHUDCheckbox = NSButton(checkboxWithTitle: "Show compact HUD", target: nil, action: nil)
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
@@ -1080,8 +1081,8 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let currentPlanValueLabel = NSTextField(labelWithString: "")
     private let planSummaryLabel = NSTextField(wrappingLabelWithString: "")
     private let pricingSummaryLabel = NSTextField(wrappingLabelWithString: "")
-    private let plansButton = NSButton(title: "View Plans", target: nil, action: nil)
-    private let upgradeButton = NSButton(title: "Upgrade to Pro", target: nil, action: nil)
+    private let plansButton = NSButton(title: "Pricing", target: nil, action: nil)
+    private let upgradeButton = NSButton(title: "Buy PressTalk", target: nil, action: nil)
     private let setupHintLabel = NSTextField(wrappingLabelWithString: "")
     private let inputMonitoringValueLabel = NSTextField(labelWithString: "")
     private let microphoneValueLabel = NSTextField(labelWithString: "")
@@ -1109,11 +1110,13 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     init(
         settingsStore: JarvisTapSettingsStore,
         licenseStore: PressTalkLicenseStore,
-        commerceConfig: PressTalkCommerceConfig = PressTalkCommerceConfig()
+        commerceConfig: PressTalkCommerceConfig = PressTalkCommerceConfig(),
+        audioInputDefaults: UserDefaults = .standard
     ) {
         self.settingsStore = settingsStore
         self.licenseStore = licenseStore
         self.commerceConfig = commerceConfig
+        self.audioInputDefaults = audioInputDefaults
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
@@ -1165,6 +1168,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             planSummaryLabel.stringValue.contains(pricingSummaryLabel.stringValue)
         plansButton.isHidden = commerceConfig.plansURL == nil
         upgradeButton.isHidden = commerceConfig.upgradeURL == nil
+        if case .licensed = licenseStore.state { upgradeButton.isHidden = true }
         refreshReleaseTailLabel()
         applyRuntimeStatus()
     }
@@ -1185,7 +1189,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         setupHintLabel.font = NSFont.systemFont(ofSize: 12)
         setupHintLabel.textColor = .secondaryLabelColor
 
-        let planLabel = NSTextField(labelWithString: "Current plan")
+        let planLabel = NSTextField(labelWithString: "Licence")
         planLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         currentPlanValueLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
@@ -1432,14 +1436,17 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
 
         runSetupCheckButton.target = self
         runSetupCheckButton.action = #selector(runSetupCheck(_:))
+        runSetupCheckButton.setAccessibilityIdentifier("settings.runSetupCheck")
+        microphonePopup.setAccessibilityIdentifier("settings.microphone")
+        triggerKeyPopup.setAccessibilityIdentifier("settings.trigger")
+        showHUDCheckbox.setAccessibilityIdentifier("settings.showHUD")
+        pasteAutomaticallyCheckbox.setAccessibilityIdentifier("settings.autoPaste")
+        insertionSuffixPopup.setAccessibilityIdentifier("settings.insertionSuffix")
+        releaseTailSlider.setAccessibilityIdentifier("settings.releaseTail")
 
         runPhysicalSmokeButton.target = self
         runPhysicalSmokeButton.action = #selector(runPhysicalSmoke(_:))
-        let smokeHelpers = ["presstalk-manual-fn-smoke", "presstalk-manual-fn-smoke.swift"]
-        runPhysicalSmokeButton.isHidden = !smokeHelpers.contains { name in
-            guard let path = Bundle.main.resourceURL?.appendingPathComponent(name).path else { return false }
-            return FileManager.default.isExecutableFile(atPath: path)
-        }
+        runPhysicalSmokeButton.setAccessibilityIdentifier("settings.testDictation")
 
         restartAppButton.target = self
         restartAppButton.action = #selector(restartApp(_:))
@@ -1655,7 +1662,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     /// longer plugged in.
     func rebuildMicrophoneMenu() {
         let previous = AudioInputPreference(
-            storageValue: UserDefaults.standard.string(forKey: "PressTalk.AudioInputPreference"))
+            storageValue: audioInputDefaults.string(forKey: "PressTalk.AudioInputPreference"))
         microphonePopup.removeAllItems()
         microphoneMenuUIDs = []
 
@@ -1711,13 +1718,13 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         case .some(let uid) where uid.isEmpty: preference = .preferWired
         case .some(let uid): preference = .specificDevice(uid: uid)
         }
-        UserDefaults.standard.set(preference.storageValue,
+        audioInputDefaults.set(preference.storageValue,
                                   forKey: "PressTalk.AudioInputPreference")
         // Choosing a microphone withdraws the crash breaker's skip. It told
         // this person a device had failed and to pick it again here if they
         // wanted it; continuing to skip it after they did would make the
         // instruction a lie.
-        UserDefaults.standard.removeObject(forKey: "PressTalk.AudioInputAvoidUID")
+        audioInputDefaults.removeObject(forKey: "PressTalk.AudioInputAvoidUID")
         onAudioInputPreferenceChanged?()
 
         updateMicrophoneHint(for: preference)

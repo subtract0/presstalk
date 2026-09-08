@@ -197,6 +197,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
     private lazy var traceLogger = TraceLogger(path: config.traceLogPath)
+    private var runtimeStatusURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/Application Support/JarvisTap/runtime-status.json")
     private lazy var transcriptTextPolicy = TranscriptTextPolicy(
         shortHoldNoSpeechSuppressionSeconds: shortHoldNoSpeechSuppressionSeconds
     )
@@ -317,7 +319,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var trackpadHoldState: TrackpadHoldState?
     private var trackpadArmWorkItem: DispatchWorkItem?
     /// Set by an actual capture probe, never by the authorization status.
-    private var microphoneCaptureVerified = false
+    private var microphoneCaptureVerifiedUID: String?
+    private var setupMicrophoneProbeInProgress = false
+    private var setupNeedsFreshDictation = false
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
     private var accessibilityPermissionRequestAttempted = false
@@ -335,7 +339,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var repairLocalSigningMenuItem: NSMenuItem?
     private var settingsWindowController: PressTalkSettingsWindowController?
     private var hudController: PressTalkHUDController?
-    private var manualSmokeProcess: Process?
     private var readyResetWorkItem: DispatchWorkItem?
     private var setupRetryTimer: Timer?
     private var singletonLockFileDescriptor: Int32 = -1
@@ -565,8 +568,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         completeStartupIfPossible(
-            showSetupWindowOnFailure: shouldPresentSetupGuide,
-            forcePresentSetupWindow: shouldPresentSetupGuide
+            // The guide above is the first-run window. Opening Settings too
+            // covered it and made two competing setup flows appear at once.
+            showSetupWindowOnFailure: false,
+            forcePresentSetupWindow: false
         )
         return 0
     }
@@ -851,15 +856,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         return "\(name) \(version)"
     }
 
-    private func installProductUI() {
-        guard statusItem == nil else { return }
-
+    private func makeSettingsWindowController() -> PressTalkSettingsWindowController {
         let settingsWindowController = PressTalkSettingsWindowController(settingsStore: settingsStore, licenseStore: licenseStore)
         settingsWindowController.onSettingsChanged = { [weak self] in
             self?.handleSettingsChanged()
         }
         settingsWindowController.onRunSetupCheck = { [weak self] in
-            self?.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
+            self?.runVisibleSetupCheck()
         }
         settingsWindowController.onRunPhysicalSmoke = { [weak self] in
             self?.runPhysicalSmokeFromSettings()
@@ -922,16 +925,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsWindowController.onClearNativeCalibration = { [weak self] in
             self?.clearNativeTriggerCalibration()
         }
-        self.settingsWindowController = settingsWindowController
-        hudController = PressTalkHUDController()
+        return settingsWindowController
+    }
 
-        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        self.statusItem = statusItem
-        if let button = statusItem.button {
-            button.imagePosition = .imageOnly
-            button.toolTip = "PressTalk: hold \(settingsStore.triggerKey.displayName) to dictate"
-        }
-
+    private func makeStatusMenu() -> NSMenu {
         let menu = NSMenu()
 
         let statusSummaryMenuItem = NSMenuItem(title: appDisplayTitle, action: nil, keyEquivalent: "")
@@ -988,7 +985,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         let physicalSmokeItem = NSMenuItem(title: "Test Dictation Shortcut…", action: #selector(runPhysicalSmokeFromMenu(_:)), keyEquivalent: "")
         physicalSmokeItem.target = self
-        physicalSmokeItem.toolTip = "Opens the shortcut test helper."
+        physicalSmokeItem.toolTip = "Opens a practice field to test your shortcut and dictation."
         menu.addItem(physicalSmokeItem)
 
         let repairSigningItem = NSMenuItem(title: "Repair Signing…", action: #selector(repairLocalSigningFromMenu(_:)), keyEquivalent: "")
@@ -1012,7 +1009,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         quitItem.target = self
         menu.addItem(quitItem)
 
-        statusItem.menu = menu
+        return menu
+    }
+
+    private func installProductUI() {
+        guard statusItem == nil else { return }
+        settingsWindowController = makeSettingsWindowController()
+        hudController = PressTalkHUDController()
+        let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        self.statusItem = statusItem
+        if let button = statusItem.button {
+            button.imagePosition = .imageOnly
+            button.toolTip = "PressTalk: hold \(settingsStore.triggerKey.displayName) to dictate"
+        }
+        statusItem.menu = makeStatusMenu()
         refreshMenuSettingsState()
         applyPresentationState(.warming)
     }
@@ -1495,7 +1505,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func runSetupCheckFromMenu(_ sender: Any?) {
-        completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
+        runVisibleSetupCheck()
+    }
+
+    private func runVisibleSetupCheck() {
+        if !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress }) {
+            completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
+        }
+        presentFirstRunSetup()
     }
 
     @objc private func repairLocalSigningFromMenu(_ sender: Any?) {
@@ -1643,8 +1660,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func writeRuntimeStatusSnapshot(_ status: PressTalkRuntimeStatus) {
-        let statusURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap/runtime-status.json")
+        let statusURL = runtimeStatusURL
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let payload: [String: Any] = [
@@ -1843,91 +1859,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func runPhysicalSmokeFromSettings() {
-        guard let resourceURL = Bundle.main.resourceURL else {
-            traceLogger.log("Manual physical smoke helper missing path=\(Bundle.main.resourceURL?.path ?? "nil")")
-            present(.error("The physical smoke helper is missing from this build."))
-            return
-        }
-        let compiledHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke")
-        let scriptHelperURL = resourceURL.appendingPathComponent("presstalk-manual-fn-smoke.swift")
-        let helperURL: URL
-        let executableURL: URL
-        let arguments: [String]
-        if FileManager.default.isExecutableFile(atPath: compiledHelperURL.path) {
-            helperURL = compiledHelperURL
-            executableURL = compiledHelperURL
-            arguments = []
-        } else if FileManager.default.isExecutableFile(atPath: scriptHelperURL.path) {
-            helperURL = scriptHelperURL
-            executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            arguments = ["swift", scriptHelperURL.path]
-        } else {
-            traceLogger.log("Manual physical smoke helper missing path=\(resourceURL.path)")
-            present(.error("The physical smoke helper is missing from this build."))
-            return
-        }
-
-        let diagnosticsDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap/Diagnostics", isDirectory: true)
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
-        let logURL = diagnosticsDirectory.appendingPathComponent("manual-physical-smoke-launch-\(timestamp).log")
-        let pidURL = diagnosticsDirectory.appendingPathComponent("manual-physical-smoke-launch-\(timestamp).pid")
-
-        do {
-            try FileManager.default.createDirectory(at: diagnosticsDirectory, withIntermediateDirectories: true)
-        } catch {
-            traceLogger.log("Manual physical smoke log directory failed error=\(error)")
-            present(.error("Could not create diagnostics directory for physical smoke."))
-            return
-        }
-
-        traceLogger.log("Manual physical smoke requested from UI helper=\(helperURL.path) log=\(logURL.path) pid_file=\(pidURL.path)")
-        present(.diagnosticStarted("Physical smoke window opening for \(settingsStore.triggerKey.displayName)."))
-
-        let process = Process()
-        process.executableURL = executableURL
-        process.arguments = arguments
-        var environment = ProcessInfo.processInfo.environment
-        environment["PRESSTALK_OPEN_PERMISSION_PANES"] = "0"
-        environment["PRESSTALK_AUTO_SHOW_SETUP_WINDOW"] = "0"
-        environment["PRESSTALK_MANUAL_SMOKE_TRIGGER_KEY"] = settingsStore.triggerKey.rawValue
-        environment["PRESSTALK_MANUAL_SMOKE_TRIGGER_LABEL"] = settingsStore.triggerKey.displayName
-        process.environment = environment
-
-        FileManager.default.createFile(atPath: logURL.path, contents: nil)
-        let logHandle: FileHandle
-        do {
-            logHandle = try FileHandle(forWritingTo: logURL)
-        } catch {
-            traceLogger.log("Manual physical smoke log open failed error=\(error)")
-            present(.error("Could not open physical smoke log."))
-            return
-        }
-
-        process.standardOutput = logHandle
-        process.standardError = logHandle
-        process.terminationHandler = { [weak self] terminatedProcess in
-            logHandle.closeFile()
-            DispatchQueue.main.async {
-                self?.traceLogger.log("Manual physical smoke helper exited status=\(terminatedProcess.terminationStatus)")
-                if self?.manualSmokeProcess === terminatedProcess {
-                    self?.manualSmokeProcess = nil
-                }
-            }
-        }
-
-        do {
-            manualSmokeProcess = process
-            try process.run()
-            try "\(process.processIdentifier)\n".write(to: pidURL, atomically: true, encoding: .utf8)
-        } catch {
-            logHandle.closeFile()
-            manualSmokeProcess = nil
-            traceLogger.log("Manual physical smoke launch failed error=\(error)")
-            present(.error("Could not start physical smoke: \(error.localizedDescription)"))
-        }
+        // The customer app excludes developer smoke helpers. Use the built-in
+        // practice field and production capture/insertion path in every build.
+        runVisibleSetupCheck()
     }
 
     private func restartPressTalkFromSettings() {
@@ -5645,6 +5579,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func recordDelivery(_ transcript: String, reachedTargetApp: Bool) {
         rememberDictation(transcript, deliveryFailed: !reachedTargetApp)
+        DispatchQueue.main.async { [weak self] in
+            self?.firstRunSetupWindowController?.observeDictation(transcript)
+        }
         guard !settingsStore.firstDictationDelivered else { return }
         settingsStore.firstDictationDelivered = true
         // The trial starts when the product first works, not when it was
@@ -5731,6 +5668,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func presentFirstRunSetup() {
+        withStateLock { setupNeedsFreshDictation = true }
         let controller = firstRunSetupWindowController ?? FirstRunSetupWindowController()
         firstRunSetupWindowController = controller
 
@@ -5742,44 +5680,102 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     firstDictationDelivered: false, triggerRequiresInputMonitoring: true)
             }
             let status = self.currentRuntimeStatus()
+            let selectedUID = self.preferredAudioInputDevice()?.candidate.uid
             return FirstRunSetupPolicy.Conditions(
-                microphoneCaptureVerified: self.microphoneCaptureVerified,
+                microphoneCaptureVerified: self.withStateLock {
+                    status.microphoneGranted && selectedUID != nil && self.microphoneCaptureVerifiedUID == selectedUID
+                },
                 inputMonitoringGranted: status.inputMonitoringEffective,
                 accessibilityGranted: status.accessibilityGranted,
                 speechModelReady: self.withStateLock {
                     if case .ready = self.whisperLoadState { return true }
                     return false
                 },
-                firstDictationDelivered: self.settingsStore.firstDictationDelivered,
+                firstDictationDelivered: self.settingsStore.firstDictationDelivered
+                    && !self.withStateLock { self.setupNeedsFreshDictation },
                 triggerRequiresInputMonitoring: status.triggerRequiresWritableEventTap
-                    || status.triggerUsesRegisteredHotKey)
+                    || status.triggerUsesRegisteredHotKey,
+                triggerRequiresAccessibility: status.triggerRequiresWritableEventTap)
         }
 
         controller.onRequestMicrophoneAccess = { completion in
             AVCaptureDevice.requestAccess(for: .audio) { granted in completion(granted) }
         }
 
-        controller.onVerifyMicrophone = { [weak self] in
-            guard let self, let selected = self.preferredAudioInputDevice()?.candidate else {
-                return AudioCaptureProbeReport(outcome: .noInputDevice, authorizationStatus: "unknown",
-                    sampleRate: 0, channelCount: 0, framesCaptured: 0, peakAmplitude: 0,
-                    durationSeconds: 0, detail: "The selected microphone is unavailable.")
+        controller.onReadDetails = { [weak self] in
+            guard let self else { return .init() }
+            var details = FirstRunSetupWindowController.Details()
+            let status = self.currentRuntimeStatus()
+            details.microphoneAuthorization = status.microphoneAuthorizationStatus
+            details.microphoneName = self.preferredAudioInputDevice()?.candidate.name ?? "Not connected"
+            details.triggerName = self.settingsStore.triggerKey.displayName
+            details.modelStatus = status.speechModelStatus
+            details.shortcutUsesRegisteredHotKey = status.triggerUsesRegisteredHotKey
+            details.pasteAutomatically = self.settingsStore.pasteAutomatically
+            self.withStateLock {
+                details.recordingOrProcessing = self.isRecording || self.isProcessing
+                switch self.whisperLoadState {
+                case .idle: details.modelState = .idle
+                case .loading: details.modelState = .loading
+                case .ready: details.modelState = .ready
+                case .failed: details.modelState = .failed
+                }
             }
-            let report = AudioCaptureProbe.run(deviceID: selected.id)
-            self.microphoneCaptureVerified = report.isUsable
-            self.traceLogger.log(
-                "Setup microphone probe outcome=\(report.outcome.rawValue) frames=\(report.framesCaptured) authorization=\(report.authorizationStatus)")
-            return report
+            return details
+        }
+        controller.onVerifyMicrophone = { [weak self] completion in
+            guard let self else { return }
+            guard let selected = self.preferredAudioInputDevice()?.candidate else {
+                completion(AudioCaptureProbeReport(outcome: .noInputDevice, authorizationStatus: "unknown",
+                    sampleRate: 0, channelCount: 0, framesCaptured: 0, peakAmplitude: 0,
+                    durationSeconds: 0, detail: "The selected microphone is unavailable."))
+                return
+            }
+            let canCheck = self.withStateLock { () -> Bool in
+                guard !self.isRecording, !self.isProcessing, !self.setupMicrophoneProbeInProgress else { return false }
+                self.setupMicrophoneProbeInProgress = true
+                return true
+            }
+            guard canCheck else {
+                completion(AudioCaptureProbeReport(outcome: .engineFailed, authorizationStatus: "unknown",
+                    sampleRate: 0, channelCount: 0, framesCaptured: 0, peakAmplitude: 0,
+                    durationSeconds: 0, detail: "Finish the current dictation, then try the microphone check again."))
+                return
+            }
+            DispatchQueue.global(qos: .userInitiated).async {
+                let report = AudioCaptureProbe.run(deviceID: selected.id)
+                self.withStateLock {
+                    self.microphoneCaptureVerifiedUID = report.isUsable ? selected.uid : nil
+                    self.setupMicrophoneProbeInProgress = false
+                }
+                self.traceLogger.log(
+                    "Setup microphone probe outcome=\(report.outcome.rawValue) frames=\(report.framesCaptured) authorization=\(report.authorizationStatus)")
+                completion(report)
+            }
+        }
+        controller.onOpenMicrophoneSettings = { [weak self] in
+            self?.openMicrophonePrivacyPane()
         }
 
         controller.onOpenInputMonitoringSettings = { [weak self] in
             self?.openInputMonitoringPrivacyPane()
+        }
+        controller.onRetryShortcut = { [weak self] in
+            guard let self else { return false }
+            if !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress }) {
+                self.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
+            }
+            return self.currentRuntimeStatus().inputMonitoringEffective
         }
         controller.onOpenAccessibilitySettings = { [weak self] in
             self?.requestAccessibilitySetup()
         }
         controller.onDownloadSpeechModel = { [weak self] in
             self?.startWhisperWarmupIfNeeded()
+        }
+        controller.onConfirmDictation = { [weak self] in
+            guard let self else { return }
+            self.withStateLock { self.setupNeedsFreshDictation = false }
         }
         controller.onFinish = { [weak self] in
             self?.settingsStore.firstRunSetupCompleted = true
@@ -6953,10 +6949,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         enum PressDecision {
             case ignoreSilently
             case ignoreStillProcessing
+            case ignoreMicrophoneCheck
             case start(UInt64)
         }
 
         let decision = withStateLock { () -> PressDecision in
+            if setupMicrophoneProbeInProgress { return .ignoreMicrophoneCheck }
             if isRecording {
                 return .ignoreSilently
             }
@@ -6981,6 +6979,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch decision {
         case .ignoreSilently:
             return
+        case .ignoreMicrophoneCheck:
+            present(.busy("The microphone check is finishing. Hold your shortcut again in a moment."))
+            return
         case .ignoreStillProcessing:
             traceLogger.log("Trigger ignored trigger=\(trigger.rawValue) reason=still_processing")
             print("⏳ [PressTalk] Still processing the previous dictation. Ignoring trigger.")
@@ -6996,6 +6997,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             captureSessionID = sessionID
         }
         captureStartFocusedPID = focusedApplicationProcessID()
+        DispatchQueue.main.async { [weak self] in
+            self?.firstRunSetupWindowController?.beginDictation()
+        }
         resetLiveCapturedAudioSamples()
 
         if let readinessMessage = currentWhisperReadinessMessage() {
@@ -7123,6 +7127,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         onSamples: { [weak self] samples in
                             self?.appendLiveCapturedAudioSamples(samples, sessionID: captureSessionID)
                         }, onReceipt: { [weak self] receipt in
+                            if let self, receipt.complete, receipt.convertedFrames > 0 {
+                                self.withStateLock { self.microphoneCaptureVerifiedUID = receipt.deviceUID }
+                            }
                             if let self, receipt.complete, let latency = receipt.firstConvertedSeconds {
                                 var history = self.inputLatencyMemory
                                 history.record(seconds: latency, forDeviceUID: receipt.deviceUID)

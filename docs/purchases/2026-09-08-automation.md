@@ -2,8 +2,13 @@
 
 Status: email DNS and persistent Stripe access are verified. The isolated
 **acceptance service is deployed**; the production service is not deployed or
-open for sales. Real test checkout, email delivery, native activation/offline
-relaunch, notarization and production publication remain required.
+open for sales. The owner completed a real sandbox checkout, received a delivered
+receipt, downloaded the valid licence and activated installed 0.1.23 / 23.1.
+The saved licence matches the downloaded file. Apple notarization credentials
+are now validated. A broader Mac setup/release review is in progress; full-app
+offline relaunch and production publication remain outstanding. Corrected build
+23.2 is frozen and hash-bound; the Downloads release finisher is ready because
+codesign's secure timestamp step fails in the agent session.
 
 ## Implemented
 
@@ -31,7 +36,7 @@ relaunch, notarization and production publication remain required.
 
 | Check | Result and scope |
 |---|---|
-| Mac suite | 222 tests passed, including a negative check that owners never read the trial anchor while actual trials still do. |
+| Mac suite | The purchase baseline passed 222 tests; the setup review expanded this to 226 passing tests, including a negative check that owners never read the trial anchor while actual trials still do. |
 | Native app store | Actual ProductUI entitlement and trial-start call sites pass with isolated preferences and counting stores. Two deliberate call-site defects are rejected by behavioral assertions. No real Keychain access. |
 | Cross-language licence | Actual JavaScript issuer matches the Swift fixture; CryptoKit accepts it, new store/defaults instances retain it, expired trial and future major 99 remain licensed. Not yet a customer app relaunch. |
 | PostgreSQL | 15 purchase/delivery/recovery tests passed using real PGlite SQL. |
@@ -42,11 +47,12 @@ relaunch, notarization and production publication remain required.
 | Visuals | Receipt/recovery controls verified at 1100px desktop and 390px phone widths. Screenshots reviewed; no horizontal clipping. Local fixtures only. |
 | Existing app behavior | Capture source unchanged; capture wiring, offer consistency and site privacy gates pass. |
 | Readiness gate | Correctly fails with missing real configuration; cannot pass using the fixture screenshots or unit-test results. |
-| Signed Mac candidate | 0.1.23 / 23.1 built; deep/strict signature, original designated requirement, both public keys and activation metadata verified. Binary SHA-256 `c6d96605fa56de229fc5535057a97f5e1a0c9232d42241db102de85386557387`. Not notarized, installed or published. |
+| Signed Mac candidate | 0.1.23 / 23.1 built; deep/strict signature, original designated requirement, both public keys and activation metadata verified. Binary SHA-256 `c6d96605fa56de229fc5535057a97f5e1a0c9232d42241db102de85386557387`. Installed and activated by the owner; not notarized or published. A corrected setup candidate is being prepared. |
 | Acceptance deployment | `presstalk-licenses-acceptance.presstalk.workers.dev`, version `a5901c57-7b6b-4623-b600-64b8c30d82c5`. Tested and deployed bundle SHA-256 both `56dc4030c62dca19dbf94117afe3a38ad2db363ef048c7eec6d312b401149199`. Remote schema health passes; invalid webhook returns 400; anonymous retry returns 401; authorized empty retry returns 200. This is not completed purchase evidence. |
 
-Receipts and logs are under `.local/commerce/` in this worktree. No new app
-artifact has been published or installed. Public 0.1.22 remains the live release.
+Receipts and logs are under `.local/commerce/` in this worktree. The owner has
+installed 0.1.23 / 23.1; public 0.1.22 remains the live release. See
+`2026-09-08-release-review.md` for the expanded native review and acceptance evidence.
 
 ## External setup and actual blockers
 
@@ -70,7 +76,7 @@ artifact has been published or installed. Public 0.1.22 remains the live release
    `81e788ea-1a6e-4351-b8ce-eeba31b7f691`, is now verified. Created the three
    sending records through Porkbun after dry runs, verified authoritative DNS
    and preserved all nine previous records. Open/click tracking remain disabled.
-   No actual receipt email has been sent yet.
+   The purchase receipt and a recovery receipt have both reached provider status `delivered`.
 4. **Stripe access:** the owner completed CLI OAuth for the existing account,
    including live mode, and saved a persistent restricted live key through the
    hidden-input launcher. All five required resource reads and Payment Link
@@ -81,7 +87,9 @@ artifact has been published or installed. Public 0.1.22 remains the live release
    Created a separate sandbox product, price, Managed Payments link and webhook
    for acceptance. The sandbox product uses the existing product's tax code and
    the same three price amounts. Its private reference restricts issuance to
-   the acceptance link; no test transaction has completed yet.
+   the acceptance link. One sandbox checkout is now paid and complete. Stripe's
+   actual completed event has no pending webhooks; redelivery left one order and
+   one purchase receipt delivery. No live transaction was created by this test.
    The owner's subsequent instruction is explicit: leave the existing checkout
    active and finish automatic delivery. Do not repeat the attempted pause.
 5. **Acceptance/publication:** complete real Stripe sandbox checkout, provider
@@ -126,13 +134,19 @@ Setup and remote database receipts are in
 
 ## Required operational finish
 
-Apple notarization credentials remain unresolved locally: the documented
-`presstalk-notary` profile was not found, and the login keychain and current
-environment files did not identify another notary profile. The old accepted
-0.1.22 submission is evidence for that artifact only. No GitHub repository
-secrets are configured. Do not reuse its ticket for the changed binary, retry
-the failed local development-keychain password, or access the protected original
-signing directory to work around this gap.
+Apple notarization credentials are now validated in the explicit login Keychain
+under profile `presstalk-notary`. The owner completed the secure Downloads
+launcher and a real `notarytool history` request succeeds. The corrected binary
+still requires its own submission and stapled ticket. Never use the old 0.1.22
+ticket for a changed binary, access the protected original signing directory or
+retry the failed local-development keychain password.
+
+Run `~/Downloads/Finish PressTalk Release.command` for the reviewed corrected
+0.1.23 / 23.2 artifact. It requires a secure timestamp, Apple's Accepted result,
+stapled ticket and Gatekeeper acceptance before installation. It preserves the
+old app and stops on ambiguous process detection. The full procedure and current
+verification limits are in `2026-09-08-release-review.md`. The prior notarization
+authorization launcher has completed and does not need to run again.
 
 Use `commerce/README.md` for the acceptance sequence. Keep the original offline
 license promise. The email provider's successful API response is acceptance for

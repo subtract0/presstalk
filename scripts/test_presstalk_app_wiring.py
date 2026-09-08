@@ -46,4 +46,3 @@ with tempfile.TemporaryDirectory(prefix='presstalk-app-wiring-') as directory:
     print(result.stdout, end=''); print(result.stderr, end='')
     assert result.returncode == 0 and 'PASS: actual app settings/menu wiring' in result.stdout, \
         'App wiring fixture did not finish all behavioral assertions'
-

@@ -4,7 +4,9 @@ PressTalk's pitch is that your voice stays on your Mac. This page says exactly
 what that means, including the parts where the network is involved, because a
 privacy promise with an asterisk you find later is worse than no promise.
 
-Last verified against the source on 2026-09-05.
+Purchase-service disclosures updated against the prepared implementation on
+2026-09-08. Automatic purchase delivery is not live until deployment acceptance
+is complete.
 
 ## The short version
 
@@ -23,7 +25,8 @@ Last verified against the source on 2026-09-05.
 | Trace log (`~/Library/Logs/presstalk_trace.log`) | Your Mac. Transcripts are redacted to a length, a word count, and a short digest. Rotates at 8 MB | No, unless you attach it to a support email yourself |
 | Diagnostics export | A file you choose to create | Only if you send it |
 | Speech models (~460 MB) | `~/Library/Application Support/` | Downloaded from huggingface.co during setup |
-| Licence key | Your Mac, checked locally | No. There is no activation server |
+| Licence key | Purchase service and your Mac, checked locally after import | Delivered through your receipt, email or licence file. The app does not upload it or contact an activation server |
+| Purchase email and order identifiers | Payment processor and purchase service | Used to verify payment, deliver the licence and recover the same licence later |
 
 ### About the clipboard, specifically
 
@@ -42,13 +45,15 @@ AirDrop & Handoff.
 
 ## What PressTalk connects to
 
-Two things, both during setup, neither carrying anything you said:
+In normal dictation mode, the app's network use is for model setup. It does not
+send anything you said:
 
 - **huggingface.co** — downloads the speech recognition model, and a tokenizer
   file for the optional second-pass model. Hugging Face sees a download request
   and your IP address, the same as any file download.
-- **Nothing else.** There is no analytics service, no crash reporter, no
-  telemetry endpoint, and no licence server.
+- There is no analytics service, crash reporter, telemetry endpoint or recurring
+  licence check. Buying or recovering a licence opens the purchase website in
+  your browser; that website has the separate data flow described below.
 
 Set `PRESSTALK_LOG_TRANSCRIPTS=1` and PressTalk writes transcripts to its log
 verbatim instead of redacting them. That is for debugging your own recognition
@@ -66,9 +71,25 @@ you turn it on, sends your transcript to an endpoint you configure. That mode is
 off by default and you have to set an environment variable to reach it. If you
 turn it on, your transcript goes wherever you pointed it.
 
-**Buying is not anonymous.** If you buy a licence, the payment processor handles
-your payment and your email. That is between you and them; PressTalk never sees a
-card number, and the app itself never contacts them.
+**Buying is not anonymous.** Stripe processes the payment. The purchase service
+reads the payment status, purchased item and checkout email address. It stores
+the order identifiers, that email address, the signed licence and delivery
+status so it can deliver and recover the same licence. Card numbers are not
+received by the purchase service or the Mac app. No recording or dictated text
+is involved in buying or recovery.
+
+The prepared service uses Cloudflare Workers and D1 for hosting and order
+storage, and Resend for licence emails. Resend receives the recipient address
+and receipt contents, including the licence attachment. Email open and click
+tracking are disabled. Recovery requests use hashed email and network-address
+values to limit repeated requests; the service sends only to the original
+checkout address. Order and licence records are retained for future recovery.
+
+Receipt links and licence files are private: anyone you give them to can obtain
+the licence. Receipt pages do not use analytics or tracking pixels, are marked
+not to be cached, and suppress outgoing referrers. The Mac verifies the licence
+locally after import; it does not require a purchase-service connection to keep
+dictating.
 
 **Where the text ends up is the other app's business.** PressTalk pastes into
 whatever you are using. What Notion or Mail or your terminal then does with those
@@ -83,8 +104,8 @@ work requires a formal assessment, PressTalk has not had one.
 ## Checking for yourself
 
 - Turn off Wi-Fi after setup and dictate. It works.
-- `grep -rn "URLSession\|https://" Sources/` in the public repository — there are
-  two network call sites, both model downloads.
+- Search `Sources/` for `URLSession` and `https://` to inspect app connections;
+  inspect `commerce/` separately for purchase and email processing.
 - Little Snitch or `lsof -i -P | grep PressTalk` will show you the connections.
 
 The source is public at <https://github.com/subtract0/presstalk>. A privacy claim

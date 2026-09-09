@@ -85,6 +85,10 @@ def check(files):
     need('onSamples?(samples)' in adapter, 'converted PCM must reach the installed consumer')
     need('frames > 0 && frames == receipt?.convertedFrames' in probe, 'selftest must verify its actual consumer received all converted PCM')
     need('stats.retainedFrames != stats.consumedFrames' in adapter, 'stop must account for all retained PCM')
+    need('receipt?.recordTransportFailure(stats)' in body(adapter, 'private func finishLocked()'),
+         'the actual completion path must preserve transport failure diagnostics')
+    need('fail(c, PT_DISCONTINUITY, 0)' in body(hal, 'static void retain_pcm('),
+         'a sample timestamp discontinuity must reject the recording')
     need('try validateDeviceLocked()' in adapter, 'device must be revalidated')
     need('AudioObjectSetPropertyData(' not in hal, 'HAL adapter must not change system settings')
     need('c->boundDevice != device' in hal, 'HAL binding must be read back and checked')
@@ -113,6 +117,8 @@ def self_test(files):
         (FILES[2], 'onSamples?(samples)', '// onSamples?(samples)'),
         (FILES[1], 'frames > 0 && frames == receipt?.convertedFrames', 'true /* frames > 0 && frames == receipt?.convertedFrames */'),
         (FILES[2], 'deliverLocked(try converter.finish())', '/* deliverLocked(try converter.finish()) */'),
+        (FILES[2], 'receipt?.recordTransportFailure(stats)', '// receipt?.recordTransportFailure(stats)'),
+        (FILES[3], 'fail(c, PT_DISCONTINUITY, 0)', '/* fail(c, PT_DISCONTINUITY, 0) */'),
         (FILES[3], 'CHECK(AudioUnitAddPropertyListener(c->unit, monitoredProperties[i], unit_property_changed, c));', '/* CHECK(AudioUnitAddPropertyListener(c->unit, monitoredProperties[i], unit_property_changed, c)); */'),
         (FILES[3], 'c->boundDevice != device', 'false /* c->boundDevice != device */'),
         (FILES[3], '!isfinite(pcm[i])', 'false /* !isfinite(pcm[i]) */'),

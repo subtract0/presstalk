@@ -12,16 +12,18 @@ to PressTalk-0.1.11-macos-arm64.zip through that alias, so publishing 0.1.12
 turns the live download button into a 404 without touching a single file here.
 Nothing else in this repository would notice.
 
-Checks only links that must work for a purchase to complete: the release
-download and the checkout. Ordinary reading links are not worth failing a
-deploy over.
+Checks external release, checkout and recovery links, plus local page links.
+The stable checkout page opened by the Mac app must exist and contain an actual
+purchase-service link. A commented-out button or a successful redirect to a
+missing destination cannot satisfy the gate.
 """
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
-import urllib.error
-import urllib.request
+from html.parser import HTMLParser
+from urllib.parse import urlsplit, unquote
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,34 +31,78 @@ SITE = ROOT / "site"
 MUST_RESOLVE = (
     re.compile(r"https://github\.com/[^\"'\s]+/releases/[^\"'\s]+"),
     re.compile(r"https://buy\.stripe\.com/[^\"'\s]+"),
+    re.compile(r"https://presstalk-licenses\.presstalk\.workers\.dev/(?:buy|recover)$"),
 )
+CHECKOUT_SERVICE = 'https://presstalk-licenses.presstalk.workers.dev/buy'
 UA = "PressTalk-link-gate (+https://presstalk.app)"
 
 
 def status(url: str) -> tuple[int, str]:
-    req = urllib.request.Request(url, headers={"User-Agent": UA})
+    # Exercise redirects too. Cloudflare rejects urllib's TLS client here;
+    # curl reaches the same public endpoint without credentials or cookies.
     try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return r.status, ""
-    except urllib.error.HTTPError as e:
-        return e.code, e.reason
-    except Exception as e:                      # DNS, TLS, timeout
+        result = subprocess.run(['curl', '--silent', '--show-error', '--location',
+            '--proto', '=http,https', '--proto-redir', '=http,https', '--max-redirs', '5',
+            '--max-time', '30', '--output', '/dev/null', '--write-out', '%{http_code}',
+            '--user-agent', UA, url], capture_output=True, text=True, timeout=35)
+        if result.returncode:
+            return 0, result.stderr.strip()
+        return int(result.stdout), ''
+    except (OSError, ValueError, subprocess.TimeoutExpired) as e:
         return 0, str(e)
+
+
+class Links(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.hrefs = []
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'a':
+            href = dict(attrs).get('href')
+            if href:
+                self.hrefs.append(href)
 
 
 def main() -> int:
     urls: dict[str, set[str]] = {}
+    local_failures = []
+    parsed_pages = {}
     for page in sorted(SITE.rglob("*.html")):
-        text = page.read_text(encoding="utf-8")
-        for pattern in MUST_RESOLVE:
-            for m in pattern.finditer(text):
-                urls.setdefault(m.group(0).rstrip('"\'')  , set()).add(
-                    str(page.relative_to(ROOT)))
+        links = Links()
+        links.feed(page.read_text(encoding='utf-8'))
+        parsed_pages[page.resolve()] = links.hrefs
+        for href in links.hrefs:
+            if any(pattern.fullmatch(href) for pattern in MUST_RESOLVE):
+                urls.setdefault(href, set()).add(str(page.relative_to(ROOT)))
+            parts = urlsplit(href)
+            if parts.scheme or parts.netloc or not parts.path:
+                continue
+            path = unquote(parts.path)
+            if not (path.endswith('.html') or path.endswith('/')):
+                continue
+            if path.endswith('/'):
+                path += 'index.html'
+            target = ((SITE / path.lstrip('/')) if path.startswith('/') else page.parent / path).resolve()
+            if not target.is_relative_to(SITE.resolve()) or not target.is_file():
+                local_failures.append(f'{page.relative_to(ROOT)} links missing local page {href}')
 
-    if not urls:
-        print("No download or checkout links found on the site.", file=sys.stderr)
-        print("That is not a pass: a page with no way to get the app is broken.",
-              file=sys.stderr)
+    policy = (ROOT / 'Sources/PressTalkCore/EntitlementPolicy.swift').read_text()
+    match = re.search(r'public static let checkoutURLString\s*=\s*"([^"]*)"', policy)
+    if not match:
+        local_failures.append('Cannot read the checkout URL used by the Mac app')
+    elif urlsplit(match[1]).hostname == 'presstalk.app':
+        target = (SITE / urlsplit(match[1]).path.lstrip('/')).resolve()
+        if target not in parsed_pages:
+            local_failures.append('The checkout page opened by the Mac app does not exist')
+        elif CHECKOUT_SERVICE not in parsed_pages[target]:
+            local_failures.append('The Mac checkout page has no link to the purchase service')
+
+    if not any(urlsplit(url).path.endswith('.zip') for url in urls):
+        local_failures.append('No direct app download link found on the site')
+    if local_failures:
+        for failure in local_failures:
+            print('FAIL ', failure, file=sys.stderr)
         return 1
 
     failures = 0

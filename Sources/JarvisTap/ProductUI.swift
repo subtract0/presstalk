@@ -69,7 +69,6 @@ struct PressTalkNativeTriggerCalibration: Codable, Hashable {
 /// can check on its own forever.
 final class PressTalkLicenseStore {
     private enum Key {
-        static let licenseString = "PressTalk.License"
         static let trialStartedAt = "PressTalk.TrialStartedAt"
         /// Recorded once, at the first launch of a licensing-aware build.
         static let predatesPaidLicensing = "PressTalk.PredatesPaidLicensing"
@@ -84,18 +83,22 @@ final class PressTalkLicenseStore {
     /// an update; licences signed by an older key keep working because the key
     /// id travels with the licence.
     ///
-    /// Generated 2026-09-06. The private half lives outside this repository at
+    /// The original founder key was generated 2026-09-06. Its private half lives outside this repository at
     /// ~/.presstalk-signing/ (mode 600) and must never be committed; only this
     /// public half ships. Rotating means adding a second entry here, not
     /// replacing this one, or every licence already sold stops verifying.
+    /// The separate commerce key is held only by the purchase service. Adding
+    /// it preserves every licence issued before automatic delivery existed.
     static let trustedPublicKeys: [String: String] = [
         "founder-2026": "kRCsB+YLcYSDKFt8u9qGXodXWEHGORTl3dYydLILFE4=",
+        "commerce-2026": "JDwkjz0hZtenKwfUoAF1N0FH03WSruCxlrwkZpfYqtE=",
     ]
 
     private let defaults: UserDefaults
     private let policy = EntitlementPolicy()
     private let overrideEntitlement: String?
     private let verifier: PressTalkLicenseVerifier
+    private lazy var paidLicense = OfflineLicenseStore(defaults: defaults, verifier: verifier)
 
     /// The trial start date is recorded in both, and the earliest one wins.
     /// UserDefaults alone made "3 days" mean "3 days per reinstall".
@@ -145,9 +148,7 @@ final class PressTalkLicenseStore {
 
     private var verifiedEntitlement: String? {
         if let overrideEntitlement { return overrideEntitlement }
-        guard let stored = defaults.string(forKey: Key.licenseString) else { return nil }
-        guard case .success(let license) = verifier.verify(stored) else { return nil }
-        return license.entitlement
+        return paidLicense.license?.entitlement
     }
 
     /// Reads every anchor store, believes the earliest date, and refills any
@@ -187,6 +188,7 @@ final class PressTalkLicenseStore {
     /// Called after the first successful dictation. The trial starts when the
     /// product first works, not when it was installed.
     func startTrialIfNeeded() {
+        guard verifiedEntitlement == nil, !priorUse.indicatesPriorUse else { return }
         // Checks every store, not just UserDefaults. Someone who reinstalled
         // still has a date in the keychain, and starting a new one here would
         // hand them the fresh trial the anchor exists to prevent.
@@ -208,11 +210,7 @@ final class PressTalkLicenseStore {
     /// was working.
     @discardableResult
     func importLicense(_ encoded: String) -> Result<PressTalkLicense, PressTalkLicenseError> {
-        let result = verifier.verify(encoded)
-        if case .success = result {
-            defaults.set(encoded.trimmingCharacters(in: .whitespacesAndNewlines), forKey: Key.licenseString)
-        }
-        return result
+        paidLicense.importLicense(encoded)
     }
 
     var currentPlanName: String {
@@ -1045,6 +1043,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let settingsStore: JarvisTapSettingsStore
     private let licenseStore: PressTalkLicenseStore
     private let commerceConfig: PressTalkCommerceConfig
+    private let audioInputDefaults: UserDefaults
     private var runtimeStatus: PressTalkRuntimeStatus = .placeholder
     private let showHUDCheckbox = NSButton(checkboxWithTitle: "Show compact HUD", target: nil, action: nil)
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
@@ -1082,8 +1081,8 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let currentPlanValueLabel = NSTextField(labelWithString: "")
     private let planSummaryLabel = NSTextField(wrappingLabelWithString: "")
     private let pricingSummaryLabel = NSTextField(wrappingLabelWithString: "")
-    private let plansButton = NSButton(title: "View Plans", target: nil, action: nil)
-    private let upgradeButton = NSButton(title: "Upgrade to Pro", target: nil, action: nil)
+    private let plansButton = NSButton(title: "Pricing", target: nil, action: nil)
+    private let upgradeButton = NSButton(title: "Buy PressTalk", target: nil, action: nil)
     private let setupHintLabel = NSTextField(wrappingLabelWithString: "")
     private let inputMonitoringValueLabel = NSTextField(labelWithString: "")
     private let microphoneValueLabel = NSTextField(labelWithString: "")
@@ -1111,11 +1110,13 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     init(
         settingsStore: JarvisTapSettingsStore,
         licenseStore: PressTalkLicenseStore,
-        commerceConfig: PressTalkCommerceConfig = PressTalkCommerceConfig()
+        commerceConfig: PressTalkCommerceConfig = PressTalkCommerceConfig(),
+        audioInputDefaults: UserDefaults = .standard
     ) {
         self.settingsStore = settingsStore
         self.licenseStore = licenseStore
         self.commerceConfig = commerceConfig
+        self.audioInputDefaults = audioInputDefaults
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 560, height: 620),
@@ -1167,6 +1168,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             planSummaryLabel.stringValue.contains(pricingSummaryLabel.stringValue)
         plansButton.isHidden = commerceConfig.plansURL == nil
         upgradeButton.isHidden = commerceConfig.upgradeURL == nil
+        if case .licensed = licenseStore.state { upgradeButton.isHidden = true }
         refreshReleaseTailLabel()
         applyRuntimeStatus()
     }
@@ -1187,7 +1189,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         setupHintLabel.font = NSFont.systemFont(ofSize: 12)
         setupHintLabel.textColor = .secondaryLabelColor
 
-        let planLabel = NSTextField(labelWithString: "Current plan")
+        let planLabel = NSTextField(labelWithString: "Licence")
         planLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         currentPlanValueLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
@@ -1434,14 +1436,17 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
 
         runSetupCheckButton.target = self
         runSetupCheckButton.action = #selector(runSetupCheck(_:))
+        runSetupCheckButton.setAccessibilityIdentifier("settings.runSetupCheck")
+        microphonePopup.setAccessibilityIdentifier("settings.microphone")
+        triggerKeyPopup.setAccessibilityIdentifier("settings.trigger")
+        showHUDCheckbox.setAccessibilityIdentifier("settings.showHUD")
+        pasteAutomaticallyCheckbox.setAccessibilityIdentifier("settings.autoPaste")
+        insertionSuffixPopup.setAccessibilityIdentifier("settings.insertionSuffix")
+        releaseTailSlider.setAccessibilityIdentifier("settings.releaseTail")
 
         runPhysicalSmokeButton.target = self
         runPhysicalSmokeButton.action = #selector(runPhysicalSmoke(_:))
-        let smokeHelpers = ["presstalk-manual-fn-smoke", "presstalk-manual-fn-smoke.swift"]
-        runPhysicalSmokeButton.isHidden = !smokeHelpers.contains { name in
-            guard let path = Bundle.main.resourceURL?.appendingPathComponent(name).path else { return false }
-            return FileManager.default.isExecutableFile(atPath: path)
-        }
+        runPhysicalSmokeButton.setAccessibilityIdentifier("settings.testDictation")
 
         restartAppButton.target = self
         restartAppButton.action = #selector(restartApp(_:))
@@ -1657,7 +1662,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     /// longer plugged in.
     func rebuildMicrophoneMenu() {
         let previous = AudioInputPreference(
-            storageValue: UserDefaults.standard.string(forKey: "PressTalk.AudioInputPreference"))
+            storageValue: audioInputDefaults.string(forKey: "PressTalk.AudioInputPreference"))
         microphonePopup.removeAllItems()
         microphoneMenuUIDs = []
 
@@ -1713,13 +1718,13 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         case .some(let uid) where uid.isEmpty: preference = .preferWired
         case .some(let uid): preference = .specificDevice(uid: uid)
         }
-        UserDefaults.standard.set(preference.storageValue,
+        audioInputDefaults.set(preference.storageValue,
                                   forKey: "PressTalk.AudioInputPreference")
         // Choosing a microphone withdraws the crash breaker's skip. It told
         // this person a device had failed and to pick it again here if they
         // wanted it; continuing to skip it after they did would make the
         // instruction a lie.
-        UserDefaults.standard.removeObject(forKey: "PressTalk.AudioInputAvoidUID")
+        audioInputDefaults.removeObject(forKey: "PressTalk.AudioInputAvoidUID")
         onAudioInputPreferenceChanged?()
 
         updateMicrophoneHint(for: preference)

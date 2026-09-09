@@ -37,6 +37,7 @@ public struct FirstRunSetupPolicy {
         public let speechModelReady: Bool
         public let firstDictationDelivered: Bool
         public let triggerRequiresInputMonitoring: Bool
+        public let triggerRequiresAccessibility: Bool
         /// Optional steps the user chose to pass over. Without this the
         /// policy keeps selecting a step the UI already offered to skip, so
         /// the advertised optional path never advances.
@@ -49,6 +50,7 @@ public struct FirstRunSetupPolicy {
             speechModelReady: Bool,
             firstDictationDelivered: Bool,
             triggerRequiresInputMonitoring: Bool,
+            triggerRequiresAccessibility: Bool = false,
             skippedSteps: Set<Step> = []
         ) {
             self.microphoneCaptureVerified = microphoneCaptureVerified
@@ -57,6 +59,7 @@ public struct FirstRunSetupPolicy {
             self.speechModelReady = speechModelReady
             self.firstDictationDelivered = firstDictationDelivered
             self.triggerRequiresInputMonitoring = triggerRequiresInputMonitoring
+            self.triggerRequiresAccessibility = triggerRequiresAccessibility
             self.skippedSteps = skippedSteps
         }
     }
@@ -85,7 +88,8 @@ public struct FirstRunSetupPolicy {
     }
 
     public func state(of step: Step, given conditions: Conditions) -> StepState {
-        if conditions.skippedSteps.contains(step), step.isOptional {
+        if step == .accessibility, conditions.accessibilityGranted { return .satisfied }
+        if conditions.skippedSteps.contains(step), canSkip(step, given: conditions) {
             return .skipped
         }
         switch step {
@@ -105,6 +109,12 @@ public struct FirstRunSetupPolicy {
         }
     }
 
+    /// Fn and modifier shortcuts need a writable event tap. Offering to skip
+    /// Accessibility for those shortcuts leads directly to an impossible step.
+    public func canSkip(_ step: Step, given conditions: Conditions) -> Bool {
+        step.isOptional && !conditions.triggerRequiresAccessibility
+    }
+
     /// The one step to put in front of the user. Returning a single step is the
     /// point: three simultaneous system dialogs are three chances to say no.
     public func currentStep(for conditions: Conditions) -> Step? {
@@ -121,6 +131,7 @@ public struct FirstRunSetupPolicy {
     /// anyone whose Mac is managed.
     public func isComplete(_ conditions: Conditions) -> Bool {
         guard conditions.microphoneCaptureVerified else { return false }
+        if conditions.triggerRequiresAccessibility, !conditions.accessibilityGranted { return false }
         if conditions.triggerRequiresInputMonitoring, !conditions.inputMonitoringGranted { return false }
         guard conditions.speechModelReady else { return false }
         return conditions.firstDictationDelivered

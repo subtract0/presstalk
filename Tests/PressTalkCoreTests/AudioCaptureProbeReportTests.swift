@@ -62,6 +62,11 @@ final class AudioCaptureProbeReportTests: XCTestCase {
         }
     }
 
+    func testCapturedLabelWithoutFramesDoesNotPass() {
+        XCTAssertFalse(report(outcome: .captured, frames: 0).isUsable)
+        XCTAssertFalse(report(outcome: .captured, frames: -1).isUsable)
+    }
+
     // The summary is what a buyer reads at 11pm. A silent denial must not be
     // described using the word the system API would have used.
     func testSilentDenialSummaryContradictsTheSystemStatus() {

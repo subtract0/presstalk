@@ -29,6 +29,33 @@ final class FirstRunSetupPolicyTests: XCTestCase {
         XCTAssertEqual(policy.currentStep(for: conditions()), .microphone)
     }
 
+    func testGrantAfterSkipShowsSatisfied() {
+        XCTAssertEqual(policy.state(of: .accessibility,
+            given: conditions(accessibility: true, skipped: [.accessibility])), .satisfied)
+    }
+
+    func testShortcutThatNeedsAccessibilityCannotSkipIt() {
+        let pending = FirstRunSetupPolicy.Conditions(
+            microphoneCaptureVerified: true, inputMonitoringGranted: false,
+            accessibilityGranted: false, speechModelReady: true,
+            firstDictationDelivered: true, triggerRequiresInputMonitoring: true,
+            triggerRequiresAccessibility: true, skippedSteps: [.accessibility])
+        XCTAssertFalse(policy.canSkip(.accessibility, given: pending))
+        XCTAssertEqual(policy.currentStep(for: pending), .accessibility)
+        XCTAssertFalse(policy.isComplete(pending))
+    }
+
+    func testRegisteredShortcutCanUseClipboardWithoutAccessibility() {
+        let pending = FirstRunSetupPolicy.Conditions(
+            microphoneCaptureVerified: true, inputMonitoringGranted: true,
+            accessibilityGranted: false, speechModelReady: true,
+            firstDictationDelivered: true, triggerRequiresInputMonitoring: true,
+            triggerRequiresAccessibility: false, skippedSteps: [.accessibility])
+        XCTAssertTrue(policy.canSkip(.accessibility, given: pending))
+        XCTAssertNil(policy.currentStep(for: pending))
+        XCTAssertTrue(policy.isComplete(pending))
+    }
+
     func testOneStepAtATime() {
         var conditions = self.conditions()
         var seen: [FirstRunSetupPolicy.Step] = []

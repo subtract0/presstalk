@@ -1,0 +1,27 @@
+{
+  "name": "presstalk-commerce",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node --test test/commerce.test.js test/observability.test.js",
+    "build:worker": "wrangler deploy --dry-run --outdir ../.local/commerce/worker-bundle",
+    "build:monitor": "wrangler deploy --config wrangler.monitor.jsonc --dry-run --outdir ../.local/commerce/monitor-bundle",
+    "test:worker": "node --test test/worker-runtime.test.js",
+    "start": "node dev.js",
+    "migrate": "node scripts/migrate.js"
+  },
+  "dependencies": {
+    "pg": "8.23.0",
+    "stripe": "22.6.1"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "miniflare": "5.20260907.0-alpha",
+    "playwright": "1.63.0",
+    "wrangler": "4.129.1"
+  }
+}

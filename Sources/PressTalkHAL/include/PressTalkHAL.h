@@ -15,6 +15,9 @@ typedef struct {
     uint32_t boundDevice, channels, maximumFrames, selectedChannel;
     double sampleRate, requestedAt, startedAt, firstPCMAt, lastPCMAt;
     uint64_t callbacks, renderedFrames, retainedFrames, consumedFrames, droppedFrames;
+    // Valid only for PT_DISCONTINUITY. Preserve both sides of the first jump;
+    // a timestamp jump alone does not establish how much audio was lost.
+    double discontinuityExpectedSampleTime, discontinuityObservedSampleTime;
 } PTStats;
 // One control/consumer thread. One HAL producer. Stop before destroy.
 PTHAL *pt_create(AudioDeviceID device, uint32_t channel, OSStatus *status);

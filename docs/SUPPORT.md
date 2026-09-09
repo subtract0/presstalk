@@ -3,10 +3,12 @@
 PressTalk is built by one developer. Support may be handled by the project's
 operator, who identifies their role when replying.
 
-New purchases are temporarily paused while payment and licence delivery are
-verified. Existing licences, included-update promises and the advertised
-14-day refund promise remain in force. If you have already paid and need a
-licence or refund, contact **help@presstalk.app**.
+Your purchase confirmation includes an activation button and a downloadable
+licence file. Double-click the file to activate PressTalk. Keep a copy; your
+licence works offline and has no expiry. If you need it again, use
+[licence recovery](https://presstalk-licenses.presstalk.workers.dev/recover)
+with the email address you used at checkout. For purchase or refund questions,
+contact **help@presstalk.app**. The advertised 14-day refund promise applies.
 
 ## Getting help
 
@@ -26,20 +28,22 @@ it is plain text.
 ## The problems people hit first
 
 **"PressTalk cannot be opened because the developer cannot be verified."**
-The public 0.1.11 release is signed with Alexander Monas's Developer ID and
+The current public release is signed with Alexander Monas's Developer ID and
 carries a stapled notarization ticket. macOS may still ask you to confirm that
 you want to open an app downloaded from the internet. A damaged-app or
 unverified-developer warning is different: check that you downloaded the current
-[official release](https://github.com/subtract0/presstalk/releases/tag/v0.1.11),
+[official release](https://github.com/subtract0/presstalk/releases/latest),
 and contact support with the exact message before proceeding. See
 [Apple's explanation of these prompts](https://support.apple.com/en-us/102445).
 
 **I hold the key and nothing happens.**
-Usually Input Monitoring. Open Settings from the menu bar and check the permission
-rows; they say which one is missing. If macOS already shows PressTalk as enabled
-and the app disagrees, do not keep toggling it — that means the app's signature
-changed and macOS is tracking a different identity. Export diagnostics and email
-them.
+Open **Run Setup Check** from PressTalk's menu bar menu or Settings. Follow the
+highlighted step. Fn / Globe needs Accessibility to detect and suppress the key,
+and recording needs Microphone access. Other shortcuts may also need Input
+Monitoring; the setup check identifies the permission needed for your shortcut.
+If macOS already shows PressTalk as enabled and the app still cannot use it,
+quit and reopen the app. If the check still disagrees, export diagnostics and
+email them instead of repeatedly toggling permissions.
 
 **Text goes to the clipboard instead of the app.**
 Accessibility permission is missing, or the target app does not accept programmatic
@@ -50,6 +54,13 @@ back.
 **The first dictation takes a while.**
 The speech model is about 460 MB and downloads during setup, with progress shown.
 After that it stays on your Mac, unless you clear the cache or reinstall.
+
+**The first AirPods recording asks me to try again.**
+This is a known issue after connecting AirPods. Release the key, wait a moment,
+then dictate again. PressTalk inserts nothing from the interrupted recording.
+If retries also fail, export diagnostics and contact support. The current
+release includes clearer retry guidance and diagnostics; the underlying
+transition issue is still under investigation.
 
 **German words come out wrong.**
 Some are fixable and some are not yet. PressTalk carries a German vocabulary

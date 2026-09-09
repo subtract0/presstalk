@@ -1,0 +1,25 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "presstalk-licenses",
+  "account_id": "cbcced21185315aff602a2938ac194ee",
+  "main": "worker.js",
+  "compatibility_date": "2026-09-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "observability": {
+    // Raw request metadata includes bearer receipt URLs. Only sanitized metrics
+    // cross the private MONITOR binding, where logs and traces are enabled.
+    "enabled": false,
+    "logs": { "enabled": false, "invocation_logs": false },
+    "traces": { "enabled": false }
+  },
+  "services": [{ "binding": "MONITOR", "service": "presstalk-commerce-monitor" }],
+  "triggers": { "crons": ["* * * * *"] },
+  "d1_databases": [{
+    "binding": "ORDERS",
+    "database_name": "presstalk-orders",
+    "database_id": "f4ee6ffd-a0ef-45c5-b240-381724cb3f53",
+    "migrations_dir": "migrations"
+  }]
+  // Runtime secrets and exact test/live configuration are supplied separately.
+}

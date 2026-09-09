@@ -27,9 +27,10 @@ final class CheckoutConfigTests: XCTestCase {
     // The single line someone edits when the store opens has to produce a usable
     // URL, or the button appears and does nothing.
     func testANonEmptyCheckoutStringProducesAUsableURL() {
-        XCTAssertEqual(
-            URL(string: "https://example.lemonsqueezy.com/buy/abc")?.scheme, "https",
-            "the shape PressTalkOffer.checkoutURLString expects must parse")
+        let configured = PressTalkOffer.checkoutURL
+        XCTAssertEqual(configured?.scheme, "https")
+        XCTAssertEqual(configured?.host, "presstalk.app")
+        XCTAssertEqual(configured?.path, "/buy.html")
     }
 
     func testPricingPageFollowsTheSameRule() {

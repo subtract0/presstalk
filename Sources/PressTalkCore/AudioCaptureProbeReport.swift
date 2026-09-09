@@ -70,10 +70,10 @@ public struct AudioCaptureProbeReport: Codable, Equatable {
     public var userFacingSummary: String {
         switch outcome {
         case .captured:
-            return "Microphone is working. Captured \(framesCaptured) audio frames."
+            return "Audio arrived from the microphone. Now dictate a sentence to check speech recognition and text insertion."
         case .silentDenial:
             return "macOS reports microphone access as \(authorizationStatus), but no audio arrived. "
-                + "This build cannot record. Reinstall PressTalk; if it persists, this is a bug, not a setting."
+                + "Check that the selected microphone is connected, then try again or choose another microphone in Settings."
         case .engineFailed:
             return "The audio engine could not start: \(detail)"
         case .noInputDevice:
@@ -81,5 +81,7 @@ public struct AudioCaptureProbeReport: Codable, Equatable {
         }
     }
 
-    public var isUsable: Bool { outcome == .captured }
+    public var isUsable: Bool {
+        outcome == .captured && framesCaptured > 0 && sampleRate.isFinite && sampleRate > 0 && channelCount > 0
+    }
 }

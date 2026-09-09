@@ -1,5 +1,8 @@
 # Release acceptance — 2026-09-09
 
+> Historical preparation snapshot. The [public release record](2026-09-09-public-release.md)
+> contains the completed publication and current cutover verification.
+
 The owner explicitly approved shipping build 23.4 with the known first-attempt
 AirPods retry: the first attempt showed an error, the second worked, and the
 owner accepted release while the underlying issue remains under investigation.

@@ -1,5 +1,8 @@
 # Production purchase service — 2026-09-09
 
+> Historical preparation snapshot. The [public release record](2026-09-09-public-release.md)
+> contains the completed publication and current cutover verification.
+
 The production licence Worker is deployed and its live-mode health endpoint
 passes. The existing Stripe checkout remains active. The new PressTalk webhook
 is staged and the service's new-sales switch remains off until the matching Mac

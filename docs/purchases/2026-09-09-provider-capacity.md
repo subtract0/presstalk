@@ -1,5 +1,8 @@
 # Provider capacity and draft release — 2026-09-09
 
+> Historical preparation snapshot. The [public release record](2026-09-09-public-release.md)
+> contains the completed publication and current cutover verification.
+
 This check established the actual provider plans, rather than inferring paid
 capacity from successful test requests. New public sales remain disabled.
 

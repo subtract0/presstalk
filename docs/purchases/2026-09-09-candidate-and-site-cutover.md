@@ -1,5 +1,8 @@
 # Candidate and website cutover — 2026-09-09
 
+> Historical preparation snapshot. The [public release record](2026-09-09-public-release.md)
+> contains the completed publication and current cutover verification.
+
 The owner’s live Fn recordings are preserved in the offline-dictation receipt.
 The three described routes delivered text: Shure with AirPods in their case,
 explicit Shure with AirPods connected, and AirPods input. The first AirPods

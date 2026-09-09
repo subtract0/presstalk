@@ -98,7 +98,7 @@ def main() -> int:
         elif CHECKOUT_SERVICE not in parsed_pages[target]:
             local_failures.append('The Mac checkout page has no link to the purchase service')
 
-    if not any(urlsplit(url).path.endswith('.zip') for url in urls):
+    if not any(urlsplit(url).path.endswith(('.zip', '.dmg')) for url in urls):
         local_failures.append('No direct app download link found on the site')
     if local_failures:
         for failure in local_failures:

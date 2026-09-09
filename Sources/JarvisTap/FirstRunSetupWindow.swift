@@ -8,13 +8,20 @@ private final class SetupDocumentView: NSView {
 /// A check ends with a real dictation, and every action shows what happens next.
 final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate {
     enum ModelState { case idle, loading, ready, failed }
+    struct ShortcutChoice: Equatable {
+        let id: String
+        let title: String
+    }
     struct Details {
         var microphoneAuthorization = "not_determined"
         var microphoneName = "Selected microphone"
         var triggerName = "your trigger key"
+        var shortcutID = ""
+        var shortcutChoices: [ShortcutChoice] = []
         var modelState: ModelState = .idle
         var modelStatus = ""
         var recordingOrProcessing = false
+        var isRecording = false
         var pasteAutomatically = true
         var shortcutUsesRegisteredHotKey = false
     }
@@ -25,6 +32,7 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenAccessibilitySettings: (() -> Void)?
     var onRetryShortcut: (() -> Bool)?
+    var onChangeShortcut: ((String) -> Bool)?
     var onReadConditions: (() -> FirstRunSetupPolicy.Conditions)?
     var onReadDetails: (() -> Details)?
     var onDownloadSpeechModel: (() -> Void)?
@@ -36,13 +44,16 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
     private var lastProbe: AudioCaptureProbeReport?
     private var microphoneMessage = ""
     private var shortcutMessage = ""
+    private var shortcutChangeMessage = ""
     private var checkingMicrophone = false
     private var expectedDictation: String?
     private var practiceBeforeDictation = ""
     private var practiceSelectionBeforeDictation = NSRange(location: 0, length: 0)
     private var confirmedDictation = false
     private var skippedSteps: Set<FirstRunSetupPolicy.Step> = []
-    private let progressBar = NSProgressIndicator()
+    private let shortcutPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let shortcutHint = NSTextField(wrappingLabelWithString: "")
+    private var shortcutChoices: [ShortcutChoice] = []
     private let progressLabel = NSTextField(labelWithString: "")
     private let stepTitleLabel = NSTextField(labelWithString: "")
     private let stepBodyLabel = NSTextField(wrappingLabelWithString: "")
@@ -76,10 +87,18 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
             "Check your microphone and shortcut, then dictate a sentence. Your audio and text stay on this Mac.")
         subheading.textColor = .secondaryLabelColor
         subheading.font = .systemFont(ofSize: 12)
-        progressBar.isIndeterminate = false
-        progressBar.minValue = 0
-        progressBar.maxValue = 1
-        progressBar.controlSize = .small
+        let shortcutLabel = NSTextField(labelWithString: "Hold to dictate")
+        shortcutLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        shortcutPopup.setAccessibilityIdentifier("setup.shortcut")
+        shortcutPopup.setAccessibilityLabel("Dictation shortcut")
+        shortcutPopup.target = self
+        shortcutPopup.action = #selector(shortcutChanged(_:))
+        let shortcutRow = NSStackView(views: [shortcutLabel, shortcutPopup])
+        shortcutRow.orientation = .horizontal
+        shortcutRow.spacing = 12
+        shortcutHint.font = .systemFont(ofSize: 12)
+        shortcutHint.textColor = .secondaryLabelColor
+        shortcutHint.setAccessibilityIdentifier("setup.shortcutHint")
         progressLabel.font = .systemFont(ofSize: 11)
         progressLabel.textColor = .secondaryLabelColor
         progressLabel.setAccessibilityIdentifier("setup.progress")
@@ -116,20 +135,23 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         practiceScrollView.heightAnchor.constraint(equalToConstant: 100).isActive = true
         let buttonRow = NSStackView(views: [skipButton, NSView(), primaryButton])
         buttonRow.orientation = .horizontal
-        let stack = NSStackView(views: [heading, subheading, progressBar, progressLabel,
-            stepListStack, stepTitleLabel, stepBodyLabel, detailLabel, practiceScrollView, buttonRow])
+        // Keep the next action ahead of already-satisfied checks. A percentage
+        // bar looked like background work even while we were waiting for a click.
+        let stack = NSStackView(views: [heading, subheading, shortcutRow, shortcutHint,
+            stepTitleLabel, stepBodyLabel, detailLabel, practiceScrollView, buttonRow,
+            progressLabel, stepListStack])
         stack.orientation = .vertical
         stack.alignment = .leading
         stack.spacing = 12
         stack.translatesAutoresizingMaskIntoConstraints = false
-        for field in [subheading, stepBodyLabel, detailLabel] {
+        for field in [subheading, shortcutHint, stepBodyLabel, detailLabel] {
             field.maximumNumberOfLines = 0
             field.lineBreakMode = .byWordWrapping
             field.cell?.isScrollable = false
             field.cell?.usesSingleLineMode = false
             field.setContentCompressionResistancePriority(.required, for: .vertical)
         }
-        for view in [subheading, progressBar, stepBodyLabel, detailLabel, practiceScrollView, buttonRow] {
+        for view in [subheading, shortcutHint, stepBodyLabel, detailLabel, practiceScrollView, buttonRow] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         let document = SetupDocumentView()
@@ -220,7 +242,19 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         }
         let steps = policy.steps(for: conditions)
         let current = policy.currentStep(for: conditions)
-        progressBar.doubleValue = policy.progress(conditions)
+        if shortcutChoices != details.shortcutChoices {
+            shortcutChoices = details.shortcutChoices
+            shortcutPopup.removeAllItems()
+            shortcutPopup.addItems(withTitles: shortcutChoices.map(\.title))
+        }
+        if let index = shortcutChoices.firstIndex(where: { $0.id == details.shortcutID }) {
+            shortcutPopup.selectItem(at: index)
+        }
+        shortcutPopup.isEnabled = !details.recordingOrProcessing && !checkingMicrophone
+        shortcutHint.stringValue = shortcutChangeMessage.isEmpty
+            ? "If Fn / Globe does nothing on your keyboard, choose Option + Space or F5 here. You’ll try it below."
+            : shortcutChangeMessage
+        if conditions.inputMonitoringGranted { shortcutMessage = "" }
         let resolved = steps.filter {
             let state = policy.state(of: $0, given: conditions)
             return state == .satisfied || state == .skipped
@@ -251,9 +285,10 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         stepBodyLabel.stringValue = current.explanation
         switch current {
         case .microphone:
-            stepBodyLabel.stringValue = "Microphone: \(details.microphoneName). We’ll record a short audio check, then you’ll try a sentence."
+            stepBodyLabel.stringValue = "Click Test microphone, then speak for a moment into \(details.microphoneName)."
             if checkingMicrophone {
                 primaryButton.title = "Checking microphone…"
+                stepBodyLabel.stringValue = "Checking \(details.microphoneName)…"
                 detailLabel.stringValue = "Speak normally for a moment. This check stays on your Mac and is not saved."
             } else if details.recordingOrProcessing {
                 primaryButton.title = "Test microphone"
@@ -263,14 +298,18 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
                 switch details.microphoneAuthorization {
                 case "denied", "restricted":
                     primaryButton.title = "Open Microphone Settings"
+                    stepBodyLabel.stringValue = "Click Open Microphone Settings to allow access to \(details.microphoneName)."
                     detailLabel.stringValue = "Microphone access is off. Enable PressTalk in Microphone Settings, then return here to test it."
                     return
                 case "authorized": primaryButton.title = "Test microphone"
                 default: primaryButton.title = "Allow microphone"
                 }
+                if details.microphoneAuthorization != "authorized" {
+                    stepBodyLabel.stringValue = "Click Allow microphone and approve the macOS prompt. Then speak for a moment into \(details.microphoneName)."
+                }
                 detailLabel.stringValue = microphoneMessage.isEmpty
                     ? (lastProbe.flatMap { $0.isUsable ? nil : $0.userFacingSummary }
-                        ?? "The check tests the selected microphone without changing your Mac’s default input.")
+                        ?? "Waiting for you to click. Nothing is recording yet. This checks your selected microphone without changing your Mac’s default input.")
                     : microphoneMessage
             }
         case .accessibility:
@@ -284,7 +323,7 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
                 ? "Retry shortcut" : "Open Input Monitoring Settings"
             detailLabel.stringValue = details.shortcutUsesRegisteredHotKey
                 ? (shortcutMessage.isEmpty
-                    ? "PressTalk could not register this shortcut. Retry it, or choose a different shortcut in Settings if another app uses it."
+                    ? "PressTalk could not register this shortcut. Retry it, or choose a different shortcut above if another app uses it."
                     : shortcutMessage)
                 : permissionInstructions
         case .speechModel:
@@ -302,14 +341,31 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         case .firstDictation:
             primaryButton.title = expectedDictation == nil ? "Try dictation here" : "Confirm full sentence"
             stepBodyLabel.stringValue = "Click the box below, hold \(details.triggerName), say a sentence, and release. You can also use a text field in another app."
-            if expectedDictation != nil {
+            if details.recordingOrProcessing {
+                primaryButton.isEnabled = false
+                primaryButton.title = details.isRecording ? "Listening…" : "Recognising…"
+                detailLabel.stringValue = details.isRecording
+                    ? "Speak your sentence, then release \(details.triggerName)."
+                    : "Your recording has ended. Wait for the recognised sentence to appear."
+            } else if expectedDictation != nil {
                 detailLabel.stringValue = "A sentence was recognised. If you used this box, paste with ⌘V if needed. If you used another app, confirm only after checking that the whole sentence appeared there."
             } else {
                 detailLabel.stringValue = details.pasteAutomatically && conditions.accessibilityGranted
-                    ? "The check completes when the full recognised sentence appears here. Typing alone does not count as dictation."
+                    ? "Waiting for you to hold \(details.triggerName). If nothing happens, choose another shortcut above. The full recognised sentence must appear here; typing alone does not complete the check."
                     : "After dictating, press ⌘V to paste the copied words."
             }
         }
+    }
+
+    @objc private func shortcutChanged(_ sender: NSPopUpButton) {
+        guard let details = onReadDetails?(), !details.recordingOrProcessing,
+              !checkingMicrophone, shortcutChoices.indices.contains(sender.indexOfSelectedItem) else {
+            refresh()
+            return
+        }
+        let changed = onChangeShortcut?(shortcutChoices[sender.indexOfSelectedItem].id) ?? false
+        shortcutChangeMessage = changed ? "" : "The shortcut could not be changed. Finish any current dictation and try again."
+        refresh()
     }
 
     private func newlyInsertedPracticeText() -> String? {
@@ -371,7 +427,7 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
             if details.shortcutUsesRegisteredHotKey {
                 let ready = onRetryShortcut?() ?? false
                 shortcutMessage = ready ? "Shortcut is ready."
-                    : "The shortcut is still unavailable. Choose another shortcut in PressTalk Settings, then run this check again."
+                    : "The shortcut is still unavailable. Choose another shortcut above, then try again."
                 refresh()
             } else { onOpenInputMonitoringSettings?() }
         case .accessibility: onOpenAccessibilitySettings?()

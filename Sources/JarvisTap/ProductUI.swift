@@ -519,7 +519,7 @@ final class JarvisTapSettingsStore {
             case .rightOption:
                 return "Right Option"
             case .f5:
-                return "Legacy F5 / Mic"
+                return "F5 / Mic"
             case .trackpadHold:
                 return "Trackpad Hold"
             }

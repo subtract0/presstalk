@@ -35,6 +35,13 @@ class LinkGateTests(unittest.TestCase):
                     self.assertIn(gate.CHECKOUT_SERVICE, [call.args[0] for call in probe.call_args_list])
                 with patch.object(gate, 'status', side_effect=lambda url: (503 if url == gate.CHECKOUT_SERVICE else 200, '')):
                     self.assertEqual(gate.main(), 1)
+                (site / 'index.html').write_text(download.replace('app.zip', 'app.dmg') + '<a href="buy.html">Buy</a>')
+                with patch.object(gate, 'status', return_value=(200, '')) as probe:
+                    self.assertEqual(gate.main(), 0)
+                    self.assertTrue(any(call.args[0].endswith('.dmg') for call in probe.call_args_list))
+                with patch.object(gate, 'status', side_effect=lambda url: (404 if url.endswith('.dmg') else 200, '')):
+                    self.assertEqual(gate.main(), 1)
+                (site / 'index.html').write_text(download + '<a href="buy.html">Buy</a>')
                 with patch.object(gate, 'status', return_value=(200, '')):
                     (site / 'buy.html').unlink()
                     self.assertEqual(gate.main(), 1)

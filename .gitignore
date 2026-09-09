@@ -7,3 +7,6 @@ metrics/
 
 # Local capture builds, measurements and scratch orchestration.
 .local/
+
+# Regenerated from scripts/render_presstalk_artwork.swift.
+resources/PressTalk.iconset/

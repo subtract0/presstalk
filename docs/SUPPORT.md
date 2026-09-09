@@ -27,6 +27,12 @@ it is plain text.
 
 ## The problems people hit first
 
+**How do I install the download?**
+Open the DMG and drag PressTalk onto Applications in the installer window.
+Open PressTalk from Applications, then eject the installer disk. If you already
+have PressTalk running, quit it before replacing the app. Your settings and
+licence are stored separately from the app.
+
 **"PressTalk cannot be opened because the developer cannot be verified."**
 The current public release is signed with Alexander Monas's Developer ID and
 carries a stapled notarization ticket. macOS may still ask you to confirm that
@@ -38,7 +44,9 @@ and contact support with the exact message before proceeding. See
 
 **I hold the key and nothing happens.**
 Open **Run Setup Check** from PressTalk's menu bar menu or Settings. Follow the
-highlighted step. Fn / Globe needs Accessibility to detect and suppress the key,
+highlighted step. You can choose your shortcut directly at the top of setup.
+If Fn / Globe does nothing on your keyboard, try Option + Space or F5 there.
+Fn / Globe needs Accessibility to detect and suppress the key,
 and recording needs Microphone access. Other shortcuts may also need Input
 Monitoring; the setup check identifies the permission needed for your shortcut.
 If macOS already shows PressTalk as enabled and the app still cannot use it,

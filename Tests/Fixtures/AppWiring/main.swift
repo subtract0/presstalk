@@ -37,6 +37,23 @@ func runAssertions() {
     require(delegate.setupNeedsFreshDictation, "Setup accepted an old dictation as a fresh check")
     require(!delegate.inputPipelineReady && delegate.whisperWarmupTask == nil,
         "Setup check interrupted the busy dictation to start another pipeline")
+    let originalShortcut = delegate.settingsStore.triggerKey
+    require(guide.onChangeShortcut?("f5") == false && delegate.settingsStore.triggerKey == originalShortcut,
+        "Setup changed the app shortcut during a dictation")
+    // Keep the listener itself isolated: the fixture says F5 is already
+    // installed, so this exercises production persistence/refresh without
+    // registering a global key on the owner's Mac.
+    delegate.isProcessing = false
+    delegate.installedTriggerKey = .f5
+    require(guide.onChangeShortcut?("f5") == true && delegate.settingsStore.triggerKey == .f5,
+        "Setup shortcut callback did not update the actual settings store")
+    require(guide.onReadDetails?().shortcutID == "f5",
+        "Setup did not read the newly selected shortcut back from the app")
+    require(guide.onChangeShortcut?("unsupported") == false && delegate.settingsStore.triggerKey == .f5,
+        "An unsupported setup shortcut changed the app")
+    delegate.installedTriggerKey = nil
+    delegate.settingsStore.triggerKey = originalShortcut
+    delegate.isProcessing = true
     guide.close(finished: false)
     let menu = delegate.makeStatusMenu()
     for title in ["Run Setup…", "Run Setup Check", "Test Dictation Shortcut…"] {

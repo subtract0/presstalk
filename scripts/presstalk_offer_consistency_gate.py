@@ -203,12 +203,12 @@ def check_rails(pages: list[Path]) -> list[str]:
                 problems.append(
                     f"{page.relative_to(ROOT)} offers {rail} but does not link "
                     f"the configured {rail} URL")
-    # And the reverse: a live rail nobody can reach from the site is money left
-    # on the table, but it is not a lie, so it is reported rather than failed.
+    # Relative links and service redirects can reach checkout without embedding
+    # its absolute URL. The link gate follows the actual customer path.
     for rail, url in urls.items():
         if url and not any(url in p.read_text() for p in pages):
-            print(f"note  {rail} checkout is configured in the app but appears "
-                  f"on no page (fine while purchases are paused)")
+            print(f"note  configured {rail} checkout URL is not written verbatim "
+                  "on a page; the download/checkout link gate checks reachability")
     return problems
 
 TAG = re.compile(r"<[^>]+>")

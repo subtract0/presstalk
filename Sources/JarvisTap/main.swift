@@ -5735,11 +5735,16 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             details.microphoneAuthorization = status.microphoneAuthorizationStatus
             details.microphoneName = self.preferredAudioInputDevice()?.candidate.name ?? "Not connected"
             details.triggerName = self.settingsStore.triggerKey.displayName
+            details.shortcutID = self.settingsStore.triggerKey.rawValue
+            details.shortcutChoices = JarvisTapSettingsStore.TriggerKeyOption.allCases.map {
+                .init(id: $0.rawValue, title: $0.displayName)
+            }
             details.modelStatus = status.speechModelStatus
             details.shortcutUsesRegisteredHotKey = status.triggerUsesRegisteredHotKey
             details.pasteAutomatically = self.settingsStore.pasteAutomatically
             self.withStateLock {
                 details.recordingOrProcessing = self.isRecording || self.isProcessing
+                details.isRecording = self.isRecording
                 switch self.whisperLoadState {
                 case .idle: details.modelState = .idle
                 case .loading: details.modelState = .loading
@@ -5792,6 +5797,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 self.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
             }
             return self.currentRuntimeStatus().inputMonitoringEffective
+        }
+        controller.onChangeShortcut = { [weak self] rawValue in
+            guard let self, let shortcut = JarvisTapSettingsStore.TriggerKeyOption(rawValue: rawValue),
+                  !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress })
+            else { return false }
+            self.settingsStore.triggerKey = shortcut
+            self.handleSettingsChanged()
+            self.settingsWindowController?.reloadFromStore()
+            return self.settingsStore.triggerKey == shortcut
         }
         controller.onOpenAccessibilitySettings = { [weak self] in
             self?.requestAccessibilitySetup()

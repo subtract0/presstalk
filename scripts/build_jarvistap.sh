@@ -71,6 +71,7 @@ mkdir -p "$APP_MACOS_DIR"
 mkdir -p "$APP_RESOURCES_DIR"
 cp "$BINARY_DIR/jarvistap" "$APP_MACOS_DIR/jarvistap"
 chmod 755 "$APP_MACOS_DIR/jarvistap"
+cp "$PKG_DIR/resources/PressTalk.icns" "$APP_RESOURCES_DIR/PressTalk.icns"
 cp "$PKG_DIR/scripts/presstalk_bootstrap.sh" "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
@@ -159,6 +160,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <string>6.0</string>
   <key>CFBundleName</key>
   <string>PressTalk</string>
+  <key>CFBundleIconFile</key>
+  <string>PressTalk.icns</string>
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
@@ -198,6 +201,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
+
+swift "$PKG_DIR/scripts/presstalk_bundle_icon_gate.swift" "$APP_BUNDLE"
 
 resolve_signing_identity() {
   if [[ -n "${PRESSTALK_CODESIGN_IDENTITY:-}" ]]; then

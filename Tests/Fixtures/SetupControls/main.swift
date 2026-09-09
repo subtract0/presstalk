@@ -21,6 +21,9 @@ var details = FirstRunSetupWindowController.Details()
 details.triggerName = "Fn"
 details.microphoneName = "Shure MV7i"
 details.microphoneAuthorization = "authorized"
+details.shortcutID = "fn"
+details.shortcutChoices = [.init(id: "fn", title: "Fn / Globe"),
+    .init(id: "option_space", title: "Option + Space"), .init(id: "f5", title: "F5 / Mic")]
 guide.onReadConditions = {
     .init(microphoneCaptureVerified: microphone, inputMonitoringGranted: shortcut,
         accessibilityGranted: accessibility, speechModelReady: model,
@@ -44,9 +47,23 @@ func report(_ outcome: AudioCaptureProbeReport.Outcome, frames: Int = 0) -> Audi
 }
 guide.refresh()
 require(primary.title == "Test microphone", "Already-authorized mic still asks for permission")
+require(text("setup.detail").contains("Waiting for you to click"), "Idle setup looks like background work")
+require(descendants(content).allSatisfy { !($0 is NSProgressIndicator) }, "Idle setup still shows a loading-style progress bar")
+let shortcutPicker = descendants(content).compactMap { $0 as? NSPopUpButton }
+    .first { $0.accessibilityIdentifier() == "setup.shortcut" }!
+var shortcutChanges: [String] = []
+guide.onChangeShortcut = { value in
+    shortcutChanges.append(value); details.shortcutID = value
+    details.triggerName = details.shortcutChoices.first { $0.id == value }!.title
+    return true
+}
+shortcutPicker.selectItem(at: 2)
+app.sendAction(shortcutPicker.action!, to: shortcutPicker.target, from: shortcutPicker)
+require(shortcutChanges == ["f5"] && details.triggerName == "F5 / Mic", "Setup shortcut selection did not call its production action")
 primary.performClick(nil)
 require(probeCalls == 1, "Real microphone button did not invoke its capture action")
 require(!primary.isEnabled && primary.title.contains("Checking"), "No visible in-progress state")
+require(!shortcutPicker.isEnabled, "Shortcut can change during microphone test")
 require(text("setup.detail").contains("Speak normally"), "No instruction during microphone check")
 primary.performClick(nil)
 require(probeCalls == 1, "Repeated clicks started concurrent checks")
@@ -104,6 +121,16 @@ primary.performClick(nil)
 require(modelStarts == 2, "Model retry button does nothing")
 model = true; details.modelState = .ready; guide.refresh()
 require(text("setup.step") == "Your first dictation", "Model ready did not advance")
+require(text("setup.detail").contains("Waiting for you to hold F5 / Mic"), "Practice instructions ignore the chosen shortcut")
+details.recordingOrProcessing = true; details.isRecording = true; guide.refresh()
+require(primary.title == "Listening…" && !primary.isEnabled && !shortcutPicker.isEnabled,
+    "Recording does not show clear listening state or lock shortcut changes")
+shortcutPicker.selectItem(at: 0)
+app.sendAction(shortcutPicker.action!, to: shortcutPicker.target, from: shortcutPicker)
+require(shortcutChanges == ["f5"], "An action bypassed the busy shortcut guard")
+details.isRecording = false; guide.refresh()
+require(primary.title == "Recognising…", "Processing looks like idle input")
+details.recordingOrProcessing = false; guide.refresh()
 primary.performClick(nil)
 let practice = descendants(content).compactMap { $0 as? NSTextView }.first { $0.accessibilityIdentifier() == "setup.practice" }!
 require(guide.window!.firstResponder === practice, "Try dictation button did not focus an editable field")
@@ -152,35 +179,30 @@ require(!guide.window!.isVisible, "Interaction test unexpectedly displayed a win
 // Render the real views, at the minimum supported size, into a local artifact.
 if let directory = ProcessInfo.processInfo.environment["PRESSTALK_UI_ARTIFACTS"] {
     try FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true)
-    func snapshot(_ name: String) {
+    func snapshot(_ name: String, appearance: NSAppearance.Name = .aqua) {
+        app.setActivationPolicy(.accessory)
+        guide.window!.appearance = NSAppearance(named: appearance)
         guide.window!.setContentSize(NSSize(width: 520, height: 500))
-        content.layoutSubtreeIfNeeded()
-        if let bitmap = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
-            content.cacheDisplay(in: content.bounds, to: bitmap)
-            // Offscreen AppKit views omit the window's opaque background.
-            // Composite that background explicitly, as the window server does.
-            let rendered = NSBitmapImageRep(bitmapDataPlanes: nil,
-                pixelsWide: bitmap.pixelsWide, pixelsHigh: bitmap.pixelsHigh,
-                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true,
-                isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-            NSGraphicsContext.saveGraphicsState()
-            NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rendered)
-            let context = NSGraphicsContext.current!.cgContext
-            let rect = NSRect(x: 0, y: 0, width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
-            context.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
-            context.fill(rect)
-            context.setBlendMode(.normal)
-            context.draw(bitmap.cgImage!, in: rect)
-            NSGraphicsContext.restoreGraphicsState()
-            if let png = rendered.representation(using: .png, properties: [:]) {
-                try! png.write(to: URL(fileURLWithPath: directory).appendingPathComponent(name + ".png"))
-            }
-        }
+        guide.window!.orderBack(nil)
+        let deadline = Date().addingTimeInterval(0.2)
+        while Date() < deadline { RunLoop.current.run(until: Date().addingTimeInterval(0.02)) }
+        guide.window!.displayIfNeeded()
+        let capture = Process()
+        capture.executableURL = URL(fileURLWithPath: "/usr/sbin/screencapture")
+        capture.arguments = ["-o", "-x", "-l", String(guide.window!.windowNumber),
+            URL(fileURLWithPath: directory).appendingPathComponent(name + ".png").path]
+        try! capture.run(); capture.waitUntilExit()
+        require(capture.terminationStatus == 0, "Native setup screenshot failed")
+        guide.window!.orderOut(nil)
+        app.setActivationPolicy(.prohibited)
     }
     dictated = false; accessibility = true; needsAccessibility = true
-    details.pasteAutomatically = true; details.triggerName = "Fn"
+    details.pasteAutomatically = true; details.triggerName = "F5 / Mic"
+    details.shortcutID = "f5"; practice.string = ""
     guide.beginDictation(); guide.refresh(); snapshot("setup-dictation")
-    microphone = false; details.microphoneAuthorization = "denied"; guide.refresh(); snapshot("setup-microphone-denied")
+    snapshot("setup-dictation-dark", appearance: .darkAqua)
+    microphone = false; details.microphoneAuthorization = "authorized"; guide.refresh(); snapshot("setup-microphone-waiting")
+    details.microphoneAuthorization = "denied"; guide.refresh(); snapshot("setup-microphone-denied")
     microphone = true; model = false; details.modelState = .failed
     details.modelStatus = String(repeating: "Model download interrupted. Check the connection and retry. ", count: 5)
     guide.refresh(); snapshot("setup-model-failed-long-message")

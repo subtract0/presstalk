@@ -278,13 +278,25 @@ gh repo clone "$TAP_REPO" "$TMP_DIR/homebrew-presstalk" >/dev/null 2>&1 || true
 mkdir -p "$TMP_DIR/homebrew-presstalk/Casks"
 configure_git_identity "$TMP_DIR/homebrew-presstalk"
 
-cat >"$TMP_DIR/homebrew-presstalk/README.md" <<EOF
-# homebrew-presstalk
+cat >"$TMP_DIR/homebrew-presstalk/README.md" <<'EOF'
+# PressTalk for Homebrew
 
-\`\`\`bash
+Requires Apple Silicon and macOS 14 or later.
+
+```bash
 brew tap subtract0/presstalk
 brew install --cask presstalk
-\`\`\`
+```
+
+Open PressTalk to complete its native setup. Choose F5 or another supported
+shortcut if your keyboard's Fn key is not detected. Setup downloads about
+460 MB of speech model. The first recording after connecting AirPods can
+require a retry. [Setup and troubleshooting](https://presstalk.app/download.html).
+
+For an existing Homebrew installation, quit PressTalk before running
+`brew update` and `brew upgrade --cask presstalk`. Direct-download users should
+replace their existing app using the DMG and keep one installed copy; do not
+delete preferences or the licence to update.
 EOF
 
 cat >"$TMP_DIR/homebrew-presstalk/Casks/presstalk.rb" <<EOF
@@ -295,32 +307,25 @@ cask "presstalk" do
   url "${RELEASE_URL}"
   name "PressTalk"
   desc "Hold-to-talk local dictation for Apple Silicon"
-  homepage "https://github.com/${RELEASE_REPO}"
+  homepage "https://presstalk.app/"
 
+  livecheck do
+    url :url
+    regex(/^v?(\d+(?:\.\d+)+)$/i)
+    strategy :github_latest
+  end
+
+  depends_on arch: :arm64
   depends_on macos: :sonoma
 
   app "PressTalk.app"
 
-  postflight do |c|
-    c.system_command "/usr/bin/env",
-                     args: [
-                       "PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1",
-                       "PRESSTALK_OPEN_PERMISSION_PANES=1",
-                       "PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0",
-                       "/bin/bash",
-                       "#{appdir}/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh",
-                     ],
-                     must_succeed: false
-  end
-
   caveats <<~EOS
-    PressTalk defaults to the native Fn / Globe push-to-talk trigger.
-    On first launch, PressTalk opens a compact setup window for Microphone,
-    Input Monitoring, and Accessibility. Approve those three macOS permissions.
-    If you need to rerun setup manually, use:
-      PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1 PRESSTALK_OPEN_PERMISSION_PANES=1 PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh
-    If you choose the optional F5 trigger and need the Karabiner bridge, use:
-      /bin/bash /Applications/PressTalk.app/Contents/Resources/presstalk-karabiner-fallback.sh --enable
+    Open PressTalk to complete setup: microphone permission, pasting into apps,
+    a shortcut of your choice, and an approximately 460 MB speech-model download.
+    Choose F5 or another supported shortcut if your keyboard's Fn key is not detected.
+    The first recording after connecting AirPods can require a retry.
+    Setup and troubleshooting: https://presstalk.app/download.html
   EOS
 end
 EOF

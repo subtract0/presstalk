@@ -1,5 +1,9 @@
 # PressTalk Distribution Roadmap v1.0
 
+> Historical plan from June 2026. Its build, checkout provider and rollout
+> assumptions are obsolete. Use the [current distribution path](launch/DISTRIBUTION_PATH_2026-09-09.md)
+> and the [campaign ledger](launch/LOG.md) for current decisions.
+
 Date: 2026-06-13
 Audience: agents, operators, collaborators
 Source baseline: `refactor/skills-code-health-audit` at `d6c0da1` (`Extract transcript text policy`)

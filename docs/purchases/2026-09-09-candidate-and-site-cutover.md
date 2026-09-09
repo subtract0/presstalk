@@ -74,6 +74,11 @@ receipt redirect have not been enabled. Do not bypass the link gate to deploy.
 
 ## Remaining release work
 
+The subsequent [provider-capacity check](2026-09-09-provider-capacity.md)
+confirmed both free plans, prepared their payment forms, and uploaded the exact
+notarized app and checksum to a GitHub draft release. Provider upgrades still
+need owner payment verification; support still needs the Porkbun login.
+
 Resolve or characterize the AirPods transition with useful timestamp evidence;
 the owner does not need to repeat the whole acceptance sequence. Verify support
 forwarding and actual provider plan capacity. The observed Resend rate-limit

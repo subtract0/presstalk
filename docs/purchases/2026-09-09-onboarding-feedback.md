@@ -65,5 +65,36 @@ insertion timestamps with the activity before attributing it to PressTalk or
 changing model lifetime.
 
 Private build, native UI, browser, signature and notarization evidence is in
-`.local/onboarding-24/`. Publication and final artifact verification are recorded
-below after they complete.
+`.local/onboarding-24/`. Final publication and artifact verification follow.
+
+## Published release
+
+[PressTalk 0.1.24/build 24.1](https://github.com/subtract0/presstalk/releases/tag/v0.1.24)
+is public and marked latest. Native app source is `c5026b2`; the release target
+is `cf2f447be800114d699a4f54a244af2a89074cd4`. Both app and final installer
+were accepted by Apple, stapled, and accepted by Gatekeeper.
+
+- App notarization: `aadc3f0c-d617-4ed2-b4d5-4eb58971c02e`.
+- Final DMG notarization: `863d10c6-4143-4a56-8415-4e45e1995122`.
+- DMG: 5,777,402 bytes; SHA-256
+  `f88c6618ffd69d4cfb9e354953a3757b1cb71bab3a71953e699cee6f1bea79e4`.
+- ZIP: 4,977,336 bytes; SHA-256
+  `b9711c7114e218a12485ebf3324af8d0b7836ce8357b40dd5c0bbca73771e39a`.
+
+The first 400-pixel-tall installer window clipped its instructions when Finder
+showed the owner's status/path bars. That unpublished layout was rejected.
+The final 500-pixel window was mounted and visually checked with both bars
+visible. Its Applications symlink points to `/Applications`, its app icon is
+registered and decodable, and the copied app retains its valid signature. A
+fresh public DMG download matches the final verified bytes. A copy is in Downloads.
+
+[PR #2](https://github.com/subtract0/presstalk/pull/2) merged as
+`400b4f8c7bc98b84f4efefc415ec8ee1c989b534`.
+[Pages run 34349715590](https://github.com/subtract0/presstalk/actions/runs/34349715590)
+passed all gates and deployed. All six live pages match source; four updated
+live download-page previews pass. Production purchase health remains live with
+sales enabled. No new charge was made and no payment configuration was changed.
+
+The owner's currently running 0.1.23/build 23.4 was not replaced or restarted
+as part of this feedback release. The release installer is available in
+`~/Downloads/PressTalk-0.1.24-macos-arm64.dmg`.

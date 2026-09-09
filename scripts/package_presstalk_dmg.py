@@ -40,7 +40,9 @@ dmgbuild.build_dmg(str(output), 'PressTalk', settings={
     'icon': str(app / 'Contents/Resources' / icon_name),
     'background': str(root / 'resources/installer-background.png'),
     'icon_locations': {'PressTalk.app': (170, 180), 'Applications': (470, 180)},
-    'window_rect': ((180, 140), (640, 400)),
+    # Reserve room for Finder chrome even when the user's preferences show
+    # its status/path bars despite the image's preferred window settings.
+    'window_rect': ((180, 140), (640, 500)),
     'default_view': 'icon-view',
     'show_status_bar': False, 'show_tab_view': False, 'show_toolbar': False,
     'show_pathbar': False, 'show_sidebar': False,

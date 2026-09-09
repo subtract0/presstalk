@@ -3,6 +3,31 @@
 This check established the actual provider plans, rather than inferring paid
 capacity from successful test requests. New public sales remain disabled.
 
+## Owner clarification and revised email decision
+
+The owner subsequently confirmed that support forwarding already reaches the
+existing Tuta inbox and that the account can send mail. This is owner-reported
+operational evidence; a Porkbun browser login is no longer a release requirement
+just to inspect the forwarding list. Preserve the existing support mail route.
+
+The owner added a card for Resend and questioned the $20/month upgrade. A fresh
+Vercel configuration read still reports the Free plan. Keep Resend Free for
+initial automatic licence and recovery emails; no paid email subscription was
+activated by this work. Making an upgrade a prerequisite for the first customer
+was premature. The known 100/day and 3,000/month quotas still require capacity
+planning before approaching them; this decision does not assert capacity for
+500,000 emails on Free.
+
+Tuta supports the existing human support workflow. Its
+[support documentation](https://tuta.com/de/support/howto) states that it does
+not support third-party clients or IMAP/POP3/SMTP, so the mailbox is not a
+drop-in SMTP sender for the deployed purchase Worker. Retain the already-tested
+Resend API integration for automatic fulfilment. Reconsider a paid tier or
+another supported transactional sender when measured volume warrants it.
+
+The account-step page in Downloads now reflects this clarification. The
+provider observations below describe the earlier billing review.
+
 ## Transactional email
 
 Vercel's installed Resend configuration and the Resend usage dashboard both
@@ -47,13 +72,14 @@ owner's payment method verification. The owner was asked to complete it there.
 `~/Downloads/Finish PressTalk Release.html` collects the two billing links and
 the Porkbun login in one local page; it contains no credentials or SSO tokens.
 
-## Support forwarding
+## Earlier support-forwarding inspection
 
 Porkbun requires a browser login before its Current Forwards list can be
 inspected. DNS API access works, but the retrieved published API specification
 does not expose a forwarding-list operation. MX records alone do not prove
 that `help@presstalk.app` forwards to an attended inbox. The login window is
-open and the owner was asked to sign in. No support-delivery claim is made.
+open and the owner was asked to sign in. This inspection was superseded by the
+owner's operational confirmation above; no agent-run forwarding test is claimed.
 
 ## Prepared release and website check
 

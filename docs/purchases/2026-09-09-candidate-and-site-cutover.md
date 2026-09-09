@@ -77,7 +77,10 @@ receipt redirect have not been enabled. Do not bypass the link gate to deploy.
 The subsequent [provider-capacity check](2026-09-09-provider-capacity.md)
 confirmed both free plans, prepared their payment forms, and uploaded the exact
 notarized app and checksum to a GitHub draft release. Provider upgrades still
-need owner payment verification; support still needs the Porkbun login.
+need owner payment verification if selected. The subsequent owner clarification
+confirmed working Tuta support forwarding and retained Resend Free for initial
+volume. Neither a paid email tier nor a Porkbun login is now a prerequisite for
+the first customer; capacity planning remains required as volume grows.
 
 Resolve or characterize the AirPods transition with useful timestamp evidence;
 the owner does not need to repeat the whole acceptance sequence. Verify support

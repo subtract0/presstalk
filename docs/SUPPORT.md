@@ -55,6 +55,13 @@ back.
 The speech model is about 460 MB and downloads during setup, with progress shown.
 After that it stays on your Mac, unless you clear the cache or reinstall.
 
+**The first AirPods recording asks me to try again.**
+This is a known issue after connecting AirPods. Release the key, wait a moment,
+then dictate again. PressTalk inserts nothing from the interrupted recording.
+If retries also fail, export diagnostics and contact support. The current
+release includes clearer retry guidance and diagnostics; the underlying
+transition issue is still under investigation.
+
 **German words come out wrong.**
 Some are fixable and some are not yet. PressTalk carries a German vocabulary
 repair pass for brand names, technical terms, and compounds. If a word you use

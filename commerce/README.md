@@ -1,7 +1,7 @@
 # PressTalk purchase service
 
 Buy once, activate on the Mac, continue offline. This service handles purchases
-and receipts only. It never sees microphone audio or dictated text.
+receipts, and owner-issued access grants. It never sees microphone audio or dictated text.
 
 Stripe Managed Payments remains the checkout. Its verified paid Checkout Session
 is checked against the exact configured Payment Link and Price, quantity one,
@@ -20,12 +20,9 @@ binding, periodic activation check or remote licence revocation is added.
 
 - Cloudflare Workers with D1 is the selected production host. `wrangler.jsonc`
   pins the authorized account and existing EU `presstalk-orders` database.
-  Migrations `0001_orders.sql` and `0002_delivery_capacity.sql` are applied and
-  the remote schema and required indexes were verified. The production Worker
-  is deployed with new sales disabled and its new Stripe webhook staged.
-  The isolated acceptance Worker uses a separate EU database. The owner has
-  completed test Checkout, received the licence, and dictated with the whole
-  Mac app offline. Final public release and checkout cutover remain outstanding.
+  The live Worker serves checkout, paid receipts and recovery. Migrations
+  `0001_orders.sql` through `0003_access_grants.sql` define its schema. The
+  isolated acceptance runtime uses a separate database and fixture signing key.
 - The Node 24/PostgreSQL adapter remains an alternative runtime. The prepared
   Vercel Hobby project is unused; no hosting plan upgrade is needed for the
   selected Cloudflare route.
@@ -42,8 +39,7 @@ binding, periodic activation check or remote licence revocation is added.
   and bypass this switch. The owner explicitly requested that the existing
   Stripe link remain active during setup; do not deactivate it.
 - The new Mac app opens the stable, user-owned `https://presstalk.app/buy.html`.
-  That page stays paused until the service passes acceptance, then redirects to
-  its verified `/buy` URL. Changing hosts will not require another Mac release.
+  That page redirects to the service’s verified `/buy` URL. Changing hosts will not require another Mac release.
 
 ## Invariants and limits
 
@@ -149,3 +145,43 @@ future major version. Invalid imports cannot displace a working licence.
 link is independent; leave it active under the owner's current instruction.
 Keep receipt/recovery routes and their keys/database available for existing
 customers. Do not delete orders or replace trusted signing keys during rollback.
+
+## Private access manager
+
+The owner opens `Manage PressTalk.command` in Downloads. `scripts/manage_presstalk.py`
+reads a mode-0600 credential from `~/Library/Application Support/PressTalk Operator/config.json`
+and requests a one-use, 60-second sign-in link using `ADMIN_TOKEN`. The master
+credential never enters a browser URL. Sign-in codes and 30-day session cookies
+are stored hashed in D1. Cookies are Secure, HttpOnly, SameSite=Strict; every
+form mutation requires a matching Origin. Form pages use same-origin referrer
+policy because no-referrer makes browser POST navigations omit the Origin.
+Private URLs are never sent to third-party sites.
+
+Give 7 days, Give 30 days, or Free forever creates a separate invitation record,
+not a paid order. Labels are visible only to the owner and never embedded in a
+licence. The recipient can open the link without starting the clock, then claim
+and activate via deep link, downloaded licence file, or manual key. No emails
+are sent. A link is a bearer capability: share it only with its recipient.
+
+Extra time starts when claimed. Adding days to an existing grant extends its
+expiry (or starts from now if expired); an unclaimed invitation gains days.
+The recipient reopens the same link and activates the updated key. There is no
+background phone-home to discover grants. Creation IDs, revisions and operation
+IDs prevent repeated submissions from adding time twice. Disabled links stop
+serving keys; they cannot revoke an already imported offline licence.
+
+Permanent gifts use existing schema 1 and work with 0.1.24. Extensions use schema
+2, require a signed expiry and trial_extension entitlement, and require 0.1.25+.
+Older clients reject schema 2 safely. The app checks expiry on every entitlement
+read and protects an existing permanent or longer licence from replacement.
+Like the original trial, offline expiry relies on the Mac clock; there is no
+new device tracking, DRM service or seat enforcement.
+
+Validation: `npm test`, `npm run build:worker && npm run test:worker`,
+`node test/grants-browser.mjs` (Chrome; isolated runtime), and `swift test` from
+the repo root. The browser suite covers real form navigation, copy, recipient
+claim, licence download, extension and permanent upgrade.
+
+Rotate ADMIN_TOKEN in Cloudflare and this Mac’s private config together if the
+operator credential is lost. To terminate existing logins too, delete rows from
+operator_logins and operator_sessions. Keep paid orders and access_grants intact.

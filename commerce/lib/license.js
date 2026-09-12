@@ -34,3 +34,20 @@ export function issueLicense({ session, key, keyID }) {
 export function activationURL(license) {
   return `presstalk://activate?license=${encodeURIComponent(license)}`;
 }
+
+// Schema 2 is deliberately rejected by older apps. Adding an expiry to schema
+// 1 would silently turn an extension into permanent access in those apps.
+export function issueAccessLicense({grant, key, keyID, now}) {
+  const temporary=grant.kind==='extension';
+  if(temporary && (!Number.isSafeInteger(grant.expires_at) || grant.expires_at<=now)) {
+    throw new Error('An extension needs a future expiry');
+  }
+  const payload={entitlement:temporary?'trial_extension':'founder',
+    issuedAt:new Date(now).toISOString().replace(/\.\d{3}Z$/,'Z'),keyID,
+    licenseID:grant.id,maxMajorVersion:0,productID:'com.am.presstalk',
+    schemaVersion:temporary?2:1};
+  if(temporary)payload.expiresAt=new Date(grant.expires_at).toISOString().replace(/\.\d{3}Z$/,'Z');
+  const encoded=Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature=sign(null,Buffer.from(`PressTalk-license-v1\n${keyID}.${encoded}`),key);
+  return `PRESSTALK-1.${keyID}.${encoded}.${signature.toString('base64url')}`;
+}

@@ -30,6 +30,8 @@ public struct PressTalkLicense: Codable, Equatable {
     /// adding it back after the fact would mean a schema change and a second
     /// signing key rollout.
     public let maxMajorVersion: Int
+    /// Only schema 2 grants expire. Schema 1 paid and gifted licences stay permanent.
+    public let expiresAt: Date?
 
     public init(
         schemaVersion: Int = PressTalkLicense.currentSchemaVersion,
@@ -38,7 +40,8 @@ public struct PressTalkLicense: Codable, Equatable {
         licenseID: String,
         entitlement: String,
         issuedAt: Date,
-        maxMajorVersion: Int
+        maxMajorVersion: Int,
+        expiresAt: Date? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.keyID = keyID
@@ -47,9 +50,11 @@ public struct PressTalkLicense: Codable, Equatable {
         self.entitlement = entitlement
         self.issuedAt = issuedAt
         self.maxMajorVersion = maxMajorVersion
+        self.expiresAt = expiresAt
     }
 
     public static let currentSchemaVersion = 1
+    public static let expiringSchemaVersion = 2
     public static let productIdentifier = "com.am.presstalk"
     /// Sentinel for "no upper bound". Zero rather than Int.max so the encoded
     /// payload stays short and readable.
@@ -61,9 +66,19 @@ public struct PressTalkLicense: Codable, Equatable {
         case personal
         case founder
         case commercial
+        case trialExtension = "trial_extension"
     }
 
     public var entitlementKind: Entitlement? { Entitlement(rawValue: entitlement) }
+
+    public var accessSummary: String {
+        if let expiresAt {
+            return "Free dictation until \(expiresAt.formatted(date: .abbreviated, time: .shortened)). No automatic charge."
+        }
+        return maxMajorVersion == Self.allMajorVersions
+            ? "Permanent licence. Every future Mac update included."
+            : "Permanent licence. Covers updates through \(maxMajorVersion).x."
+    }
 
     /// No email, no machine identifier, no hardware hash anywhere in here. A
     /// signature proves authenticity, not confidentiality: the payload is
@@ -80,6 +95,8 @@ public enum PressTalkLicenseError: Error, Equatable {
     case unsupportedSchema(Int)
     case wrongProduct(String)
     case versionNotCovered(licensed: Int, running: Int)
+    case expired
+    case existingLicenseIsBetter
 
     public var userFacingMessage: String {
         switch self {
@@ -98,6 +115,10 @@ public enum PressTalkLicenseError: Error, Equatable {
         case .versionNotCovered(let licensed, let running):
             return "That licence covers PressTalk \(licensed).x, and this is version \(running). "
                 + "Your existing version keeps working."
+        case .expired:
+            return "That extension has expired. Open your invitation link for an updated licence, or buy PressTalk to keep dictating."
+        case .existingLicenseIsBetter:
+            return "Your saved licence already gives you longer access. It has been kept on this Mac."
         }
     }
 }
@@ -130,7 +151,7 @@ public struct PressTalkLicenseVerifier {
     /// anything. Decoding first and verifying a re-encoded copy is the classic
     /// way to make a signature check meaningless, because the bytes that were
     /// signed and the bytes that get used stop being the same.
-    public func verify(_ encoded: String) -> Result<PressTalkLicense, PressTalkLicenseError> {
+    public func verify(_ encoded: String, now: Date = Date()) -> Result<PressTalkLicense, PressTalkLicenseError> {
         let trimmed = encoded.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count <= Self.maximumEncodedLength else {
             return .failure(.tooLarge(trimmed.count))
@@ -173,8 +194,17 @@ public struct PressTalkLicenseVerifier {
             return .failure(.malformed("payload is not a licence"))
         }
 
-        guard license.schemaVersion == PressTalkLicense.currentSchemaVersion else {
+        guard [PressTalkLicense.currentSchemaVersion, PressTalkLicense.expiringSchemaVersion].contains(license.schemaVersion) else {
             return .failure(.unsupportedSchema(license.schemaVersion))
+        }
+        if license.schemaVersion == PressTalkLicense.expiringSchemaVersion {
+            guard license.entitlementKind == .trialExtension,
+                  let expiry = license.expiresAt, expiry > license.issuedAt else {
+                return .failure(.malformed("extension must have a valid expiry"))
+            }
+            guard now < expiry else { return .failure(.expired) }
+        } else if license.expiresAt != nil || license.entitlementKind == .trialExtension {
+            return .failure(.malformed("permanent schema cannot contain an extension"))
         }
         // A signature by a trusted key over someone else's product identifier
         // still must not unlock this one.

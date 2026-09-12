@@ -216,13 +216,14 @@ final class PressTalkLicenseStore {
     var currentPlanName: String {
         switch state {
         case .grandfathered: return "Free (early user)"
-        case .licensed(let entitlement): return entitlement.capitalized
+        case .licensed(let entitlement):
+            return entitlement == PressTalkLicense.Entitlement.trialExtension.rawValue ? "Extended trial" : entitlement.capitalized
         case .trial: return "Trial"
         case .trialExpired: return "Trial finished"
         }
     }
 
-    var planSummary: String { PressTalkOffer.stateSummary(state) }
+    var planSummary: String { paidLicense.license?.accessSummary ?? PressTalkOffer.stateSummary(state) }
     var pricingSummary: String { PressTalkOffer.founderSummary }
 }
 
@@ -1168,7 +1169,10 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             planSummaryLabel.stringValue.contains(pricingSummaryLabel.stringValue)
         plansButton.isHidden = commerceConfig.plansURL == nil
         upgradeButton.isHidden = commerceConfig.upgradeURL == nil
-        if case .licensed = licenseStore.state { upgradeButton.isHidden = true }
+        if case .licensed(let entitlement) = licenseStore.state,
+           entitlement != PressTalkLicense.Entitlement.trialExtension.rawValue {
+            upgradeButton.isHidden = true
+        }
         refreshReleaseTailLabel()
         applyRuntimeStatus()
     }
@@ -1817,9 +1821,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         case .success(let license):
             let confirmation = NSAlert()
             confirmation.messageText = "Licence activated"
-            confirmation.informativeText = license.maxMajorVersion == PressTalkLicense.allMajorVersions
-                ? "\(license.entitlement.capitalized). Every future Mac update included."
-                : "\(license.entitlement.capitalized). Covers updates through \(license.maxMajorVersion).x."
+            confirmation.informativeText = license.accessSummary
             confirmation.runModal()
             reloadFromStore()
         case .failure(let error):

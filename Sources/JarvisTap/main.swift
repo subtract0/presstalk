@@ -471,11 +471,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             do {
                 let encoded = try LicenseActivation.encodedLicense(from: url)
                 switch self.licenseStore.importLicense(encoded) {
-                case .success:
+                case .success(let license):
                     self.lastTrialExpiredNoticeAt = nil
                     self.settingsWindowController?.reloadFromStore()
                     alert.messageText = "PressTalk is activated"
-                    alert.informativeText = "Your licence is saved on this Mac. You can keep dictating offline after the trial."
+                    alert.informativeText = "Your licence is saved on this Mac. " + license.accessSummary
                 case .failure(let error):
                     alert.alertStyle = .warning
                     alert.messageText = "That licence could not be activated"
@@ -5590,8 +5590,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         switch licenseStore.importLicense(field.stringValue) {
         case .success(let license):
             outcome.messageText = "Licence activated"
-            outcome.informativeText =
-                "\(license.entitlement.capitalized). Dictation is available again."
+            outcome.informativeText = license.accessSummary
             // A key that just verified means the next press must not be
             // refused by a throttle timestamp from the refusal before it.
             lastTrialExpiredNoticeAt = nil

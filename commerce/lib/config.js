@@ -16,7 +16,7 @@ export function configuration(env=process.env,{database='postgres'}={}) {
   if(!/^[A-Za-z0-9_-]{1,50}$/.test(keyID)) throw new Error('Invalid signing key ID');
   const recoveryPepper=required('RECOVERY_PEPPER'),cronSecret=required('CRON_SECRET');
   if(recoveryPepper.length<32||cronSecret.length<32) throw new Error('Recovery and retry secrets must be at least 32 characters');
-  return {origin,liveMode,testReference,stripeKey,keyID,recoveryPepper,cronSecret,
+  return {origin,liveMode,testReference,stripeKey,keyID,recoveryPepper,cronSecret,adminToken:env.ADMIN_TOKEN,
     databaseURL:database==='postgres' ? required('DATABASE_URL') : undefined,webhookSecret:required('STRIPE_WEBHOOK_SECRET'),
     paymentLinkID:required('STRIPE_PAYMENT_LINK_ID'),priceID:required('STRIPE_PRICE_ID'),
     currencies:required('STRIPE_CURRENCIES').split(',').map(x=>x.trim()),privateKey:required('LICENSE_PRIVATE_KEY'),

@@ -5,6 +5,7 @@ import { D1Store } from './lib/d1-store.js';
 import { Commerce } from './lib/service.js';
 import { ResendMailer } from './lib/mail.js';
 import { handler } from './lib/handler.js';
+import { AccessGrants } from './lib/access-grants.js';
 import { requestObservation,sanitizeObservation } from './lib/observability.js';
 
 const environment=env=>env.STRIPE_LIVE_MODE==='true'?'live':'test';
@@ -19,7 +20,8 @@ function application(env) {
   const stripe=new Stripe(config.stripeKey,{httpClient:Stripe.createFetchHttpClient(),maxNetworkRetries:1,timeout:10000});
   const commerce=new Commerce({config,stripe,store:new D1Store(env.ORDERS),
     mailer:new ResendMailer(config),key:signingKey(config.privateKey,config.publicKey)});
-  return {commerce,serve:handler(commerce,{...config,clientIPHeader:'cf-connecting-ip'},stripe)};
+  const grants=new AccessGrants({db:env.ORDERS,key:signingKey(config.privateKey,config.publicKey),config});
+  return {commerce,serve:handler(commerce,{...config,clientIPHeader:'cf-connecting-ip'},stripe,grants)};
 }
 export default {
   async fetch(request,env,context) {

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { Unavailable } from './service.js';
 import * as pages from './pages.js';
+import {grantHandler} from './grant-handler.js';
 
 const response=(body,status=200,extra={})=>new Response(body,{status,headers:{...pages.headers,...extra}});
 const json=(data,status=200)=>response(JSON.stringify(data),status,{'content-type':'application/json'});
@@ -22,10 +23,11 @@ async function limitedBody(request,max=65536) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
-export function handler(commerce,config,stripe) {
+export function handler(commerce,config,stripe,grants=null) {
   return async request => {
     const url=new URL(request.url),path=url.pathname;
     try {
+      if(grants) {const result=await grantHandler(request,grants,config);if(result)return result;}
       if (path==='/api/stripe-webhook' && request.method==='POST') {
         let event;
         try {
@@ -52,7 +54,9 @@ export function handler(commerce,config,stripe) {
         if (!link.active || link.livemode!==config.liveMode) return response(pages.paused(),503);
         return response('',303,{location:link.url});
       }
-      if (path==='/recover' && request.method==='GET') return response(pages.recovery());
+      // Browser form POSTs need Origin for CSRF checks. Private receipt pages
+      // retain no-referrer; this form has no bearer credential in its URL.
+      if (path==='/recover' && request.method==='GET') return response(pages.recovery(),200,{'referrer-policy':'same-origin'});
       if (path==='/api/recover' && request.method==='POST') {
         // Same-origin form only. Do not permit a third-party site to trigger
         // receipt email, and never reveal whether an address bought the app.

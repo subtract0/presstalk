@@ -7,7 +7,7 @@
     "node": "24.x"
   },
   "scripts": {
-    "test": "node --test test/commerce.test.js test/observability.test.js",
+    "test": "node --test test/commerce.test.js test/observability.test.js test/campaign.test.js",
     "build:worker": "wrangler deploy --dry-run --outdir ../.local/commerce/worker-bundle",
     "build:monitor": "wrangler deploy --config wrangler.monitor.jsonc --dry-run --outdir ../.local/commerce/monitor-bundle",
     "test:worker": "node --test test/worker-runtime.test.js test/access-grants.test.js",

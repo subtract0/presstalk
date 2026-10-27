@@ -4,9 +4,9 @@ PressTalk's pitch is that your voice stays on your Mac. This page says exactly
 what that means, including the parts where the network is involved, because a
 privacy promise with an asterisk you find later is worse than no promise.
 
-Purchase-service disclosures updated against the prepared implementation on
-2026-09-08. Automatic purchase delivery is not live until deployment acceptance
-is complete.
+Purchase-service disclosures updated on 2026-10-27 against the current
+implementation. The purchase service is live; the Mac app's dictation remains
+local.
 
 ## The short version
 
@@ -78,7 +78,7 @@ status so it can deliver and recover the same licence. Card numbers are not
 received by the purchase service or the Mac app. No recording or dictated text
 is involved in buying or recovery.
 
-The prepared service uses Cloudflare Workers and D1 for hosting and order
+The purchase service uses Cloudflare Workers and D1 for hosting and order
 storage, and Resend for licence emails. Resend receives the recipient address
 and receipt contents, including the licence attachment. Email open and click
 tracking are disabled. Recovery requests use hashed email and network-address
@@ -90,6 +90,17 @@ the licence. Receipt pages do not use analytics or tracking pixels, are marked
 not to be cached, and suppress outgoing referrers. The Mac verifies the licence
 locally after import; it does not require a purchase-service connection to keep
 dictating.
+
+**Advertising links.** Some links contain a public campaign and banner label.
+The website carries accepted labels through its navigation URLs, without
+cookies, browser storage, tracking pixels or background analytics requests.
+The purchase service can attach that shared label to Stripe Checkout so paid
+orders can be associated with an advertisement. Everyone using the same banner
+has the same label; it is not a unique visitor or device identifier. Arbitrary
+URL parameters, customer details and receipt credentials are not forwarded.
+This does not add any analytics to the Mac app or measure what you dictate.
+Purchases reached later through an untagged link may not be attributable to an
+advertisement.
 
 **Where the text ends up is the other app's business.** PressTalk pastes into
 whatever you are using. What Notion or Mail or your terminal then does with those

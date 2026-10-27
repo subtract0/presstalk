@@ -181,6 +181,10 @@ Validation: `npm test`, `npm run build:worker && npm run test:worker`,
 `node test/grants-browser.mjs` (Chrome; isolated runtime), and `swift test` from
 the repo root. The browser suite covers real form navigation, copy, recipient
 claim, licence download, extension and permanent upgrade.
+`bash scripts/test_presstalk_access_grants.sh EXTENSION_FILE PERMANENT_FILE`
+from the repository root verifies service-issued keys through the actual native
+licence store and Settings controls in isolated preferences. Both files are
+required; a missing canary cannot silently pass.
 
 Rotate ADMIN_TOKEN in Cloudflare and this Mac’s private config together if the
 operator credential is lost. To terminate existing logins too, delete rows from

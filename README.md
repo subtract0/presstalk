@@ -1,17 +1,21 @@
 # PressTalk
 
-Push-to-talk dictation for Apple Silicon. Hold `Fn`, speak, release, and the text
-lands in whatever app you were using. Recognition runs on the Neural Engine in
-your Mac.
+Push-to-talk dictation for Apple Silicon Macs (M1 or later), running macOS 14 or
+later. Hold `Fn`, speak, release, and PressTalk pastes the text into your focused
+text field. Recognition runs on the Neural Engine in your Mac.
+
+[Download PressTalk](https://presstalk.app/download.html) for a three-day free
+trial, with no card or account required. Homebrew is also available:
 
 ```bash
 brew tap subtract0/presstalk
 brew install --cask presstalk
 ```
 
-Then hold `Fn / Globe` and start talking. First launch walks through the three
-permissions macOS requires and downloads the speech model (~460 MB), ending in a
-dictation you can see arrive.
+First launch walks through the permissions needed for your chosen shortcut and
+downloads the speech model (~460 MB). Then click a text field, hold `Fn / Globe`,
+speak, and release. If Fn does not respond, setup also offers `Option + Space`
+or `F5`. Dictation works offline after setup.
 
 ## Where things are
 
@@ -20,19 +24,41 @@ dictation you can see arrive.
 | Privacy, in detail | [docs/PRIVACY.md](docs/PRIVACY.md) |
 | Support and refunds | [docs/SUPPORT.md](docs/SUPPORT.md) |
 | What it costs | [docs/MONETIZATION.md](docs/MONETIZATION.md) |
-| Landing page draft | [site/index.html](site/index.html) |
+| Product website | [presstalk.app](https://presstalk.app/) · [source](site/index.html) |
+| Current public release | [PressTalk 0.1.25](https://github.com/subtract0/presstalk/releases/tag/v0.1.25) |
+| Purchase and licence delivery | [commerce/README.md](commerce/README.md) |
 | What is measured, and how | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
-| What still blocks a paid launch | [docs/LAUNCH_GATES.md](docs/LAUNCH_GATES.md) |
-| The current two-week plan and stop limits | [docs/TWO_WEEK_PLAN_2026-09-05.md](docs/TWO_WEEK_PLAN_2026-09-05.md) |
-| Getting to a paid launch | [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md) |
+| Completed public launch record | [9 September release verification](docs/purchases/2026-09-09-public-release.md) |
+| Earlier launch checklist (historical) | [docs/LAUNCH_GATES.md](docs/LAUNCH_GATES.md) |
+| September launch plan (historical) | [docs/TWO_WEEK_PLAN_2026-09-05.md](docs/TWO_WEEK_PLAN_2026-09-05.md) |
+| Distribution roadmap | [docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md](docs/PRESSTALK_DISTRIBUTION_ROADMAP_V1.md) |
 | Permission trouble | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) |
 | Testing on other Macs | [docs/APPLE_SILICON_TESTING.md](docs/APPLE_SILICON_TESTING.md) |
 
 ## Current state
 
-**Not notarized.** Builds are ad-hoc signed, so macOS reports an unverified
-developer and first launch needs right-click → Open. A Developer ID certificate
-is the remaining gate; everything downstream of it is scripted and tested.
+**The public 0.1.25 release is Developer ID signed and notarized by Apple.**
+Download the DMG, drag PressTalk into Applications, and open it from there.
+The older certificate and manual-fulfilment tasks in the historical launch
+checklist are not the current distribution status.
+
+New installations receive a three-day trial starting with their first successful
+dictation. The existing one-time purchase includes every future Mac release we
+publish, including major versions; it does not promise indefinite development,
+support, or compatibility with future macOS versions. Prior users retain their
+grandfathered core dictation. See the [offer](docs/MONETIZATION.md) for details.
+
+After purchase, the confirmation page provides the licence immediately and the
+purchase service sends it by email. Activate through the app link, licence file,
+or pasted key. Verification then happens locally, without recurring activation
+checks. [Licence recovery](https://presstalk-licenses.presstalk.workers.dev/recover)
+is available for existing buyers.
+
+**Known limitations:** the first recording after connecting AirPods can stop
+with a retry message; release the key, wait briefly, and dictate again.
+Interrupted recordings insert nothing. Compatibility with macOS 27 has not yet
+been verified on a Mac running that release. See [support](docs/SUPPORT.md) and
+the [release notes](https://github.com/subtract0/presstalk/releases/tag/v0.1.25).
 
 Recognition uses Parakeet v3 on the Neural Engine. A larger WhisperKit model can
 re-check low-confidence results, but it is a separate ~620 MB download that is

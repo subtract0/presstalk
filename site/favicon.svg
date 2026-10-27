@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- The fn key, simplified for 16px browser tabs. No external font needed. -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#d5ee78" stroke="#3c4a2d" stroke-width="4"/>
+  <g fill="#252a22">
+    <path d="M14 52V29H8V21H14V19C14 11 18 8 26 8H28V16H26C23 16 22 18 22 21H28V29H22V52Z"/>
+    <path d="M32 21H40V25C42 22 45 20 49 20C54 20 56 24 56 30V52H48V33C48 29 47 28 45 28C42 28 41 30 41 33V52H32Z"/>
+  </g>
+</svg>

@@ -3,6 +3,12 @@
 Prepared 27 October 2026. This is a seven-day paid acquisition experiment for
 the existing PressTalk product, not a new pricing or licensing system.
 
+The yellow-green design now also serves at `https://presstalk.app/`. The
+original campaign URL remains available. The main homepage publication passed
+at commit `1699451fc62c2d4455cc1dd841abd12e56501fb5`, Actions run `40509729010`,
+and was verified at the root URL in the browser. `homepage-live.jpg` records
+that result. Existing homepage fragment links remain supported.
+
 ## Offer and audience
 
 - Product: PressTalk 0.1.25; Apple Silicon M1 or later; macOS 14 or later.

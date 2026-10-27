@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { Unavailable } from './service.js';
 import * as pages from './pages.js';
 import {grantHandler} from './grant-handler.js';
+import {campaignCheckoutURL} from './campaign.js';
 
 const response=(body,status=200,extra={})=>new Response(body,{status,headers:{...pages.headers,...extra}});
 const json=(data,status=200)=>response(JSON.stringify(data),status,{'content-type':'application/json'});
@@ -52,7 +53,7 @@ export function handler(commerce,config,stripe,grants=null) {
         await commerce.store.health();
         const link=await stripe.paymentLinks.retrieve(config.paymentLinkID);
         if (!link.active || link.livemode!==config.liveMode) return response(pages.paused(),503);
-        return response('',303,{location:link.url});
+        return response('',303,{location:campaignCheckoutURL(link.url,url,config)});
       }
       // Browser form POSTs need Origin for CSRF checks. Private receipt pages
       // retain no-referrer; this form has no bearer credential in its URL.

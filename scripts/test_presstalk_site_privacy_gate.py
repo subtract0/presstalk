@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Proves the site privacy gate fails on every shape of third-party request.
+"""Proves the site privacy gate fails on known third-party request patterns.
 
 A gate that reports success over a broken thing is worse than no gate. Each
 case below plants one real defect and asserts the shipping gate rejects it;
@@ -57,6 +57,24 @@ MUST_FAIL = {
     "unquoted attribute": (
         'index.html', '<script src=https://example.com/a.js></script>'
     ),
+    "campaign script sends a request": (
+        'campaign.js', 'window.fetch("https://example.com/track");'
+    ),
+    "campaign script sends a beacon": (
+        'campaign.js', 'navigator.sendBeacon("https://example.com/track", "visit");'
+    ),
+    "script opens XMLHttpRequest": (
+        'campaign.js', 'const request = new XMLHttpRequest();'
+    ),
+    "script opens a socket": (
+        'campaign.js', 'const socket = new WebSocket("wss://example.com/track");'
+    ),
+    "script dynamically imports a remote module": (
+        'campaign.js', 'import("https://example.com/tracking.js");'
+    ),
+    "inline script bypasses the local asset check": (
+        'index.html', '<script>fetch("https://example.com/track")</script>'
+    ),
 }
 
 MUST_PASS = {
@@ -72,13 +90,29 @@ MUST_PASS = {
         'index.html', '<!-- we deliberately do not load fonts.googleapis.com -->'
     ),
     "mailto link": ('index.html', '<a href="mailto:x@example.com">mail</a>'),
+    "local campaign script": (
+        'index.html', '<script src="campaign.js" defer></script>'
+    ),
+    "link decoration does not make a request": (
+        'campaign.js',
+        'const link = document.querySelector("a");\n'
+        'const url = new URL(link.href, "https://presstalk.app/");\n'
+        'url.searchParams.set("utm_source", "4chan"); link.href = url.href;'
+    ),
+    "JavaScript comment documents a forbidden request": (
+        'campaign.js', '// Do not call fetch("https://example.com/track").\n'
+        'const campaign = "4chan";'
+    ),
+    "JavaScript string is not a network call": (
+        'campaign.js', 'const explanation = "No fetch() or sendBeacon() is used.";'
+    ),
 }
 
 
 def run_gate(body: str, filename: str) -> int:
     with tempfile.TemporaryDirectory() as d:
         (Path(d) / filename).write_text(
-            body if filename.endswith(".css")
+            body if filename.endswith((".css", ".js"))
             else f"<title>t</title>\n{body}\n", encoding="utf-8")
         return subprocess.run(
             [sys.executable, str(GATE), d],

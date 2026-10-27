@@ -11,7 +11,11 @@ reader clicks is fine -- the page does not phone anyone until they choose to
 go. A stylesheet, script, image, font, iframe or CSS url() fires on load with
 no choice involved, and those are what this refuses.
 
-Exit 0 means every byte the page loads by itself comes from its own origin.
+The site's small JavaScript files only provide local interactions and decorate
+links. Direct network APIs in those scripts require a deliberate review rather
+than passing unnoticed because the file extension was not scanned. This source
+check catches known request patterns; it is not a JavaScript interpreter or a
+substitute for checking browser requests after changing script behavior.
 """
 from __future__ import annotations
 
@@ -48,6 +52,36 @@ ATTR = re.compile(r'([\w:-]+)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'<>`]+))')
 CSS_URL = re.compile(r"""url\(\s*['"]?([^'")]+)['"]?\s*\)""")
 CSS_IMPORT = re.compile(r"""@import\s+(?:url\(\s*)?['"]([^'"]+)['"]""")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
+SCRIPT_BODY = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.S | re.I)
+JS_STRING_OR_COMMENT = re.compile(
+    r'''(?P<string>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|'''
+    r'''(?P<comment>/\*[\s\S]*?\*/|//[^\r\n]*)'''
+)
+JS_NETWORK_CALL = re.compile(
+    r"\b(?:fetch|sendBeacon|XMLHttpRequest|WebSocket|EventSource|importScripts)\s*\("
+)
+JS_REMOTE_IMPORT = re.compile(
+    r'''\bimport\s*(?:\(\s*|[^;\n]*?\bfrom\s*|)(["'])(?:https?:)?//'''
+)
+
+
+def javascript_findings(text: str) -> list[tuple[int, str]]:
+    """Check explicit network operations without mistaking prose for code."""
+    def blank(value: str) -> str:
+        return "".join("\n" if char == "\n" else " " for char in value)
+
+    # Preserve offsets for useful line numbers. URLs and examples inside strings
+    # are not calls, and comments can explain why a network API is absent.
+    code = JS_STRING_OR_COMMENT.sub(lambda match: blank(match.group()), text)
+    without_comments = JS_STRING_OR_COMMENT.sub(
+        lambda match: match.group() if match.group("string") else blank(match.group()),
+        text,
+    )
+    findings = [(match.start(), "JavaScript network API requires review")
+                for match in JS_NETWORK_CALL.finditer(code)]
+    findings += [(match.start(), "JavaScript imports a third-party script")
+                 for match in JS_REMOTE_IMPORT.finditer(without_comments)]
+    return findings
 
 
 def is_external(value: str) -> bool:
@@ -81,6 +115,17 @@ def scan(path: Path) -> list[str]:
 
     def line_of(idx: int) -> int:
         return text.count("\n", 0, idx) + 1
+
+    if path.suffix == ".js":
+        return [f"{rel_path}:{line_of(offset)}  {message}"
+                for offset, message in javascript_findings(text)]
+
+    if path.suffix == ".html":
+        for script in SCRIPT_BODY.finditer(text):
+            for offset, message in javascript_findings(script.group(1)):
+                findings.append(
+                    f"{rel_path}:{line_of(script.start(1) + offset)}  {message}"
+                )
 
     for m in TAG.finditer(text):
         tag = m.group(1).lower()
@@ -123,7 +168,8 @@ def main() -> int:
     # An explicit directory lets the test point the real gate at planted
     # defects, so the test exercises the shipping code rather than a copy.
     root = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else SITE
-    targets = sorted(root.rglob("*.html")) + sorted(root.rglob("*.css"))
+    targets = (sorted(root.rglob("*.html")) + sorted(root.rglob("*.css"))
+               + sorted(root.rglob("*.js")))
     if not targets:
         print(f"no pages found under {root}", file=sys.stderr)
         return 1
@@ -138,13 +184,14 @@ def main() -> int:
     print()
     print(f"scanned {len(targets)} file(s) under {root}")
     if all_findings:
-        print(f"{len(all_findings)} automatic third-party request(s).")
-        print("Vendor the asset locally; scripts/presstalk_vendor_webfonts.py "
-              "does this for webfonts.")
+        print(f"{len(all_findings)} external resource or script-network finding(s).")
+        print("Vendor external assets locally. JavaScript network calls need "
+              "explicit review; campaign attribution should decorate links only.")
         return 1
 
-    print("No automatic third-party requests. Links a reader clicks are not "
-          "checked -- those are their choice, not the page's.")
+    print("No known automatic third-party request patterns or direct JavaScript "
+          "network calls. Links a reader clicks are not checked -- those are "
+          "their choice, not the page's.")
     return 0
 
 

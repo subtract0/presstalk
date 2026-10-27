@@ -167,8 +167,12 @@ No local test is a live customer purchase or proof of current email delivery.
 - Browser review covered the desktop page, a 390-pixel mobile view, and
   landing → download → buy navigation with campaign labels preserved. The
   temporary mobile QA page was removed from the deployment directory.
-- `landing-preview.jpg` records the reviewed desktop layout. Both PNG banner
-  sizes were inspected at their native dimensions.
+- `landing-preview.jpg` records the published page on `presstalk.app`. Both
+  PNG banner sizes were inspected at their native dimensions.
+- GitHub Pages publication passed at commit
+  `087ebc67ac6ed627f19b190bb7e9abd611f6b30a`, Actions run `40507948098`.
+  The public `https://presstalk.app/voice-to-text.html` page was opened and
+  its live content verified in the browser after deployment.
 - Production Worker deployment remains outstanding. Static-site publication
   and the Worker deployment are independent operations.
 

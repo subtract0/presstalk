@@ -25,6 +25,7 @@ local.
 | Trace log (`~/Library/Logs/presstalk_trace.log`) | Your Mac. Transcripts are redacted to a length, a word count, and a short digest. Rotates at 8 MB | No, unless you attach it to a support email yourself |
 | Diagnostics export | A file you choose to create | Only if you send it |
 | Speech models (~460 MB) | `~/Library/Application Support/` | Downloaded from huggingface.co during setup |
+| App update checks and downloads (0.1.26 onward) | PressTalk's update feed and GitHub release hosting | Ordinary HTTPS requests reveal your IP address and app/user-agent metadata to the hosting providers; no recordings, transcripts or licence keys are sent |
 | Licence key | Purchase service and your Mac, checked locally after import | Delivered through your receipt, email or licence file. The app does not upload it or contact an activation server |
 | Purchase email and order identifiers | Payment processor and purchase service | Used to verify payment, deliver the licence and recover the same licence later |
 
@@ -45,12 +46,20 @@ AirDrop & Handoff.
 
 ## What PressTalk connects to
 
-In normal dictation mode, the app's network use is for model setup. It does not
-send anything you said:
+In normal dictation mode, the app uses the network for model setup and, from
+version 0.1.26, optional app updates. It does not send anything you said:
 
 - **huggingface.co** — downloads the speech recognition model, and a tokenizer
   file for the optional second-pass model. Hugging Face sees a download request
   and your IP address, the same as any file download.
+- **presstalk.app and GitHub release hosting** — checks the signed update feed
+  and downloads signed app updates. Automatic checks and downloads are enabled
+  by default in 0.1.26 and later. Turn either off in PressTalk Settings. Sparkle's
+  system profiling is disabled; the app adds no device identifier or licence key
+  to these requests. Hosts receive normal connection and user-agent metadata.
+  Updates install when PressTalk quits, after any dictation and clipboard
+  restoration finish. Dictation and licence verification continue to work
+  offline when checks or downloads are unavailable.
 - There is no analytics service, crash reporter, telemetry endpoint or recurring
   licence check. Buying or recovering a licence opens the purchase website in
   your browser; that website has the separate data flow described below.

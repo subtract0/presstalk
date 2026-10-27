@@ -111,6 +111,73 @@ func control<T: NSView>(_ identifier: String, as type: T.Type) -> T {
     }
     return view
 }
+
+// Exercise the real updater controls against an isolated preference provider.
+// Refreshes must only read preferences: opting out cannot silently opt back in.
+var updateSettings = PressTalkSettingsWindowController.UpdateSettings(
+    available: true, canCheck: true, automaticChecks: true, automaticDownloads: true,
+    message: "Updates are ready.")
+var updateChecks = 0
+var checkPreferenceWrites: [Bool] = []
+var downloadPreferenceWrites: [Bool] = []
+controller.onReadUpdateSettings = { updateSettings }
+controller.onCheckForUpdates = { updateChecks += 1 }
+controller.onAutomaticUpdateChecksChanged = {
+    checkPreferenceWrites.append($0)
+    updateSettings.automaticChecks = $0
+}
+controller.onAutomaticUpdateDownloadsChanged = {
+    downloadPreferenceWrites.append($0)
+    updateSettings.automaticDownloads = $0
+}
+let checkUpdate = control("settings.checkForUpdates", as: NSButton.self)
+let automaticChecks = control("settings.automaticUpdateChecks", as: NSButton.self)
+let automaticDownloads = control("settings.automaticUpdateDownloads", as: NSButton.self)
+controller.refreshUpdateSettings()
+require(checkUpdate.isEnabled && automaticChecks.isEnabled && automaticDownloads.isEnabled,
+    "Official release update controls are unreachable")
+checkUpdate.performClick(nil)
+require(updateChecks == 1, "Check for Updates did not invoke its production callback")
+automaticDownloads.performClick(nil)
+require(downloadPreferenceWrites == [false] && !updateSettings.automaticDownloads,
+    "Automatic download opt-out was not saved exactly once")
+automaticChecks.performClick(nil)
+require(checkPreferenceWrites == [false] && !updateSettings.automaticChecks,
+    "Automatic check opt-out was not saved exactly once")
+require(!automaticDownloads.isEnabled, "Downloads remain interactive while automatic checks are off")
+app.sendAction(automaticDownloads.action!, to: automaticDownloads.target, from: automaticDownloads)
+require(downloadPreferenceWrites == [false], "Disabled download action bypassed its availability guard")
+for _ in 0..<3 {
+    controller.refreshUpdateSettings()
+    controller.reloadFromStore()
+    controller.updateRuntimeStatus(.placeholder)
+}
+require(automaticChecks.state == .off && automaticDownloads.state == .off,
+    "Refreshing Settings overwrote the update opt-outs")
+require(checkPreferenceWrites == [false] && downloadPreferenceWrites == [false],
+    "Refreshing Settings recursively wrote update preferences")
+automaticChecks.performClick(nil)
+automaticDownloads.performClick(nil)
+require(checkPreferenceWrites == [false, true] && downloadPreferenceWrites == [false, true],
+    "Automatic update controls cannot opt back in")
+
+updateSettings.canCheck = false
+controller.refreshUpdateSettings()
+require(!checkUpdate.isEnabled, "Busy updater still offers a manual check")
+app.sendAction(checkUpdate.action!, to: checkUpdate.target, from: checkUpdate)
+require(updateChecks == 1, "Busy updater action bypassed its availability guard")
+updateSettings.available = false
+updateSettings.canCheck = true
+controller.refreshUpdateSettings()
+require(!checkUpdate.isEnabled && !automaticChecks.isEnabled && !automaticDownloads.isEnabled,
+    "Development app exposes working production-update controls")
+for button in [checkUpdate, automaticChecks, automaticDownloads] {
+    app.sendAction(button.action!, to: button.target, from: button)
+}
+require(updateChecks == 1 && checkPreferenceWrites == [false, true]
+    && downloadPreferenceWrites == [false, true], "Unavailable updater action reached a callback")
+print("PASS: update controls fire, preserve opt-outs on refresh, avoid recursive writes and disable unavailable actions")
+
 var settingsChanges = 0
 controller.onSettingsChanged = { settingsChanges += 1 }
 let hud = control("settings.showHUD", as: NSButton.self)

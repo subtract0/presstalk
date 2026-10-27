@@ -129,6 +129,10 @@ if truthy "${PRESSTALK_BUILD_PLAN_ONLY:-0}"; then
     "$TARGET_APP_BUNDLE" "$APP_BUNDLE_IDENTIFIER" "$DISTRIBUTION_SIGNING"
   exit 0
 fi
+SPARKLE_PUBLIC_KEY="$PKG_DIR/resources/PressTalkUpdatePublicKey.txt"
+if truthy "$DISTRIBUTION_SIGNING"; then
+  python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" validate-key --public-key "$SPARKLE_PUBLIC_KEY"
+fi
 
 pushd "$PKG_DIR" >/dev/null
 if truthy "${PRESSTALK_BUILD_CLEAN:-0}"; then swift package clean; fi
@@ -149,6 +153,15 @@ mkdir -p "$APP_RESOURCES_DIR"
 cp "$BINARY_DIR/jarvistap" "$APP_MACOS_DIR/jarvistap"
 chmod 755 "$APP_MACOS_DIR/jarvistap"
 cp "$PKG_DIR/resources/PressTalk.icns" "$APP_RESOURCES_DIR/PressTalk.icns"
+SPARKLE_DISTRIBUTION="$PKG_DIR/.build/artifacts/sparkle/Sparkle"
+SPARKLE_SOURCE="$SPARKLE_DISTRIBUTION/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+if [[ ! -d "$SPARKLE_SOURCE" ]]; then
+  echo "Missing checksum-verified Sparkle artifact. Resolve the pinned Swift package first." >&2
+  exit 1
+fi
+mkdir -p "$APP_CONTENTS_DIR/Frameworks"
+ditto "$SPARKLE_SOURCE" "$APP_CONTENTS_DIR/Frameworks/Sparkle.framework"
+cp "$SPARKLE_DISTRIBUTION/LICENSE" "$APP_RESOURCES_DIR/Sparkle-LICENSE"
 cp "$PKG_DIR/scripts/presstalk_bootstrap.sh" "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
@@ -279,6 +292,11 @@ cat >"$APP_INFO_PLIST" <<PLIST
 </plist>
 PLIST
 
+updater_args=(configure --app "$APP_BUNDLE")
+if truthy "$DISTRIBUTION_SIGNING"; then updater_args+=(--production --public-key "$SPARKLE_PUBLIC_KEY"); fi
+python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" "${updater_args[@]}"
+python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" verify --app "$APP_BUNDLE"
+
 swift "$PKG_DIR/scripts/presstalk_bundle_icon_gate.swift" "$APP_BUNDLE"
 
 resolve_signing_identity() {
@@ -380,6 +398,19 @@ if [[ "$HARDENED_RUNTIME" == "1" ]]; then
   codesign_args+=(--options runtime)
 fi
 
+# Sparkle's helpers have their own entitlement requirements. Sign inside-out
+# before sealing the framework; never apply the app's microphone entitlement
+# to them, and preserve the Downloader's supplied entitlements specifically.
+sparkle_codesign_args=("${codesign_args[@]}")
+if [[ "$HARDENED_RUNTIME" != "1" ]]; then sparkle_codesign_args+=(--options runtime); fi
+sparkle_framework="$APP_CONTENTS_DIR/Frameworks/Sparkle.framework"
+sparkle_version="$sparkle_framework/Versions/B"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/XPCServices/Installer.xpc"
+codesign "${sparkle_codesign_args[@]}" --preserve-metadata=entitlements "$sparkle_version/XPCServices/Downloader.xpc"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/Autoupdate"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/Updater.app"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_framework"
+
 # A hardened process is denied microphone input unless it carries
 # com.apple.security.device.audio-input, and the denial is silent: the
 # authorization status still reads .authorized while the input tap delivers zero
@@ -402,6 +433,7 @@ sign_nested_machos() {
     [[ "$candidate" == "$APP_MACOS_DIR/jarvistap" ]] && continue
     # The nested input method app signs itself in its own build script.
     [[ "$candidate" == *"/PressTalkInputMethod.app/"* ]] && continue
+    [[ "$candidate" == *"/Frameworks/Sparkle.framework/"* ]] && continue
     echo "Signing nested Mach-O: ${candidate#$APP_BUNDLE/}"
     codesign "${codesign_args[@]}" "$candidate"
     found=$((found + 1))

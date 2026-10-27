@@ -66,8 +66,19 @@ def main():
              "guard !accessibilityIsTrusted(), currentPermissionRecoveryState() == .renewPermission else {",
              "guard true else {", "Approval received during confirmation was reset"),
             ("in-flight-startup", "private func completeStartupIfPossible(",
-             "        guard !withStateLock({ permissionRenewalInFlight }) else { return }", "",
+             "        guard !withStateLock({ permissionRenewalInFlight || updateInstallationReserved || terminationPending }) else { return }", "",
              "Startup rearmed services during permission renewal"),
+            ("update-startup", "private func completeStartupIfPossible(",
+             "permissionRenewalInFlight || updateInstallationReserved || terminationPending",
+             "permissionRenewalInFlight || terminationPending",
+             "Startup rearmed services during update or termination"),
+            ("termination-startup", "private func completeStartupIfPossible(",
+             "permissionRenewalInFlight || updateInstallationReserved || terminationPending",
+             "permissionRenewalInFlight || updateInstallationReserved",
+             "Startup rearmed services during update or termination"),
+            ("reserved-recheck", "private func recheckPermissionsAfterSettings()",
+             "                || updateInstallationReserved || terminationPending", "",
+             "Permission recheck changed listener or recovery state during update or termination"),
         ]
         for name, declaration, before, after, expected in mutants:
             mutated = methods.copy()

@@ -1038,6 +1038,17 @@ final class PressTalkHUDController {
 }
 
 final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegate {
+    struct UpdateSettings {
+        var available = false
+        var canCheck = false
+        var automaticChecks = false
+        var automaticDownloads = false
+        var message = "Automatic updates are available in the official PressTalk release."
+    }
+    var onReadUpdateSettings: (() -> UpdateSettings)?
+    var onCheckForUpdates: (() -> Void)?
+    var onAutomaticUpdateChecksChanged: ((Bool) -> Void)?
+    var onAutomaticUpdateDownloadsChanged: ((Bool) -> Void)?
     var onSettingsChanged: (() -> Void)?
     var onTranscriptionComputeChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
@@ -1065,6 +1076,10 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let insertionSuffixPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let computeDevicePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let computeDeviceHintLabel = NSTextField(wrappingLabelWithString: "")
+    private let automaticUpdateChecksCheckbox = NSButton(checkboxWithTitle: "Check for updates automatically", target: nil, action: nil)
+    private let automaticUpdateDownloadsCheckbox = NSButton(checkboxWithTitle: "Download updates and install when PressTalk quits", target: nil, action: nil)
+    private let checkForUpdatesButton = NSButton(title: "Check for Updates…", target: nil, action: nil)
+    private let updateStatusLabel = NSTextField(wrappingLabelWithString: "")
     /// What the picker lists. Supplied by the app so CoreAudio stays out of
     /// the view, and so the list is whatever the capture path would actually
     /// see rather than a second enumeration that can disagree with it.
@@ -1172,6 +1187,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     }
 
     func reloadFromStore() {
+        refreshUpdateSettings()
         showHUDCheckbox.state = settingsStore.showHUD ? .on : .off
         pasteAutomaticallyCheckbox.state = settingsStore.pasteAutomatically ? .on : .off
         triggerKeyPopup.selectItem(at: JarvisTapSettingsStore.TriggerKeyOption.allCases.firstIndex(of: settingsStore.triggerKey) ?? 0)
@@ -1193,6 +1209,34 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         applyRuntimeStatus()
     }
 
+    func refreshUpdateSettings() {
+        let settings = onReadUpdateSettings?() ?? UpdateSettings()
+        automaticUpdateChecksCheckbox.state = settings.automaticChecks ? .on : .off
+        automaticUpdateDownloadsCheckbox.state = settings.automaticDownloads ? .on : .off
+        automaticUpdateChecksCheckbox.isEnabled = settings.available
+        automaticUpdateDownloadsCheckbox.isEnabled = settings.available && settings.automaticChecks
+        checkForUpdatesButton.isEnabled = settings.available && settings.canCheck
+        updateStatusLabel.stringValue = settings.message
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        guard let settings = onReadUpdateSettings?(), settings.available, settings.canCheck else { return }
+        onCheckForUpdates?()
+        refreshUpdateSettings()
+    }
+
+    @objc private func changeAutomaticUpdateChecks(_ sender: Any?) {
+        guard onReadUpdateSettings?().available == true else { return }
+        onAutomaticUpdateChecksChanged?(automaticUpdateChecksCheckbox.state == .on)
+        refreshUpdateSettings()
+    }
+
+    @objc private func changeAutomaticUpdateDownloads(_ sender: Any?) {
+        guard let settings = onReadUpdateSettings?(), settings.available, settings.automaticChecks else { return }
+        onAutomaticUpdateDownloadsChanged?(automaticUpdateDownloadsCheckbox.state == .on)
+        refreshUpdateSettings()
+    }
+
     private func buildUI() {
         guard let contentView = window?.contentView else { return }
 
@@ -1211,6 +1255,12 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
 
         let planLabel = NSTextField(labelWithString: "Licence")
         planLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+
+        let updatesLabel = NSTextField(labelWithString: "Updates")
+        updatesLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
+        updateStatusLabel.font = NSFont.systemFont(ofSize: 12)
+        updateStatusLabel.textColor = .secondaryLabelColor
+        checkForUpdatesButton.bezelStyle = .rounded
 
         currentPlanValueLabel.font = NSFont.systemFont(ofSize: 13, weight: .semibold)
         currentPlanValueLabel.textColor = .labelColor
@@ -1388,6 +1438,11 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             dictationButtonsRow,
             nativeButtonsRow,
             fallbackButtonsRow,
+            updatesLabel,
+            automaticUpdateChecksCheckbox,
+            automaticUpdateDownloadsCheckbox,
+            checkForUpdatesButton,
+            updateStatusLabel,
             plansRow,
             planSummaryLabel,
             pricingSummaryLabel,
@@ -1401,7 +1456,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         // Constrain wrapped text and rows to the viewport, including at the
         // minimum window width. Intrinsic text width must not widen the page.
         for view in [subtitleLabel, microphoneHintLabel, computeDeviceHintLabel, computeDeviceRow, tailHintLabel, setupHintLabel,
-                     planSummaryLabel, pricingSummaryLabel, triggerKeyRow,
+                     planSummaryLabel, pricingSummaryLabel, updateStatusLabel, triggerKeyRow,
                      microphonePickerRow, insertionSuffixRow, tailHeaderRow,
                      releaseTailSlider, inputMonitoringRow, microphoneRow,
                      accessibilityRow, systemDictationRow, speechModelRow,
@@ -1409,7 +1464,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
         for field in [subtitleLabel, microphoneHintLabel, computeDeviceHintLabel, tailHintLabel, setupHintLabel,
-                      planSummaryLabel, pricingSummaryLabel] {
+                      planSummaryLabel, pricingSummaryLabel, updateStatusLabel] {
             field.maximumNumberOfLines = 0
             field.lineBreakMode = .byWordWrapping
             field.cell?.wraps = true
@@ -1458,6 +1513,16 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         computeDevicePopup.target = self
         computeDevicePopup.action = #selector(changeComputeDevice(_:))
         computeDevicePopup.setAccessibilityIdentifier("settings.transcriptionCompute")
+
+        automaticUpdateChecksCheckbox.target = self
+        automaticUpdateChecksCheckbox.action = #selector(changeAutomaticUpdateChecks(_:))
+        automaticUpdateChecksCheckbox.setAccessibilityIdentifier("settings.automaticUpdateChecks")
+        automaticUpdateDownloadsCheckbox.target = self
+        automaticUpdateDownloadsCheckbox.action = #selector(changeAutomaticUpdateDownloads(_:))
+        automaticUpdateDownloadsCheckbox.setAccessibilityIdentifier("settings.automaticUpdateDownloads")
+        checkForUpdatesButton.target = self
+        checkForUpdatesButton.action = #selector(checkForUpdates(_:))
+        checkForUpdatesButton.setAccessibilityIdentifier("settings.checkForUpdates")
 
         insertionSuffixPopup.target = self
         insertionSuffixPopup.action = #selector(changeInsertionSuffix(_:))

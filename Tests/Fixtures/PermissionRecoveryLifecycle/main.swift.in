@@ -69,6 +69,7 @@ func require(_ condition: @autoclosure () -> Bool, _ message: String) {
 final class RecoveryHarness {
     var trusted = false
     var permissionRenewalInFlight = false
+    var updateInstallationReserved = false, terminationPending = false
     var isRecording = false, isProcessing = false, setupMicrophoneProbeInProgress = false
     var permissionSettingsOpened = false, permissionSettingsReturned = false
     var permissionRecoveryMessage = ""
@@ -189,7 +190,38 @@ final class RecoveryHarness {
                 && app.permissionRecoveryMessage.contains("Quit and reopen"),
                 "Post-reset relaunch failure lost its actionable recovery state")
         }
-        print("PASS: production permission recovery lifecycle (6 scenarios)")
+        for terminating in [false, true] {
+            let app = RecoveryHarness()
+            app.updateInstallationReserved = !terminating
+            app.terminationPending = terminating
+            app.completeStartupIfPossible(showSetupWindowOnFailure: false, presentFailureStatus: false)
+            require(app.permissionChecks == 0 && app.listenerInstalls == 0 && app.warmups == 0,
+                "Startup rearmed services during update or termination")
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            require(app.currentPermissionRecoveryState() == .finishCurrentDictation,
+                "Recovery ignored an update or termination reservation")
+            app.renewAccessibilityPermission()
+            require(Process.calls.isEmpty && app.teardowns == 0 && app.restarts == 0,
+                "Permission renewal interrupted update or termination")
+            app.trusted = true
+            app.eventTapInstallSummary = "hid:listen_only"
+            app.recheckPermissionsAfterSettings()
+            require(app.teardowns == 0 && app.listenerInstalls == 0
+                && UserDefaults.standard.bool(forKey: app.permissionRestartKey),
+                "Permission recheck changed listener or recovery state during update or termination")
+        }
+        for terminating in [false, true] {
+            let app = RecoveryHarness()
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            NSAlert.duringModal = {
+                app.updateInstallationReserved = !terminating
+                app.terminationPending = terminating
+            }
+            app.renewAccessibilityPermission()
+            require(Process.calls.isEmpty && app.teardowns == 0 && app.restarts == 0,
+                "Modal confirmation bypassed a new update or termination reservation")
+        }
+        print("PASS: production permission recovery lifecycle (10 scenarios)")
     }
 }
 RecoveryHarness.runTests()

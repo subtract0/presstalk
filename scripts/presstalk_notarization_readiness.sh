@@ -71,6 +71,18 @@ record() {
 
 MAIN_BINARY="$APP_BUNDLE/Contents/MacOS/$(/usr/libexec/PlistBuddy -c 'Print CFBundleExecutable' "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || echo jarvistap)"
 
+# Old releases did not contain Sparkle. Any app declaring update configuration
+# or embedding its framework must pass the complete packaging check.
+if [[ -d "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework" ]] ||
+   /usr/libexec/PlistBuddy -c 'Print SUEnableAutomaticChecks' "$APP_BUNDLE/Contents/Info.plist" >/dev/null 2>&1; then
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if sparkle_check="$(python3 "$SCRIPT_DIR/presstalk_sparkle_bundle.py" verify --app "$APP_BUNDLE" 2>&1)"; then
+    record "updater.bundle" ok "$sparkle_check"
+  else
+    record "updater.bundle" fail "$sparkle_check"
+  fi
+fi
+
 # --- Info.plist ------------------------------------------------------------
 plist_string() {
   /usr/libexec/PlistBuddy -c "Print $1" "$APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true

@@ -16,7 +16,7 @@ private let fnModifierMask = CGEventFlags(rawValue: UInt64(NX_SECONDARYFNMASK))
 private let leftOptionModifierMask = CGEventFlags(rawValue: UInt64(NX_DEVICELALTKEYMASK))
 private let rightOptionModifierMask = CGEventFlags(rawValue: UInt64(NX_DEVICERALTKEYMASK))
 
-final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
+final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate, NSMenuItemValidation {
     private struct StreamingSnapshot {
         var currentText = ""
         var confirmedText = ""
@@ -354,6 +354,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var toggleAbortPopupsMenuItem: NSMenuItem?
     private var repairLocalSigningMenuItem: NSMenuItem?
     private var settingsWindowController: PressTalkSettingsWindowController?
+    private var appUpdater: PressTalkUpdater?
+    private var checkForUpdatesMenuItem: NSMenuItem?
+    // Protected by stateLock, including checks that begin capture or recovery.
+    private var updateInstallationReserved = false
+    private var terminationPending = false
+    private var pendingPasteboardRestorations = 0
     private var hudController: PressTalkHUDController?
     private var readyResetWorkItem: DispatchWorkItem?
     private var setupRetryTimer: Timer?
@@ -361,7 +367,14 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
         stateLock.lock()
-        defer { stateLock.unlock() }
+        let wasBusy = updateActivityIsBusy
+        defer {
+            let becameIdle = wasBusy && !updateActivityIsBusy
+            stateLock.unlock()
+            // A single transition observer covers successful, cancelled and
+            // failed capture/setup paths without a polling timer.
+            if becameIdle { notifyUpdateActivityChanged() }
+        }
         return try body()
     }
 
@@ -521,6 +534,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        let mustWait = withStateLock { () -> Bool in
+            if updateActivityIsBusy {
+                terminationPending = true
+                return true
+            }
+            updateInstallationReserved = true
+            terminationPending = false
+            return false
+        }
+        if mustWait {
+            present(.busy("PressTalk will quit after the current dictation or setup task finishes."))
+            return .terminateLater
+        }
+        return .terminateNow
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         stopSetupRetry()
         if let permissionWorkspaceObserver {
@@ -584,6 +614,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         speaker.configure(voiceIdentifier: config.sayVoice)
         installProductUI()
+        startAppUpdater()
         installProductionInsertionProbeNotification()
         applyWhisperDecodingPreferences()
         refreshRuntimeStatusUI()
@@ -623,7 +654,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     ) {
         // All retry and settings entry points converge here. A permission
         // reset owns the listener until its subprocess has finished.
-        guard !withStateLock({ permissionRenewalInFlight }) else { return }
+        guard !withStateLock({ permissionRenewalInFlight || updateInstallationReserved || terminationPending }) else { return }
         refreshRuntimeStatusUI()
         let permissions = checkSetupPermissions()
         if permissions.accessibilityGranted {
@@ -901,6 +932,24 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func makeSettingsWindowController() -> PressTalkSettingsWindowController {
         let settingsWindowController = PressTalkSettingsWindowController(settingsStore: settingsStore, licenseStore: licenseStore)
+        settingsWindowController.onReadUpdateSettings = { [weak self] in
+            MainActor.assumeIsolated {
+                guard let updater = self?.appUpdater else { return .init() }
+                return .init(available: updater.isAvailable, canCheck: updater.canCheckForUpdates,
+                             automaticChecks: updater.automaticallyChecksForUpdates,
+                             automaticDownloads: updater.automaticallyDownloadsUpdates,
+                             message: updater.status)
+            }
+        }
+        settingsWindowController.onCheckForUpdates = { [weak self] in
+            MainActor.assumeIsolated { self?.appUpdater?.checkForUpdates() }
+        }
+        settingsWindowController.onAutomaticUpdateChecksChanged = { [weak self] enabled in
+            MainActor.assumeIsolated { self?.appUpdater?.automaticallyChecksForUpdates = enabled }
+        }
+        settingsWindowController.onAutomaticUpdateDownloadsChanged = { [weak self] enabled in
+            MainActor.assumeIsolated { self?.appUpdater?.automaticallyDownloadsUpdates = enabled }
+        }
         settingsWindowController.onSettingsChanged = { [weak self] in
             self?.handleSettingsChanged()
         }
@@ -1025,6 +1074,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let updateItem = NSMenuItem(title: "Check for Updates…", action: #selector(checkForUpdatesFromMenu(_:)), keyEquivalent: "")
+        updateItem.target = self
+        updateItem.isEnabled = false
+        checkForUpdatesMenuItem = updateItem
+        menu.addItem(updateItem)
+
         let setupCheckItem = NSMenuItem(title: "Run Setup Check", action: #selector(runSetupCheckFromMenu(_:)), keyEquivalent: "")
         setupCheckItem.target = self
         menu.addItem(setupCheckItem)
@@ -1072,6 +1127,82 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.menu = makeStatusMenu()
         refreshMenuSettingsState()
         applyPresentationState(.warming)
+    }
+
+    /// Read only under stateLock. Keep this gate shared by updater and quit.
+    private var updateActivityIsBusy: Bool {
+        UpdateSafetyPolicy.Activity(
+            isRecording: isRecording, isProcessing: isProcessing,
+            isMicrophoneProbeRunning: setupMicrophoneProbeInProgress,
+            isCalibrationRunning: nativeCalibrationSession != nil,
+            isPermissionRenewalRunning: permissionRenewalInFlight,
+            isCapturePending: trackpadHoldState != nil,
+            isClipboardRestoring: pendingPasteboardRestorations > 0).isBusy
+    }
+
+    private func startAppUpdater() {
+        guard !config.testHarnessEnabled else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let updater = PressTalkUpdater()
+            updater.isApplicationBusy = { [weak self] in
+                guard let self else { return true }
+                return self.withStateLock { self.updateActivityIsBusy || self.terminationPending }
+            }
+            updater.tryReserveInstallation = { [weak self] in
+                guard let self else { return false }
+                return self.withStateLock {
+                    guard !self.updateActivityIsBusy && !self.terminationPending
+                            && !self.updateInstallationReserved else { return false }
+                    self.updateInstallationReserved = true
+                    return true
+                }
+            }
+            updater.releaseInstallationReservation = { [weak self] in
+                guard let self else { return }
+                self.withStateLock { self.updateInstallationReserved = false }
+            }
+            updater.onStateChanged = { [weak self] in
+                MainActor.assumeIsolated { self?.refreshUpdateControls() }
+            }
+            self.appUpdater = updater
+            updater.start()
+            self.refreshUpdateControls()
+        }
+    }
+
+    @MainActor private func refreshUpdateControls() {
+        checkForUpdatesMenuItem?.isEnabled = appUpdater?.canCheckForUpdates ?? false
+        settingsWindowController?.refreshUpdateSettings()
+    }
+
+    private func notifyUpdateActivityChanged() {
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            let finishTermination = self.withStateLock { () -> Bool in
+                guard self.terminationPending && !self.updateActivityIsBusy else { return false }
+                self.terminationPending = false
+                self.updateInstallationReserved = true
+                return true
+            }
+            if finishTermination {
+                NSApp.reply(toApplicationShouldTerminate: true)
+                return
+            }
+            self.appUpdater?.activityDidChange()
+            self.refreshUpdateControls()
+        }
+    }
+
+    @objc private func checkForUpdatesFromMenu(_ sender: Any?) {
+        MainActor.assumeIsolated { appUpdater?.checkForUpdates() }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem === checkForUpdatesMenuItem {
+            return MainActor.assumeIsolated { appUpdater?.canCheckForUpdates ?? false }
+        }
+        return menuItem.isEnabled
     }
 
     private func installApplicationMenu() {
@@ -1683,6 +1814,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func refreshRuntimeStatusUI() {
+        notifyUpdateActivityChanged()
         refreshKarabinerFallbackState()
         let status = currentRuntimeStatus()
         writeRuntimeStatusSnapshot(status)
@@ -1913,7 +2045,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func recheckPermissionsAfterSettings() {
         permissionSettingsReturned = true
-        guard !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight }) else { return }
+        guard !withStateLock({
+            isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight
+                || updateInstallationReserved || terminationPending
+        }) else { return }
         clearPermissionRecoveryAfterGrant()
         // Recreate a tap made before consent. A listen-only tap cannot become
         // writable merely because the Settings switch has changed.
@@ -1935,6 +2070,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             permissionRenewalAttempted: UserDefaults.standard.bool(forKey: permissionRenewalKey),
             recordingOrProcessing: withStateLock {
                 isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight
+                    || updateInstallationReserved || terminationPending
             }))
     }
 
@@ -1976,7 +2112,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             return
         }
         let reserved = withStateLock { () -> Bool in
-            guard !isRecording && !isProcessing && !setupMicrophoneProbeInProgress && !permissionRenewalInFlight else { return false }
+            guard !isRecording && !isProcessing && !setupMicrophoneProbeInProgress && !permissionRenewalInFlight
+                    && !updateInstallationReserved && !terminationPending else { return false }
             permissionRenewalInFlight = true
             return true
         }
@@ -2137,7 +2274,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     @discardableResult
     private func restartPressTalkFromSettings() -> Bool {
-        guard !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight }) else {
+        guard !withStateLock({ updateActivityIsBusy || updateInstallationReserved || terminationPending }) else {
             present(.busy("Finish the current dictation before restarting PressTalk."))
             return false
         }
@@ -2539,10 +2676,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func startNativeTriggerCalibration() {
-        nativeCalibrationTimeoutWorkItem?.cancel()
-        withStateLock {
+        let canStart = withStateLock { () -> Bool in
+            guard !updateInstallationReserved && !terminationPending && !permissionRenewalInFlight else { return false }
             nativeCalibrationSession = NativeCalibrationSession()
+            return true
         }
+        guard canStart else { return }
+        nativeCalibrationTimeoutWorkItem?.cancel()
 
         traceLogger.log("Native trigger calibration started")
         present(.copied("Native F5 calibration started. Press and release F5 three times now."))
@@ -4171,7 +4311,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         )
 
         let workItem: DispatchWorkItem? = withStateLock {
-            guard !isRecording, !isProcessing else { return nil }
+            guard !isRecording, !isProcessing, !updateInstallationReserved, !terminationPending,
+                  !permissionRenewalInFlight else { return nil }
 
             trackpadArmWorkItem?.cancel()
             trackpadHoldState = TrackpadHoldState(
@@ -6047,6 +6188,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.withStateLock {
                 details.recordingOrProcessing = self.isRecording || self.isProcessing
                     || self.setupMicrophoneProbeInProgress || self.permissionRenewalInFlight
+                    || self.updateInstallationReserved || self.terminationPending
                 details.isRecording = self.isRecording
                 switch self.whisperLoadState {
                 case .idle: details.modelState = .idle
@@ -6067,7 +6209,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             let canCheck = self.withStateLock { () -> Bool in
                 guard !self.isRecording, !self.isProcessing, !self.setupMicrophoneProbeInProgress,
-                      !self.permissionRenewalInFlight else { return false }
+                      !self.permissionRenewalInFlight, !self.updateInstallationReserved,
+                      !self.terminationPending else { return false }
                 self.setupMicrophoneProbeInProgress = true
                 return true
             }
@@ -6171,8 +6314,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func restorePasteboardAfterInsertion(_ staging: PasteboardInsertionStaging) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+        withStateLock { pendingPasteboardRestorations += 1 }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             staging.restoreIfUnchanged(on: .general)
+            guard let self else { return }
+            self.withStateLock { self.pendingPasteboardRestorations -= 1 }
         }
     }
 
@@ -7311,10 +7457,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case ignoreStillProcessing
             case ignoreMicrophoneCheck
             case ignorePermissionChange
+            case ignoreTermination
             case start(UInt64)
         }
 
         let decision = withStateLock { () -> PressDecision in
+            if updateInstallationReserved || terminationPending { return .ignoreTermination }
             if setupMicrophoneProbeInProgress { return .ignoreMicrophoneCheck }
             if permissionRenewalInFlight { return .ignorePermissionChange }
             if isRecording {
@@ -7340,6 +7488,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let captureSessionID: UInt64
         switch decision {
         case .ignoreSilently:
+            return
+        case .ignoreTermination:
+            present(.busy("PressTalk is finishing before it quits or installs an update."))
             return
         case .ignorePermissionChange:
             present(.setupRequired("Finish the permission update before starting a dictation."))
@@ -7633,6 +7784,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             var streamShutdownCompleted = true
 
             func finishProcessing(reason: String, spokenText: String? = nil) {
+                // Restore any temporary keyboard selection before exposing an
+                // idle state to the next dictation or a waiting app update.
+                self.restoreInputMethodPreselectionIfNeeded(reason: reason)
                 self.withStateLock {
                     self.isProcessing = false
                     self.processingTask = nil
@@ -7640,7 +7794,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                         self.activeCaptureEngineStarted = false
                     }
                 }
-                self.restoreInputMethodPreselectionIfNeeded(reason: reason)
                 // Every delivery path funnels through here, so the note is
                 // attached once rather than at each of the four call sites --
                 // three of which would have been easy to add and one easy to

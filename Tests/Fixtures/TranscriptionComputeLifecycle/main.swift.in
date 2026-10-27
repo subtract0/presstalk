@@ -103,6 +103,10 @@ final class LifecycleFixture {
     var captureEngineInitializations = 0
     var presentations: [Presentation] = []
     var checkReservationAtNextRefresh = false
+    // The compute fixture has no updater. Keep the production lock's activity
+    // observer inert; UpdaterIntegration exercises its actual termination path.
+    var updateActivityIsBusy: Bool { false }
+    func notifyUpdateActivityChanged() {}
 
     init(loaded: TranscriptionComputeDevice? = .neuralEngine) {
         loadedComputeDevice = loaded

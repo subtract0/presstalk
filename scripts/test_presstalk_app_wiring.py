@@ -34,6 +34,12 @@ with tempfile.TemporaryDirectory(prefix='presstalk-app-wiring-') as directory:
     response.write_text('\n'.join(objects) + '\n')
     command = ['swiftc', '-D', 'DEBUG', '-module-name', 'PressTalkAppWiringTest', '-I', str(build / 'Modules'),
                '-I', str(build), '-module-cache-path', str(build / 'ModuleCache')]
+    # The fixture is an unbundled executable; production uses its app-relative
+    # Frameworks runpath. Point only this fixture at the resolved binary artifact.
+    sparkle_parent = root / '.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64'
+    assert (sparkle_parent / 'Sparkle.framework').is_dir(), 'Resolve the pinned Sparkle package first'
+    command += ['-F', str(sparkle_parent), '-framework', 'Sparkle',
+                '-Xlinker', '-rpath', '-Xlinker', str(sparkle_parent)]
     description = json.loads((build / 'description.json').read_text())
     compilation = next(v for v in description['swiftCommands'].values() if v['moduleName'] == 'JarvisTap')
     flags = compilation['otherArguments']

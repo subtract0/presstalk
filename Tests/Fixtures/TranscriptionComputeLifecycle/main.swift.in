@@ -1,0 +1,261 @@
+import Foundation
+import Darwin
+
+func require(_ condition: @autoclosure () -> Bool, _ message: String) {
+    guard condition() else { print("FAIL: \(message)"); exit(1) }
+}
+func eventually(_ message: String, _ predicate: () -> Bool) {
+    let deadline = Date().addingTimeInterval(5)
+    while !predicate() && Date() < deadline {
+        RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.002))
+    }
+    require(predicate(), message)
+}
+
+// These types replace only external services. The application lifecycle and
+// acceptance/rollback code below is extracted verbatim from production source.
+enum ControlledFailure: Error { case requested }
+struct Models { let device: TranscriptionComputeDevice }
+final class ControlledLoader {
+    static let shared = ControlledLoader()
+    let lock = NSLock()
+    var pending: [(TranscriptionComputeDevice, CheckedContinuation<Models, Error>)] = []
+    var devices: [TranscriptionComputeDevice] = []
+    var maximumPending = 0
+    func load(_ device: TranscriptionComputeDevice) async throws -> Models {
+        try await withCheckedThrowingContinuation { continuation in
+            lock.lock()
+            pending.append((device, continuation))
+            devices.append(device)
+            maximumPending = max(maximumPending, pending.count)
+            lock.unlock()
+        }
+    }
+    var count: Int { lock.lock(); defer { lock.unlock() }; return devices.count }
+    func reset() {
+        lock.lock(); defer { lock.unlock() }
+        require(pending.isEmpty, "Fixture leaked a pending model load")
+        devices.removeAll(); maximumPending = 0
+    }
+    func complete(succeed: Bool) {
+        lock.lock()
+        require(pending.count == 1, "Overlapping warmups or no pending load")
+        let (device, continuation) = pending.removeFirst()
+        lock.unlock()
+        if succeed { continuation.resume(returning: Models(device: device)) }
+        else { continuation.resume(throwing: ControlledFailure.requested) }
+    }
+}
+struct TranscriptionComputeConfiguration {
+    let device: TranscriptionComputeDevice
+    var label: String { device.computeUnitsDescription }
+    static func downloadParakeetModelsIfMissing(to: URL) async throws {}
+    func loadCachedParakeetModels(from: URL) async throws -> Models {
+        try await ControlledLoader.shared.load(device)
+    }
+}
+enum AsrModels {
+    enum Version { case v3 }
+    static func defaultCacheDirectory(for: Version) -> URL {
+        URL(fileURLWithPath: "/unused-test-model-cache")
+    }
+}
+actor AsrManager {
+    enum Config { case `default` }
+    init(config: Config) {}
+    let decoderLayerCount = 1
+    func loadModels(_ models: Models) async throws {}
+}
+final class Settings { var transcriptionComputeDevice = TranscriptionComputeDevice.neuralEngine }
+final class SettingsWindow { func reloadFromStore() {} }
+struct Logger { func log(_ text: String) {} }
+struct Config {
+    var qualityFallbackAutoDownload = false
+    var whisperModel = "unused-test-whisper"
+}
+enum Presentation { case ready, error(String) }
+
+final class LifecycleFixture {
+    let stateLock = NSLock()
+    let settingsStore = Settings()
+    let traceLogger = Logger()
+    let config = Config()
+    var settingsWindowController: SettingsWindow? = SettingsWindow()
+    private var whisperLoadState: WhisperLoadState = .idle
+    var loadedComputeDevice: TranscriptionComputeDevice?
+    var parakeetAsrManager: AsrManager?
+    var parakeetDecoderLayerCount = 1
+    var whisperWarmupTask: Task<Void, Never>?
+    var computeChangeWorkItem: DispatchWorkItem?
+    var computeChangeMessage = ""
+    var forceComputeReload = false
+    var isRecording = false
+    var isProcessing = false
+    var setupMicrophoneProbeInProgress = false
+    var trackpadHoldState: Bool?
+    var nativeCalibrationSession: Bool?
+    let usesParakeetFinalBackend = true
+    let effectiveASRBackend = "fixture-parakeet"
+    let effectiveQualityFallbackEnabled = false
+    let whisperModelIsLocallyAvailable = false
+    let usesFluidTrueStreamingBackend = false
+    let effectiveStreamingTranscriptionEnabled = false
+    var captureEngineInitializations = 0
+    var presentations: [Presentation] = []
+    var checkReservationAtNextRefresh = false
+
+    init(loaded: TranscriptionComputeDevice? = .neuralEngine) {
+        loadedComputeDevice = loaded
+        if let loaded {
+            settingsStore.transcriptionComputeDevice = loaded
+            parakeetAsrManager = AsrManager(config: .default)
+            whisperLoadState = .ready
+        }
+    }
+    func refreshRuntimeStatusUI() {
+        if checkReservationAtNextRefresh {
+            checkReservationAtNextRefresh = false
+            require(isLoading, "Idle-to-loading reservation was lost before warmup launch")
+        }
+    }
+    func present(_ value: Presentation) { withStateLock { presentations.append(value) } }
+    func loadAudioCaptureEngine() async throws {
+        withStateLock { captureEngineInitializations += 1 }
+    }
+    func loadWhisperKit() async throws { fatalError("Unexpected hidden Whisper backend") }
+    func loadFluidTrueStreamingASR() async throws { fatalError("Unexpected streaming backend") }
+
+    // PRODUCTION_DECLARATIONS
+
+    var isLoading: Bool { withStateLock { if case .loading = whisperLoadState { return true }; return false } }
+    var ready: Bool { withStateLock { if case .ready = whisperLoadState { return true }; return false } }
+    var failed: Bool { withStateLock { if case .failed = whisperLoadState { return true }; return false } }
+    var taskCleared: Bool { withStateLock { whisperWarmupTask == nil } }
+    var errorCount: Int {
+        withStateLock { presentations.filter { if case .error = $0 { return true }; return false }.count }
+    }
+    func choose(_ device: TranscriptionComputeDevice) {
+        settingsStore.transcriptionComputeDevice = device
+        requestComputeChange()
+    }
+    func request() { requestComputeChange() }
+    func startInitial() { startWhisperWarmupIfNeeded() }
+    func stopDeferredWork() { computeChangeWorkItem?.cancel(); computeChangeWorkItem = nil }
+}
+
+let loader = ControlledLoader.shared
+
+// Replacements wait for both capture and final processing. The current model
+// remains usable until a replacement is committed, and repeated requests share
+// one reserved loading task.
+do {
+    loader.reset()
+    let app = LifecycleFixture()
+    let original = app.parakeetAsrManager
+    app.isRecording = true
+    app.choose(.gpu)
+    require(loader.count == 0 && app.ready && app.computeChangeWorkItem != nil,
+            "A processor change interrupted capture")
+    app.isRecording = false; app.isProcessing = true
+    app.request()
+    require(loader.count == 0 && app.ready, "A processor change interrupted final processing")
+    app.isProcessing = false
+    app.checkReservationAtNextRefresh = true
+    app.request()
+    eventually("Deferred GPU load never started") { loader.count == 1 }
+    require(app.parakeetAsrManager === original && app.loadedComputeDevice == .neuralEngine,
+            "Working model was discarded before replacement loaded")
+    for _ in 0..<8 { app.request(); app.startInitial() }
+    require(loader.count == 1 && app.isLoading, "Repeated requests started overlapping warmups")
+    loader.complete(succeed: true)
+    eventually("GPU completion did not become ready") { app.ready && app.taskCleared }
+    require(app.loadedComputeDevice == .gpu && app.parakeetAsrManager !== original,
+            "Successful replacement was not committed")
+    require(app.captureEngineInitializations == 1 && loader.maximumPending == 1,
+            "Warmup initialization overlapped")
+    app.stopDeferredWork()
+}
+
+// A success for a superseded choice must not replace the currently working
+// model. Re-selecting the in-flight choice later accepts that same load.
+do {
+    loader.reset()
+    let app = LifecycleFixture()
+    let original = app.parakeetAsrManager
+    app.choose(.gpu)
+    eventually("Rapid-change load did not start") { loader.count == 1 }
+    app.choose(.neuralEngine)
+    loader.complete(succeed: true)
+    eventually("Superseded completion did not settle") { app.ready && app.taskCleared }
+    require(app.loadedComputeDevice == .neuralEngine && app.parakeetAsrManager === original,
+            "A superseded successful load replaced the active processor")
+    require(app.errorCount == 0, "Discarding a superseded result displayed an error")
+    app.choose(.gpu)
+    eventually("Second requested load did not start") { loader.count == 2 }
+    app.choose(.neuralEngine); app.choose(.gpu)
+    require(loader.count == 2, "Rapid selection started an overlapping load")
+    loader.complete(succeed: true)
+    eventually("Latest GPU selection was not committed") { app.ready && app.taskCleared }
+    require(app.loadedComputeDevice == .gpu && loader.maximumPending == 1,
+            "Latest processor selection was lost")
+    app.stopDeferredWork()
+}
+
+// With no loaded model, a superseded ANE failure must keep a new GPU selection
+// and automatically attempt it, without showing the old failure to the user.
+do {
+    loader.reset()
+    let app = LifecycleFixture(loaded: nil)
+    app.startInitial()
+    eventually("Initial ANE load did not start") { loader.count == 1 }
+    app.choose(.gpu)
+    loader.complete(succeed: false)
+    eventually("Latest choice was not retried after a superseded failure") { loader.count == 2 }
+    require(app.settingsStore.transcriptionComputeDevice == .gpu && app.errorCount == 0,
+            "Superseded failure rolled back the latest setting or displayed a stale error")
+    loader.complete(succeed: true)
+    eventually("GPU recovery did not become ready") { app.ready && app.taskCleared }
+    require(app.loadedComputeDevice == .gpu && loader.maximumPending == 1,
+            "Superseded failure recovery overlapped loads")
+    app.stopDeferredWork()
+}
+
+// A failure of the still-current choice restores the previous working choice
+// and reports the failed request. It must not discard or recreate that manager.
+do {
+    loader.reset()
+    let app = LifecycleFixture()
+    let original = app.parakeetAsrManager
+    app.choose(.gpu)
+    eventually("Failing replacement did not start") { loader.count == 1 }
+    loader.complete(succeed: false)
+    eventually("Current failure did not recover") { app.ready && app.taskCleared && app.errorCount == 1 }
+    require(app.settingsStore.transcriptionComputeDevice == .neuralEngine &&
+            app.loadedComputeDevice == .neuralEngine && app.parakeetAsrManager === original,
+            "Current failed choice did not retain and restore the working processor")
+    require(app.computeChangeMessage.contains("Could not prepare GPU"),
+            "Current load failure was hidden from the user")
+    app.stopDeferredWork()
+}
+
+// First-load failure remains explicit and retryable; it never claims ready or
+// changes the selected processor when no previous working model exists.
+do {
+    loader.reset()
+    let app = LifecycleFixture(loaded: nil)
+    app.settingsStore.transcriptionComputeDevice = .gpu
+    app.startInitial()
+    eventually("First GPU load did not start") { loader.count == 1 }
+    loader.complete(succeed: false)
+    eventually("First-load failure was not reported") { app.failed && app.taskCleared && app.errorCount == 1 }
+    require(app.loadedComputeDevice == nil && app.settingsStore.transcriptionComputeDevice == .gpu,
+            "Failed first load selected an unrequested fallback")
+    app.startInitial()
+    eventually("Explicit retry did not start") { loader.count == 2 }
+    loader.complete(succeed: true)
+    eventually("Explicit retry did not recover") { app.ready && app.taskCleared }
+    require(app.loadedComputeDevice == .gpu, "Retry lost the user's processor choice")
+    app.stopDeferredWork()
+}
+
+print("PASS: actual compute lifecycle deferral, atomic reservation, serial warmups, superseded success/failure, rollback and retry")

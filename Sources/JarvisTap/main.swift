@@ -197,8 +197,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private lazy var settingsStore = JarvisTapSettingsStore(config: config)
     private lazy var licenseStore = PressTalkLicenseStore()
     private lazy var traceLogger = TraceLogger(path: config.traceLogPath)
+    private static var supportDirectoryName: String {
+        Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true ? "PressTalk Dev" : "JarvisTap"
+    }
     private var runtimeStatusURL = FileManager.default.homeDirectoryForCurrentUser
-        .appendingPathComponent("Library/Application Support/JarvisTap/runtime-status.json")
+        .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/runtime-status.json")
     private lazy var transcriptTextPolicy = TranscriptTextPolicy(
         shortHoldNoSpeechSuppressionSeconds: shortHoldNoSpeechSuppressionSeconds
     )
@@ -259,6 +262,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// fires. Nil is a normal state, not a failure.
     private var whisperKit: WhisperKit?
     private var parakeetAsrManager: AsrManager?
+    private var loadedComputeDevice: TranscriptionComputeDevice?
+    private var computeChangeWorkItem: DispatchWorkItem?
+    private var forceComputeReload = false
+    private var computeChangeMessage = ""
     private var parakeetDecoderLayerCount = 2
     private var fluidStreamingAsrManager: (any StreamingAsrManager)?
     private var fluidStreamingFedSampleCount = 0
@@ -325,6 +332,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var microphonePermissionRequestInFlight = false
     private var microphonePermissionRequestAttempted = false
     private var accessibilityPermissionRequestAttempted = false
+    private var permissionSettingsOpened = false
+    private var permissionSettingsReturned = false
+    private var permissionSettingsWasActive = false
+    private var permissionWorkspaceObserver: NSObjectProtocol?
+    private var permissionRecoveryMessage = ""
+    private var permissionRenewalInFlight = false
+    private let permissionRestartKey = "PressTalk.PermissionRecovery.RestartAttempted"
+    private let permissionRenewalKey = "PressTalk.PermissionRecovery.RenewalAttempted"
+    private let permissionResumeSetupKey = "PressTalk.PermissionRecovery.ResumeSetup"
     private var lastInputMethodInsertionFailure: InputMethodInsertionFailure?
     private var activeInputMethodPreselection: InputMethodPreselectionSession?
     private var inputMethodHelperWarmupScheduled = false
@@ -450,6 +466,20 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             self.captureFailed("Recording was interrupted by sleep. Nothing was inserted.", sessionID: session)
             self.ownedCapture.invalidate(session: session, reason: "System sleep interrupted capture.")
         }
+        permissionWorkspaceObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let self, self.permissionSettingsOpened,
+                  let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            else { return }
+            if application.bundleIdentifier == "com.apple.systempreferences" {
+                self.permissionSettingsWasActive = true
+            } else if self.permissionSettingsWasActive {
+                self.permissionSettingsWasActive = false
+                self.permissionSettingsReturned = true
+                self.recheckPermissionsAfterSettings()
+            }
+        }
         let exitCode = runStartup()
         if exitCode != 0 {
             NSApp.terminate(nil)
@@ -493,6 +523,10 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         stopSetupRetry()
+        if let permissionWorkspaceObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(permissionWorkspaceObserver)
+        }
+        computeChangeWorkItem?.cancel()
         // An orderly quit is not a crash. Without this, quitting or restarting
         // inside the sub-second window while the engine is starting leaves the
         // attempt record behind, and the next launch revokes a microphone that
@@ -538,11 +572,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         traceLogger.log(
             "Release tail max seconds=\(String(format: "%.2f", settingsStore.releaseTailMaxSeconds))"
         )
-        traceLogger.log("ASR backend=\(config.asrBackend)")
+        traceLogger.log("ASR backend=\(effectiveASRBackend)")
         traceLogger.log("Streaming ASR backend=\(config.streamingASRBackend ?? "none")")
-        traceLogger.log("Streaming transcription enabled=\(config.streamingTranscriptionEnabled ? 1 : 0)")
+        traceLogger.log("Streaming transcription enabled=\(effectiveStreamingTranscriptionEnabled ? 1 : 0)")
         traceLogger.log(
-            "Parakeet quality fallback enabled=\(config.parakeetQualityFallbackEnabled ? 1 : 0) min_confidence=\(String(format: "%.3f", config.parakeetQualityFallbackMinConfidence))"
+            "Parakeet quality fallback enabled=\(effectiveQualityFallbackEnabled ? 1 : 0) min_confidence=\(String(format: "%.3f", config.parakeetQualityFallbackMinConfidence))"
         )
         traceLogger.log("HUD enabled=\(settingsStore.showHUD ? 1 : 0) paste_automatically=\(settingsStore.pasteAutomatically ? 1 : 0) trigger_key=\(settingsStore.triggerKey.rawValue) insertion_suffix=\(settingsStore.insertionSuffix.rawValue)")
         traceLogger.log("Native microphone key path enabled=\(config.enableNativeMicrophoneKey ? 1 : 0)")
@@ -561,7 +595,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         // Guided setup runs until text has actually been delivered once, not
         // just until the permissions look right.
-        if config.autoShowSetupWindow && !settingsStore.firstRunSetupCompleted {
+        let resumePermissionSetup = UserDefaults.standard.bool(forKey: permissionResumeSetupKey)
+        if resumePermissionSetup {
+            UserDefaults.standard.removeObject(forKey: permissionResumeSetupKey)
+            permissionSettingsOpened = true
+            permissionSettingsReturned = true
+        }
+        if resumePermissionSetup || (config.autoShowSetupWindow && !settingsStore.firstRunSetupCompleted) {
             DispatchQueue.main.async { [weak self] in
                 self?.presentFirstRunSetup()
             }
@@ -581,8 +621,17 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         forcePresentSetupWindow: Bool = false,
         presentFailureStatus: Bool = true
     ) {
+        // All retry and settings entry points converge here. A permission
+        // reset owns the listener until its subprocess has finished.
+        guard !withStateLock({ permissionRenewalInFlight }) else { return }
         refreshRuntimeStatusUI()
         let permissions = checkSetupPermissions()
+        if permissions.accessibilityGranted {
+            // A successful relaunch can start with usable access and never
+            // enter the retry timer. End that recovery episode here too, so
+            // a later independent denial gets its own bounded recovery.
+            clearPermissionRecoveryAfterGrant()
+        }
 
         if presentFailureStatus {
             print("Checking Input Monitoring permission...")
@@ -639,7 +688,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             traceLogger.log("Accessibility permission OK")
         } else {
             traceLogger.log("Accessibility preflight unavailable; paste will use capability probe")
-            requestAccessibilityPermissionIfNeeded()
             if presentFailureStatus {
                 print("Accessibility preflight unavailable; continuing and testing paste when needed.")
                 fflush(stdout)
@@ -673,7 +721,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // retry -- so granting Accessibility afterwards upgraded nothing,
             // and guided setup waited forever for a writable tap it had already
             // given up on. Keep retrying until the tap is actually writable.
-            if eventTapInstallSummary.contains("listen_only") {
+            if eventTapInstallSummary.contains("listen_only") ||
+                (settingsStore.pasteAutomatically && !accessibilityIsTrusted()) {
                 traceLogger.log(
                     "Input trigger listener is listen-only; keeping retry alive to "
                     + "upgrade once Accessibility is granted")
@@ -721,17 +770,6 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func accessibilityIsTrusted() -> Bool { AXIsProcessTrusted() }
-
-    private func requestAccessibilityPermissionIfNeeded() {
-        guard config.allowPermissionPaneOpen, settingsStore.pasteAutomatically,
-              !accessibilityPermissionRequestAttempted, !accessibilityIsTrusted() else { return }
-        accessibilityPermissionRequestAttempted = true
-        traceLogger.log("Requesting native Accessibility permission for automatic text insertion")
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
-        // The system presents the request asynchronously. It is not a grant:
-        // the existing retry still checks trust before enabling insertion.
-        _ = AXIsProcessTrustedWithOptions(options)
-    }
 
     /// Releases the current event tap so a fresh one can be installed.
     ///
@@ -781,8 +819,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // is the trap: the old check saw inputPipelineReady, stopped, and
             // left the user on a step that could never be satisfied.
             let onlyListening = self.eventTapInstallSummary.contains("listen_only")
-            if self.inputPipelineReady && !onlyListening {
+            if self.inputPipelineReady && !onlyListening &&
+                (!self.settingsStore.pasteAutomatically || self.accessibilityIsTrusted()) {
+                self.clearPermissionRecoveryAfterGrant()
                 self.stopSetupRetry()
+                return
+            }
+            if self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress || self.permissionRenewalInFlight }) {
                 return
             }
             if onlyListening, self.accessibilityIsTrusted() {
@@ -811,7 +854,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func acquireSingletonLock() -> Bool {
         let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: supportDirectory, withIntermediateDirectories: true)
         } catch {
@@ -894,6 +937,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         settingsWindowController.onExportDiagnostics = { [weak self] in
             self?.exportDiagnostics()
+        }
+        settingsWindowController.onTranscriptionComputeChanged = { [weak self] in
+            self?.requestComputeChange()
         }
         settingsWindowController.onRestartApp = { [weak self] in
             self?.restartPressTalkFromSettings()
@@ -1063,6 +1109,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func handleSettingsChanged() {
+        if withStateLock({ permissionRenewalInFlight }) {
+            if let previous = installedTriggerKey { settingsStore.triggerKey = previous }
+            settingsWindowController?.reloadFromStore()
+            present(.busy("Finish the permission update before changing the shortcut."))
+            return
+        }
         if installedTriggerKey != settingsStore.triggerKey {
             if let previous = installedTriggerKey,
                withStateLock({ isRecording || isProcessing || trackpadHoldState != nil || nativeCalibrationSession != nil }) {
@@ -1535,7 +1587,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func runVisibleSetupCheck() {
-        if !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress }) {
+        if !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight }) {
             completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
         }
         presentFirstRunSetup()
@@ -1568,20 +1620,58 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func reloadSpeechModelFromMenu(_ sender: Any?) {
-        traceLogger.log("Manual speech model reload requested")
+        forceComputeReload = true
+        requestComputeChange()
+    }
+
+    private var transcriptionComputeStatus: String {
         withStateLock {
-            whisperWarmupTask?.cancel()
-            whisperWarmupTask = nil
-            whisperKit = nil
-            audioCaptureKit = nil
-            parakeetAsrManager = nil
-            parakeetDecoderLayerCount = 2
-            streamTranscriber = nil
-            whisperLoadState = .idle
+            if !computeChangeMessage.isEmpty { return computeChangeMessage }
+            let desired = settingsStore.transcriptionComputeDevice
+            if case .loading = whisperLoadState {
+                return "Preparing \(desired.displayName)…"
+            }
+            if let loadedComputeDevice, loadedComputeDevice != desired {
+                return "\(loadedComputeDevice.displayName) is active. The new choice applies after this dictation."
+            }
+            return loadedComputeDevice.map { "\($0.displayName) is ready." }
+                ?? "The model will use this processor when it is ready."
+        }
+    }
+
+    private func requestComputeChange() {
+        computeChangeWorkItem?.cancel()
+        computeChangeWorkItem = nil
+        let desired = settingsStore.transcriptionComputeDevice
+        let decision = withStateLock {
+            let choice = TranscriptionComputePolicy.reloadDecision(
+                requestedDevice: desired,
+                loadedDevice: forceComputeReload ? nil : loadedComputeDevice,
+                isRecording: isRecording || setupMicrophoneProbeInProgress || trackpadHoldState != nil,
+                isProcessing: isProcessing || nativeCalibrationSession != nil,
+                isLoading: { if case .loading = whisperLoadState { return true }; return false }())
+            if case .reload = choice {
+                // Reserve loading in the same critical section that checks
+                // capture and processing. A trigger must never observe a gap
+                // between the idle decision and the replacement task.
+                whisperLoadState = .loading
+                computeChangeMessage = ""
+            }
+            return choice
+        }
+        switch decision {
+        case .unchanged:
+            break
+        case .waitUntilIdle:
+            let item = DispatchWorkItem { [weak self] in self?.requestComputeChange() }
+            computeChangeWorkItem = item
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: item)
+        case .reload(let device):
+            forceComputeReload = false
+            // Retain the working model until its replacement loads successfully.
+            startReservedSpeechModelWarmup(requestedDevice: device)
         }
         refreshRuntimeStatusUI()
-        present(.warming)
-        startWhisperWarmupIfNeeded()
     }
 
     @objc private func revealLogsFromMenu(_ sender: Any?) {
@@ -1629,7 +1719,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// download, so say which one is true.
     private func currentQualityFallbackStatus() -> String {
         guard usesParakeetFinalBackend else { return "Not applicable" }
-        guard config.parakeetQualityFallbackEnabled else { return "Off" }
+        guard effectiveQualityFallbackEnabled else { return "Off" }
         if whisperKit != nil { return "Ready" }
         if whisperModelIsLocallyAvailable { return "Downloaded, loading" }
         return "Not downloaded (dictation uses Parakeet alone)"
@@ -1673,15 +1763,18 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             adHocSigned: appCodeSignatureSummary.contains("Signature=adhoc"),
             permissionPaneOpeningAllowed: config.allowPermissionPaneOpen,
             speechModelStatus: whisperStatus,
-            asrBackend: config.asrBackend,
+            asrBackend: effectiveASRBackend,
             streamingASRBackend: config.streamingASRBackend ?? "none",
-            realtimePartialTranscriptionEnabled: config.streamingTranscriptionEnabled,
+            realtimePartialTranscriptionEnabled: effectiveStreamingTranscriptionEnabled,
             asrMode: currentASRModeDescription(),
             qualityFallbackStatus: currentQualityFallbackStatus(),
             f5BridgeStatus: bridgeStatus,
             codeSignatureIdentifier: codeSignatureIdentifier,
             codeSignatureCDHash: codeSignatureCDHash,
-            codeSignatureAuthority: codeSignatureAuthority
+            codeSignatureAuthority: codeSignatureAuthority,
+            transcriptionComputeRequested: settingsStore.transcriptionComputeDevice.rawValue,
+            transcriptionComputeActive: withStateLock { loadedComputeDevice?.rawValue ?? "not_loaded" },
+            transcriptionComputeStatus: transcriptionComputeStatus
         )
     }
 
@@ -1700,6 +1793,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 "processID": ProcessInfo.processInfo.processIdentifier,
             ],
             "runtime": [
+                "transcriptionComputeRequested": status.transcriptionComputeRequested,
+                "transcriptionComputeActive": status.transcriptionComputeActive,
+                "transcriptionComputeStatus": status.transcriptionComputeStatus,
                 "inputPipelineReady": inputPipelineReady,
                 "inputListener": eventTapInstallSummary,
                 "setupRetryActive": setupRetryTimer != nil,
@@ -1765,6 +1861,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func openInputMonitoringPrivacyPane() {
+        beginPermissionSettingsVisit()
+        if !CGPreflightListenEventAccess() { _ = CGRequestListenEventAccess() }
         // Called only by an explicit Settings/setup action. Headless launch
         // flags suppress automatic prompts, never a person's button click.
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent"),
@@ -1787,14 +1885,161 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func requestAccessibilitySetup() {
-        // This request follows an explicit button click, including managed
-        // launches whose automatic permission prompts are disabled.
-        if !accessibilityIsTrusted() {
+        beginPermissionSettingsVisit()
+        // Register the request once per process, only after an explicit click.
+        if !accessibilityPermissionRequestAttempted && !accessibilityIsTrusted() {
+            accessibilityPermissionRequestAttempted = true
             let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
             _ = AXIsProcessTrustedWithOptions(options)
         }
         openAccessibilityPrivacyPane()
         refreshRuntimeStatusUI()
+    }
+
+    private func beginPermissionSettingsVisit() {
+        permissionSettingsOpened = true
+        permissionSettingsReturned = false
+        permissionSettingsWasActive = false
+        permissionRecoveryMessage = ""
+        scheduleSetupRetry()
+    }
+
+    private func clearPermissionRecoveryAfterGrant() {
+        guard !withStateLock({ permissionRenewalInFlight }), accessibilityIsTrusted() else { return }
+        UserDefaults.standard.removeObject(forKey: permissionRestartKey)
+        UserDefaults.standard.removeObject(forKey: permissionRenewalKey)
+        permissionRecoveryMessage = ""
+    }
+
+    private func recheckPermissionsAfterSettings() {
+        permissionSettingsReturned = true
+        guard !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight }) else { return }
+        clearPermissionRecoveryAfterGrant()
+        // Recreate a tap made before consent. A listen-only tap cannot become
+        // writable merely because the Settings switch has changed.
+        if eventTapInstallSummary.contains("listen_only"), accessibilityIsTrusted() {
+            guard teardownInputTriggerListener() else { return }
+            inputPipelineReady = false
+        }
+        completeStartupIfPossible(showSetupWindowOnFailure: false,
+                                  forcePresentSetupWindow: false, presentFailureStatus: false)
+        refreshRuntimeStatusUI()
+    }
+
+    private func currentPermissionRecoveryState() -> PermissionRecoveryPolicy.State {
+        PermissionRecoveryPolicy().state(for: .init(
+            permissionAvailable: accessibilityIsTrusted(),
+            hasOpenedSystemSettings: permissionSettingsOpened,
+            hasReturnedFromSystemSettings: permissionSettingsReturned,
+            restartAttempted: UserDefaults.standard.bool(forKey: permissionRestartKey),
+            permissionRenewalAttempted: UserDefaults.standard.bool(forKey: permissionRenewalKey),
+            recordingOrProcessing: withStateLock {
+                isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight
+            }))
+    }
+
+    @discardableResult
+    private func restartForPermissionRecovery() -> Bool {
+        guard !accessibilityIsTrusted(),
+              !UserDefaults.standard.bool(forKey: permissionRestartKey),
+              !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight })
+        else { return false }
+        UserDefaults.standard.set(true, forKey: permissionRestartKey)
+        UserDefaults.standard.set(true, forKey: permissionResumeSetupKey)
+        guard restartPressTalkFromSettings() else {
+            UserDefaults.standard.removeObject(forKey: permissionRestartKey)
+            UserDefaults.standard.removeObject(forKey: permissionResumeSetupKey)
+            return false
+        }
+        return true
+    }
+
+    private func renewAccessibilityPermission() {
+        guard currentPermissionRecoveryState() == .renewPermission,
+              Bundle.main.bundleIdentifier == "com.am.presstalk",
+              codeSignatureValue(prefix: "TeamIdentifier=") == "5HUC5LA94B",
+              codeSignatureValue(prefix: "Authority=").hasPrefix("Developer ID Application:")
+        else {
+            permissionRecoveryMessage = "Permission renewal is available in the official PressTalk app after checking access."
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "Renew PressTalk’s text-insertion permission?"
+        alert.informativeText = "macOS may still remember an earlier copy of PressTalk. This clears only PressTalk’s Accessibility approval and restarts this app. Enable PressTalk once more in System Settings afterward. Microphone access and other apps are unchanged."
+        alert.addButton(withTitle: "Renew Permission")
+        alert.addButton(withTitle: "Cancel")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        // The modal alert runs a nested event loop. Approval may have arrived
+        // while it was open; never discard that newly working permission.
+        guard !accessibilityIsTrusted(), currentPermissionRecoveryState() == .renewPermission else {
+            recheckPermissionsAfterSettings()
+            return
+        }
+        let reserved = withStateLock { () -> Bool in
+            guard !isRecording && !isProcessing && !setupMicrophoneProbeInProgress && !permissionRenewalInFlight else { return false }
+            permissionRenewalInFlight = true
+            return true
+        }
+        guard reserved else { return }
+        guard teardownInputTriggerListener() else {
+            withStateLock { permissionRenewalInFlight = false }
+            permissionRecoveryMessage = "The shortcut is still in use. Finish the current dictation and try again."
+            return
+        }
+        inputPipelineReady = false
+        stopSetupRetry()
+        permissionRecoveryMessage = "Renewing PressTalk’s permission…"
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+            // Never reset all services or any other application's permissions.
+            process.arguments = ["reset", "Accessibility", "com.am.presstalk"]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            let exited = DispatchSemaphore(value: 0)
+            process.terminationHandler = { _ in exited.signal() }
+            var failure: String?
+            do {
+                try process.run()
+                if exited.wait(timeout: .now() + 10) == .timedOut {
+                    if process.isRunning { process.terminate() }
+                    // Do not rearm capture while a late reset could still run.
+                    if exited.wait(timeout: .now() + 3) == .timedOut {
+                        // This is our own bounded child. Reap it before any
+                        // future launch can begin another permission episode.
+                        if process.isRunning { _ = Darwin.kill(process.processIdentifier, SIGKILL) }
+                        if exited.wait(timeout: .now() + 2) == .timedOut {
+                            DispatchQueue.main.async { [weak self] in
+                                self?.permissionRecoveryMessage = "macOS has not ended the permission request. Restart this Mac before trying again."
+                                if let self { UserDefaults.standard.set(true, forKey: self.permissionRenewalKey) }
+                            }
+                            return
+                        }
+                    }
+                    failure = "macOS did not finish renewing permission. Nothing will be retried automatically."
+                } else if process.terminationStatus != 0 {
+                    failure = "macOS could not renew this permission. Check the permission in System Settings."
+                }
+            } catch {
+                failure = "PressTalk could not ask macOS to renew permission."
+            }
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.withStateLock { self.permissionRenewalInFlight = false }
+                // One explicit attempt per denied episode, including failures.
+                UserDefaults.standard.set(true, forKey: self.permissionRenewalKey)
+                if let failure {
+                    self.permissionRecoveryMessage = failure
+                    self.recheckPermissionsAfterSettings()
+                    return
+                }
+                UserDefaults.standard.set(true, forKey: self.permissionResumeSetupKey)
+                if !self.restartPressTalkFromSettings() {
+                    self.permissionRecoveryMessage = "Permission was renewed. Quit and reopen PressTalk, then allow it in System Settings."
+                    self.recheckPermissionsAfterSettings()
+                }
+            }
+        }
     }
 
     private func disableSystemDictationHotkeyFromSettings() {
@@ -1809,7 +2054,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func exportDiagnostics() {
         let diagnosticsDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap/Diagnostics", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/Diagnostics", isDirectory: true)
         do {
             try FileManager.default.createDirectory(at: diagnosticsDirectory, withIntermediateDirectories: true)
             let formatter = ISO8601DateFormatter()
@@ -1890,7 +2135,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         runVisibleSetupCheck()
     }
 
-    private func restartPressTalkFromSettings() {
+    @discardableResult
+    private func restartPressTalkFromSettings() -> Bool {
+        guard !withStateLock({ isRecording || isProcessing || setupMicrophoneProbeInProgress || permissionRenewalInFlight }) else {
+            present(.busy("Finish the current dictation before restarting PressTalk."))
+            return false
+        }
         traceLogger.log("Restart requested from settings")
         present(.setupRequired("Restarting PressTalk to refresh runtime status."))
 
@@ -1913,10 +2163,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         } catch {
             traceLogger.log("Restart helper launch failed error=\(error)")
             present(.error("Could not restart PressTalk: \(error.localizedDescription)"))
-            return
+            return false
         }
 
         NSApp.terminate(nil)
+        return true
     }
 
     private func repairLocalSigningFromSettings() {
@@ -1934,7 +2185,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let diagnosticsDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap/Diagnostics", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/Diagnostics", isDirectory: true)
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         let timestamp = formatter.string(from: Date()).replacingOccurrences(of: ":", with: "-")
@@ -2746,7 +2997,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             "fixture": Self.resolveFixtureAudioURL(config.fixtureAudioURL)?.lastPathComponent ?? "",
             "keyupToTranscriptSeconds": Date().timeIntervalSince(releasedAt),
             "recordedAt": ISO8601DateFormatter().string(from: Date()),
-            "asrBackend": config.asrBackend,
+            "asrBackend": effectiveASRBackend,
             "qualityFallbackStatus": currentQualityFallbackStatus(),
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: record),
@@ -2907,9 +3158,23 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         self.streamTranscriber = transcriber
     }
 
+    private var effectiveASRBackend: String {
+        config.testHarnessEnabled ? config.asrBackend
+            : "parakeet-v3-\(settingsStore.transcriptionComputeDevice.rawValue)"
+    }
+
+    private var effectiveStreamingTranscriptionEnabled: Bool {
+        config.testHarnessEnabled && config.streamingTranscriptionEnabled
+    }
+
+    private var effectiveQualityFallbackEnabled: Bool {
+        // An ANE selection must never load a second GPU recognizer implicitly.
+        config.testHarnessEnabled && config.parakeetQualityFallbackEnabled
+    }
+
     private var usesParakeetFinalBackend: Bool {
-        switch config.asrBackend {
-        case "parakeet", "parakeet-v3", "parakeet-v3-ane", "ane", "npu":
+        switch effectiveASRBackend {
+        case "parakeet", "parakeet-v3", "parakeet-v3-ane", "parakeet-v3-gpu", "ane", "npu":
             return true
         default:
             return false
@@ -2917,7 +3182,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var fluidTrueStreamingVariant: StreamingModelVariant? {
-        switch config.streamingASRBackend ?? config.asrBackend {
+        switch config.streamingASRBackend ?? effectiveASRBackend {
         case "parakeet-eou-160", "parakeet-eou-160ms":
             return .parakeetEou160ms
         case "parakeet-eou-320", "parakeet-eou-320ms":
@@ -2940,53 +3205,61 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func currentASRModeDescription() -> String {
+        let compute = withStateLock { loadedComputeDevice } ?? settingsStore.transcriptionComputeDevice
         if usesParakeetFinalBackend, let fluidTrueStreamingVariant {
             let streamingMode = fluidTrueStreamingVariant.rawValue.replacingOccurrences(of: "-", with: "_")
-            return config.streamingTranscriptionEnabled
-                ? "parakeet_v3_ane_final_pass_with_\(streamingMode)_true_streaming_partials"
-                : "parakeet_v3_ane_final_pass"
+            return effectiveStreamingTranscriptionEnabled
+                ? "parakeet_v3_\(compute.rawValue)_final_pass_with_\(streamingMode)_true_streaming_partials"
+                : "parakeet_v3_\(compute.rawValue)_final_pass"
         }
 
         if let fluidTrueStreamingVariant {
             let baseMode = fluidTrueStreamingVariant.rawValue.replacingOccurrences(of: "-", with: "_")
-            return config.streamingTranscriptionEnabled
+            return effectiveStreamingTranscriptionEnabled
                 ? "\(baseMode)_true_streaming"
                 : "\(baseMode)_final_pass"
         }
 
         if usesParakeetFinalBackend {
-            return config.streamingTranscriptionEnabled
-                ? "parakeet_v3_ane_final_pass_with_realtime_whisper_partials"
-                : "parakeet_v3_ane_final_pass"
+            return effectiveStreamingTranscriptionEnabled
+                ? "parakeet_v3_\(compute.rawValue)_final_pass_with_realtime_whisper_partials"
+                : "parakeet_v3_\(compute.rawValue)_final_pass"
         }
 
-        return config.streamingTranscriptionEnabled
+        return effectiveStreamingTranscriptionEnabled
             ? "realtime_whisper_partials_with_offline_finalize"
             : "offline_whisper_final_pass"
     }
 
-    private func loadParakeetV3ANE() async throws {
-        traceLogger.log("Loading Parakeet v3 ASR backend compute=cpuAndNeuralEngine")
+    private func loadParakeetV3(device: TranscriptionComputeDevice) async throws -> Bool {
+        let selected = TranscriptionComputeConfiguration(device: device)
+        traceLogger.log("Loading Parakeet v3 ASR backend compute=\(selected.label)")
         let loadStart = Date()
-        let configuration = AsrModels.defaultConfiguration()
-        let models = try await AsrModels.downloadAndLoad(
-            configuration: configuration,
-            version: .v3,
-            encoderComputeUnits: nil
-        )
+        let directory = AsrModels.defaultCacheDirectory(for: .v3)
+        try await TranscriptionComputeConfiguration.downloadParakeetModelsIfMissing(to: directory)
+        let models = try await selected.loadCachedParakeetModels(from: directory)
         let manager = AsrManager(config: .default)
         try await manager.loadModels(models)
         let decoderLayerCount = await manager.decoderLayerCount
-        parakeetAsrManager = manager
-        parakeetDecoderLayerCount = decoderLayerCount
+        try Task.checkCancellation()
+        let accepted = withStateLock { () -> Bool in
+            guard TranscriptionComputePolicy.acceptsCompletedLoad(
+                device: device, requestedDevice: settingsStore.transcriptionComputeDevice)
+            else { return false }
+            parakeetAsrManager = manager
+            parakeetDecoderLayerCount = decoderLayerCount
+            loadedComputeDevice = device
+            computeChangeMessage = ""
+            return true
+        }
         traceLogger.log(
-            "Parakeet v3 ASR ready load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart))) decoder_layers=\(decoderLayerCount)"
-        )
+            "Parakeet v3 ASR load completed compute=\(selected.label) accepted=\(accepted) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))")
+        return accepted
     }
 
     private func loadFluidTrueStreamingASR() async throws {
         guard let variant = fluidTrueStreamingVariant else { return }
-        traceLogger.log("Loading FluidAudio true streaming ASR backend=\(config.streamingASRBackend ?? config.asrBackend) variant=\(variant.rawValue) compute=cpuAndNeuralEngine")
+        traceLogger.log("Loading FluidAudio true streaming ASR backend=\(config.streamingASRBackend ?? effectiveASRBackend) variant=\(variant.rawValue) compute=cpuAndNeuralEngine")
         let loadStart = Date()
         let configuration = MLModelConfiguration()
         configuration.computeUnits = .cpuAndNeuralEngine
@@ -2995,11 +3268,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let displayName = await manager.displayName
         fluidStreamingAsrManager = manager
         traceLogger.log(
-            "FluidAudio true streaming ASR ready backend=\(config.streamingASRBackend ?? config.asrBackend) variant=\(variant.rawValue) display_name=\(displayName) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))"
+            "FluidAudio true streaming ASR ready backend=\(config.streamingASRBackend ?? effectiveASRBackend) variant=\(variant.rawValue) display_name=\(displayName) load_seconds=\(String(format: "%.2f", Date().timeIntervalSince(loadStart)))"
         )
     }
 
-    private func transcribeParakeetV3ANE(samples: [Float]) async throws -> ParakeetTranscriptCandidate {
+    private func transcribeParakeetV3(samples: [Float]) async throws -> ParakeetTranscriptCandidate {
         guard let parakeetAsrManager else {
             throw JarvisTapError.whisperUnavailable
         }
@@ -3012,7 +3285,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             language: nil
         )
         traceLogger.log(
-            "Parakeet v3 ASR pass completed samples=\(samples.count) inference_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt))) confidence=\(String(format: "%.3f", Double(result.confidence))) language=auto"
+            "Parakeet v3 ASR pass completed compute=\(withStateLock { loadedComputeDevice?.rawValue ?? "unknown" }) samples=\(samples.count) inference_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt))) confidence=\(String(format: "%.3f", Double(result.confidence))) language=auto"
         )
         return ParakeetTranscriptCandidate(
             text: cleanedTranscriptText(result.text),
@@ -3347,15 +3620,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func whisperTokenizerSearchRoots() -> [URL] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [
-            home.appendingPathComponent("Library/Application Support/JarvisTap/Tokenizers", isDirectory: true),
-            home.appendingPathComponent("Library/Application Support/JarvisTap/Models", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/Tokenizers", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/Models", isDirectory: true),
         ]
     }
 
     private func whisperModelSearchRoots() -> [URL] {
         let home = FileManager.default.homeDirectoryForCurrentUser
         return [
-            home.appendingPathComponent("Library/Application Support/JarvisTap/Models", isDirectory: true),
+            home.appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)/Models", isDirectory: true),
         ]
     }
 
@@ -3473,13 +3746,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private func productionInsertionProbePayloadURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)", isDirectory: true)
             .appendingPathComponent(ProductionInsertionProbeNotification.payloadFileName)
     }
 
     private func productionInsertionProbeMarkerURL() -> URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)", isDirectory: true)
             .appendingPathComponent(ProductionInsertionProbeNotification.markerFileName)
     }
 
@@ -4472,7 +4745,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         for candidate: ParakeetTranscriptCandidate,
         captureDurationSeconds: TimeInterval
     ) -> String? {
-        guard config.parakeetQualityFallbackEnabled else { return nil }
+        guard effectiveQualityFallbackEnabled else { return nil }
         // Asking for a second opinion nobody can give throws away a usable
         // transcript: the caller marks the Parakeet result as superseded and the
         // Whisper path then has nothing to supersede it with. When the fallback
@@ -5167,7 +5440,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let pollNanoseconds = UInt64(realtimeStreamPollSeconds * 1_000_000_000)
         var revision = 0
         var previousTranscript = ""
-        traceLogger.log("FluidAudio true streaming loop started backend=\(config.streamingASRBackend ?? config.asrBackend) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))")
+        traceLogger.log("FluidAudio true streaming loop started backend=\(config.streamingASRBackend ?? effectiveASRBackend) poll_seconds=\(String(format: "%.2f", realtimeStreamPollSeconds))")
 
         while !Task.isCancelled {
             try? await Task.sleep(nanoseconds: pollNanoseconds)
@@ -5246,7 +5519,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let transcript = cleanedTranscriptText(try await manager.finish())
         traceTranscriptCandidate("FluidAudio true streaming transcript", text: transcript)
         traceLogger.log(
-            "FluidAudio true streaming finalize completed backend=\(config.streamingASRBackend ?? config.asrBackend) samples=\(samples.count) appended_samples=\(appendedSamples) finalize_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
+            "FluidAudio true streaming finalize completed backend=\(config.streamingASRBackend ?? effectiveASRBackend) samples=\(samples.count) appended_samples=\(appendedSamples) finalize_seconds=\(String(format: "%.3f", Date().timeIntervalSince(startedAt)))"
         )
 
         return validatedFinalTranscriptCandidate(
@@ -5418,86 +5691,113 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
         }
         guard shouldStart else { return }
+        startReservedSpeechModelWarmup(requestedDevice: settingsStore.transcriptionComputeDevice)
+    }
+
+    /// The caller has reserved `.loading` while holding `stateLock`.
+    private func startReservedSpeechModelWarmup(requestedDevice: TranscriptionComputeDevice) {
         refreshRuntimeStatusUI()
-
-        let task = Task(priority: .userInitiated) { [self] in
-            do {
-                traceLogger.log("ASR backend=\(config.asrBackend)")
-                traceLogger.log("Whisper decode language=auto")
-
-                // Capture first, and cheaply. Everything below is a recognizer.
-                try await loadAudioCaptureEngine()
-
-                if usesParakeetFinalBackend {
-                    try await loadParakeetV3ANE()
-                    print("Parakeet v3 ANE ready.")
-                    fflush(stdout)
-
-                    // Dictation is ready the moment the primary recognizer is,
-                    // which is about 0.7s in. Waiting for the optional fallback
-                    // too made that 7.3s, and a trigger pressed inside that
-                    // window is refused with "still warming up" -- so the app
-                    // spent seven seconds looking broken to earn a second
-                    // opinion it usually does not need.
-                    markSpeechModelReady()
-
-                    // The quality fallback re-checks low-confidence Parakeet
-                    // output. Worth loading when the model is already here;
-                    // never worth a surprise 619 MB download on someone who just
-                    // wanted to dictate a sentence. While it is absent the
-                    // fallback does not fire and currentQualityFallbackStatus
-                    // says so out loud.
-                    if config.parakeetQualityFallbackEnabled {
-                        if whisperModelIsLocallyAvailable || config.qualityFallbackAutoDownload {
-                            traceLogger.log("Loading Whisper quality fallback in background local=\(whisperModelIsLocallyAvailable ? 1 : 0)")
-                            Task(priority: .utility) { [self] in
-                                let started = Date()
-                                do {
-                                    try await loadWhisperKit()
-                                    traceLogger.log(
-                                        "Whisper quality fallback ready seconds=\(String(format: "%.2f", Date().timeIntervalSince(started)))")
-                                } catch {
-                                    // Not fatal. Parakeet is the recognizer;
-                                    // this was the optional second opinion.
-                                    traceLogger.log("Whisper quality fallback failed to load error=\(error)")
-                                }
-                                refreshRuntimeStatusUI()
-                            }
-                        } else {
-                            traceLogger.log(
-                                "Whisper quality fallback NOT loaded reason=model_not_downloaded; dictation uses Parakeet alone")
-                        }
-                    }
-                } else {
-                    // WhisperKit is the final recognizer here, so the model is
-                    // not optional.
-                    traceLogger.log("Loading WhisperKit model=\(config.whisperModel)")
-                    try await loadWhisperKit()
-                    traceLogger.log("WhisperKit ready")
-                    print("WhisperKit ready.")
-                    fflush(stdout)
-                }
-                if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
-                    try await loadFluidTrueStreamingASR()
-                    print("FluidAudio true streaming ASR ready.")
-                    fflush(stdout)
-                }
-
-                markSpeechModelReady()
-            } catch {
-                traceLogger.log("Startup failed: WhisperKit load error=\(error)")
-                fputs("[PressTalk] Failed to load WhisperKit: \(error)\n", stderr)
-                withStateLock {
-                    whisperLoadState = .failed(String(describing: error))
-                    whisperWarmupTask = nil
-                }
-                refreshRuntimeStatusUI()
-                present(.error("The local speech model failed to load."))
-            }
-        }
-
+        // Publish the task before a fast failure/completion can clear it.
         withStateLock {
-            whisperWarmupTask = task
+            whisperWarmupTask = Task(priority: .userInitiated) { [self] in
+                do {
+                    traceLogger.log("ASR backend=\(effectiveASRBackend)")
+                    traceLogger.log("Whisper decode language=auto")
+
+                    // Capture first, and cheaply. Everything below is a recognizer.
+                    try await loadAudioCaptureEngine()
+
+                    if usesParakeetFinalBackend {
+                        guard try await loadParakeetV3(device: requestedDevice) else {
+                            withStateLock {
+                                whisperLoadState = loadedComputeDevice == nil ? .idle : .ready
+                                whisperWarmupTask = nil
+                            }
+                            DispatchQueue.main.async { [weak self] in self?.requestComputeChange() }
+                            return
+                        }
+                        print("Parakeet v3 \(requestedDevice.displayName) ready.")
+                        fflush(stdout)
+
+                        // Dictation is ready the moment the primary recognizer is,
+                        // which is about 0.7s in. Waiting for the optional fallback
+                        // too made that 7.3s, and a trigger pressed inside that
+                        // window is refused with "still warming up" -- so the app
+                        // spent seven seconds looking broken to earn a second
+                        // opinion it usually does not need.
+
+                        // The quality fallback re-checks low-confidence Parakeet
+                        // output. Worth loading when the model is already here;
+                        // never worth a surprise 619 MB download on someone who just
+                        // wanted to dictate a sentence. While it is absent the
+                        // fallback does not fire and currentQualityFallbackStatus
+                        // says so out loud.
+                        if effectiveQualityFallbackEnabled {
+                            if whisperModelIsLocallyAvailable || config.qualityFallbackAutoDownload {
+                                traceLogger.log("Loading Whisper quality fallback in background local=\(whisperModelIsLocallyAvailable ? 1 : 0)")
+                                Task(priority: .utility) { [self] in
+                                    let started = Date()
+                                    do {
+                                        try await loadWhisperKit()
+                                        traceLogger.log(
+                                            "Whisper quality fallback ready seconds=\(String(format: "%.2f", Date().timeIntervalSince(started)))")
+                                    } catch {
+                                        // Not fatal. Parakeet is the recognizer;
+                                        // this was the optional second opinion.
+                                        traceLogger.log("Whisper quality fallback failed to load error=\(error)")
+                                    }
+                                    refreshRuntimeStatusUI()
+                                }
+                            } else {
+                                traceLogger.log(
+                                    "Whisper quality fallback NOT loaded reason=model_not_downloaded; dictation uses Parakeet alone")
+                            }
+                        }
+                    } else {
+                        // WhisperKit is the final recognizer here, so the model is
+                        // not optional.
+                        traceLogger.log("Loading WhisperKit model=\(config.whisperModel)")
+                        try await loadWhisperKit()
+                        traceLogger.log("WhisperKit ready")
+                        print("WhisperKit ready.")
+                        fflush(stdout)
+                    }
+                    if usesFluidTrueStreamingBackend && effectiveStreamingTranscriptionEnabled {
+                        try await loadFluidTrueStreamingASR()
+                        print("FluidAudio true streaming ASR ready.")
+                        fflush(stdout)
+                    }
+
+                    markSpeechModelReady()
+                } catch {
+                    traceLogger.log("Speech model load failed compute=\(requestedDevice.rawValue) error=\(error)")
+                    enum LoadFailure { case superseded, recovered, unavailable }
+                    let failure = withStateLock { () -> LoadFailure in
+                        whisperWarmupTask = nil
+                        guard requestedDevice == settingsStore.transcriptionComputeDevice else {
+                            whisperLoadState = loadedComputeDevice == nil ? .idle : .ready
+                            return .superseded
+                        }
+                        if let loadedComputeDevice, parakeetAsrManager != nil {
+                            settingsStore.transcriptionComputeDevice = loadedComputeDevice
+                            whisperLoadState = .ready
+                            computeChangeMessage = "Could not prepare \(requestedDevice.displayName). \(loadedComputeDevice.displayName) remains active."
+                            return .recovered
+                        }
+                        whisperLoadState = .failed(String(describing: error))
+                        computeChangeMessage = "Could not prepare \(requestedDevice.displayName). Try the other processor or retry the model."
+                        return .unavailable
+                    }
+                    if case .superseded = failure {
+                        DispatchQueue.main.async { [weak self] in self?.requestComputeChange() }
+                        return
+                    }
+                    DispatchQueue.main.async { [weak self] in self?.settingsWindowController?.reloadFromStore() }
+                    refreshRuntimeStatusUI()
+                    present(.error(failure == .recovered ? "The previous transcription processor is still available."
+                        : "The local speech model failed to load. Choose another processor in Settings."))
+                }
+            }
         }
     }
 
@@ -5741,8 +6041,11 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             details.modelStatus = status.speechModelStatus
             details.shortcutUsesRegisteredHotKey = status.triggerUsesRegisteredHotKey
             details.pasteAutomatically = self.settingsStore.pasteAutomatically
+            details.permissionRecoveryState = self.currentPermissionRecoveryState()
+            details.permissionRecoveryMessage = self.permissionRecoveryMessage
             self.withStateLock {
                 details.recordingOrProcessing = self.isRecording || self.isProcessing
+                    || self.setupMicrophoneProbeInProgress || self.permissionRenewalInFlight
                 details.isRecording = self.isRecording
                 switch self.whisperLoadState {
                 case .idle: details.modelState = .idle
@@ -5762,7 +6065,8 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 return
             }
             let canCheck = self.withStateLock { () -> Bool in
-                guard !self.isRecording, !self.isProcessing, !self.setupMicrophoneProbeInProgress else { return false }
+                guard !self.isRecording, !self.isProcessing, !self.setupMicrophoneProbeInProgress,
+                      !self.permissionRenewalInFlight else { return false }
                 self.setupMicrophoneProbeInProgress = true
                 return true
             }
@@ -5792,19 +6096,28 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         controller.onRetryShortcut = { [weak self] in
             guard let self else { return false }
-            if !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress }) {
+            if !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress || self.permissionRenewalInFlight }) {
                 self.completeStartupIfPossible(showSetupWindowOnFailure: false, forcePresentSetupWindow: false)
             }
             return self.currentRuntimeStatus().inputMonitoringEffective
         }
         controller.onChangeShortcut = { [weak self] rawValue in
             guard let self, let shortcut = JarvisTapSettingsStore.TriggerKeyOption(rawValue: rawValue),
-                  !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress })
+                  !self.withStateLock({ self.isRecording || self.isProcessing || self.setupMicrophoneProbeInProgress || self.permissionRenewalInFlight })
             else { return false }
             self.settingsStore.triggerKey = shortcut
             self.handleSettingsChanged()
             self.settingsWindowController?.reloadFromStore()
             return self.settingsStore.triggerKey == shortcut
+        }
+        controller.onRecheckPermissions = { [weak self] in
+            self?.permissionSettingsOpened = true
+            self?.recheckPermissionsAfterSettings()
+        }
+        controller.onRestartForPermissions = { [weak self] in self?.restartForPermissionRecovery() ?? false }
+        controller.onRenewPermission = { [weak self] in self?.renewAccessibilityPermission() }
+        controller.onShowCurrentApp = {
+            NSWorkspace.shared.activateFileViewerSelecting([Bundle.main.bundleURL])
         }
         controller.onOpenAccessibilitySettings = { [weak self] in
             self?.requestAccessibilitySetup()
@@ -5943,6 +6256,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func ensureInputMethodInstalledForInsertion() -> URL? {
+        // The bundled helper still has the production input-source identity.
+        // Development apps must neither install it nor select an existing
+        // production helper, even when legacy environment flags enable it.
+        guard Bundle.main.bundleIdentifier?.hasSuffix(".dev") != true else {
+            traceLogger.log("Input method unavailable in development app: preserving the production helper")
+            return nil
+        }
         let installedURL = installedInputMethodBundleURL()
         let executableURL = installedURL.appendingPathComponent("Contents/MacOS/presstalk-input-method")
         if FileManager.default.isExecutableFile(atPath: executableURL.path),
@@ -6504,7 +6824,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let supportDirectory = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/JarvisTap", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/\(JarvisTapApp.supportDirectoryName)", isDirectory: true)
         let payloadURL = supportDirectory.appendingPathComponent("input-method-insert.txt")
         let acknowledgementURL = supportDirectory.appendingPathComponent("input-method-insert-ack.json")
 
@@ -6989,11 +7309,13 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
             case ignoreSilently
             case ignoreStillProcessing
             case ignoreMicrophoneCheck
+            case ignorePermissionChange
             case start(UInt64)
         }
 
         let decision = withStateLock { () -> PressDecision in
             if setupMicrophoneProbeInProgress { return .ignoreMicrophoneCheck }
+            if permissionRenewalInFlight { return .ignorePermissionChange }
             if isRecording {
                 return .ignoreSilently
             }
@@ -7017,6 +7339,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let captureSessionID: UInt64
         switch decision {
         case .ignoreSilently:
+            return
+        case .ignorePermissionChange:
+            present(.setupRequired("Finish the permission update before starting a dictation."))
             return
         case .ignoreMicrophoneCheck:
             present(.busy("The microphone check is finishing. Hold your shortcut again in a moment."))
@@ -7202,9 +7527,9 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                     return
                 }
                 traceLogger.log("Audio unit started session=\(captureSessionID); readiness requires retained PCM")
-                if usesFluidTrueStreamingBackend && config.streamingTranscriptionEnabled {
+                if usesFluidTrueStreamingBackend && effectiveStreamingTranscriptionEnabled {
                     await runFluidTrueStreamingLoop()
-                } else if config.streamingTranscriptionEnabled, let whisperKit = self.whisperKit {
+                } else if effectiveStreamingTranscriptionEnabled, let whisperKit = self.whisperKit {
                     await runRealtimeWhisperLoop(whisperKit: whisperKit)
                 } else {
                     while !Task.isCancelled {
@@ -7345,7 +7670,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 engineStartLatencySeconds: withStateLock { activeEngineStartLatencySeconds },
                 sessionID: releasedCaptureSessionID)
             if let streamTaskToStop {
-                if config.streamingTranscriptionEnabled {
+                if effectiveStreamingTranscriptionEnabled {
                     // Do NOT block the paste on stream teardown.
                     //
                     // This used to `await awaitStreamShutdown(...)`, which waits up
@@ -7476,15 +7801,15 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 var acceptedParakeetTranscriptForFallback: String?
                 var whisperCandidateDeferredForRecall = false
                 if usesParakeetFinalBackend, !capturedAudioSamples.isEmpty {
-                    traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedAudioSamples.count)")
+                    traceLogger.log("Finalizing Parakeet v3 transcript samples=\(capturedAudioSamples.count)")
                     do {
                         var parakeetAcceptedForQualityFallback = false
                         let finalInferenceStartedAt = Date()
-                        let parakeetCandidate = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                        let parakeetCandidate = try await transcribeParakeetV3(samples: normalizedSamples)
                         primaryOutcome = .completed
                         traceLogger.log(
                             "latency span=final_inference seconds=\(String(format: "%.3f", Date().timeIntervalSince(finalInferenceStartedAt)))")
-                        traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetCandidate.text)
+                        traceTranscriptCandidate("Parakeet v3 transcript", text: parakeetCandidate.text)
                         if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
                             parakeetCandidate.text,
                             signalStats: capturedSignalStats,
@@ -7503,7 +7828,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                             ) {
                                 parakeetAcceptedForQualityFallback = true
                                 traceLogger.log(
-                                    "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                                    "Parakeet v3 transcript accepted but quality fallback requested reason=\(fallbackReason)"
                                 )
                             } else if let fallbackReason = parakeetQualityFallbackReason(
                                 for: acceptedCandidate,
@@ -7512,19 +7837,19 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                                 acceptedParakeetTranscriptForFallback = acceptedParakeetTranscript
                                 parakeetAcceptedForQualityFallback = true
                                 traceLogger.log(
-                                    "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                                    "Parakeet v3 transcript accepted but quality fallback requested reason=\(fallbackReason)"
                                 )
                             } else {
-                                traceLogger.log("Using Parakeet v3 ANE transcript as final transcript")
+                                traceLogger.log("Using Parakeet v3 transcript as final transcript")
                                 return acceptedParakeetTranscript
                             }
                         }
                         if !parakeetAcceptedForQualityFallback {
-                            traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
+                            traceLogger.log("Parakeet v3 transcript rejected; falling back to WhisperKit")
                         }
                     } catch {
                         primaryOutcome = .failed(error)
-                        traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
+                        traceLogger.log("Parakeet v3 transcript failed; falling back to WhisperKit error=\(error)")
                     }
                 }
 
@@ -7543,7 +7868,7 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 if !streamShutdownCompleted {
                     traceLogger.log("Skipping offline Whisper finalize because realtime stream shutdown timed out")
                     if let acceptedParakeetTranscriptForFallback {
-                        traceLogger.log("Using accepted Parakeet v3 ANE transcript after realtime shutdown timeout")
+                        traceLogger.log("Using accepted Parakeet v3 transcript after realtime shutdown timeout")
                         return acceptedParakeetTranscriptForFallback
                     }
                     return acceptedStreamingTranscript ?? ""
@@ -7708,7 +8033,7 @@ let relaxedResults = try await whisperKit.transcribe(
                 }
 
                 if let acceptedParakeetTranscriptForFallback {
-                    traceLogger.log("Using accepted Parakeet v3 ANE transcript fallback after Whisper candidates were empty, implausible, or too short")
+                    traceLogger.log("Using accepted Parakeet v3 transcript fallback after Whisper candidates were empty, implausible, or too short")
                     return acceptedParakeetTranscriptForFallback
                 }
 
@@ -8097,12 +8422,12 @@ let relaxedResults = try await whisperKit.transcribe(
         var acceptedParakeetTranscriptForFallback: String?
         var whisperCandidateDeferredForRecall = false
         if usesParakeetFinalBackend {
-            traceLogger.log("Finalizing Parakeet v3 ANE transcript samples=\(capturedSamples.count)")
+            traceLogger.log("Finalizing Parakeet v3 transcript samples=\(capturedSamples.count)")
             do {
                 var parakeetAcceptedForQualityFallback = false
-                let parakeetCandidate = try await transcribeParakeetV3ANE(samples: normalizedSamples)
+                let parakeetCandidate = try await transcribeParakeetV3(samples: normalizedSamples)
                 primaryOutcome = .completed
-                traceTranscriptCandidate("Parakeet v3 ANE transcript", text: parakeetCandidate.text)
+                traceTranscriptCandidate("Parakeet v3 transcript", text: parakeetCandidate.text)
                 if let acceptedParakeetTranscript = validatedFinalTranscriptCandidate(
                     parakeetCandidate.text,
                     signalStats: signalStats,
@@ -8120,7 +8445,7 @@ let relaxedResults = try await whisperKit.transcribe(
                         context: "parakeet_v3_ane"
                     ) {
                         traceLogger.log(
-                            "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                            "Parakeet v3 transcript accepted but quality fallback requested reason=\(fallbackReason)"
                         )
                         parakeetAcceptedForQualityFallback = true
                     } else if let fallbackReason = parakeetQualityFallbackReason(
@@ -8129,20 +8454,20 @@ let relaxedResults = try await whisperKit.transcribe(
                     ) {
                         acceptedParakeetTranscriptForFallback = acceptedParakeetTranscript
                         traceLogger.log(
-                            "Parakeet v3 ANE transcript accepted but quality fallback requested reason=\(fallbackReason)"
+                            "Parakeet v3 transcript accepted but quality fallback requested reason=\(fallbackReason)"
                         )
                         parakeetAcceptedForQualityFallback = true
                     } else {
-                        traceLogger.log("Using Parakeet v3 ANE transcript as final transcript")
+                        traceLogger.log("Using Parakeet v3 transcript as final transcript")
                         return acceptedParakeetTranscript
                     }
                 }
                 if !parakeetAcceptedForQualityFallback {
-                    traceLogger.log("Parakeet v3 ANE transcript rejected; falling back to WhisperKit")
+                    traceLogger.log("Parakeet v3 transcript rejected; falling back to WhisperKit")
                 }
             } catch {
                 primaryOutcome = .failed(error)
-                traceLogger.log("Parakeet v3 ANE transcript failed; falling back to WhisperKit error=\(error)")
+                traceLogger.log("Parakeet v3 transcript failed; falling back to WhisperKit error=\(error)")
             }
         }
 
@@ -8293,7 +8618,7 @@ let relaxedResults = try await whisperKit.transcribe(
         }
 
         if let acceptedParakeetTranscriptForFallback {
-            traceLogger.log("Using accepted Parakeet v3 ANE transcript fallback after Whisper candidates were empty, implausible, or too short")
+            traceLogger.log("Using accepted Parakeet v3 transcript fallback after Whisper candidates were empty, implausible, or too short")
             return acceptedParakeetTranscriptForFallback
         }
 

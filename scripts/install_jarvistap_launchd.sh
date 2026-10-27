@@ -16,18 +16,31 @@ fi
 if [[ ! -x "$APP_BINARY" && -x "$LEGACY_SYSTEM_APP_BINARY" ]]; then
   APP_BINARY="$LEGACY_SYSTEM_APP_BINARY"
 fi
-PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-com.am.presstalk}"
+if [[ -n "${PRESSTALK_APP_BUNDLE:-}" ]]; then APP_BINARY="$PRESSTALK_APP_BUNDLE/Contents/MacOS/jarvistap"; fi
+APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$(dirname "$APP_BINARY")/../Info.plist" 2>/dev/null || true)"
+IS_DEVELOPMENT_APP=0
+if [[ "$APP_IDENTIFIER" == *.dev ]]; then IS_DEVELOPMENT_APP=1; fi
+PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-${APP_IDENTIFIER:-com.am.presstalk}}"
+if [[ "$IS_DEVELOPMENT_APP" == 1 && "$PRESSTALK_LAUNCHD_LABEL" != *.dev ]]; then
+  echo "Development apps require a separate .dev LaunchAgent label." >&2
+  exit 2
+fi
 LEGACY_LAUNCHD_LABELS="${PRESSTALK_LEGACY_LAUNCHD_LABELS:-com.am.jarvistap}"
 PLIST="$HOME/Library/LaunchAgents/$PRESSTALK_LAUNCHD_LABEL.plist"
 WORKDIR="$HOME/Library/Application Support/PressTalk"
 LOG_OUT="$HOME/Library/Logs/presstalk.out.log"
 LOG_ERR="$HOME/Library/Logs/presstalk.err.log"
 TRACE_LOG="$HOME/Library/Logs/presstalk_trace.log"
+if [[ "$IS_DEVELOPMENT_APP" == 1 ]]; then
+  LEGACY_LAUNCHD_LABELS=""
+  WORKDIR="$HOME/Library/Application Support/PressTalk Dev"
+  LOG_OUT="$HOME/Library/Logs/presstalk-dev.out.log"
+  LOG_ERR="$HOME/Library/Logs/presstalk-dev.err.log"
+  TRACE_LOG="$HOME/Library/Logs/presstalk-dev_trace.log"
+fi
 
 if [[ ! -x "$APP_BINARY" ]]; then
-  echo "PressTalk.app is missing. Build it first:"
-  echo "  bash $ROOT/scripts/build_jarvistap.sh"
-  echo "Or install the public cask:"
+  echo "PressTalk.app is missing. Install the public cask:"
   echo "  brew tap subtract0/presstalk && brew install --cask presstalk"
   exit 1
 fi
@@ -49,8 +62,8 @@ touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
 
 terminate_existing_presstalk() {
   local pids=""
-  pids="$(ps -axo pid=,command= | awk '
-    index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap") {
+  pids="$(ps -axo pid=,command= | awk -v dev="$IS_DEVELOPMENT_APP" -v binary="$APP_BINARY" '
+    (dev == 1 && index($0, binary)) || (dev == 0 && (index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap"))) {
       print $1
     }
   ')"
@@ -100,8 +113,8 @@ JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
 JARVISTAP_RELEASE_TAIL_PADDING_SECONDS="${JARVISTAP_RELEASE_TAIL_PADDING_SECONDS:-0.35}"
 PRESSTALK_ASR_BACKEND="${PRESSTALK_ASR_BACKEND:-${JARVISTAP_ASR_BACKEND:-parakeet-v3-ane}}"
 PRESSTALK_STREAMING_ASR_BACKEND="${PRESSTALK_STREAMING_ASR_BACKEND:-${JARVISTAP_STREAMING_ASR_BACKEND:-parakeet-eou-320}}"
-PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION="${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION:-${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION:-1}}"
-PRESSTALK_PARAKEET_QUALITY_FALLBACK="${PRESSTALK_PARAKEET_QUALITY_FALLBACK:-${JARVISTAP_PARAKEET_QUALITY_FALLBACK:-1}}"
+PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION="${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION:-${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION:-0}}"
+PRESSTALK_PARAKEET_QUALITY_FALLBACK="${PRESSTALK_PARAKEET_QUALITY_FALLBACK:-${JARVISTAP_PARAKEET_QUALITY_FALLBACK:-0}}"
 PRESSTALK_PARAKEET_MIN_CONFIDENCE="${PRESSTALK_PARAKEET_MIN_CONFIDENCE:-${JARVISTAP_PARAKEET_MIN_CONFIDENCE:-0.96}}"
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-${JARVISTAP_TRIGGER_KEY:-fn}}"
 PRESSTALK_AUTO_SHOW_SETUP_WINDOW="${PRESSTALK_AUTO_SHOW_SETUP_WINDOW:-${JARVISTAP_AUTO_SHOW_SETUP_WINDOW:-0}}"
@@ -111,8 +124,9 @@ JARVISTAP_TRACE_LOG="${JARVISTAP_TRACE_LOG:-$TRACE_LOG}"
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 seed_trigger_key_default "$(current_bundle_identifier)"
 
-/usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
-/usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true
+if [[ "$IS_DEVELOPMENT_APP" == 1 ]]; then
+  /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
+fi
 
 xml_escape() {
   local value="$1"

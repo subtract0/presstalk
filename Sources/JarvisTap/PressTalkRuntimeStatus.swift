@@ -37,6 +37,9 @@ struct PressTalkRuntimeStatus {
     let codeSignatureIdentifier: String
     let codeSignatureCDHash: String
     let codeSignatureAuthority: String
+    var transcriptionComputeRequested: String = "ane"
+    var transcriptionComputeActive: String = "not_loaded"
+    var transcriptionComputeStatus: String = ""
 
     var triggerRequiresWritableEventTap: Bool {
         switch triggerKey {

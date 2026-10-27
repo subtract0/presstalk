@@ -75,7 +75,8 @@ final class PressTalkLicenseStore {
         static let hasSeenSetupGuide = "JarvisTap.HasSeenSetupGuide"
         static let firstDictationDelivered = "JarvisTap.FirstDictationDelivered"
         /// Keychain coordinates for the second copy of the trial start date.
-        static let keychainService = "com.am.presstalk.trial"
+        static let keychainService = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+            ? "com.am.presstalk.dev.trial" : "com.am.presstalk.trial"
         static let keychainAccount = "trial-started-at"
     }
 
@@ -593,6 +594,11 @@ final class JarvisTapSettingsStore {
         }
     }
 
+    var transcriptionComputeDevice: TranscriptionComputeDevice {
+        get { TranscriptionComputeDevice(storageValue: defaults.string(forKey: TranscriptionComputeDevice.preferenceKey)) }
+        set { defaults.set(newValue.storageValue, forKey: TranscriptionComputeDevice.preferenceKey) }
+    }
+
     var triggerKey: TriggerKeyOption {
         get {
             TriggerKeyOption(rawValue: defaults.string(forKey: Key.triggerKey) ?? "") ?? .fn
@@ -1027,6 +1033,7 @@ final class PressTalkHUDController {
 
 final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegate {
     var onSettingsChanged: (() -> Void)?
+    var onTranscriptionComputeChanged: (() -> Void)?
     var onRunSetupCheck: (() -> Void)?
     var onRunPhysicalSmoke: (() -> Void)?
     var onExportDiagnostics: (() -> Void)?
@@ -1050,6 +1057,8 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     private let pasteAutomaticallyCheckbox = NSButton(checkboxWithTitle: "Paste transcript automatically", target: nil, action: nil)
     private let triggerKeyPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let insertionSuffixPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let computeDevicePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let computeDeviceHintLabel = NSTextField(wrappingLabelWithString: "")
     /// What the picker lists. Supplied by the app so CoreAudio stays out of
     /// the view, and so the list is whatever the capture path would actually
     /// see rather than a second enumeration that can disagree with it.
@@ -1161,6 +1170,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         pasteAutomaticallyCheckbox.state = settingsStore.pasteAutomatically ? .on : .off
         triggerKeyPopup.selectItem(at: JarvisTapSettingsStore.TriggerKeyOption.allCases.firstIndex(of: settingsStore.triggerKey) ?? 0)
         insertionSuffixPopup.selectItem(at: JarvisTapSettingsStore.InsertionSuffixOption.allCases.firstIndex(of: settingsStore.insertionSuffix) ?? 0)
+        computeDevicePopup.selectItem(at: TranscriptionComputeDevice.allCases.firstIndex(of: settingsStore.transcriptionComputeDevice) ?? 0)
         releaseTailSlider.doubleValue = settingsStore.releaseTailMaxSeconds
         currentPlanValueLabel.stringValue = licenseStore.currentPlanName
         planSummaryLabel.stringValue = licenseStore.planSummary
@@ -1209,6 +1219,17 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
         triggerKeyLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
 
         triggerKeyPopup.addItems(withTitles: JarvisTapSettingsStore.TriggerKeyOption.allCases.map(\.displayName))
+
+        let computeDeviceLabel = NSTextField(labelWithString: "Transcription processor")
+        computeDeviceLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
+        computeDevicePopup.addItems(withTitles: TranscriptionComputeDevice.allCases.map(\.displayName))
+        computeDeviceHintLabel.font = NSFont.systemFont(ofSize: 12)
+        computeDeviceHintLabel.textColor = .secondaryLabelColor
+        let computeDeviceRow = NSStackView(views: [computeDeviceLabel, computeDevicePopup])
+        computeDeviceRow.orientation = .horizontal
+        computeDeviceRow.alignment = .centerY
+        computeDeviceRow.distribution = .fillProportionally
+        computeDeviceRow.spacing = 12
 
         let microphoneLabel = NSTextField(labelWithString: "Microphone")
         microphoneLabel.font = NSFont.systemFont(ofSize: 13, weight: .medium)
@@ -1338,6 +1359,8 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
             triggerKeyRow,
             microphonePickerRow,
             microphoneHintLabel,
+            computeDeviceRow,
+            computeDeviceHintLabel,
             showHUDCheckbox,
             pasteAutomaticallyCheckbox,
             insertionSuffixRow,
@@ -1371,7 +1394,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
 
         // Constrain wrapped text and rows to the viewport, including at the
         // minimum window width. Intrinsic text width must not widen the page.
-        for view in [subtitleLabel, microphoneHintLabel, tailHintLabel, setupHintLabel,
+        for view in [subtitleLabel, microphoneHintLabel, computeDeviceHintLabel, computeDeviceRow, tailHintLabel, setupHintLabel,
                      planSummaryLabel, pricingSummaryLabel, triggerKeyRow,
                      microphonePickerRow, insertionSuffixRow, tailHeaderRow,
                      releaseTailSlider, inputMonitoringRow, microphoneRow,
@@ -1379,7 +1402,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
                      f5BridgeRow, plansRow] {
             view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
         }
-        for field in [subtitleLabel, microphoneHintLabel, tailHintLabel, setupHintLabel,
+        for field in [subtitleLabel, microphoneHintLabel, computeDeviceHintLabel, tailHintLabel, setupHintLabel,
                       planSummaryLabel, pricingSummaryLabel] {
             field.maximumNumberOfLines = 0
             field.lineBreakMode = .byWordWrapping
@@ -1425,6 +1448,10 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
 
         triggerKeyPopup.target = self
         triggerKeyPopup.action = #selector(changeTriggerKey(_:))
+
+        computeDevicePopup.target = self
+        computeDevicePopup.action = #selector(changeComputeDevice(_:))
+        computeDevicePopup.setAccessibilityIdentifier("settings.transcriptionCompute")
 
         insertionSuffixPopup.target = self
         insertionSuffixPopup.action = #selector(changeInsertionSuffix(_:))
@@ -1513,6 +1540,8 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     }
 
     private func applyRuntimeStatus() {
+        computeDeviceHintLabel.stringValue = settingsStore.transcriptionComputeDevice.detail
+            + " " + runtimeStatus.transcriptionComputeStatus
         for row in legacyShortcutRows { row.isHidden = settingsStore.triggerKey != .f5 }
         clearNativeCalibrationButton.isEnabled = settingsStore.nativeTriggerCalibration != nil
         disableSystemDictationButton.isHidden = runtimeStatus.systemDictationHotkeyDisabled ||
@@ -1609,7 +1638,7 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     }
 
     private func permissionHintText() -> String {
-        let help = " Use the permission buttons below. If macOS already shows this app enabled, use Show This App to locate the running copy before replacing its stale entry with the + button."
+        let help = " Use the permission buttons below. If macOS already shows PressTalk enabled but dictation still does not work, choose Run Setup Check for guided permission recovery."
         if !runtimeStatus.microphoneGranted {
             return "Microphone access is needed to record your voice." + help
         }
@@ -1652,6 +1681,14 @@ final class PressTalkSettingsWindowController: NSWindowController, NSMenuDelegat
     @objc private func togglePasteAutomatically(_ sender: NSButton) {
         settingsStore.pasteAutomatically = sender.state == .on
         onSettingsChanged?()
+    }
+
+    @objc private func changeComputeDevice(_ sender: NSPopUpButton) {
+        let index = sender.indexOfSelectedItem
+        guard TranscriptionComputeDevice.allCases.indices.contains(index) else { return }
+        settingsStore.transcriptionComputeDevice = TranscriptionComputeDevice.allCases[index]
+        onTranscriptionComputeChanged?()
+        applyRuntimeStatus()
     }
 
     @objc private func changeTriggerKey(_ sender: NSPopUpButton) {

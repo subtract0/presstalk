@@ -2,14 +2,17 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SOURCE_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-build-existing-signing-test.XXXXXX")"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
+ROOT="$TEST_TMPDIR/repository"
+mkdir -p "$ROOT"
+cp -R "$SOURCE_ROOT/scripts" "$SOURCE_ROOT/resources" "$ROOT/"
 
 fake_bin="$TEST_TMPDIR/bin"
 home_dir="$TEST_TMPDIR/home"
 swift_bin_dir="$TEST_TMPDIR/swift-bin"
-app_bundle="$TEST_TMPDIR/PressTalk.app"
+app_bundle="$TEST_TMPDIR/PressTalk Dev.app"
 codesign_log="$TEST_TMPDIR/codesign.log"
 mkdir -p "$fake_bin" "$home_dir/Library/Application Support/PressTalk" "$swift_bin_dir"
 
@@ -18,8 +21,10 @@ cat >"$fake_bin/swift" <<'SH'
 set -euo pipefail
 
 if [[ "$*" == "package clean" ]]; then
-  exit 0
+  echo "Unexpected clean in incremental build" >&2
+  exit 98
 fi
+if [[ "$1" == */presstalk_bundle_icon_gate.swift ]]; then exit 0; fi
 
 if [[ "$*" == "build -c release --show-bin-path" ]]; then
   printf '%s\n' "$PRESSTALK_TEST_SWIFT_BIN_DIR"
@@ -128,8 +133,11 @@ grep -Fq "Code signing identity: TESTHASH" "$ready_output"
 grep -Fq -- "--sign TESTHASH" "$codesign_log"
 test -x "$app_bundle/Contents/MacOS/jarvistap"
 test -x "$app_bundle/Contents/Resources/PressTalkInputMethod.app/Contents/MacOS/presstalk-input-method"
+test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$app_bundle/Contents/Info.plist")" = com.am.presstalk.dev
+test "$(/usr/libexec/PlistBuddy -c 'Print CFBundleURLTypes:0:CFBundleURLSchemes:0' "$app_bundle/Contents/Info.plist")" = presstalk-dev
+printf 'preserve-me\n' >"$app_bundle/sentinel"
 
-rm -rf "$app_bundle" "$swift_bin_dir" "$codesign_log"
+rm -rf "$swift_bin_dir" "$codesign_log"
 mkdir -p "$swift_bin_dir"
 missing_output="$TEST_TMPDIR/missing.txt"
 if PRESSTALK_TEST_EXISTING_IDENTITY=missing run_build "$missing_output" bash "$ROOT/scripts/build_jarvistap.sh"; then
@@ -141,5 +149,6 @@ if [[ -f "$codesign_log" ]] && grep -Fq -- "--sign -" "$codesign_log"; then
   echo "FAIL: existing-signing build fell back to ad-hoc signing" >&2
   exit 1
 fi
+test "$(cat "$app_bundle/sentinel")" = preserve-me
 
 echo "PASS build_existing_signing"

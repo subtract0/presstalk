@@ -1,0 +1,195 @@
+import Foundation
+
+// External services only. The production method bodies are inserted below.
+// Defaults are in memory and Process cannot launch an executable.
+final class UserDefaults {
+    static let standard = UserDefaults()
+    var values: [String: Bool] = [:]
+    func bool(forKey key: String) -> Bool { values[key] ?? false }
+    func set(_ value: Bool, forKey key: String) { values[key] = value }
+    func removeObject(forKey key: String) { values.removeValue(forKey: key) }
+}
+struct Bundle {
+    static let main = Bundle()
+    var bundleIdentifier: String? { "com.am.presstalk" }
+}
+final class NSAlert {
+    enum Response { case alertFirstButtonReturn, cancel }
+    static var duringModal: (() -> Void)?
+    static var response = Response.alertFirstButtonReturn
+    var messageText = "", informativeText = ""
+    func addButton(withTitle: String) {}
+    func runModal() -> Response { Self.duringModal?(); return Self.response }
+}
+final class Process {
+    enum Failure: Error { case launch }
+    static var calls: [[String]] = []
+    static var shouldThrow = false
+    static var exitStatus: Int32 = 0
+    var executableURL: URL?
+    var arguments: [String]?
+    var standardOutput: Any?, standardError: Any?
+    var terminationHandler: ((Process) -> Void)?
+    var terminationStatus: Int32 { Self.exitStatus }
+    var isRunning: Bool { false }
+    var processIdentifier: Int32 { -1 }
+    func run() throws {
+        Self.calls.append(arguments ?? [])
+        if Self.shouldThrow { throw Failure.launch }
+        terminationHandler?(self)
+    }
+    func terminate() { fatalError("Synchronous fixture process cannot time out") }
+}
+enum Darwin {
+    static func kill(_ pid: Int32, _ signal: Int32) -> Int32 {
+        fatalError("Fixture must never signal a process")
+    }
+}
+struct DispatchQueue {
+    enum QoS { case userInitiated }
+    static let main = DispatchQueue()
+    static func global(qos: QoS) -> DispatchQueue { .init() }
+    func async(execute work: () -> Void) { work() }
+}
+struct TraceLogger { func log(_ value: String) {} }
+struct Trigger { var displayName = "Test shortcut" }
+struct SettingsStore { var triggerKey = Trigger(); var pasteAutomatically = true }
+struct Config { var whisperModel = "fixture"; var agentMode = "dictation" }
+enum Presentation { case idle, listening, processing, warming, setupRequired(String) }
+struct Permissions {
+    var inputMonitoringGranted = true, microphoneGranted = true, accessibilityGranted = false
+    var microphoneAuthorizationStatus = "authorized"
+}
+final class SettingsWindow { func present() {} }
+
+func require(_ condition: @autoclosure () -> Bool, _ message: String) {
+    guard condition() else { print("FAIL: \(message)"); exit(1) }
+}
+
+final class RecoveryHarness {
+    var trusted = false
+    var permissionRenewalInFlight = false
+    var isRecording = false, isProcessing = false, setupMicrophoneProbeInProgress = false
+    var permissionSettingsOpened = false, permissionSettingsReturned = false
+    var permissionRecoveryMessage = ""
+    let permissionRestartKey = "restart", permissionRenewalKey = "renewal", permissionResumeSetupKey = "resume"
+    var inputPipelineReady = false
+    var eventTapInstallSummary = "not_installed"
+    var installedTriggerKey: Trigger?
+    var settingsStore = SettingsStore(), config = Config(), traceLogger = TraceLogger()
+    var presentationState = Presentation.idle
+    var settingsWindowController: SettingsWindow?
+    var refreshes = 0, permissionChecks = 0, listenerInstalls = 0, teardowns = 0, warmups = 0
+    var restarts = 0, restartSucceeds = true
+
+    init() {
+        UserDefaults.standard.values = [:]
+        Process.calls = []; Process.shouldThrow = false; Process.exitStatus = 0
+        NSAlert.duringModal = nil; NSAlert.response = .alertFirstButtonReturn
+    }
+    func withStateLock<T>(_ body: () -> T) -> T { body() }
+    func accessibilityIsTrusted() -> Bool { trusted }
+    func refreshRuntimeStatusUI() { refreshes += 1 }
+    func checkSetupPermissions() -> Permissions {
+        permissionChecks += 1
+        return Permissions(accessibilityGranted: trusted)
+    }
+    func requestMicrophonePermissionAndRetry(showSetupWindowOnFailure: Bool,
+        forcePresentSetupWindow: Bool, presentFailureStatus: Bool) {
+        fatalError("Fixture must never request microphone permission")
+    }
+    func printMicrophoneHelp() {}
+    func printTapFailureHelp() {}
+    func present(_ value: Presentation) { presentationState = value }
+    func scheduleSetupRetry() {}
+    func stopSetupRetry() {}
+    func shouldPresentSetupWindow(showSetupWindowOnFailure: Bool, forcePresentSetupWindow: Bool) -> Bool { false }
+    func installDarwinTriggerNotifications() {}
+    func installInputTriggerListener() -> Bool {
+        listenerInstalls += 1; eventTapInstallSummary = "hid:default"; return true
+    }
+    func installSystemDefinedMonitor() {}
+    func scheduleInputMethodHelperWarmupIfNeeded() {}
+    func startWhisperWarmupIfNeeded() { warmups += 1 }
+    func teardownInputTriggerListener() -> Bool { teardowns += 1; return true }
+    func restartPressTalkFromSettings() -> Bool { restarts += 1; return restartSucceeds }
+    func codeSignatureValue(prefix: String) -> String {
+        prefix == "TeamIdentifier=" ? "5HUC5LA94B" : "Developer ID Application: Fixture"
+    }
+
+    // PRODUCTION_DECLARATIONS
+
+    static func runTests() {
+        do {
+            let app = RecoveryHarness()
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            UserDefaults.standard.set(true, forKey: app.permissionRenewalKey)
+            app.trusted = true
+            app.completeStartupIfPossible(showSetupWindowOnFailure: false, presentFailureStatus: false)
+            require(!UserDefaults.standard.bool(forKey: app.permissionRestartKey)
+                && !UserDefaults.standard.bool(forKey: app.permissionRenewalKey),
+                "Granted startup retained an earlier recovery episode")
+            app.trusted = false
+            require(app.currentPermissionRecoveryState() == .openSystemSettings,
+                "Later denial inherited exhausted recovery attempts")
+        }
+        do {
+            let app = RecoveryHarness()
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            NSAlert.duringModal = { app.trusted = true }
+            app.renewAccessibilityPermission()
+            require(Process.calls.isEmpty && app.teardowns == 0 && app.restarts == 0,
+                "Approval received during confirmation was reset")
+            require(app.currentPermissionRecoveryState() == .ready, "New grant was not usable after modal")
+        }
+        do {
+            let app = RecoveryHarness()
+            app.permissionRenewalInFlight = true
+            app.completeStartupIfPossible(showSetupWindowOnFailure: false, presentFailureStatus: false)
+            require(app.permissionChecks == 0 && app.listenerInstalls == 0 && app.warmups == 0,
+                "Startup rearmed services during permission renewal")
+            app.trusted = true
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            app.clearPermissionRecoveryAfterGrant()
+            require(UserDefaults.standard.bool(forKey: app.permissionRestartKey),
+                "In-flight renewal cleared its recovery episode")
+        }
+        do {
+            let app = RecoveryHarness()
+            app.restartSucceeds = false
+            require(!app.restartForPermissionRecovery(), "Failed relaunch reported success")
+            require(!UserDefaults.standard.bool(forKey: app.permissionRestartKey)
+                && !UserDefaults.standard.bool(forKey: app.permissionResumeSetupKey),
+                "Failed restart consumed recovery attempt")
+            app.restartSucceeds = true
+            require(app.restartForPermissionRecovery(), "Explicit retry after launch failure was blocked")
+            require(!app.restartForPermissionRecovery() && app.restarts == 2,
+                "Recovery restarted more than once after successful helper launch")
+        }
+        do {
+            let app = RecoveryHarness()
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            Process.shouldThrow = true
+            app.renewAccessibilityPermission()
+            require(Process.calls == [["reset", "Accessibility", "com.am.presstalk"]],
+                "Renewal reset scope was broader than the production app's Accessibility")
+            require(!app.permissionRenewalInFlight && app.currentPermissionRecoveryState() == .systemApprovalRequired,
+                "Failed reset left an unbounded retry or permanent reservation")
+            app.renewAccessibilityPermission()
+            require(Process.calls.count == 1 && app.restarts == 0, "Failed reset retried automatically")
+        }
+        do {
+            let app = RecoveryHarness()
+            UserDefaults.standard.set(true, forKey: app.permissionRestartKey)
+            app.restartSucceeds = false
+            app.renewAccessibilityPermission()
+            require(Process.calls.count == 1 && app.restarts == 1 && !app.trusted,
+                "Successful reset was confused with consent or relaunched repeatedly")
+            require(app.currentPermissionRecoveryState() == .systemApprovalRequired
+                && app.permissionRecoveryMessage.contains("Quit and reopen"),
+                "Post-reset relaunch failure lost its actionable recovery state")
+        }
+        print("PASS: production permission recovery lifecycle (6 scenarios)")
+    }
+}
+RecoveryHarness.runTests()

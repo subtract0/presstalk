@@ -1,8 +1,16 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- The fn key, simplified for 16px browser tabs. No external font needed. -->
-  <rect x="2" y="2" width="60" height="60" rx="12" fill="#d5ee78" stroke="#3c4a2d" stroke-width="4"/>
-  <g fill="#252a22">
-    <path d="M14 52V29H8V21H14V19C14 11 18 8 26 8H28V16H26C23 16 22 18 22 21H28V29H22V52Z"/>
-    <path d="M32 21H40V25C42 22 45 20 49 20C54 20 56 24 56 30V52H48V33C48 29 47 28 45 28C42 28 41 30 41 33V52H32Z"/>
+  <!-- PressTalk fn key: optically sized original vector lettering, no font dependency. -->
+  <defs>
+    <linearGradient id="face" x2="0" y2="1">
+      <stop stop-color="#383d34"/>
+      <stop offset="1" stop-color="#292e27"/>
+    </linearGradient>
+  </defs>
+  <rect x="2" y="4" width="60" height="58" rx="13" fill="#626a57"/>
+  <rect x="2" y="2" width="60" height="57" rx="13" fill="url(#face)" stroke="#c1c5b5" stroke-width="2"/>
+  <rect x="27" y="8" width="10" height="2.5" rx="1.25" fill="#c3d5a1"/>
+  <g transform="translate(.5 5) scale(.9)" fill="#f7f5ec">
+    <path d="M18 50V28H12V23H18V20C18 13 21 10 28 10H31V15H28C24 15 23 17 23 21V23H30V28H23V50Z"/>
+    <path d="M34 23H39V27C41 24 44 22 48 22C55 22 58 26 58 33V50H53V34C53 29 51 27 47 27C43 27 39 30 39 35V50H34Z"/>
   </g>
 </svg>

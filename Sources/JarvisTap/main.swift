@@ -5907,11 +5907,12 @@ final class JarvisTapApp: NSObject, NSApplicationDelegate, NSMenuDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.firstRunSetupWindowController?.observeDictation(transcript)
         }
+        // Retry after successful deliveries if unreadable storage deferred the
+        // first trial start. This preserves an existing anchor and skips paid
+        // and early-user installations before touching their trial stores.
+        licenseStore.startTrialIfNeeded()
         guard !settingsStore.firstDictationDelivered else { return }
         settingsStore.firstDictationDelivered = true
-        // The trial starts when the product first works, not when it was
-        // installed, so a slow model download does not eat someone's trial.
-        licenseStore.startTrialIfNeeded()
         traceLogger.log("First dictation delivered reached_target_app=\(reachedTargetApp ? 1 : 0)")
     }
 

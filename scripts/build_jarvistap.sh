@@ -5,13 +5,29 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PKG_DIR="$ROOT"
 OUT_DIR="$PKG_DIR/bin"
 OUT_BIN="$OUT_DIR/jarvistap"
-DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk.app"
+truthy() { case "${1:-}" in 1|true|TRUE|yes|YES) return 0 ;; *) return 1 ;; esac; }
+DISTRIBUTION_SIGNING="${PRESSTALK_DISTRIBUTION_SIGNING:-0}"
+if truthy "$DISTRIBUTION_SIGNING"; then
+  DEFAULT_APP_BUNDLE="$ROOT/dist/PressTalk.app"
+  DEFAULT_BUNDLE_IDENTIFIER="com.am.presstalk"
+  APP_DISPLAY_NAME="PressTalk"
+  APP_URL_SCHEME="presstalk"
+  APP_LICENSE_EXTENSION="presstalk-license"
+else
+  DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk Dev.app"
+  DEFAULT_BUNDLE_IDENTIFIER="com.am.presstalk.dev"
+  APP_DISPLAY_NAME="PressTalk Dev"
+  APP_URL_SCHEME="presstalk-dev"
+  APP_LICENSE_EXTENSION="presstalk-dev-license"
+fi
 APP_BUNDLE="${PRESSTALK_APP_BUNDLE:-$DEFAULT_APP_BUNDLE}"
-LEGACY_APP_BUNDLE="$HOME/Applications/JarvisTap.app"
-APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
-APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
-APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
-APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+set_app_paths() {
+  APP_CONTENTS_DIR="$APP_BUNDLE/Contents"
+  APP_MACOS_DIR="$APP_CONTENTS_DIR/MacOS"
+  APP_RESOURCES_DIR="$APP_CONTENTS_DIR/Resources"
+  APP_INFO_PLIST="$APP_CONTENTS_DIR/Info.plist"
+}
+set_app_paths
 LOCAL_CODESIGN_HELPER="$PKG_DIR/scripts/create_presstalk_local_codesign_identity.sh"
 ENTITLEMENTS_PLIST="${PRESSTALK_ENTITLEMENTS:-$PKG_DIR/resources/PressTalk.entitlements}"
 # Developer probes and smoke helpers are useful locally and are a liability in a
@@ -20,6 +36,7 @@ ENTITLEMENTS_PLIST="${PRESSTALK_ENTITLEMENTS:-$PKG_DIR/resources/PressTalk.entit
 # would throw away a stapled notarization ticket. Distribution packaging sets
 # this to 0.
 INCLUDE_DEV_TOOLS="${PRESSTALK_INCLUDE_DEV_TOOLS:-1}"
+if truthy "$DISTRIBUTION_SIGNING"; then INCLUDE_DEV_TOOLS=0; fi
 
 include_dev_tools() {
   case "$INCLUDE_DEV_TOOLS" in
@@ -34,8 +51,6 @@ current_bundle_identifier() {
   fi
 }
 
-DEFAULT_BUNDLE_IDENTIFIER="$(current_bundle_identifier)"
-DEFAULT_BUNDLE_IDENTIFIER="${DEFAULT_BUNDLE_IDENTIFIER:-com.am.presstalk}"
 APP_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-$DEFAULT_BUNDLE_IDENTIFIER}}"
 APP_VERSION="${PRESSTALK_VERSION:-0.1.5}"
 APP_BUILD="${PRESSTALK_BUILD_NUMBER:-6}"
@@ -55,15 +70,81 @@ if [[ -z "$APP_BUILD" ]]; then
   exit 2
 fi
 
-mkdir -p "$OUT_DIR"
-rm -rf "$APP_BUNDLE"
+# Reserve the customer identity for explicit distribution builds. Never infer
+# it from an existing app: that used to re-sign the daily app with a local
+# certificate and leave a checked but unusable macOS permission entry behind.
+if truthy "$DISTRIBUTION_SIGNING"; then
+  if [[ "$APP_BUNDLE_IDENTIFIER" != "com.am.presstalk" ]]; then
+    echo "Distribution builds require the official com.am.presstalk identity." >&2
+    exit 2
+  fi
+  requested_identity="${PRESSTALK_CODESIGN_IDENTITY:-${CODESIGN_IDENTITY:-}}"
+  if [[ -z "$requested_identity" || "$requested_identity" == "-" ]]; then
+    echo "Distribution builds require an explicit Developer ID Application signing identity." >&2
+    exit 2
+  fi
+  identity_search_args=(find-identity -v -p codesigning)
+  if [[ -n "${PRESSTALK_CODESIGN_KEYCHAIN:-}" ]]; then identity_search_args+=("$PRESSTALK_CODESIGN_KEYCHAIN"); fi
+  identities="$(security "${identity_search_args[@]}" 2>/dev/null)" || {
+    echo "Cannot verify the requested Developer ID signing identity." >&2; exit 2;
+  }
+  selected_identity=""
+  identity_matches=0
+  while IFS= read -r identity_line; do
+    [[ "$identity_line" == *'"Developer ID Application:'*' (5HUC5LA94B)"'* ]] || continue
+    identity_hash="$(printf '%s\n' "$identity_line" | awk '{print $2}')"
+    identity_name="$(printf '%s\n' "$identity_line" | sed -E 's/^[^"]*"([^"]+)".*$/\1/')"
+    if [[ "$requested_identity" == "$identity_hash" || "$requested_identity" == "$identity_name" ||
+          "$requested_identity" == "Developer ID Application" ]]; then
+      selected_identity="$identity_hash"
+      identity_matches=$((identity_matches + 1))
+    fi
+  done <<<"$identities"
+  if [[ "$identity_matches" != "1" ]]; then
+    echo "Choose exactly one valid Developer ID Application identity for PressTalk team 5HUC5LA94B." >&2
+    exit 2
+  fi
+  export PRESSTALK_CODESIGN_IDENTITY="$selected_identity"
+  export PRESSTALK_CODESIGN_HARDENED_RUNTIME=1
+  export PRESSTALK_CODESIGN_TIMESTAMP=1
+elif [[ "$APP_BUNDLE_IDENTIFIER" != *.dev ]]; then
+  echo "Development builds require a distinct .dev bundle identifier; production identity is distribution-only." >&2
+  exit 2
+fi
+
+TARGET_APP_BUNDLE="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$APP_BUNDLE")"
+PRODUCTION_USER_APP="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$HOME/Applications/PressTalk.app")"
+if [[ "$TARGET_APP_BUNDLE" != *.app || "$TARGET_APP_BUNDLE" == "$PRODUCTION_USER_APP" ||
+      "$TARGET_APP_BUNDLE" == "/Applications/PressTalk.app" ]]; then
+  echo "Refusing to build over the daily PressTalk app. Build a development app or a staged distribution artifact." >&2
+  exit 2
+fi
+existing_identifier="$(current_bundle_identifier)"
+if [[ "$existing_identifier" == "com.am.presstalk" ]]; then
+  echo "Refusing to overwrite an existing production app. Choose an empty staging destination." >&2
+  exit 2
+fi
+if truthy "${PRESSTALK_BUILD_PLAN_ONLY:-0}"; then
+  printf 'App: %s\nBundleIdentifier: %s\nDistributionSigning: %s\n' \
+    "$TARGET_APP_BUNDLE" "$APP_BUNDLE_IDENTIFIER" "$DISTRIBUTION_SIGNING"
+  exit 0
+fi
+SPARKLE_PUBLIC_KEY="$PKG_DIR/resources/PressTalkUpdatePublicKey.txt"
+if truthy "$DISTRIBUTION_SIGNING"; then
+  python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" validate-key --public-key "$SPARKLE_PUBLIC_KEY"
+fi
 
 pushd "$PKG_DIR" >/dev/null
-swift package clean
+if truthy "${PRESSTALK_BUILD_CLEAN:-0}"; then swift package clean; fi
 swift build -c release --product jarvistap
 BINARY_DIR="$(swift build -c release --show-bin-path)"
 popd >/dev/null
 
+BUILD_STAGING_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-build.XXXXXX")"
+trap 'rm -rf "$BUILD_STAGING_ROOT"' EXIT
+APP_BUNDLE="$BUILD_STAGING_ROOT/$(basename "$TARGET_APP_BUNDLE")"
+set_app_paths
+mkdir -p "$OUT_DIR"
 cp "$BINARY_DIR/jarvistap" "$OUT_BIN"
 chmod 755 "$OUT_BIN"
 
@@ -72,6 +153,15 @@ mkdir -p "$APP_RESOURCES_DIR"
 cp "$BINARY_DIR/jarvistap" "$APP_MACOS_DIR/jarvistap"
 chmod 755 "$APP_MACOS_DIR/jarvistap"
 cp "$PKG_DIR/resources/PressTalk.icns" "$APP_RESOURCES_DIR/PressTalk.icns"
+SPARKLE_DISTRIBUTION="$PKG_DIR/.build/artifacts/sparkle/Sparkle"
+SPARKLE_SOURCE="$SPARKLE_DISTRIBUTION/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+if [[ ! -d "$SPARKLE_SOURCE" ]]; then
+  echo "Missing checksum-verified Sparkle artifact. Resolve the pinned Swift package first." >&2
+  exit 1
+fi
+mkdir -p "$APP_CONTENTS_DIR/Frameworks"
+ditto "$SPARKLE_SOURCE" "$APP_CONTENTS_DIR/Frameworks/Sparkle.framework"
+cp "$SPARKLE_DISTRIBUTION/LICENSE" "$APP_RESOURCES_DIR/Sparkle-LICENSE"
 cp "$PKG_DIR/scripts/presstalk_bootstrap.sh" "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 chmod 755 "$APP_RESOURCES_DIR/presstalk-bootstrap.sh"
 cp "$PKG_DIR/scripts/presstalk_disable_system_dictation.sh" "$APP_RESOURCES_DIR/presstalk-disable-system-dictation.sh"
@@ -151,7 +241,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>CFBundleDevelopmentRegion</key>
   <string>en</string>
   <key>CFBundleDisplayName</key>
-  <string>PressTalk</string>
+  <string>$APP_DISPLAY_NAME</string>
   <key>CFBundleExecutable</key>
   <string>jarvistap</string>
   <key>CFBundleIdentifier</key>
@@ -159,7 +249,7 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
-  <string>PressTalk</string>
+  <string>$APP_DISPLAY_NAME</string>
   <key>CFBundleIconFile</key>
   <string>PressTalk.icns</string>
   <key>CFBundlePackageType</key>
@@ -172,8 +262,8 @@ cat >"$APP_INFO_PLIST" <<PLIST
   <true/>
   <key>CFBundleURLTypes</key>
   <array><dict>
-    <key>CFBundleURLName</key><string>com.am.presstalk.activation</string>
-    <key>CFBundleURLSchemes</key><array><string>presstalk</string></array>
+    <key>CFBundleURLName</key><string>$APP_BUNDLE_IDENTIFIER.activation</string>
+    <key>CFBundleURLSchemes</key><array><string>$APP_URL_SCHEME</string></array>
     <key>CFBundleTypeRole</key><string>Viewer</string>
   </dict></array>
   <key>CFBundleDocumentTypes</key>
@@ -181,15 +271,15 @@ cat >"$APP_INFO_PLIST" <<PLIST
     <key>CFBundleTypeName</key><string>PressTalk Licence</string>
     <key>CFBundleTypeRole</key><string>Viewer</string>
     <key>LSHandlerRank</key><string>Owner</string>
-    <key>LSItemContentTypes</key><array><string>com.am.presstalk.license</string></array>
+    <key>LSItemContentTypes</key><array><string>$APP_BUNDLE_IDENTIFIER.license</string></array>
   </dict></array>
   <key>UTExportedTypeDeclarations</key>
   <array><dict>
-    <key>UTTypeIdentifier</key><string>com.am.presstalk.license</string>
+    <key>UTTypeIdentifier</key><string>$APP_BUNDLE_IDENTIFIER.license</string>
     <key>UTTypeDescription</key><string>PressTalk Licence</string>
     <key>UTTypeConformsTo</key><array><string>public.plain-text</string></array>
     <key>UTTypeTagSpecification</key><dict>
-      <key>public.filename-extension</key><array><string>presstalk-license</string></array>
+      <key>public.filename-extension</key><array><string>$APP_LICENSE_EXTENSION</string></array>
     </dict>
   </dict></array>
   <key>NSMicrophoneUsageDescription</key>
@@ -201,6 +291,11 @@ cat >"$APP_INFO_PLIST" <<PLIST
 </dict>
 </plist>
 PLIST
+
+updater_args=(configure --app "$APP_BUNDLE")
+if truthy "$DISTRIBUTION_SIGNING"; then updater_args+=(--production --public-key "$SPARKLE_PUBLIC_KEY"); fi
+python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" "${updater_args[@]}"
+python3 "$PKG_DIR/scripts/presstalk_sparkle_bundle.py" verify --app "$APP_BUNDLE"
 
 swift "$PKG_DIR/scripts/presstalk_bundle_icon_gate.swift" "$APP_BUNDLE"
 
@@ -303,6 +398,19 @@ if [[ "$HARDENED_RUNTIME" == "1" ]]; then
   codesign_args+=(--options runtime)
 fi
 
+# Sparkle's helpers have their own entitlement requirements. Sign inside-out
+# before sealing the framework; never apply the app's microphone entitlement
+# to them, and preserve the Downloader's supplied entitlements specifically.
+sparkle_codesign_args=("${codesign_args[@]}")
+if [[ "$HARDENED_RUNTIME" != "1" ]]; then sparkle_codesign_args+=(--options runtime); fi
+sparkle_framework="$APP_CONTENTS_DIR/Frameworks/Sparkle.framework"
+sparkle_version="$sparkle_framework/Versions/B"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/XPCServices/Installer.xpc"
+codesign "${sparkle_codesign_args[@]}" --preserve-metadata=entitlements "$sparkle_version/XPCServices/Downloader.xpc"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/Autoupdate"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_version/Updater.app"
+codesign "${sparkle_codesign_args[@]}" "$sparkle_framework"
+
 # A hardened process is denied microphone input unless it carries
 # com.apple.security.device.audio-input, and the denial is silent: the
 # authorization status still reads .authorized while the input tap delivers zero
@@ -325,6 +433,7 @@ sign_nested_machos() {
     [[ "$candidate" == "$APP_MACOS_DIR/jarvistap" ]] && continue
     # The nested input method app signs itself in its own build script.
     [[ "$candidate" == *"/PressTalkInputMethod.app/"* ]] && continue
+    [[ "$candidate" == *"/Frameworks/Sparkle.framework/"* ]] && continue
     echo "Signing nested Mach-O: ${candidate#$APP_BUNDLE/}"
     codesign "${codesign_args[@]}" "$candidate"
     found=$((found + 1))
@@ -336,10 +445,35 @@ sign_nested_machos
 codesign "${codesign_args[@]}" --identifier "$APP_BUNDLE_IDENTIFIER" "$APP_MACOS_DIR/jarvistap"
 codesign "${codesign_args[@]}" "$APP_BUNDLE"
 
-if [[ "$APP_BUNDLE" == "$DEFAULT_APP_BUNDLE" && -d "$LEGACY_APP_BUNDLE" && "$LEGACY_APP_BUNDLE" != "$APP_BUNDLE" ]]; then
-  rm -rf "$LEGACY_APP_BUNDLE"
+codesign --verify --deep --strict "$APP_BUNDLE"
+if truthy "$DISTRIBUTION_SIGNING"; then
+  signature_report="$(codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1)"
+  if [[ "$signature_report" != *"Authority=Developer ID Application:"* ||
+        "$signature_report" != *"TeamIdentifier=5HUC5LA94B"* ]]; then
+    echo "Built app did not retain PressTalk's production signing identity; destination is untouched." >&2
+    exit 1
+  fi
+fi
+
+# Install only the fully built and verified artifact. Keep any earlier dev
+# build instead of destroying it before compilation or signing can fail.
+mkdir -p "$(dirname "$TARGET_APP_BUNDLE")"
+PREVIOUS_APP=""
+if [[ -e "$TARGET_APP_BUNDLE" ]]; then
+  final_existing_id="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$TARGET_APP_BUNDLE/Contents/Info.plist" 2>/dev/null || true)"
+  if [[ "$final_existing_id" == "com.am.presstalk" ]]; then
+    echo "Destination became a production app during the build; refusing to replace it." >&2
+    exit 2
+  fi
+  PREVIOUS_APP="$TARGET_APP_BUNDLE.previous-$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  mv "$TARGET_APP_BUNDLE" "$PREVIOUS_APP"
+fi
+if ! mv "$APP_BUNDLE" "$TARGET_APP_BUNDLE"; then
+  if [[ -n "$PREVIOUS_APP" && ! -e "$TARGET_APP_BUNDLE" ]]; then mv "$PREVIOUS_APP" "$TARGET_APP_BUNDLE"; fi
+  echo "Could not move the staged app into place; previous build preserved at $PREVIOUS_APP." >&2
+  exit 1
 fi
 
 echo "Built: $OUT_BIN"
-echo "App:   $APP_BUNDLE"
+echo "App:   $TARGET_APP_BUNDLE"
 echo "Bundle identifier: $APP_BUNDLE_IDENTIFIER"

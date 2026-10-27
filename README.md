@@ -72,12 +72,31 @@ teardown work on the paste path.
 ## Building
 
 ```bash
-bash scripts/build_jarvistap.sh     # builds and installs to ~/Applications
+bash scripts/build_jarvistap.sh     # builds ~/Applications/PressTalk Dev.app
 swift test                          # unit tests for the policy layer
 ```
 
-Set `PRESSTALK_INCLUDE_DEV_TOOLS=0` to leave the probe and smoke helpers out, as
-distribution packaging does.
+Development builds use `com.am.presstalk.dev`, separate settings, runtime files,
+and activation handlers. They never replace the daily `PressTalk.app`. Keep the
+official release installed for everyday use and reproduce customer bugs there.
+The builder stages and verifies the new app before moving it into place; an
+earlier development app is preserved if compilation or signing fails.
+
+Production artifacts require an explicit Developer ID distribution build for
+the PressTalk signing team. Packaging uses a temporary destination, preserves
+the official identity, and excludes developer probes and signing helpers:
+
+```bash
+PRESSTALK_DISTRIBUTION_SIGNING=1 \
+PRESSTALK_CODESIGN_IDENTITY="Developer ID Application: <certificate name> (5HUC5LA94B)" \
+PRESSTALK_NOTARIZE=1 PRESSTALK_NOTARYTOOL_PROFILE="<profile>" \
+  bash scripts/package_presstalk_release.sh <version>
+```
+
+Without distribution signing, packaging produces a separately named development
+artifact. Neither local nor ad-hoc signing may use the production bundle ID.
+`PRESSTALK_BUILD_CLEAN=1` opts into a clean SwiftPM build when needed.
+See [Troubleshooting](docs/TROUBLESHOOTING.md) for permission recovery.
 
 ## Gates worth knowing about
 

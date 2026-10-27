@@ -24,6 +24,8 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         var isRecording = false
         var pasteAutomatically = true
         var shortcutUsesRegisteredHotKey = false
+        var permissionRecoveryState: PermissionRecoveryPolicy.State = .openSystemSettings
+        var permissionRecoveryMessage = ""
     }
 
     var onVerifyMicrophone: ((@escaping (AudioCaptureProbeReport) -> Void) -> Void)?
@@ -31,6 +33,10 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
     var onOpenMicrophoneSettings: (() -> Void)?
     var onOpenInputMonitoringSettings: (() -> Void)?
     var onOpenAccessibilitySettings: (() -> Void)?
+    var onRecheckPermissions: (() -> Void)?
+    var onRestartForPermissions: (() -> Bool)?
+    var onRenewPermission: (() -> Void)?
+    var onShowCurrentApp: (() -> Void)?
     var onRetryShortcut: (() -> Bool)?
     var onChangeShortcut: ((String) -> Bool)?
     var onReadConditions: (() -> FirstRunSetupPolicy.Conditions)?
@@ -60,6 +66,9 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
     private let detailLabel = NSTextField(wrappingLabelWithString: "")
     private let primaryButton = NSButton(title: "Continue", target: nil, action: nil)
     private let skipButton = NSButton(title: "Use clipboard instead", target: nil, action: nil)
+    private let recheckAccessButton = NSButton(title: "Check access again", target: nil, action: nil)
+    private let showCurrentAppButton = NSButton(title: "Show PressTalk", target: nil, action: nil)
+    private let permissionActionsRow = NSStackView()
     private let stepListStack = NSStackView()
     private let practiceScrollView = NSScrollView()
     private let practiceTextView = NSTextView()
@@ -84,7 +93,7 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         let heading = NSTextField(labelWithString: "Let’s check your dictation setup.")
         heading.font = .systemFont(ofSize: 19, weight: .semibold)
         let subheading = NSTextField(wrappingLabelWithString:
-            "Check your microphone and shortcut, then dictate a sentence. Your audio and text stay on this Mac.")
+            "Check your microphone and shortcut, then dictate a sentence. Speech recognition runs on this Mac.")
         subheading.textColor = .secondaryLabelColor
         subheading.font = .systemFont(ofSize: 12)
         let shortcutLabel = NSTextField(labelWithString: "Hold to dictate")
@@ -120,6 +129,18 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         skipButton.action = #selector(skipTapped(_:))
         skipButton.bezelStyle = .inline
         skipButton.setAccessibilityIdentifier("setup.skip")
+        recheckAccessButton.target = self
+        recheckAccessButton.action = #selector(recheckAccessTapped(_:))
+        recheckAccessButton.bezelStyle = .inline
+        recheckAccessButton.setAccessibilityIdentifier("setup.recheckAccess")
+        showCurrentAppButton.target = self
+        showCurrentAppButton.action = #selector(showCurrentAppTapped(_:))
+        showCurrentAppButton.bezelStyle = .inline
+        showCurrentAppButton.setAccessibilityIdentifier("setup.showCurrentApp")
+        permissionActionsRow.orientation = .horizontal
+        permissionActionsRow.spacing = 16
+        permissionActionsRow.addArrangedSubview(recheckAccessButton)
+        permissionActionsRow.addArrangedSubview(showCurrentAppButton)
         practiceTextView.isRichText = false
         practiceTextView.font = .systemFont(ofSize: 14)
         practiceTextView.textContainerInset = NSSize(width: 10, height: 10)
@@ -138,7 +159,7 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
         // Keep the next action ahead of already-satisfied checks. A percentage
         // bar looked like background work even while we were waiting for a click.
         let stack = NSStackView(views: [heading, subheading, shortcutRow, shortcutHint,
-            stepTitleLabel, stepBodyLabel, detailLabel, practiceScrollView, buttonRow,
+            stepTitleLabel, stepBodyLabel, detailLabel, practiceScrollView, permissionActionsRow, buttonRow,
             progressLabel, stepListStack])
         stack.orientation = .vertical
         stack.alignment = .leading
@@ -270,6 +291,12 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
             stepListStack.addArrangedSubview(row)
         }
         primaryButton.isEnabled = !checkingMicrophone
+        let isPermissionStep = current == .accessibility
+            || (current == .inputMonitoring && !details.shortcutUsesRegisteredHotKey)
+        permissionActionsRow.isHidden = !isPermissionStep
+        recheckAccessButton.isEnabled = !details.recordingOrProcessing
+        showCurrentAppButton.isEnabled = !details.recordingOrProcessing
+        showCurrentAppButton.isHidden = details.permissionRecoveryState != .systemApprovalRequired
         skipButton.isHidden = current.map { !policy.canSkip($0, given: conditions) } ?? true
         practiceScrollView.isHidden = current != .firstDictation && current != nil
         guard let current else {
@@ -313,19 +340,19 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
                     : microphoneMessage
             }
         case .accessibility:
-            primaryButton.title = "Open Accessibility Settings"
             if conditions.triggerRequiresAccessibility {
-                stepBodyLabel.stringValue = "Your \(details.triggerName) shortcut needs Accessibility permission so PressTalk can respond to the key. It also lets PressTalk insert text into other apps."
+                stepBodyLabel.stringValue = "Allow PressTalk to respond to \(details.triggerName) and insert your dictated text into other apps."
             }
-            detailLabel.stringValue = permissionInstructions
+            showPermissionRecovery(details)
         case .inputMonitoring:
-            primaryButton.title = details.shortcutUsesRegisteredHotKey
-                ? "Retry shortcut" : "Open Input Monitoring Settings"
-            detailLabel.stringValue = details.shortcutUsesRegisteredHotKey
-                ? (shortcutMessage.isEmpty
+            if details.shortcutUsesRegisteredHotKey {
+                primaryButton.title = "Retry shortcut"
+                detailLabel.stringValue = shortcutMessage.isEmpty
                     ? "PressTalk could not register this shortcut. Retry it, or choose a different shortcut above if another app uses it."
-                    : shortcutMessage)
-                : permissionInstructions
+                    : shortcutMessage
+            } else {
+                showPermissionRecovery(details)
+            }
         case .speechModel:
             switch details.modelState {
             case .idle: primaryButton.title = "Prepare speech model"
@@ -387,8 +414,68 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
             length: after.length - prefixLength - suffixLength))
     }
 
-    private var permissionInstructions: String {
-        "Enable PressTalk in System Settings, then return here. This window checks automatically. If PressTalk is missing, use + to add this copy: \(Bundle.main.bundleURL.path)."
+    private func showPermissionRecovery(_ details: Details) {
+        switch details.permissionRecoveryState {
+        case .openSystemSettings:
+            primaryButton.title = "Open System Settings"
+            detailLabel.stringValue = "Allow PressTalk in the privacy pane that opens, then return here. PressTalk will check whether access is usable."
+        case .waitingForReturn:
+            primaryButton.title = "Check access again"
+            detailLabel.stringValue = "After allowing PressTalk in System Settings, return here. If the switch was already on, check access again."
+        case .finishCurrentDictation:
+            primaryButton.title = "Finish current dictation first"
+            primaryButton.isEnabled = false
+            detailLabel.stringValue = "Permission recovery will be available after your current recording and text delivery finish."
+        case .restartToRefresh:
+            primaryButton.title = "Restart PressTalk"
+            detailLabel.stringValue = "macOS has not made this access available to the running app. If you enabled it, restart PressTalk once to refresh access. Your settings stay saved."
+        case .renewPermission:
+            primaryButton.title = "Renew PressTalk Permission"
+            detailLabel.stringValue = "A permission entry can still refer to an older copy of PressTalk. Renewing it asks macOS for a fresh approval for this app. You will be shown exactly what changes before continuing."
+        case .systemApprovalRequired:
+            primaryButton.title = "Open System Settings"
+            detailLabel.stringValue = "PressTalk still needs your approval in macOS. Allow the current app in the privacy pane. If your Mac is managed, your administrator may control this setting. Show PressTalk locates the exact app to approve."
+        case .ready:
+            // Capability state can advance before the input listener has been
+            // rebuilt. A recheck never claims setup or text insertion passed.
+            primaryButton.title = "Check access again"
+            detailLabel.stringValue = "Checking that your shortcut and text insertion can use the newly available access."
+        }
+        if !details.permissionRecoveryMessage.isEmpty {
+            detailLabel.stringValue = details.permissionRecoveryMessage
+        }
+        if details.recordingOrProcessing { primaryButton.isEnabled = false }
+    }
+
+    private func performPermissionAction(
+        for step: FirstRunSetupPolicy.Step, details: Details
+    ) {
+        guard !details.recordingOrProcessing else { return }
+        switch details.permissionRecoveryState {
+        case .openSystemSettings, .systemApprovalRequired:
+            if step == .accessibility { onOpenAccessibilitySettings?() }
+            else { onOpenInputMonitoringSettings?() }
+        case .waitingForReturn, .ready:
+            onRecheckPermissions?()
+        case .restartToRefresh:
+            _ = onRestartForPermissions?()
+        case .renewPermission:
+            onRenewPermission?()
+        case .finishCurrentDictation:
+            return
+        }
+        refresh()
+    }
+
+    @objc private func recheckAccessTapped(_ sender: Any?) {
+        guard let details = onReadDetails?(), !details.recordingOrProcessing else { return }
+        onRecheckPermissions?()
+        refresh()
+    }
+
+    @objc private func showCurrentAppTapped(_ sender: Any?) {
+        guard let details = onReadDetails?(), !details.recordingOrProcessing else { return }
+        onShowCurrentApp?()
     }
 
     @objc private func primaryTapped(_ sender: Any?) {
@@ -429,8 +516,8 @@ final class FirstRunSetupWindowController: NSWindowController, NSWindowDelegate 
                 shortcutMessage = ready ? "Shortcut is ready."
                     : "The shortcut is still unavailable. Choose another shortcut above, then try again."
                 refresh()
-            } else { onOpenInputMonitoringSettings?() }
-        case .accessibility: onOpenAccessibilitySettings?()
+            } else { performPermissionAction(for: current, details: details) }
+        case .accessibility: performPermissionAction(for: current, details: details)
         case .speechModel:
             onDownloadSpeechModel?()
             refresh()

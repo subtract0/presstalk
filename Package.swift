@@ -28,6 +28,7 @@ let package = Package(
         ),
     ],
     dependencies: [
+        .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.1"),
         .package(url: "https://github.com/argmaxinc/WhisperKit.git", from: "0.9.0"),
         .package(
             url: "https://github.com/FluidInference/FluidAudio.git",
@@ -52,8 +53,10 @@ let package = Package(
                 "PressTalkCapture",
                 "PressTalkCore",
                 .product(name: "FluidAudio", package: "FluidAudio"),
+                .product(name: "Sparkle", package: "Sparkle"),
                 "WhisperKit",
-            ]
+            ],
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-rpath", "-Xlinker", "@executable_path/../Frameworks"])]
         ),
         .executableTarget(
             name: "PressTalkInputMethod",

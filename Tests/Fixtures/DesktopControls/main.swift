@@ -51,6 +51,7 @@ final class CountingAnchor: TrialAnchorStore {
     func read() -> TrialAnchor.Reading { reads += 1; return reading }
     func write(_ date: Date) -> Bool { writes += 1; return true }
 }
+#if DEBUG
 for earlyUser in [false, true] {
     defaults.set(earlyUser, forKey: "PressTalk.PredatesPaidLicensing")
     let anchor = CountingAnchor()
@@ -63,6 +64,32 @@ for earlyUser in [false, true] {
     require(anchor.reads == 0 && anchor.writes == 0,
         "The production owner path accessed the trial anchor")
 }
+#else
+// Compile this fixture without DEBUG as well as with it. A process environment
+// value must not unlock the actual release store after its trial has expired.
+defaults.set(false, forKey: "PressTalk.PredatesPaidLicensing")
+let releaseAnchor = CountingAnchor()
+releaseAnchor.reading = .found(Date().addingTimeInterval(-10 * 86400))
+let unlicensedRelease = PressTalkLicenseStore(defaults: defaults,
+    env: ["PRESSTALK_ENTITLEMENT_OVERRIDE": "founder"], anchorStores: [releaseAnchor])
+require(unlicensedRelease.state == .trialExpired && unlicensedRelease.shouldBlockDictation,
+    "A release build accepted an unverified entitlement override")
+unlicensedRelease.startTrialIfNeeded()
+require(releaseAnchor.reads > 0 && releaseAnchor.writes == 0,
+    "Release enforcement reset an existing expired trial")
+
+defaults.set(true, forKey: "PressTalk.PredatesPaidLicensing")
+let earlyAnchor = CountingAnchor()
+earlyAnchor.reading = .unavailable
+let earlyRelease = PressTalkLicenseStore(defaults: defaults,
+    env: ["PRESSTALK_ENTITLEMENT_OVERRIDE": "founder"], anchorStores: [earlyAnchor])
+require(earlyRelease.state == .grandfathered && !earlyRelease.shouldBlockDictation,
+    "Ignoring a release override removed or replaced an early user's entitlement")
+earlyRelease.startTrialIfNeeded()
+require(earlyAnchor.reads == 0 && earlyAnchor.writes == 0,
+    "A release build accessed trial storage for an early user")
+print("PASS: release ignores unverified entitlement overrides and preserves early-user access")
+#endif
 defaults.set(false, forKey: "PressTalk.PredatesPaidLicensing")
 let trialAnchor = CountingAnchor()
 let trial = PressTalkLicenseStore(defaults: defaults, env: [:], anchorStores: [trialAnchor])
@@ -75,7 +102,7 @@ expiredAnchor.reading = .found(Date().addingTimeInterval(-10 * 86400))
 let expired = PressTalkLicenseStore(defaults: defaults, env: [:], anchorStores: [expiredAnchor])
 require(expired.state == .trialExpired,
     "The production state call site no longer supplies the real trial anchor")
-print("PASS: production owners skip trial stores; actual trials still read and start their anchor")
+print("PASS: actual trials still read and start their anchor")
 
 func control<T: NSView>(_ identifier: String, as type: T.Type) -> T {
     guard let view = descendants(controller.window!.contentView!).compactMap({ $0 as? T })
@@ -155,9 +182,11 @@ if let path = ProcessInfo.processInfo.environment["PRESSTALK_ACCEPTANCE_LICENSE_
     let paid = PressTalkLicenseStore(defaults: defaults, env: [:], anchorStores: [expired])
     if case .failure(let error) = paid.importLicense(encoded) { fatalError("Delivered licence failed native verifier: \(error)") }
     require(paid.currentPlanName == "Founder" && !paid.shouldBlockDictation, "Purchase did not override expired trial")
+    paid.startTrialIfNeeded()
     let relaunched = PressTalkLicenseStore(defaults: UserDefaults(suiteName: domain)!, env: [:], anchorStores: [expired])
     require(relaunched.currentPlanName == "Founder" && !relaunched.shouldBlockDictation,
         "A fresh native licence store could not recover the saved purchase")
+    relaunched.startTrialIfNeeded()
     if case .success = relaunched.importLicense("invalid") { fatalError("Invalid licence was accepted") }
     require(relaunched.currentPlanName == "Founder", "A bad import destroyed a working licence")
     require(expired.reads == 0 && expired.writes == 0, "Paid store unnecessarily accessed the trial anchors")
@@ -166,8 +195,11 @@ if let path = ProcessInfo.processInfo.environment["PRESSTALK_ACCEPTANCE_LICENSE_
     require(buy.isHidden, "Activated customer still sees a misleading upgrade offer")
     require(descendants(controller.window!.contentView!).compactMap { $0 as? NSTextField }
         .contains { $0.stringValue == "Founder" }, "Settings does not show the activated licence")
+    print("PASS: delivered founder licence activates, survives store restart and skips trial storage")
+} else {
+    print("SKIP: delivered signed-licence acceptance; PRESSTALK_ACCEPTANCE_LICENSE_FILE is not set")
 }
 controller.window!.setContentSize(NSSize(width: 520, height: 420))
 controller.window!.contentView!.layoutSubtreeIfNeeded()
 require(!controller.window!.isVisible, "Controls test unexpectedly opened a window")
-print("PASS: settings changes persist, actions fire, mic choice survives reconnects, and native paid licence survives store restart")
+print("PASS: settings changes persist, actions fire and mic choice survives reconnects")

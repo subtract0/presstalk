@@ -8,7 +8,6 @@
   </defs>
   <rect x="2" y="4" width="60" height="58" rx="13" fill="#626a57"/>
   <rect x="2" y="2" width="60" height="57" rx="13" fill="url(#face)" stroke="#c1c5b5" stroke-width="2"/>
-  <rect x="27" y="8" width="10" height="2.5" rx="1.25" fill="#c3d5a1"/>
   <g transform="translate(.5 5) scale(.9)" fill="#f7f5ec">
     <path d="M18 50V28H12V23H18V20C18 13 21 10 28 10H31V15H28C24 15 23 17 23 21V23H30V28H23V50Z"/>
     <path d="M34 23H39V27C41 24 44 22 48 22C55 22 58 26 58 33V50H53V34C53 29 51 27 47 27C43 27 39 30 39 35V50H34Z"/>

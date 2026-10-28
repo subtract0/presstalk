@@ -108,7 +108,13 @@ final class PressTalkLicenseStore {
          env: [String: String] = ProcessInfo.processInfo.environment,
          anchorStores: [TrialAnchorStore]? = nil) {
         self.defaults = defaults
+        #if DEBUG
         self.overrideEntitlement = env["PRESSTALK_ENTITLEMENT_OVERRIDE"]
+        #else
+        // Environment values cannot grant paid access in a release build.
+        // The owner override exists only for isolated development fixtures.
+        self.overrideEntitlement = nil
+        #endif
         self.anchorStores = anchorStores ?? [
             UserDefaultsTrialAnchorStore(defaults: defaults, key: Key.trialStartedAt),
             KeychainTrialAnchorStore(service: Key.keychainService,
@@ -185,8 +191,8 @@ final class PressTalkLicenseStore {
         return PressTalkOffer.checkoutIsLive
     }
 
-    /// Called after the first successful dictation. The trial starts when the
-    /// product first works, not when it was installed.
+    /// Called after successful dictations, so a later delivery can retry a
+    /// start deferred by unreadable storage. An existing start date is retained.
     func startTrialIfNeeded() {
         guard verifiedEntitlement == nil, !priorUse.indicatesPriorUse else { return }
         // Checks every store, not just UserDefaults. Someone who reinstalled

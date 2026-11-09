@@ -2,7 +2,7 @@
 
 Push-to-talk dictation for Apple Silicon Macs (M1 or later), running macOS 14 or
 later. Hold `Fn`, speak, release, and PressTalk pastes the text into your focused
-text field. Recognition runs on the Neural Engine in your Mac.
+text field. Recognition runs locally; Settings offers Neural Engine/CPU and GPU/CPU processing.
 
 [Download PressTalk](https://presstalk.app/download.html) for a three-day free
 trial, with no card or account required. Homebrew is also available:
@@ -17,6 +17,10 @@ downloads the speech model (~460 MB). Then click a text field, hold `Fn / Globe`
 speak, and release. If Fn does not respond, setup also offers `Option + Space`
 or `F5`. Dictation works offline after setup.
 
+This public repository hosts the website, customer downloads and historical source.
+Current app development is maintained privately; the source here does not
+represent the implementation of every later binary release.
+
 ## Where things are
 
 | | |
@@ -25,7 +29,7 @@ or `F5`. Dictation works offline after setup.
 | Support and refunds | [docs/SUPPORT.md](docs/SUPPORT.md) |
 | What it costs | [docs/MONETIZATION.md](docs/MONETIZATION.md) |
 | Product website | [presstalk.app](https://presstalk.app/) · [source](site/index.html) |
-| Current public release | [PressTalk 0.1.25](https://github.com/subtract0/presstalk/releases/tag/v0.1.25) |
+| Current public release | [PressTalk 0.1.26](https://github.com/subtract0/presstalk/releases/tag/v0.1.26) |
 | Purchase and licence delivery | [commerce/README.md](commerce/README.md) |
 | What is measured, and how | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
 | Completed public launch record | [9 September release verification](docs/purchases/2026-09-09-public-release.md) |
@@ -37,7 +41,7 @@ or `F5`. Dictation works offline after setup.
 
 ## Current state
 
-**The public 0.1.25 release is Developer ID signed and notarized by Apple.**
+**The public 0.1.26 release is Developer ID signed and notarized by Apple.**
 Download the DMG, drag PressTalk into Applications, and open it from there.
 The older certificate and manual-fulfilment tasks in the historical launch
 checklist are not the current distribution status.
@@ -58,9 +62,10 @@ is available for existing buyers.
 with a retry message; release the key, wait briefly, and dictate again.
 Interrupted recordings insert nothing. Compatibility with macOS 27 has not yet
 been verified on a Mac running that release. See [support](docs/SUPPORT.md) and
-the [release notes](https://github.com/subtract0/presstalk/releases/tag/v0.1.25).
+the [release notes](https://github.com/subtract0/presstalk/releases/tag/v0.1.26).
 
-Recognition uses Parakeet v3 on the Neural Engine. A larger WhisperKit model can
+Recognition uses local Parakeet v3 through Core ML; Settings offers
+Neural Engine/CPU and GPU/CPU processing. A larger WhisperKit model can
 re-check low-confidence results, but it is a separate ~620 MB download that is
 never fetched implicitly — without it, dictation runs on Parakeet alone and
 `currentQualityFallbackStatus()` says so.

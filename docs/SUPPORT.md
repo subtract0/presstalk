@@ -48,7 +48,9 @@ You can change or disable the hands-free shortcut in Settings.
 From 0.1.26, clear vocal hesitations are removed automatically in ordinary
 dictation. Meaningful words such as German “um,” acknowledgements such as
 “uh-huh,” quoted words, addresses and saved vocabulary phrases are preserved.
-A recording containing only hesitations inserts nothing and finishes quietly.
+A recording containing only clear hesitations inserts nothing and finishes quietly.
+English “um” is removed when the rest of its sentence is confidently English;
+ambiguous short phrases retain the word.
 
 **Email addresses contain “at” or “dot.”**
 From 0.1.26, clear English/German address phrases are formatted automatically,

@@ -5,9 +5,9 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>PressTalk</title>
         <item>
             <title>0.1.26</title>
-            <pubDate>Mon, 09 Nov 2026 16:58:00 +0100</pubDate>
+            <pubDate>Mon, 09 Nov 2026 17:29:13 +0100</pubDate>
             <link>https://presstalk.app/</link>
-            <sparkle:version>26.2</sparkle:version>
+            <sparkle:version>26.3</sparkle:version>
             <sparkle:shortVersionString>0.1.26</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
@@ -15,7 +15,7 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
 
 Clear English/German email addresses and websites are formatted automatically: “hello at example dot com” becomes hello@example.com. Ordinary uses of “at” are protected.
 
-Clear vocal hesitations such as “uh” and “ähm” are removed in ordinary dictation. Meaningful words, quoted text, addresses and matching saved vocabulary phrases stay intact. Hesitation-only recordings finish quietly.
+Clear vocal hesitations such as “uh” and “ähm” are removed in ordinary dictation. English “um” is removed when the rest of its sentence is confidently English; ambiguous short phrases retain the word. Meaningful words, quoted text, addresses and matching saved vocabulary phrases stay intact. Hesitation-only recordings finish quietly.
 
 Fn + Space starts hands-free dictation; press it again to finish. Quick accidental key taps no longer speak a recognizer rejection as a backend error.
 
@@ -27,10 +27,10 @@ Speech models are unchanged. General conversion of spoken German numbers into di
 
 Apple Silicon · macOS 14 or later. Signed with Developer ID, notarized by Apple.
 ]]></description>
-            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.26/PressTalk-0.1.26-macos-arm64.zip" length="6257561" type="application/octet-stream" sparkle:edSignature="w0X4VrBIeZFj4gZfTJ9zZGD0vdKnwflHSg8Qz36fdrP8mi8s3CUIxvrUJPk3h4GAOlI+TcAIZs3Y48A3zy1jAA=="></enclosure>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.26/PressTalk-0.1.26-macos-arm64.zip" length="6258574" type="application/octet-stream" sparkle:edSignature="QEoUige3g2S+OVhHtHSG2j7P9q4LLyVvIslNhfF1nfwoLGJ7OV7eQlTusZP+LEeVZIuCAjYzHxe/tg7hLMREDA=="></enclosure>
         </item>
     </channel>
 </rss><!-- sparkle-signatures:
-edSignature: p+7bnw5+jy2UONFPT9vcgTVszXC6dJMDhbNV9L3PDD7lEI5ohmrjjRi4B4V/vo5DWQha7F3Jav/U7cYS+WZzCg==
-length: 2642
+edSignature: Jp/u6rvOBdmzuf0Bg7wkDYK/dtsgoVIXQ3lfZIaqt7cSe+seIk8FIUZd8bmguTZaTlCusEcn/M4UeJYb9msXBw==
+length: 2765
 -->

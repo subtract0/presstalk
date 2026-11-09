@@ -10,3 +10,7 @@ metrics/
 
 # Regenerated from scripts/render_presstalk_artwork.swift.
 resources/PressTalk.iconset/
+
+# Generated benchmark audio stays local; historical measured clips remain in old tags.
+/eval/**/audio/
+/eval/**/.gate/

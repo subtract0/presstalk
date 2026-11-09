@@ -2,7 +2,9 @@
 
 PressTalk claims 12.71 % word error rate on German against Apple's 19.38 % on
 the same audio. This directory is the whole basis of that claim: the sentences,
-the audio, the references, the runner and the scorer. Run it yourself and
+the references, the runner and the scorer. Generated audio stays local.
+The original measured clips and their checksums remain available in the
+[immutable 0.1.25 archive](https://github.com/subtract0/presstalk/tree/v0.1.25/eval/de). Run it yourself and
 disagree with a number, not with an assertion.
 
     ./run_eval.sh /path/to/PressTalkAsrBench "$PWD" results.tsv
@@ -10,14 +12,14 @@ disagree with a number, not with an assertion.
 
 `PressTalkAsrBench` builds from this repository:
 
-    swift build -c release --product PressTalkAsrBench
+    swift build -c release --product presstalk-asr-bench
 
 ## What is here
 
 | | |
 |---|---|
 | `eval_set.tsv` | 48 German sentences, 8 categories of 6 |
-| `audio/` | 144 clips: every sentence spoken by three German voices |
+| `audio/` | Local generated clips; not tracked in current source |
 | `ref/` | the reference text for each clip, one file per clip |
 | `gen_audio.sh` | regenerates `audio/` and `ref/` from `eval_set.tsv` |
 | `run_eval.sh` | scores every clip on every backend, one TSV row per clip |
@@ -72,7 +74,7 @@ Read this before quoting the number anywhere.
     ./gen_audio.sh eval_set.tsv "$PWD" /path/to/PressTalkAsrBench
 
 This overwrites `audio/` and `ref/`. Regenerated clips will not be byte-identical
-to the committed ones across different macOS releases, because Apple revises its
+to the archived measured clips across different macOS releases, because Apple revises its
 voices. If your scores differ from `results.tsv`, check `MANIFEST.sha256` first
 — it distinguishes "the recognizer behaved differently" from "you are scoring
 different audio".

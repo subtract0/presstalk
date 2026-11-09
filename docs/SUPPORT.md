@@ -33,6 +33,28 @@ Open PressTalk from Applications, then eject the installer disk. If you already
 have PressTalk running, quit it before replacing the app. Your settings and
 licence are stored separately from the app.
 
+**How do updates work?**
+Versions 0.1.25 and earlier need one manual replacement with the current download.
+Quit PressTalk, replace the existing copy, and reopen it. Keep one installed copy;
+your licence and settings are stored separately. From 0.1.26, PressTalk can check
+for and download signed updates automatically. Change either option in Settings.
+Updates wait for dictation and clipboard restoration to finish.
+
+**Can I dictate without holding the key?**
+Press Fn + Space to start hands-free recording and press it again to finish.
+You can change or disable the hands-free shortcut in Settings.
+
+**Can PressTalk leave out “uh” and “ähm”?**
+From 0.1.26, clear vocal hesitations are removed automatically in ordinary
+dictation. Meaningful words such as German “um,” acknowledgements such as
+“uh-huh,” quoted words, addresses and saved vocabulary phrases are preserved.
+A recording containing only hesitations inserts nothing and finishes quietly.
+
+**Email addresses contain “at” or “dot.”**
+From 0.1.26, clear English/German address phrases are formatted automatically,
+including “hello at example dot com.” Ambiguous or unsupported phrases can stay
+unchanged. Check important addresses before sending them.
+
 **"PressTalk cannot be opened because the developer cannot be verified."**
 The current public release is signed with Alexander Monas's Developer ID and
 carries a stapled notarization ticket. macOS may still ask you to confirm that

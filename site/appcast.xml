@@ -7,9 +7,9 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
         <title>PressTalk</title>
         <item>
             <title>0.1.27</title>
-            <pubDate>Tue, 10 Nov 2026 20:19:59 +0100</pubDate>
+            <pubDate>Tue, 10 Nov 2026 20:38:17 +0100</pubDate>
             <link>https://presstalk.app/</link>
-            <sparkle:version>27.1</sparkle:version>
+            <sparkle:version>27.2</sparkle:version>
             <sparkle:shortVersionString>0.1.27</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
@@ -25,7 +25,7 @@ Existing licences, settings and models are retained. Signed automatic updates ar
 
 Apple Silicon · macOS 14 or later. Developer ID signed and notarized by Apple.
 ]]></description>
-            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.27/PressTalk-0.1.27-macos-arm64.zip" length="6268965" type="application/octet-stream" sparkle:edSignature="HASpvhohJxxd8+6VVkVXsVLEaZTkzO/y2gIOdjqCLv27oCHD/VB7qCkkYKWPaj+cCk3X86EODZyM8qxDd2iOCg=="/>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.27/PressTalk-0.1.27-macos-arm64.zip" length="6270981" type="application/octet-stream" sparkle:edSignature="WRkFbEyaVj86ztMTdVSxKASbd/v1WzsANTsW6gsUaqaN4i44Cufk44B9cIg5iq2STmYXkrCbq5leu5cR4i8pBw=="/>
         </item>
         <item>
             <title>0.1.26</title>
@@ -56,6 +56,6 @@ Apple Silicon · macOS 14 or later. Signed with Developer ID, notarized by Apple
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: yN2hEdS0xVDvIIyScD5NTr8gsZxawxUPhFm4xtInvijzi5LfglqUxaF/XG9xT23Cu/bBV8YFdOFO/CNiF9HsDA==
+edSignature: FmPZWwhAtBeYOLbiFrMfWJPyq//LfQ0K6mwidZj4r78qBqqESjTMLhK9NfB6b1UQnfJ9Z1vIPj+nZzr522wJCA==
 length: 4788
 -->

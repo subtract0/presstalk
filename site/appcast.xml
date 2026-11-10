@@ -6,6 +6,28 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>PressTalk</title>
         <item>
+            <title>0.1.28</title>
+            <pubDate>Tue, 10 Nov 2026 21:10:56 +0100</pubDate>
+            <link>https://presstalk.app/</link>
+            <sparkle:version>28.1</sparkle:version>
+            <sparkle:shortVersionString>0.1.28</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="plain-text"><![CDATA[PressTalk 0.1.28
+
+Personal Vocabulary now shows the complete collection of saved corrections in a two-column list: recognized phrase and preferred spelling. Every saved rule is applied. Selecting a row chooses which entry to edit or remove.
+
+Add spelling appends another entry; one spelling can have several recognized phrases, entered on separate lines. The editor retains its selection and makes newly added entries visible. Existing vocabulary data is preserved without migration. The previous dropdown also applied all saved rules, but its single visible selection made that behavior unclear.
+
+The optional Write numbers as digits setting from 0.1.27 remains disabled by default. No recognition model, dependency, licence or permission reset. Existing settings and local speech models are retained.
+
+Signed automatic updates are available from 0.1.26 onward. Users of 0.1.25 and earlier need one manual installation. The known first-recording AirPods retry issue remains under investigation. Explicit main-language locking and a Parakeet Ultra comparison remain separate planned work.
+
+Apple Silicon · macOS 14 or later. Developer ID signed and notarized by Apple.
+]]></description>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.28/PressTalk-0.1.28-macos-arm64.zip" length="6278158" type="application/octet-stream" sparkle:edSignature="nG3PaJexo+jrzVceb/dkTZ5QzsdAyl5l9zkS5A4xMEtcOvVnutiiN7jJ7afUs7QB5DXvuizzvNOsl+V7MQIjCA=="/>
+        </item>
+        <item>
             <title>0.1.27</title>
             <pubDate>Tue, 10 Nov 2026 20:38:17 +0100</pubDate>
             <link>https://presstalk.app/</link>
@@ -56,6 +78,6 @@ Apple Silicon · macOS 14 or later. Signed with Developer ID, notarized by Apple
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: FmPZWwhAtBeYOLbiFrMfWJPyq//LfQ0K6mwidZj4r78qBqqESjTMLhK9NfB6b1UQnfJ9Z1vIPj+nZzr522wJCA==
-length: 4788
+edSignature: 0yv31aTVM0E3bEbykaz9PPOnZz31llZuUtYyPkgGptfqj0xVoq4WnT5REwSfW40fX6VShXEWZR/qGvzA6rJDCg==
+length: 6790
 -->

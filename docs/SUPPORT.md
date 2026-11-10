@@ -52,6 +52,9 @@ A recording containing only clear hesitations inserts nothing and finishes quiet
 English “um” is removed when the rest of its sentence is confidently English;
 ambiguous short phrases retain the word.
 
+**Does selecting one vocabulary rule turn off the others?**
+Every saved correction is applied. From 0.1.28, Personal Vocabulary shows the full collection in a two-column list. Selecting a row chooses which rule to edit or remove. Add spelling appends another entry; enter multiple recognized phrases on separate lines to give one spelling several aliases. Existing entries are retained.
+
 **Can spoken numbers be written as digits?**
 Enable **Write numbers as digits** in Settings (off by default). Clear English and German number phrases become digits, for example “ninety nine problems” → “99 problems” and “zweiundzwanzig” → “22”. Disable it to keep the recognizer’s original number formatting. Existing digits, quoted text and saved Personal Vocabulary stay literal. Ambiguous digit sequences and unsupported forms can remain words; this does not infer phone numbers or format dates.
 

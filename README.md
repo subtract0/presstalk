@@ -29,7 +29,7 @@ represent the implementation of every later binary release.
 | Support and refunds | [docs/SUPPORT.md](docs/SUPPORT.md) |
 | What it costs | [docs/MONETIZATION.md](docs/MONETIZATION.md) |
 | Product website | [presstalk.app](https://presstalk.app/) · [source](site/index.html) |
-| Current public release | [PressTalk 0.1.27](https://github.com/subtract0/presstalk/releases/tag/v0.1.27) |
+| Current public release | [PressTalk 0.1.28](https://github.com/subtract0/presstalk/releases/tag/v0.1.28) |
 | Purchase and licence delivery | [commerce/README.md](commerce/README.md) |
 | What is measured, and how | [docs/MEASUREMENTS.md](docs/MEASUREMENTS.md) |
 | Completed public launch record | [9 September release verification](docs/purchases/2026-09-09-public-release.md) |
@@ -62,7 +62,7 @@ is available for existing buyers.
 with a retry message; release the key, wait briefly, and dictate again.
 Interrupted recordings insert nothing. Compatibility with macOS 27 has not yet
 been verified on a Mac running that release. See [support](docs/SUPPORT.md) and
-the [release notes](https://github.com/subtract0/presstalk/releases/tag/v0.1.27).
+the [release notes](https://github.com/subtract0/presstalk/releases/tag/v0.1.28).
 
 Recognition uses local Parakeet v3 through Core ML; Settings offers
 Neural Engine/CPU and GPU/CPU processing. A larger WhisperKit model can

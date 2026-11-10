@@ -52,6 +52,9 @@ A recording containing only clear hesitations inserts nothing and finishes quiet
 English “um” is removed when the rest of its sentence is confidently English;
 ambiguous short phrases retain the word.
 
+**Can spoken numbers be written as digits?**
+Enable **Write numbers as digits** in Settings (off by default). Clear English and German number phrases become digits, for example “ninety nine problems” → “99 problems” and “zweiundzwanzig” → “22”. Disable it to keep the recognizer’s original number formatting. Existing digits, quoted text and saved Personal Vocabulary stay literal. Ambiguous digit sequences and unsupported forms can remain words; this does not infer phone numbers or format dates.
+
 **Email addresses contain “at” or “dot.”**
 From 0.1.26, clear English/German address phrases are formatted automatically,
 including “hello at example dot com.” Ambiguous or unsupported phrases can stay

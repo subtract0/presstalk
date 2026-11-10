@@ -1,8 +1,32 @@
-<?xml version="1.0" standalone="yes"?><!-- sparkle-sign-warning:
+<?xml version="1.0" standalone="yes"?>
+<!-- sparkle-sign-warning:
 IMPORTANT: This file was signed by Sparkle. Any modifications to this file requires re-signing this file with generate_appcast or sign_update! The signed signature will be embedded at the end of this file.
---><rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
+-->
+<rss xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" version="2.0">
     <channel>
         <title>PressTalk</title>
+        <item>
+            <title>0.1.27</title>
+            <pubDate>Tue, 10 Nov 2026 20:19:59 +0100</pubDate>
+            <link>https://presstalk.app/</link>
+            <sparkle:version>27.1</sparkle:version>
+            <sparkle:shortVersionString>0.1.27</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="plain-text"><![CDATA[PressTalk 0.1.27
+
+New Settings option: Write numbers as digits. It is disabled by default. Enable it to format clear English and German number phrases locally: “ninety nine problems” becomes “99 problems”, “zweiundzwanzig” becomes “22”. Clear decimal phrases are supported too.
+
+Turning it off keeps the recognizer's original number formatting. Quotes, code, addresses, existing digits and saved Personal Vocabulary stay literal. Ambiguous digit sequences and unsupported forms can stay words. This does not infer phone numbers, rewrite units or format dates.
+
+No speech-model or dependency update. Dictation still uses local Parakeet v3 with the processor choice in Settings. No audio or transcripts are uploaded for number formatting. Explicit main-language locking is still planned separately.
+
+Existing licences, settings and models are retained. Signed automatic updates are available from 0.1.26 onward; users on 0.1.25 and earlier need one manual installation. Automatic checks/downloads can be disabled in Settings. The existing first-recording AirPods retry issue remains under investigation.
+
+Apple Silicon · macOS 14 or later. Developer ID signed and notarized by Apple.
+]]></description>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.27/PressTalk-0.1.27-macos-arm64.zip" length="6268965" type="application/octet-stream" sparkle:edSignature="HASpvhohJxxd8+6VVkVXsVLEaZTkzO/y2gIOdjqCLv27oCHD/VB7qCkkYKWPaj+cCk3X86EODZyM8qxDd2iOCg=="/>
+        </item>
         <item>
             <title>0.1.26</title>
             <pubDate>Mon, 09 Nov 2026 17:29:13 +0100</pubDate>
@@ -27,10 +51,11 @@ Speech models are unchanged. General conversion of spoken German numbers into di
 
 Apple Silicon · macOS 14 or later. Signed with Developer ID, notarized by Apple.
 ]]></description>
-            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.26/PressTalk-0.1.26-macos-arm64.zip" length="6258574" type="application/octet-stream" sparkle:edSignature="QEoUige3g2S+OVhHtHSG2j7P9q4LLyVvIslNhfF1nfwoLGJ7OV7eQlTusZP+LEeVZIuCAjYzHxe/tg7hLMREDA=="></enclosure>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.26/PressTalk-0.1.26-macos-arm64.zip" length="6258574" type="application/octet-stream" sparkle:edSignature="QEoUige3g2S+OVhHtHSG2j7P9q4LLyVvIslNhfF1nfwoLGJ7OV7eQlTusZP+LEeVZIuCAjYzHxe/tg7hLMREDA=="/>
         </item>
     </channel>
-</rss><!-- sparkle-signatures:
-edSignature: Jp/u6rvOBdmzuf0Bg7wkDYK/dtsgoVIXQ3lfZIaqt7cSe+seIk8FIUZd8bmguTZaTlCusEcn/M4UeJYb9msXBw==
-length: 2765
+</rss>
+<!-- sparkle-signatures:
+edSignature: yN2hEdS0xVDvIIyScD5NTr8gsZxawxUPhFm4xtInvijzi5LfglqUxaF/XG9xT23Cu/bBV8YFdOFO/CNiF9HsDA==
+length: 4788
 -->

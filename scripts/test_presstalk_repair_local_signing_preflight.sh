@@ -7,9 +7,9 @@ TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-repair-preflight-test.XXXXXX
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
 home_dir="$TEST_TMPDIR/home"
-app_bundle="$home_dir/Applications/PressTalk.app"
+app_bundle="$home_dir/Applications/PressTalk Dev.app"
 resources_dir="$app_bundle/Contents/Resources"
-status_dir="$home_dir/Library/Application Support/JarvisTap"
+status_dir="$home_dir/Library/Application Support/PressTalk Dev"
 mkdir -p "$resources_dir" "$status_dir"
 
 cat >"$app_bundle/Contents/Info.plist" <<'PLIST'
@@ -18,7 +18,7 @@ cat >"$app_bundle/Contents/Info.plist" <<'PLIST'
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key>
-  <string>com.am.presstalk</string>
+  <string>com.am.presstalk.dev</string>
 </dict>
 </plist>
 PLIST

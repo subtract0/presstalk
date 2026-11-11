@@ -1,0 +1,266 @@
+import Foundation
+
+func require(_ value: @autoclosure () -> Bool, _ message: String) {
+    guard value() else { print("FAIL: \(message)"); exit(1) }
+}
+func eventually(_ message: String, _ predicate: () -> Bool) {
+    let deadline = Date().addingTimeInterval(5)
+    while !predicate() && Date() < deadline {
+        RunLoop.current.run(mode: .default, before: Date().addingTimeInterval(0.002))
+    }
+    require(predicate(), message)
+}
+func drainMainQueue() {
+    var finished = false
+    DispatchQueue.main.async { finished = true }
+    eventually("Main queue did not drain") { finished }
+}
+
+// Only platform/service boundaries are replaced. All admission, termination,
+// clipboard tracking and observer decisions are extracted from main.swift.
+final class NSApplication {
+    enum TerminateReply { case terminateNow, terminateLater, terminateCancel }
+    var replies: [Bool] = []
+    var beforeReply: (() -> Void)?
+    func reply(toApplicationShouldTerminate answer: Bool) {
+        beforeReply?()
+        replies.append(answer)
+    }
+    func reset() { replies = []; beforeReply = nil }
+}
+let NSApp = NSApplication()
+final class PressTalkUpdater {
+    var notifications = 0
+    var onActivity: (() -> Void)?
+    func activityDidChange() { notifications += 1; onActivity?() }
+}
+enum Presentation { case busy(String), copied(String) }
+struct Logger { func log(_ text: String) {} }
+struct NativeCalibrationSession {}
+struct StreamingSnapshot {}
+enum Trigger { case configuredKey }
+enum TriggerSource { case modifierKey }
+struct InputCandidate { let id = 17; let uid = "synthetic-input" }
+struct InputSelection { let candidate = InputCandidate() }
+struct AudioCaptureProbeReport {
+    enum Outcome: String { case noInputDevice, engineFailed, syntheticSuccess }
+    let outcome: Outcome
+    let authorizationStatus: String
+    let sampleRate: Int
+    let channelCount: Int
+    let framesCaptured: Int
+    let peakAmplitude: Double
+    let durationSeconds: Double
+    let detail: String
+    var isUsable: Bool { outcome == .syntheticSuccess }
+}
+enum AudioCaptureProbe {
+    static let lock = NSLock()
+    static var runs = 0
+    static var release = DispatchSemaphore(value: 0)
+    static func run(deviceID: Int) -> AudioCaptureProbeReport {
+        lock.lock(); runs += 1; lock.unlock()
+        require(release.wait(timeout: .now() + 5) == .success, "Synthetic probe was never released")
+        return .init(outcome: .syntheticSuccess, authorizationStatus: "authorized", sampleRate: 16000,
+                     channelCount: 1, framesCaptured: 160, peakAmplitude: 0.1,
+                     durationSeconds: 0.01, detail: "Synthetic probe; microphone never opened")
+    }
+    static var count: Int { lock.lock(); defer { lock.unlock() }; return runs }
+}
+final class SetupController {
+    var onVerifyMicrophone: ((@escaping (AudioCaptureProbeReport) -> Void) -> Void)?
+}
+final class ProbeResult {
+    let lock = NSLock()
+    private var result: AudioCaptureProbeReport?
+    func receive(_ report: AudioCaptureProbeReport) { lock.lock(); result = report; lock.unlock() }
+    var outcome: AudioCaptureProbeReport.Outcome? { lock.lock(); defer { lock.unlock() }; return result?.outcome }
+}
+enum Pasteboard { case general }
+final class PasteboardInsertionStaging {
+    var restored = false
+    var onRestore: (() -> Void)?
+    func restoreIfUnchanged(on: Pasteboard) { onRestore?(); restored = true }
+}
+
+final class IntegrationFixture {
+    let stateLock = NSLock()
+    var isRecording = false
+    var isProcessing = false
+    var setupMicrophoneProbeInProgress = false
+    var nativeCalibrationSession: NativeCalibrationSession?
+    var permissionRenewalInFlight = false
+    var trackpadHoldState: Bool?
+    var pendingPasteboardRestorations = 0
+    var terminationPending = false
+    var updateInstallationReserved = false
+    var appUpdater: PressTalkUpdater? = PressTalkUpdater()
+    var nativeCalibrationTimeoutWorkItem: DispatchWorkItem?
+    var refreshes = 0
+    var presentations: [Presentation] = []
+    let traceLogger = Logger()
+    var microphoneCaptureVerifiedUID: String?
+    var latestStreamingState = StreamingSnapshot()
+    var lastPrintedPartial = ""
+    var activeCaptureSessionID: UInt64 = 0
+    var activeCaptureEngineStarted = false
+    var activeCaptureFailure: String?
+    var activeEngineStartLatencySeconds = 0.0
+    var activeTrigger: Trigger?
+    var activeTriggerSource: TriggerSource?
+    var activeTriggerStartedAt: Date?
+    func preferredAudioInputDevice() -> InputSelection? { InputSelection() }
+    func present(_ value: Presentation) { presentations.append(value) }
+    func refreshUpdateControls() { refreshes += 1 }
+    func refreshRuntimeStatusUI() {}
+    func finishNativeTriggerCalibrationDueToTimeout() {}
+
+    // PRODUCTION_DECLARATIONS
+
+    func installProbeCallback(_ controller: SetupController) {
+        // PRODUCTION_PROBE_CALLBACK
+    }
+    func attemptCapture() -> Bool {
+        let trigger = Trigger.configuredKey
+        let source = TriggerSource.modifierKey
+        // PRODUCTION_CAPTURE_ADMISSION
+        if case .start = decision { return true }
+        return false
+    }
+    func beginCalibration() { startNativeTriggerCalibration() }
+    func restore(_ staging: PasteboardInsertionStaging) { restorePasteboardAfterInsertion(staging) }
+    func mutate(_ body: () -> Void) { withStateLock(body) }
+    func mutateThrowing(_ body: () throws -> Void) rethrows { try withStateLock(body) }
+    func notify() { notifyUpdateActivityChanged() }
+    var busy: Bool { withStateLock { updateActivityIsBusy } }
+}
+
+// Every production busy field defers termination; clearing the final field
+// resumes exactly once. The termination-pending flag blocks the busy->idle gap.
+for activity in 0..<7 {
+    drainMainQueue(); NSApp.reset()
+    let app = IntegrationFixture()
+    let controller = SetupController()
+    app.installProbeCallback(controller)
+    app.mutate {
+        switch activity {
+        case 0: app.isRecording = true
+        case 1: app.isProcessing = true
+        case 2: app.setupMicrophoneProbeInProgress = true
+        case 3: app.nativeCalibrationSession = NativeCalibrationSession()
+        case 4: app.permissionRenewalInFlight = true
+        case 5: app.trackpadHoldState = true
+        default: app.pendingPasteboardRestorations = 1
+        }
+    }
+    require(app.applicationShouldTerminate(NSApp) == .terminateLater && app.terminationPending,
+            "An active production operation failed to defer termination")
+    app.mutate {
+        app.isRecording = false; app.isProcessing = false
+        app.setupMicrophoneProbeInProgress = false; app.nativeCalibrationSession = nil
+        app.permissionRenewalInFlight = false; app.trackpadHoldState = nil
+        app.pendingPasteboardRestorations = 0
+    }
+    // The queued notification has not run yet. Admission must check pending
+    // termination even though all operation flags are now idle.
+    require(!app.attemptCapture(), "New capture began while termination was pending")
+    let result = ProbeResult()
+    controller.onVerifyMicrophone?(result.receive)
+    require(result.outcome == .engineFailed && !app.setupMicrophoneProbeInProgress,
+            "New microphone probe began while termination was pending")
+    app.beginCalibration()
+    require(app.nativeCalibrationSession == nil, "Calibration began while termination was pending")
+    NSApp.beforeReply = {
+        require(app.updateInstallationReserved && !app.terminationPending && !app.busy,
+                "Termination reply ran before an idle installation reservation")
+    }
+    // The production observer queues its notification synchronously before
+    // mutate returns. A main-queue barrier makes this assertion deterministic;
+    // a missing observer must fail directly, not wait for a wall-clock timeout.
+    drainMainQueue()
+    require(NSApp.replies == [true], "Busy-to-idle observer did not resume termination")
+    app.notify(); app.notify(); drainMainQueue()
+    require(NSApp.replies == [true], "Pending termination completed more than once")
+}
+
+// A reservation already held by Sparkle is accepted by the termination delegate.
+// It must not wait for or acquire its own reservation again.
+do {
+    drainMainQueue(); NSApp.reset()
+    let app = IntegrationFixture()
+    app.updateInstallationReserved = true
+    require(app.applicationShouldTerminate(NSApp) == .terminateNow,
+            "An already-reserved idle installation deadlocked termination")
+    require(!app.attemptCapture(), "New capture began while installation was reserved")
+    let controller = SetupController(); app.installProbeCallback(controller)
+    let result = ProbeResult(); controller.onVerifyMicrophone?(result.receive)
+    require(result.outcome == .engineFailed, "Microphone probe bypassed installation reservation")
+    app.beginCalibration()
+    require(app.nativeCalibrationSession == nil, "Calibration bypassed installation reservation")
+    drainMainQueue()
+    require(NSApp.replies.isEmpty, "Immediate termination sent a delayed reply")
+}
+
+// The lock observer ignores busy->busy and idle->idle changes, runs after lock
+// release, and still handles a throwing operation that clears the busy flag.
+do {
+    drainMainQueue(); NSApp.reset()
+    let app = IntegrationFixture()
+    let updater = app.appUpdater!
+    updater.onActivity = {
+        require(app.stateLock.try(), "Activity observer ran with the state lock held")
+        app.stateLock.unlock()
+    }
+    app.mutate { app.isRecording = true; app.isProcessing = true }
+    app.mutate { app.isRecording = false }
+    drainMainQueue()
+    require(updater.notifications == 0, "Observer notified while another operation remained active")
+    enum TestFailure: Error { case expected }
+    do { try app.mutateThrowing { app.isProcessing = false; throw TestFailure.expected } }
+    catch TestFailure.expected {} catch { fatalError("Unexpected fixture error") }
+    drainMainQueue()
+    require(updater.notifications == 1, "Throwing busy-to-idle operation lost its observer notification")
+    app.mutate {}; drainMainQueue()
+    require(updater.notifications == 1, "Idle-to-idle lock operation generated another notification")
+    require(app.attemptCapture() && app.isRecording, "Idle capture was blocked by the update gate")
+    app.mutate { app.isRecording = false }
+    drainMainQueue()
+}
+
+// The complete production microphone callback is exercised with an inert,
+// explicitly released probe service. The real microphone is never accessed.
+do {
+    drainMainQueue(); NSApp.reset()
+    let app = IntegrationFixture()
+    let controller = SetupController(); app.installProbeCallback(controller)
+    let result = ProbeResult()
+    controller.onVerifyMicrophone?(result.receive)
+    eventually("Idle microphone check did not reach its external service") { AudioCaptureProbe.count == 1 }
+    require(app.setupMicrophoneProbeInProgress && app.applicationShouldTerminate(NSApp) == .terminateLater,
+            "Active microphone check did not protect termination")
+    AudioCaptureProbe.release.signal()
+    eventually("Probe completion did not resume pending termination") { NSApp.replies == [true] }
+    eventually("Probe result was not delivered") { result.outcome == .syntheticSuccess }
+    require(app.microphoneCaptureVerifiedUID == "synthetic-input" && !app.setupMicrophoneProbeInProgress,
+            "Probe completion lost its result or busy-state cleanup")
+}
+
+// Actual production restoration scheduling keeps termination deferred until
+// both clipboard snapshots have been restored, including the one-second timer.
+do {
+    drainMainQueue(); NSApp.reset()
+    let app = IntegrationFixture()
+    let first = PasteboardInsertionStaging(), second = PasteboardInsertionStaging()
+    first.onRestore = { require(app.pendingPasteboardRestorations > 0, "Clipboard restoration was untracked") }
+    second.onRestore = first.onRestore
+    app.restore(first); app.restore(second)
+    require(app.pendingPasteboardRestorations == 2 && app.applicationShouldTerminate(NSApp) == .terminateLater,
+            "Scheduled clipboard restoration did not defer termination")
+    NSApp.beforeReply = {
+        require(first.restored && second.restored && app.pendingPasteboardRestorations == 0,
+                "Termination ran before clipboard restoration completed")
+    }
+    eventually("Clipboard restoration failed to release pending termination") { NSApp.replies == [true] }
+}
+
+print("PASS: production termination, idle observer, capture/probe/calibration admission and clipboard restoration integration")

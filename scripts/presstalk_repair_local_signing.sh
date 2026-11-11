@@ -2,8 +2,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk.app"
-STATUS_JSON="$HOME/Library/Application Support/JarvisTap/runtime-status.json"
+DEFAULT_APP_BUNDLE="$HOME/Applications/PressTalk Dev.app"
+STATUS_JSON="$HOME/Library/Application Support/PressTalk Dev/runtime-status.json"
 RUN_PROBE=0
 PREFLIGHT=0
 WRITE_DESKTOP_COMMAND=0
@@ -103,6 +103,12 @@ SMOKE_COLLECTOR="$APP_RESOURCES_DIR/presstalk-collect-smoke-status.sh"
 if [[ ! -d "$APP_BUNDLE" ]]; then
   echo "Missing PressTalk app bundle: $APP_BUNDLE" >&2
   exit 1
+fi
+REPAIR_BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_CONTENTS_DIR/Info.plist" 2>/dev/null || true)"
+REPAIR_SIGNATURE="$(codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 || true)"
+if [[ "$REPAIR_BUNDLE_IDENTIFIER" != *.dev || "$REPAIR_SIGNATURE" == *"Authority=Developer ID Application:"* ]]; then
+  echo "Local signing repair is only for .dev apps. Use Set Up PressTalk in the official release for permission recovery." >&2
+  exit 2
 fi
 if [[ ! -x "$BOOTSTRAP" ]]; then
   echo "Missing bundled bootstrap helper: $BOOTSTRAP" >&2

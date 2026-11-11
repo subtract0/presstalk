@@ -56,6 +56,9 @@ struct JarvisTapConfig {
     static func load() -> JarvisTapConfig {
         let env = ProcessInfo.processInfo.environment
         let homeDirectory = env["HOME"] ?? NSHomeDirectory()
+        let isDevelopmentApp = Bundle.main.bundleIdentifier?.hasSuffix(".dev") == true
+        let supportFolder = isDevelopmentApp ? "PressTalk Dev" : "JarvisTap"
+        let traceFile = isDevelopmentApp ? "presstalk-dev_trace.log" : "presstalk_trace.log"
         let apiURLString = env["JARVISTAP_API_URL"] ?? "http://127.0.0.1:8080/v1/chat/completions"
         guard let apiURL = URL(string: apiURLString) else {
             fputs("[PressTalk] Invalid JARVISTAP_API_URL: \(apiURLString)\n", stderr)
@@ -106,7 +109,7 @@ struct JarvisTapConfig {
 
         let memoryStorePath =
             env["JARVISTAP_MEMORY_PATH"] ??
-            "\(homeDirectory)/Library/Application Support/JarvisTap/conversation_memory.json"
+            "\(homeDirectory)/Library/Application Support/\(supportFolder)/conversation_memory.json"
 
         let whisperModel =
             env["JARVISTAP_WHISPERKIT_MODEL"] ??
@@ -261,13 +264,13 @@ struct JarvisTapConfig {
         let traceLogPath =
             env["PRESSTALK_TRACE_LOG"] ??
             env["JARVISTAP_TRACE_LOG"] ??
-            "\(homeDirectory)/Library/Logs/presstalk_trace.log"
+            "\(homeDirectory)/Library/Logs/\(traceFile)"
 
         let launchdLabel =
             env["PRESSTALK_LAUNCHD_LABEL"]?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nonEmpty ??
-            "com.am.presstalk"
+            (isDevelopmentApp ? "com.am.presstalk.dev" : "com.am.presstalk")
 
         let requestTimeoutSeconds =
             env["JARVISTAP_REQUEST_TIMEOUT_SECONDS"].flatMap(TimeInterval.init) ??

@@ -1,283 +1,84 @@
 # Troubleshooting
 
-## Permission Toggle Is On, But PressTalk Still Cannot Use It
+## Permission is enabled, but dictation or pasting is blocked
 
-This means the macOS Privacy UI state and PressTalk's runtime capability probe
-are disagreeing. Treat it as a PressTalk listener/probe bug first, not as a user
-approval mistake.
+Open **Set Up PressTalk** from the PressTalk menu. Setup checks the running app's
+actual permission and shortcut state. An enabled System Settings row can still
+refer to an older copy with a different signing identity; the switch alone does
+not prove the running copy can use the permission.
 
-Common causes:
+Use **Open System Settings** to approve PressTalk when needed. Returning from
+System Settings rechecks access without showing another native permission
+prompt. **Check access again** also performs that check. After returning, setup
+may offer one restart of this exact app to refresh permission state. It waits
+until dictation and processing have finished.
 
-- A stale manually opened PressTalk process is still holding the singleton lock.
-- PressTalk was rebuilt after the permission was granted.
-- macOS has granted the app, but the runtime preflight or event-tap probe still
-  cannot observe that grant.
-- The local development build is ad-hoc signed, so macOS may treat a new build as
-  a different privacy client even if the app name looks unchanged.
+If access remains blocked, **Renew PressTalk Permission** explains what will
+change and asks for confirmation. It clears only the official PressTalk app's
+Accessibility approval, restarts the app, and guides you to approve it again.
+It preserves microphone approval and every other app's permissions. macOS must
+still receive your approval; PressTalk cannot grant itself access. Renewal is
+attempted once per blocked episode, including failure, so it cannot become a
+reset or prompt loop.
 
-If macOS already shows PressTalk enabled, do not repeatedly reopen Privacy
-panes, toggle approvals, or reset TCC as the default response. First collect the
-read-only status:
+If macOS still refuses access, setup offers **Show PressTalk in Finder** to
+identify the running copy and **Open System Settings** for the system approval.
+On a managed Mac, an administrator may control the permission. Export diagnostics
+from PressTalk Settings for support, including the app version, exact bundle
+path, signature and permission state. Report whether recording, the trigger,
+recognition, or insertion is the failing step.
 
-```bash
-bash scripts/presstalk_collect_smoke_status.sh
-```
+Use the signed official release for daily dictation. Do not re-sign it, change
+its bundle identifier, or run an old Jarvis/Tab signing repair on it. Current
+build and bootstrap scripts reject those identity changes. If the installed
+copy predates these safeguards, replace it with the official release and use
+the native setup flow. Public releases do not include developer probe tools.
 
-Current builds keep the setup retry loop quiet. They do not auto-open System
-Settings panes and do not auto-show the PressTalk Settings window after
-successful startup. If microphone authorization is truly `not_determined` for
-the current signed PressTalk identity, startup asks once through the native
-macOS microphone prompt; that is the expected first-run path and is not a
-reason to open privacy panes repeatedly.
-Even when `PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1` is deliberately set for a
-first-run guide, the window is only auto-shown for a real startup failure.
-When launched with `PRESSTALK_OPEN_PERMISSION_PANES=0`, the Settings window's
-Microphone, Input Monitoring, and Accessibility buttons are hidden too. This
-keeps a no-pane diagnostic run from reopening System Settings or suggesting
-another approval pass after the user has already confirmed the toggles.
+## Choosing the recognition processor
 
-The default `Fn / Globe` trigger is a modifier-only trigger. Current builds try
-writable HID/session event taps first and should report a ready listener such
-as `hid:default` when armed. The supported `Option + Space` trigger uses a
-registered macOS hotkey and should report
-`permissions.inputMonitoringStatus=registered_hotkey_ready` when selected.
-For other modifier-only triggers such as bare `Option`, current builds use the
-same writable event-tap path as `Fn / Globe`.
-A listen-only fallback can prove that some event tap is installed, but it is not
-effective for modifier-key triggers; runtime status reports
-`permissions.inputMonitoringStatus=writable_key_tap_unavailable` in that state.
-`trackpad_hold` can use a listen-only tap, but it is only effective after the
-app observes a real pointer trigger; before that, status reports
-`permissions.inputMonitoringStatus=waiting_for_trackpad_event`. Check
-`runtime.inputListener` in the collected status to see which path armed, for
-example `hid:listen_only`, `session:listen_only`, `hid:default`, or `failed`.
-If `permissions.inputMonitoringGranted=false` but
-`permissions.inputMonitoringEffective=true`, the selected trigger's listener is
-armed and the Settings window should show Input Monitoring as listener-ready,
-not missing.
-Treat Accessibility false-preflight as a paste probe unless paste actually
-fails.
-If Microphone is unavailable even though macOS already shows PressTalk enabled,
-check the app signature and TCC identity before re-granting. Ad-hoc builds can
-change CDHash between releases, leaving old TCC rows that no longer match the
-current binary. Current PressTalk app bundles identify as `com.am.presstalk`;
-`com.am.jarvistap` is retained as the legacy launchd/helper label.
-Current builds write `permissions.microphoneAuthorizationStatus` into
-`runtime-status.json`, so first distinguish `denied`, `not_determined`,
-`restricted`, `authorized`, and `unknown` instead of treating every false
-preflight as the same problem.
+In Settings, select the available local recognition mode. The mode is a request
+to the local runtime; a processor preference is not a hardware utilization
+measurement. Diagnostics record the selected mode and active backend. Compare
+both when investigating different behavior across Macs.
 
-The bundled smoke-status collector also prints a read-only `TCC Rows` section
-for `com.am.presstalk` and `com.am.jarvistap` across Microphone, Input
-Monitoring, and Accessibility. Use that section to detect missing, stale, or
-wrong-identity TCC rows without opening System Settings or resetting TCC.
+Live partial transcription and the optional Whisper quality fallback are off
+by default in both Finder and legacy launcher paths. Existing explicit
+configuration overrides remain effective. An unexpected GPU workload can come
+from a different backend or an enabled fallback, so verify the active settings
+before comparing hardware graphs.
 
-If Accessibility still reports false after macOS already shows PressTalk
-enabled, first run the bundled actual-bundle Accessibility probe. It launches
-the installed PressTalk app in a diagnostic mode with the prompt flag disabled,
-prints the exact bundle path, bundle id, CDHash, signing authority, and
-`accessibilityTrusted`, then exits before normal startup:
+## Development builds
 
 ```bash
-"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-actual-accessibility-probe.sh"
+bash scripts/build_jarvistap.sh
+open "$HOME/Applications/PressTalk Dev.app"
 ```
 
-If the exact app is not trusted and the input method is stuck in
-`recognized_disabled` after signing repair, use the deliberate Accessibility
-handoff instead of another permission loop:
+The default development identity is `com.am.presstalk.dev`. Its settings,
+runtime files, launch label and activation handlers are separate from the
+released app. A local development signing certificate can keep the development
+identity stable between rebuilds; it is never a repair for the official app.
+Ad-hoc development builds can require fresh macOS permission after a rebuild.
 
-```bash
-"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-handoff.sh" --write-desktop-command
-```
-
-Double-click the generated `~/Desktop/Grant PressTalk Accessibility.command`
-from the logged-in desktop. If PressTalk is already listed in Accessibility but
-off, turn on that existing entry only. If it is not listed yet, add or enable
-only PressTalk. Then let the command run the insertion probe and verifier.
-
-If the TCC databases are not readable or the actual bundle probe still leaves
-the identity question unclear, run the bundled Accessibility identity probe. It
-launches tiny background probes for `com.am.jarvistap` and `com.am.presstalk`
-with the prompt flag disabled, then reports whether either identity is already
-trusted for Accessibility:
-
-```bash
-"$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-accessibility-identity-probe.sh"
-```
-
-Some development machines have their existing working microphone/input grants
-under the older `com.am.jarvistap` app identity. If a no-pane restart with
-`com.am.presstalk` regresses a machine that was previously working, preserve the
-legacy privacy identity instead of reopening settings:
-
-```bash
-PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
-PRESSTALK_OPEN_PERMISSION_PANES=0 \
-PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-PRESSTALK_TRIGGER_KEY=option_space \
-  "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
-```
-
-Use `com.am.presstalk` for new installs or machines where that identity already
-works, such as the current mbp1 rc27 smoke path. Use `com.am.jarvistap` only as
-a compatibility fallback for machines with older grants.
-
-On a machine where launchd reports `Bootstrap failed: 5: Input/output error`,
-first check whether the label was disabled:
-
-```bash
-launchctl print-disabled "gui/$(id -u)" | grep com.am.jarvistap
-launchctl enable "gui/$(id -u)/com.am.jarvistap"
-```
-
-Current bootstrap helpers do this automatically and also remove
-`com.apple.quarantine` and `com.apple.provenance` xattrs from the installed app
-bundle before launch.
-
-If you are deliberately refreshing a development process after changing code,
-restart the LaunchAgent without opening panes:
-
-```bash
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
-```
-
-Only when intentionally preparing a fresh machine, and only with the user's
-explicit consent, should the app's manual privacy-pane buttons be enabled.
-Bootstrap still will not open System Settings automatically; the pane flag only
-allows the manual Settings buttons inside PressTalk. Do not use that path for an
-already-enabled toggle or an `AXIsProcessTrusted=false` identity mismatch.
-
-Use TCC reset only as an explicit last-resort debugging step, because it discards
-the already-approved state:
-
-```bash
-for bundle_id in com.am.presstalk com.am.jarvistap; do
-  tccutil reset ListenEvent "$bundle_id"
-  tccutil reset Microphone "$bundle_id"
-  tccutil reset Accessibility "$bundle_id"
-done
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
-```
-
-Current bootstrap helpers try to stabilize local signing automatically. They
-create or reuse a self-signed local development identity, re-sign
-`PressTalk.app`, then start the LaunchAgent. Disable that behavior only for
-debugging:
-
-```bash
-PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0 PRESSTALK_TRIGGER_KEY=fn \
-  /bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-bootstrap.sh"
-```
-
-For repeated local development builds from the source tree, current builds
-preserve both parts of the privacy identity by default: the build helper keeps
-the currently installed bundle identifier and creates or reuses the local
-development code-signing identity. A working `com.am.jarvistap` development
-install should not silently rebuild as `com.am.presstalk` or as a new ad-hoc
-CDHash.
-
-```bash
-bash scripts/create_presstalk_local_codesign_identity.sh
-PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" bash scripts/build_jarvistap.sh
-PRESSTALK_TRIGGER_KEY=fn bash scripts/install_jarvistap_launchd.sh
-```
-
-If you need to force the local compatibility identity, make it explicit:
-
-```bash
-PRESSTALK_BUNDLE_IDENTIFIER=com.am.jarvistap \
-PRESSTALK_CODESIGN_IDENTITY="<hash printed by the setup script>" \
-  bash scripts/build_jarvistap.sh
-PRESSTALK_OPEN_PERMISSION_PANES=0 PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0 \
-  PRESSTALK_TRIGGER_KEY=option_space bash scripts/install_jarvistap_launchd.sh
-```
-
-If stable signing is disabled or the helper cannot prepare an identity, the
-build script uses ad-hoc signing. That is fine for local smoke tests, but
-privacy approvals may need to be refreshed after a rebuild.
-
-To deliberately force an ad-hoc debug build:
+To deliberately build without a local certificate:
 
 ```bash
 PRESSTALK_BUILD_STABLE_SIGNING=0 bash scripts/build_jarvistap.sh
 ```
 
-The local identity script creates a self-signed code-signing identity in
-`~/Library/Keychains/presstalk-local-dev.keychain-db` and adds that keychain to
-the user search list. It stores the keychain password locally under
-`~/Library/Application Support/PressTalk/` with user-only permissions. This is
-for development builds only; public release artifacts still need normal release
-signing/notarization before they are treated as production-grade.
-
-If macOS asks for a password while creating or trusting the local signing
-identity and the prompt is cancelled, a build can still be signed but remain a
-local self-signed development artifact. Do not respond by reopening permission
-panes repeatedly. First inspect `runtime-status.json` and the app signature
-fields (`codeSignatureIdentifier`, `codeSignatureCDHash`, and
-`codeSignatureAuthority`) to confirm whether the bundle id or signing identity
-changed.
-
-Current helpers retry trust for an existing untrusted PressTalk local signing
-identity instead of importing another duplicate certificate on every failed
-attempt. If the helper prints `Existing PressTalk local code-signing identity
-remains untrusted`, run it from the logged-in desktop session and approve the
-Mac login-password signing trust prompt. This is a signing/trust repair step,
-not a reason to reopen Microphone, Input Monitoring, or Accessibility panes.
-
-The app bundle also includes a repair wrapper for that exact state:
+For an explicit development LaunchAgent:
 
 ```bash
-/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh"
+PRESSTALK_APP_BUNDLE="$HOME/Applications/PressTalk Dev.app" \
+  bash scripts/install_jarvistap_launchd.sh
 ```
 
-Run `--preflight` first if you only want the no-prompt repair plan. It reports
-whether repair is needed, whether an existing trusted local signing identity can
-be reused, whether a signing trust password prompt would be required, and
-whether the helper would refuse because it is running over SSH:
+The development installer targets the development app and its `.dev` label. It
+does not stop the production app or replace its installed input method. Avoid
+running both apps' dictation shortcuts simultaneously during a test.
 
-```bash
-/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --preflight
-```
-
-In current builds, the PressTalk menu bar and Settings both show
-`Repair Signing` for the same ad-hoc `recognized_disabled` input-method state.
-Clicking it runs the bundled repair wrapper with permission panes disabled and
-then runs the production insertion probe.
-
-It keeps `PRESSTALK_OPEN_PERMISSION_PANES=0` and
-`PRESSTALK_AUTO_SHOW_SETUP_WINDOW=0`, prepares the local signing identity,
-restarts PressTalk with stable signing, signs the bundled
-`PressTalkInputMethod.app`, and refreshes the installed copy in
-`~/Library/Input Methods`. Add `--probe` to run the production insertion probe
-after repair:
-
-```bash
-/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-repair-local-signing.sh" --probe
-```
-
-The repair wrapper refuses to start the signing trust flow over SSH unless
-`--allow-ssh` is passed deliberately. Run the command in the logged-in desktop
-session so the Mac login-password trust prompt is visible and intentional.
-
-After repair, use the smoke-status collector before rerunning insertion tests:
-
-```bash
-/bin/bash "$HOME/Applications/PressTalk.app/Contents/Resources/presstalk-collect-smoke-status.sh"
-```
-
-Its `Input Method` section is read-only. It reports the bundled and installed
-`PressTalkInputMethod.app` signatures, warns when their CDHashes differ, and
-prints the TIS source state. For the repaired path to be worth probing, the
-installed input method should match the bundled CDHash and show a recognized,
-enabled, select-capable `com.am.presstalk.inputmethod.container` source.
-
-The app also writes `permissions.inputMethodFallbackStatus` into
-`runtime-status.json`. `ready` means the InputMethodKit fallback is enabled and
-has no recent real insertion failure. `client_unavailable` means the helper
-received the request but could not attach to the focused text client; `ack_timeout`
-means it did not acknowledge in time. `recognized_disabled` means macOS
-recognizes PressTalk but has not enabled it, which is the mbp1 TIS blocker after
-signing repair when `ExistingSigningIdentity=ready`. Do not treat these states
-as missing Microphone/Input Monitoring grants or another signing repair loop.
+The local-signing repair helper accepts only `.dev` apps and refuses Developer
+ID signed bundles. Diagnostic scripts in this repository are developer tools;
+do not direct customers to missing bundled scripts or global permission resets.
+Historical JarvisTap and compatibility-identity instructions do not apply to
+current releases.

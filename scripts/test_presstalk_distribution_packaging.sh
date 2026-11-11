@@ -9,6 +9,31 @@ ARTIFACT_AUDIT_SCRIPT="$SCRIPT_DIR/presstalk_release_artifact_audit.sh"
 TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/presstalk-distribution-package-test.XXXXXX")"
 trap 'rm -rf "$TEST_TMPDIR"' EXIT
 
+# Publisher dry runs exercise packaging/audit wiring using a temporary fixture,
+# never compile the app or touch a working checkout's bin/.build directories.
+FIXTURE_ROOT="$TEST_TMPDIR/publisher-fixture"
+mkdir -p "$FIXTURE_ROOT/scripts"
+cp "$SCRIPT_DIR/"*.sh "$FIXTURE_ROOT/scripts/"
+PUBLISH_HOMEBREW_SCRIPT="$FIXTURE_ROOT/scripts/publish_presstalk_homebrew.sh"
+PUBLISH_PRERELEASE_SCRIPT="$FIXTURE_ROOT/scripts/publish_presstalk_prerelease.sh"
+cat >"$FIXTURE_ROOT/scripts/package_presstalk_release.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+fixture_app="$PRESSTALK_DIST_DIR/fixture/PressTalk.app"
+mkdir -p "$fixture_app/Contents/MacOS"
+plutil -create xml1 "$fixture_app/Contents/Info.plist"
+plutil -insert CFBundleIdentifier -string com.am.presstalk "$fixture_app/Contents/Info.plist"
+plutil -insert CFBundleShortVersionString -string "$1" "$fixture_app/Contents/Info.plist"
+plutil -insert CFBundleVersion -string 1 "$fixture_app/Contents/Info.plist"
+plutil -insert CFBundleExecutable -string PressTalk "$fixture_app/Contents/Info.plist"
+printf '#!/usr/bin/env bash\nexit 0\n' >"$fixture_app/Contents/MacOS/PressTalk"
+chmod +x "$fixture_app/Contents/MacOS/PressTalk"
+codesign --force --sign - "$fixture_app"
+fixture_zip="$PRESSTALK_DIST_DIR/${PUBLIC_NAME:-PressTalk}-$1-macos-${ARCH:-arm64}.zip"
+ditto -c -k --sequesterRsrc --keepParent "$fixture_app" "$fixture_zip"
+shasum -a 256 "$fixture_zip" >"${fixture_zip%.zip}.sha256"
+SH
+
 proof_gate_json="$TEST_TMPDIR/proof-gate.json"
 cat >"$proof_gate_json" <<'JSON'
 {
@@ -124,10 +149,13 @@ grep -Fq -- "--require-streaming-bench-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-hybrid-streaming-quality" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-streaming" "$PUBLISH_HOMEBREW_SCRIPT"
 grep -Fq -- "--require-proof-target" "$PUBLISH_HOMEBREW_SCRIPT"
-grep -Fq 'PRESSTALK_AUTO_SHOW_SETUP_WINDOW=1' "$PUBLISH_HOMEBREW_SCRIPT"
-grep -Fq 'PRESSTALK_OPEN_PERMISSION_PANES=1' "$PUBLISH_HOMEBREW_SCRIPT"
-grep -Fq 'PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0' "$PUBLISH_HOMEBREW_SCRIPT"
-grep -Fq '"/usr/bin/env"' "$PUBLISH_HOMEBREW_SCRIPT"
+# Cask installation uses the native app setup, with no postflight bootstrap
+# that re-signs, changes permissions, or injects a different launch environment.
+grep -Fq 'Open PressTalk to complete setup:' "$PUBLISH_HOMEBREW_SCRIPT"
+if grep -Fq 'presstalk-bootstrap.sh' "$PUBLISH_HOMEBREW_SCRIPT"; then
+  echo "FAIL: public cask must not re-sign or bootstrap the installed app" >&2
+  exit 1
+fi
 
 stable_publish_without_proof_output="$TEST_TMPDIR/stable-publish-without-proof.txt"
 set +e

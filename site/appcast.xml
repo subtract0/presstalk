@@ -6,6 +6,28 @@ IMPORTANT: This file was signed by Sparkle. Any modifications to this file requi
     <channel>
         <title>PressTalk</title>
         <item>
+            <title>0.1.29</title>
+            <pubDate>Sun, 15 Nov 2026 12:40:36 +0100</pubDate>
+            <link>https://presstalk.app/</link>
+            <sparkle:version>29.1</sparkle:version>
+            <sparkle:shortVersionString>0.1.29</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="plain-text"><![CDATA[PressTalk 0.1.29
+
+Fixes an automatic German vocabulary correction that could change a correctly recognized English “rocket” into “Ticket”. English sentences and uncertain short phrases are preserved; German corrections now require stronger phonetic agreement. Personal Vocabulary still applies your saved spellings.
+
+No speech-model download or change. Your licence, settings, permissions and cached models are retained. Processing stays local, with the processor choice in Settings unchanged.
+
+Signed automatic updates are available from 0.1.26 onward. Users on 0.1.25 or earlier need one manual installation. Automatic checks and downloads can be disabled in Settings.
+
+The existing first-recording AirPods retry issue remains under investigation.
+
+Apple Silicon · macOS 14 or later. Developer ID signed and notarized by Apple.
+]]></description>
+            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.29/PressTalk-0.1.29-macos-arm64.zip" length="6278294" type="application/octet-stream" sparkle:edSignature="0S1jM16OgDIyLUS55D1TAn7je52hoVumHoMkCoLJUJ7QwKcsJ56aCGGAidWYWUGnxxSOQY4iVS52sm0M79Q9BA=="/>
+        </item>
+        <item>
             <title>0.1.28</title>
             <pubDate>Tue, 10 Nov 2026 21:10:56 +0100</pubDate>
             <link>https://presstalk.app/</link>
@@ -49,35 +71,9 @@ Apple Silicon · macOS 14 or later. Developer ID signed and notarized by Apple.
 ]]></description>
             <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.27/PressTalk-0.1.27-macos-arm64.zip" length="6270981" type="application/octet-stream" sparkle:edSignature="WRkFbEyaVj86ztMTdVSxKASbd/v1WzsANTsW6gsUaqaN4i44Cufk44B9cIg5iq2STmYXkrCbq5leu5cR4i8pBw=="/>
         </item>
-        <item>
-            <title>0.1.26</title>
-            <pubDate>Mon, 09 Nov 2026 17:29:13 +0100</pubDate>
-            <link>https://presstalk.app/</link>
-            <sparkle:version>26.3</sparkle:version>
-            <sparkle:shortVersionString>0.1.26</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="plain-text"><![CDATA[PressTalk 0.1.26
-
-Clear English/German email addresses and websites are formatted automatically: “hello at example dot com” becomes hello@example.com. Ordinary uses of “at” are protected.
-
-Clear vocal hesitations such as “uh” and “ähm” are removed in ordinary dictation. English “um” is removed when the rest of its sentence is confidently English; ambiguous short phrases retain the word. Meaningful words, quoted text, addresses and matching saved vocabulary phrases stay intact. Hesitation-only recordings finish quietly.
-
-Fn + Space starts hands-free dictation; press it again to finish. Quick accidental key taps no longer speak a recognizer rejection as a backend error.
-
-Settings offers Neural Engine/CPU or GPU/CPU processing, local Personal Vocabulary corrections, optional spoken formatting commands, and signed automatic app updates. Updates wait for dictation and clipboard restoration to finish.
-
-Your existing licence and settings are retained. Users of 0.1.25 and earlier need one manual installation of this release to receive the updater. Automatic checks and downloads can be disabled in Settings. No account is required for dictation, and no audio or transcripts are sent by the updater.
-
-Speech models are unchanged. General conversion of spoken German numbers into digits is not included. The existing first-recording AirPods retry issue remains under investigation.
-
-Apple Silicon · macOS 14 or later. Signed with Developer ID, notarized by Apple.
-]]></description>
-            <enclosure url="https://github.com/subtract0/presstalk/releases/download/v0.1.26/PressTalk-0.1.26-macos-arm64.zip" length="6258574" type="application/octet-stream" sparkle:edSignature="QEoUige3g2S+OVhHtHSG2j7P9q4LLyVvIslNhfF1nfwoLGJ7OV7eQlTusZP+LEeVZIuCAjYzHxe/tg7hLMREDA=="/>
-        </item>
     </channel>
 </rss>
 <!-- sparkle-signatures:
-edSignature: 0yv31aTVM0E3bEbykaz9PPOnZz31llZuUtYyPkgGptfqj0xVoq4WnT5REwSfW40fX6VShXEWZR/qGvzA6rJDCg==
-length: 6790
+edSignature: s3d1uNGLkwVafQPeEXpEiGkPoaSTbhpuHzmUAEJaxzDongrdXLgmKEmqdKG8TDC/KGeo32HAILutglVViTWbBw==
+length: 6137
 -->

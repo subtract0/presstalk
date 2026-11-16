@@ -16,11 +16,27 @@ def sha(path):
 
 
 def inventory(app):
+    app = Path(app)
     result = {}
-    for path in sorted(Path(app).rglob('*')):
+    for path in sorted(app.rglob('*')):
         if path.is_symlink():
-            raise RuntimeError(f'Unexpected symbolic link: {path}')
-        if path.is_file():
+            relative = path.relative_to(app)
+            target = os.readlink(path)
+            parts = relative.parts
+            # Versioned frameworks require symlinks. Permit only relative links
+            # within their own embedded framework, and bind the exact link text
+            # into the reviewed inventory as well as hashing the real files.
+            if (len(parts) < 4 or parts[:2] != ('Contents', 'Frameworks')
+                    or not parts[2].endswith('.framework') or Path(target).is_absolute()):
+                raise RuntimeError(f'Unexpected symbolic link: {path}')
+            framework = app / 'Contents' / 'Frameworks' / parts[2]
+            try:
+                resolved = path.resolve(strict=True)
+                resolved.relative_to(framework.resolve(strict=True))
+            except (ValueError, OSError, RuntimeError) as error:
+                raise RuntimeError(f'Unsafe symbolic link: {path}') from error
+            result[str(relative)] = {'symlink': target}
+        elif path.is_file():
             result[str(path.relative_to(app))] = {'sha256': sha(path), 'mode': path.stat().st_mode & 0o777}
     return result
 
@@ -32,6 +48,10 @@ def verify_prepared(manifest):
     for name in ('entitlements', 'readinessScript'):
         if sha(manifest[name]['path']) != manifest[name]['sha256']:
             raise RuntimeError(f'The reviewed {name} changed.')
+    if (app / 'Contents/Frameworks/Sparkle.framework').is_dir():
+        helper = manifest.get('sparkleBundleScript')
+        if not helper or sha(helper['path']) != helper['sha256']:
+            raise RuntimeError('The reviewed Sparkle bundle verifier is missing or changed.')
     check_metadata(app, manifest)
     return app
 
@@ -69,9 +89,27 @@ def verify_signed(app, manifest, notarized=False):
     raw = run(['/usr/bin/codesign', '-d', '--entitlements', '-', '--xml', app / 'Contents/MacOS/jarvistap'])
     if plistlib.loads(raw.encode()) != {'com.apple.security.device.audio-input': True}:
         raise RuntimeError('Unexpected microphone entitlements.')
+    if (app / 'Contents/Frameworks/Sparkle.framework').is_dir():
+        run([sys.executable, manifest['sparkleBundleScript']['path'], 'verify', '--app', app])
     if notarized:
         run(['/usr/bin/xcrun', 'stapler', 'validate', app])
         run(['/usr/sbin/spctl', '--assess', '--type', 'execute', '--verbose=2', app])
+
+
+def sign_sparkle(app, sign, job):
+    framework = app / 'Contents/Frameworks/Sparkle.framework'
+    if not framework.is_dir():
+        return
+    version = framework / 'Versions/B'
+    # Official Sparkle order. Downloader alone retains its own entitlements;
+    # applying PressTalk's microphone entitlement here would erase them.
+    targets = [('installer', version / 'XPCServices/Installer.xpc', []),
+               ('downloader', version / 'XPCServices/Downloader.xpc', ['--preserve-metadata=entitlements']),
+               ('autoupdate', version / 'Autoupdate', []),
+               ('updater', version / 'Updater.app', []),
+               ('framework', framework, [])]
+    for name, path, extra in targets:
+        run(sign + extra + [path], job / ('sign-sparkle-' + name + '.log'))
 
 
 def require_stopped():
@@ -168,6 +206,7 @@ def main():
         keychain = Path.home() / 'Library/Keychains/login.keychain-db'
         sign = ['/usr/bin/codesign', '--force', '--sign', manifest['identity'], '--keychain', str(keychain), '--timestamp', '--options', 'runtime']
         print('Signing with your existing Developer ID and an Apple secure timestamp.', flush=True)
+        sign_sparkle(app, sign, job)
         # The unchanged nested input-method app already carries its own verified
         # Developer ID signature. Sign only the changed main executable and seal.
         run(sign + ['--entitlements', manifest['entitlements']['path'], '--identifier', 'com.am.presstalk', app / 'Contents/MacOS/jarvistap'], job / 'sign-main.log')

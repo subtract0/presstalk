@@ -6,6 +6,8 @@ for assertions. Functional method bodies and all other app sources are unchanged
 It runs the actual UI installation and AppKit event loop so keyboard commands
 reach the focused text responder. It does not run capture startup, request
 permissions, load models or use a real Keychain. Requires a macOS GUI session.
+DEBUG enables its isolated owner fixture; DesktopControls separately verifies
+that the same entitlement override is ignored without DEBUG.
 """
 import os
 import json
@@ -30,8 +32,14 @@ with tempfile.TemporaryDirectory(prefix='presstalk-app-wiring-') as directory:
                if '/JarvisTap.build/' not in line]
     response = temp / 'dependencies.txt'
     response.write_text('\n'.join(objects) + '\n')
-    command = ['swiftc', '-module-name', 'PressTalkAppWiringTest', '-I', str(build / 'Modules'),
+    command = ['swiftc', '-D', 'DEBUG', '-module-name', 'PressTalkAppWiringTest', '-I', str(build / 'Modules'),
                '-I', str(build), '-module-cache-path', str(build / 'ModuleCache')]
+    # The fixture is an unbundled executable; production uses its app-relative
+    # Frameworks runpath. Point only this fixture at the resolved binary artifact.
+    sparkle_parent = root / '.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64'
+    assert (sparkle_parent / 'Sparkle.framework').is_dir(), 'Resolve the pinned Sparkle package first'
+    command += ['-F', str(sparkle_parent), '-framework', 'Sparkle',
+                '-Xlinker', '-rpath', '-Xlinker', str(sparkle_parent)]
     description = json.loads((build / 'description.json').read_text())
     compilation = next(v for v in description['swiftCommands'].values() if v['moduleName'] == 'JarvisTap')
     flags = compilation['otherArguments']

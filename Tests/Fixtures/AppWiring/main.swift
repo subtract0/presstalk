@@ -12,9 +12,107 @@ func spin() {
         NSApp.sendEvent(event)
     }
 }
+
+final class MutableTrialAnchor: TrialAnchorStore {
+    let name = "app-wiring-trial-anchor"
+    var reading: TrialAnchor.Reading
+    var reads = 0
+    var writes: [Date] = []
+
+    init(_ reading: TrialAnchor.Reading) { self.reading = reading }
+    func read() -> TrialAnchor.Reading { reads += 1; return reading }
+    func write(_ date: Date) -> Bool {
+        writes.append(date)
+        reading = .found(date)
+        return true
+    }
+}
+
+func assertTrialAnchorRecovery() {
+    let domain = "com.am.presstalk.trial-delivery-test.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: domain)!
+    defer { defaults.removePersistentDomain(forName: domain) }
+    let delegate = JarvisTapApp()
+    delegate.settingsStore = JarvisTapSettingsStore(config: delegate.config, defaults: defaults)
+    let preferences = MutableTrialAnchor(.absent)
+    let keychain = MutableTrialAnchor(.unavailable)
+    delegate.licenseStore = PressTalkLicenseStore(defaults: defaults, env: [:],
+        anchorStores: [preferences, keychain])
+    delegate.licenseStore.recordInstallGenerationIfNeeded()
+
+    // Reproduce a first dictation while Keychain cannot be read. Delivery may
+    // complete, but neither store may be assigned a potentially later date.
+    delegate.recordDelivery("First successful trial dictation.", reachedTargetApp: true)
+    require(delegate.settingsStore.firstDictationDelivered, "First delivery was not recorded")
+    require(preferences.writes.isEmpty && keychain.writes.isEmpty,
+        "An unreadable anchor was overwritten when the first dictation arrived")
+    require(!delegate.licenseStore.shouldBlockDictation, "Unreadable trial storage blocked dictation")
+    delegate.recordDelivery("Storage is still unreadable.", reachedTargetApp: true)
+    require(preferences.writes.isEmpty && keychain.writes.isEmpty,
+        "A retry wrote a trial date while storage remained unreadable")
+
+    // The existing app incorrectly returned on firstDictationDelivered here,
+    // leaving this installation with no trial date for all future dictations.
+    keychain.reading = .absent
+    delegate.recordDelivery("Storage can be read again.", reachedTargetApp: true)
+    guard let startedAt = delegate.licenseStore.trialAnchor.startedAt else {
+        fatalError("A delivered dictation did not start the deferred trial after storage recovered")
+    }
+    require(preferences.writes == [startedAt] && keychain.writes == [startedAt],
+        "Recovered trial did not record the same start in both stores")
+    require(delegate.licenseStore.state == .trial(daysRemaining: 3),
+        "The recovered trial did not receive its normal duration")
+
+    // Recreating the store models an app update/relaunch with the first-use
+    // flag already persisted. Further deliveries must not restart the trial.
+    delegate.licenseStore = PressTalkLicenseStore(defaults: defaults, env: [:],
+        anchorStores: [preferences, keychain])
+    delegate.licenseStore.recordInstallGenerationIfNeeded()
+    delegate.recordDelivery("Another dictation after relaunch.", reachedTargetApp: true)
+    require(delegate.licenseStore.trialAnchor.startedAt == startedAt
+        && preferences.writes == [startedAt] && keychain.writes == [startedAt],
+        "A later delivery or relaunch restarted an existing trial")
+    require(delegate.licenseStore.currentPlanName == "Trial",
+        "A later delivery or relaunch grandfathered a new installation")
+
+    // An older surviving anchor must be healed, never replaced with today.
+    let earlier = startedAt.addingTimeInterval(-86_400)
+    preferences.reading = .absent
+    keychain.reading = .found(earlier)
+    delegate.recordDelivery("An existing date survives.", reachedTargetApp: true)
+    require(delegate.licenseStore.trialAnchor.startedAt == earlier
+        && preferences.writes.last == earlier && keychain.writes == [startedAt],
+        "Retrying trial start moved an existing anchor forward")
+
+    let expired = Date().addingTimeInterval(-4 * 86_400)
+    preferences.reading = .found(expired)
+    keychain.reading = .unavailable
+    require(!delegate.licenseStore.shouldBlockDictation,
+        "An expired trial was enforced while an anchor was unreadable")
+    keychain.reading = .found(expired)
+    require(delegate.licenseStore.shouldBlockDictation,
+        "An expired trial was not enforced after storage recovered")
+
+    // The new retry call must remain a no-op for early users and the existing
+    // owner entitlement fixture; it must not introduce Keychain reads for them.
+    for earlyUser in [true, false] {
+        defaults.set(earlyUser, forKey: "PressTalk.PredatesPaidLicensing")
+        let unused = MutableTrialAnchor(.unavailable)
+        delegate.licenseStore = PressTalkLicenseStore(defaults: defaults,
+            env: earlyUser ? [:] : ["PRESSTALK_ENTITLEMENT_OVERRIDE": "founder"],
+            anchorStores: [unused])
+        delegate.recordDelivery("Existing access remains available.", reachedTargetApp: true)
+        require(!delegate.licenseStore.shouldBlockDictation
+            && unused.reads == 0 && unused.writes.isEmpty,
+            "A delivery touched trial storage for an existing owner or early user")
+    }
+    print("PASS: production delivery retries deferred trial start, preserves existing dates and owner access")
+}
+
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)
 func runAssertions() {
+    assertTrialAnchorRecovery()
     let domain = "com.am.presstalk.app-wiring-test.\(UUID().uuidString)"
     let defaults = UserDefaults(suiteName: domain)!
     defer { defaults.removePersistentDomain(forName: domain) }

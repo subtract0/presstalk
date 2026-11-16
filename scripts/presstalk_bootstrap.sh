@@ -12,13 +12,42 @@ DISABLE_DICTATION_HELPER="$APP_CONTENTS_DIR/Resources/presstalk-disable-system-d
 INPUT_METHOD_BUNDLE="$APP_CONTENTS_DIR/Resources/PressTalkInputMethod.app"
 INPUT_METHOD_BINARY="$INPUT_METHOD_BUNDLE/Contents/MacOS/presstalk-input-method"
 INSTALLED_INPUT_METHOD_BUNDLE="$HOME/Library/Input Methods/PressTalkInputMethod.app"
-PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-com.am.presstalk}"
+CURRENT_BUNDLE_IDENTIFIER="$(/usr/libexec/PlistBuddy -c 'Print CFBundleIdentifier' "$APP_INFO_PLIST" 2>/dev/null || true)"
+REQUESTED_BUNDLE_IDENTIFIER="${PRESSTALK_BUNDLE_IDENTIFIER:-${PRESSTALK_APP_BUNDLE_IDENTIFIER:-$CURRENT_BUNDLE_IDENTIFIER}}"
+if [[ -z "$CURRENT_BUNDLE_IDENTIFIER" || "$REQUESTED_BUNDLE_IDENTIFIER" != "$CURRENT_BUNDLE_IDENTIFIER" ]]; then
+  echo "Bootstrap cannot change an app identity. Install an official release or build a separate .dev app." >&2
+  exit 2
+fi
+IS_DEVELOPMENT_APP=0
+if [[ "$CURRENT_BUNDLE_IDENTIFIER" == *.dev ]]; then IS_DEVELOPMENT_APP=1; fi
+SIGNATURE_REPORT="$(codesign -dv --verbose=4 "$APP_BUNDLE" 2>&1 || true)"
+if [[ "$IS_DEVELOPMENT_APP" == 0 ]]; then
+  if [[ "$CURRENT_BUNDLE_IDENTIFIER" != "com.am.presstalk" ||
+        "$SIGNATURE_REPORT" != *"Authority=Developer ID Application:"* ||
+        "$SIGNATURE_REPORT" != *"TeamIdentifier=5HUC5LA94B"* ]]; then
+    echo "This is not an official PressTalk release. Install the signed release; local signing cannot repair it." >&2
+    exit 2
+  fi
+  codesign --verify --deep --strict "$APP_BUNDLE"
+fi
+PRESSTALK_LAUNCHD_LABEL="${PRESSTALK_LAUNCHD_LABEL:-$CURRENT_BUNDLE_IDENTIFIER}"
+if [[ "$IS_DEVELOPMENT_APP" == 1 && "$PRESSTALK_LAUNCHD_LABEL" != *.dev ]]; then
+  echo "Development apps require a separate .dev LaunchAgent label." >&2
+  exit 2
+fi
 LEGACY_LAUNCHD_LABELS="${PRESSTALK_LEGACY_LAUNCHD_LABELS:-com.am.jarvistap}"
 PLIST="$HOME/Library/LaunchAgents/$PRESSTALK_LAUNCHD_LABEL.plist"
 WORKDIR="$HOME/Library/Application Support/PressTalk"
 LOG_OUT="$HOME/Library/Logs/presstalk.out.log"
 LOG_ERR="$HOME/Library/Logs/presstalk.err.log"
 TRACE_LOG="$HOME/Library/Logs/presstalk_trace.log"
+if [[ "$IS_DEVELOPMENT_APP" == 1 ]]; then
+  LEGACY_LAUNCHD_LABELS=""
+  WORKDIR="$HOME/Library/Application Support/PressTalk Dev"
+  LOG_OUT="$HOME/Library/Logs/presstalk-dev.out.log"
+  LOG_ERR="$HOME/Library/Logs/presstalk-dev.err.log"
+  TRACE_LOG="$HOME/Library/Logs/presstalk-dev_trace.log"
+fi
 PATH_VALUE="${PATH:-/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin}"
 JARVISTAP_AGENT_MODE="${JARVISTAP_AGENT_MODE:-dictation}"
 JARVISTAP_REQUEST_TIMEOUT_SECONDS="${JARVISTAP_REQUEST_TIMEOUT_SECONDS:-30}"
@@ -28,8 +57,8 @@ JARVISTAP_WHISPER_LANGUAGE="${JARVISTAP_WHISPER_LANGUAGE:-auto}"
 JARVISTAP_SAY_VOICE="${JARVISTAP_SAY_VOICE:-Samantha}"
 PRESSTALK_ASR_BACKEND="${PRESSTALK_ASR_BACKEND:-${JARVISTAP_ASR_BACKEND:-parakeet-v3-ane}}"
 PRESSTALK_STREAMING_ASR_BACKEND="${PRESSTALK_STREAMING_ASR_BACKEND:-${JARVISTAP_STREAMING_ASR_BACKEND:-parakeet-eou-320}}"
-PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION="${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION:-${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION:-1}}"
-PRESSTALK_PARAKEET_QUALITY_FALLBACK="${PRESSTALK_PARAKEET_QUALITY_FALLBACK:-${JARVISTAP_PARAKEET_QUALITY_FALLBACK:-1}}"
+PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION="${PRESSTALK_ENABLE_STREAMING_TRANSCRIPTION:-${JARVISTAP_ENABLE_STREAMING_TRANSCRIPTION:-0}}"
+PRESSTALK_PARAKEET_QUALITY_FALLBACK="${PRESSTALK_PARAKEET_QUALITY_FALLBACK:-${JARVISTAP_PARAKEET_QUALITY_FALLBACK:-0}}"
 PRESSTALK_PARAKEET_MIN_CONFIDENCE="${PRESSTALK_PARAKEET_MIN_CONFIDENCE:-${JARVISTAP_PARAKEET_MIN_CONFIDENCE:-0.96}}"
 PRESSTALK_TRIGGER_KEY="${PRESSTALK_TRIGGER_KEY:-fn}"
 PRESSTALK_BOOTSTRAP_STABLE_SIGNING_EXPLICIT="${PRESSTALK_BOOTSTRAP_STABLE_SIGNING+x}"
@@ -46,14 +75,21 @@ PRESSTALK_BOOTSTRAP_INPUT_METHOD_SIGNING_APPLIED=0
 PRESSTALK_BOOTSTRAP_INPUT_METHOD_REFRESHED=0
 PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD="${PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD:-1}"
 PRESSTALK_CODESIGN_IDENTITY="${PRESSTALK_CODESIGN_IDENTITY:-${CODESIGN_IDENTITY:-}}"
+# A development helper must never replace the shared production input method.
+if [[ "$IS_DEVELOPMENT_APP" == 1 ]]; then PRESSTALK_BOOTSTRAP_REFRESH_INPUT_METHOD=0; fi
+# Keep the Developer ID signature and notarization ticket intact, even if a
+# development helper is accidentally present or signing is explicitly requested.
+if [[ "$SIGNATURE_REPORT" == *"Authority=Developer ID Application:"* ]]; then
+  PRESSTALK_BOOTSTRAP_STABLE_SIGNING=0
+fi
 
 mkdir -p "$HOME/Library/LaunchAgents" "$HOME/Library/Logs" "$WORKDIR"
 touch "$LOG_OUT" "$LOG_ERR" "$TRACE_LOG"
 
 terminate_existing_presstalk() {
   local pids=""
-  pids="$(ps -axo pid=,command= | awk '
-    index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap") {
+  pids="$(ps -axo pid=,command= | awk -v dev="$IS_DEVELOPMENT_APP" -v binary="$APP_BINARY" '
+    (dev == 1 && index($0, binary)) || (dev == 0 && (index($0, "/PressTalk.app/Contents/MacOS/jarvistap") || index($0, "/JarvisTap.app/Contents/MacOS/jarvistap"))) {
       print $1
     }
   ')"
@@ -161,11 +197,10 @@ terminate_existing_imk_launch_agent() {
   done
 }
 
-# Homebrew-installed GitHub app archives can still arrive with Gatekeeper
-# metadata on a fresh Mac. Clear that before launchd/LaunchServices tries to
-# open the app, otherwise the first start can fail before PressTalk writes logs.
-/usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
-/usr/bin/xattr -dr com.apple.provenance "$APP_BUNDLE" >/dev/null 2>&1 || true
+# Official releases retain their normal macOS verification metadata.
+if [[ "$IS_DEVELOPMENT_APP" == 1 ]]; then
+  /usr/bin/xattr -dr com.apple.quarantine "$APP_BUNDLE" >/dev/null 2>&1 || true
+fi
 
 remove_legacy_launch_agents
 launchctl bootout "gui/$(id -u)" "$PLIST" >/dev/null 2>&1 || true
@@ -194,14 +229,14 @@ seed_trigger_key_default() {
 }
 
 BUNDLE_IDENTIFIER_CHANGED=0
-if [[ "$(current_bundle_identifier)" != "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" ]]; then
-  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER" "$APP_INFO_PLIST"
-  BUNDLE_IDENTIFIER_CHANGED=1
-fi
 seed_trigger_key_default "$PRESSTALK_EFFECTIVE_BUNDLE_IDENTIFIER"
 
 sign_app() {
   local identity="$1"
+  if [[ "$IS_DEVELOPMENT_APP" != 1 || "$SIGNATURE_REPORT" == *"Authority=Developer ID Application:"* ]]; then
+    echo "Refusing to re-sign an official app or production identity." >&2
+    return 1
+  fi
   if [[ -d "$INPUT_METHOD_BUNDLE" ]]; then
     if [[ ! -x "$INPUT_METHOD_BINARY" ]]; then
       echo "Bundled input method signing skipped: executable missing at $INPUT_METHOD_BINARY" >&2
@@ -301,7 +336,7 @@ refresh_installed_input_method_if_possible() {
 
 refresh_installed_input_method_if_possible
 
-if [[ -x "$KARABINER_HELPER" ]]; then
+if [[ "$IS_DEVELOPMENT_APP" != 1 && -x "$KARABINER_HELPER" ]]; then
   /bin/bash "$KARABINER_HELPER" --disable >/dev/null 2>&1 || true
 fi
 
